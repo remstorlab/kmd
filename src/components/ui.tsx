@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight } from "lucide-react";
 
 // ── Badge ────────────────────────────────────────────────────────────────────
 
@@ -82,9 +83,7 @@ export function Modal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
           <h2 className="text-base font-semibold text-gray-900">{title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" />
           </button>
         </div>
         <div className="overflow-y-auto flex-1 px-6 py-4">{children}</div>
@@ -133,10 +132,7 @@ export function Btn({
 export function EyeIcon({ onClick }: { onClick: () => void }) {
   return (
     <button onClick={onClick} className="text-blue-500 hover:text-blue-700 transition-colors p-1" title="Просмотр">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-      </svg>
+      <Eye className="w-4 h-4" />
     </button>
   );
 }
@@ -144,9 +140,7 @@ export function EyeIcon({ onClick }: { onClick: () => void }) {
 export function EditIcon({ onClick }: { onClick: () => void }) {
   return (
     <button onClick={onClick} className="text-gray-400 hover:text-gray-600 transition-colors p-1" title="Редактировать">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-      </svg>
+      <Pencil className="w-4 h-4" />
     </button>
   );
 }
@@ -154,9 +148,7 @@ export function EditIcon({ onClick }: { onClick: () => void }) {
 export function DeleteIcon({ onClick }: { onClick: () => void }) {
   return (
     <button onClick={onClick} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Удалить">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
+      <Trash2 className="w-4 h-4" />
     </button>
   );
 }
@@ -164,9 +156,7 @@ export function DeleteIcon({ onClick }: { onClick: () => void }) {
 export function PrintIcon({ onClick }: { onClick: () => void }) {
   return (
     <button onClick={onClick} className="text-gray-400 hover:text-gray-600 transition-colors p-1" title="Печать">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-      </svg>
+      <Printer className="w-4 h-4" />
     </button>
   );
 }
@@ -208,9 +198,7 @@ export function Toast({ message, onDone }: { message: string; onDone: () => void
   }, [onDone]);
   return (
     <div className="fixed bottom-6 right-6 z-[70] bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 animate-fade-in">
-      <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
+      <Check className="w-4 h-4 text-green-400" />
       {message}
     </div>
   );
@@ -251,11 +239,11 @@ export function Pagination({
     <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
       <span className="text-sm text-gray-500">Показано {from}–{to} из {total} позиций</span>
       <div className="flex items-center gap-1">
-        <button onClick={() => onPage(page - 1)} disabled={page === 1} className="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-blue-400 disabled:opacity-40 disabled:cursor-not-allowed text-sm">‹</button>
+        <button onClick={() => onPage(page - 1)} disabled={page === 1} className="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-blue-400 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronLeft className="w-4 h-4" /></button>
         {Array.from({ length: pages }, (_, i) => i + 1).map(p => (
           <button key={p} onClick={() => onPage(p)} className={`w-8 h-8 flex items-center justify-center rounded border text-sm font-medium transition-colors ${p === page ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 text-gray-600 hover:border-blue-400"}`}>{p}</button>
         ))}
-        <button onClick={() => onPage(page + 1)} disabled={page === pages} className="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-blue-400 disabled:opacity-40 disabled:cursor-not-allowed text-sm">›</button>
+        <button onClick={() => onPage(page + 1)} disabled={page === pages} className="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-blue-400 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronRight className="w-4 h-4" /></button>
       </div>
     </div>
   );
@@ -323,9 +311,7 @@ export function Textarea({ value, onChange, placeholder = "", rows = 3, disabled
 export function SearchInput({ value, onChange, placeholder = "Поиск..." }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div className="relative">
-      <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -375,9 +361,7 @@ export function PageHeader({
 export function ExportBtn({ onToast }: { onToast: (msg: string) => void }) {
   return (
     <Btn variant="secondary" onClick={() => onToast("Файл экспортирован в Excel")}>
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
+      <FileDown className="w-4 h-4" />
       Экспорт в Excel
     </Btn>
   );
@@ -404,14 +388,10 @@ export function Toggle({ checked, onChange, label, disabled = false }: { checked
 export function FileChip({ name, onDownload }: { name: string; onDownload: () => void }) {
   return (
     <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 inline-flex">
-      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-      </svg>
+      <Paperclip className="w-4 h-4 text-gray-400" />
       <span className="text-sm text-gray-700">{name}</span>
       <button onClick={onDownload} className="text-gray-400 hover:text-blue-600 transition-colors ml-1">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-        </svg>
+        <Download className="w-4 h-4" />
       </button>
     </div>
   );

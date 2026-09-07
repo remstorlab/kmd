@@ -6,6 +6,7 @@ import {
   Field, Input, Select, Toggle,
 } from "../components/ui";
 import { AppUser, Role } from "../data/mock";
+import { ArrowLeft, Plus } from "lucide-react";
 
 const sections = [
   "Склады", "Складские операции", "Движение материала",
@@ -162,8 +163,8 @@ function RolesPage({ onBack }: { onBack: () => void }) {
           <h1 className="text-2xl font-semibold text-gray-900">Роли и разрешения</h1>
         </div>
         <div className="flex gap-2">
-          <Btn variant="secondary" onClick={onBack}>← Назад к пользователям</Btn>
-          <Btn onClick={() => setShowNew(true)}>+ Создать роль</Btn>
+          <Btn variant="secondary" onClick={onBack}><ArrowLeft className="w-4 h-4" />Назад к пользователям</Btn>
+          <Btn onClick={() => setShowNew(true)}><Plus className="w-4 h-4" />Создать роль</Btn>
         </div>
       </div>
 
@@ -182,12 +183,7 @@ function RolesPage({ onBack }: { onBack: () => void }) {
               </div>
               <div className="flex items-center gap-1">
                 <EyeIcon onClick={() => show(`Роль: ${role.name}`)} />
-                <button
-                  onClick={() => confirm(`Удалить роль «${role.name}»?`, () => setRoles(prev => prev.filter(r => r.id !== role.id)))}
-                  className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </button>
+                <DeleteIcon onClick={() => confirm(`Удалить роль «${role.name}»?`, () => setRoles(prev => prev.filter(r => r.id !== role.id)))} />
               </div>
             </div>
           </div>
@@ -226,7 +222,7 @@ export function PanelAdmin() {
         breadcrumb={["Администрирование", "Пользователи"]}
         actions={
           <>
-            <Btn onClick={() => setShowNewUser(true)}>+ Добавить пользователя</Btn>
+            <Btn onClick={() => setShowNewUser(true)}><Plus className="w-4 h-4" />Добавить пользователя</Btn>
             <Btn variant="secondary" onClick={() => setShowRoles(true)}>Управление ролями</Btn>
           </>
         }

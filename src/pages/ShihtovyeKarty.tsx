@@ -5,6 +5,7 @@ import {
   ExportBtn, useToast, Toast, Field, Input, Select, useConfirm, ConfirmDialog,
 } from "../components/ui";
 import { ShihtovayaKarta } from "../data/mock";
+import { Plus, X, Calculator } from "lucide-react";
 
 const shihtaMaterials = [
   { mat: "Слиток золота ЗлА-1", klass: "Слиток", fe: "0.001", sb: "0.001", bi: "0.0005", pb: "0.001", p: "0.0005", ves: 500.25, dola: 89.2 },
@@ -61,8 +62,8 @@ function ShihtaConstructor({ karta, onClose, onSave }: { karta?: ShihtovayaKarta
           <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Шихтовые материалы</h3>
           {!ro && (
             <div className="flex gap-2">
-              <Btn size="sm" onClick={() => setShowFromSklad(true)}>+ Добавить со склада</Btn>
-              <Btn size="sm" variant="secondary" onClick={() => setShowAddDop(true)}>+ Добавить доп. материал</Btn>
+              <Btn size="sm" onClick={() => setShowFromSklad(true)}><Plus className="w-4 h-4" />Добавить со склада</Btn>
+              <Btn size="sm" variant="secondary" onClick={() => setShowAddDop(true)}><Plus className="w-4 h-4" />Добавить доп. материал</Btn>
             </div>
           )}
         </div>
@@ -93,7 +94,7 @@ function ShihtaConstructor({ karta, onClose, onSave }: { karta?: ShihtovayaKarta
                 <td className="px-3 py-2 text-right font-medium">{m.ves}</td>
                 <td className="px-3 py-2 text-right text-blue-600">{m.dola}%</td>
                 {!ro && <td className="px-3 py-2 text-center">
-                  <button onClick={() => setMaterials(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors text-xs">✕</button>
+                  <button onClick={() => setMaterials(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                 </td>}
               </tr>
             ))}
@@ -102,7 +103,7 @@ function ShihtaConstructor({ karta, onClose, onSave }: { karta?: ShihtovayaKarta
 
         {!ro && (
           <Btn size="sm" variant="secondary" onClick={() => setShowResult(true)}>
-            🧮 Рассчитать
+            <Calculator className="w-4 h-4" /> Рассчитать
           </Btn>
         )}
 
@@ -203,7 +204,7 @@ export function ShihtovyeKarty() {
         title="Шихтовые карты"
         subtitle="Расчёт состава шихты для плавки слитков"
         breadcrumb={["Шихтовые карты"]}
-        actions={<Btn onClick={() => setShowNew(true)}>+ Новая шихтовая карта</Btn>}
+        actions={<Btn onClick={() => setShowNew(true)}><Plus className="w-4 h-4" />Новая шихтовая карта</Btn>}
       />
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

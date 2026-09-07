@@ -6,6 +6,7 @@ import {
   Field, Input, Select, Tabs, Textarea, FileChip,
 } from "../components/ui";
 import { Operation } from "../data/mock";
+import { Eye, Plus, Paperclip } from "lucide-react";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm:
             className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 transition-colors"
             onClick={() => setHasFile(true)}
           >
-            <div className="text-2xl mb-2">📎</div>
+            <Paperclip className="w-6 h-6 mx-auto mb-2 text-gray-400" />
             <p className="text-sm text-gray-500">Прикрепите файл акта списания<br /><span className="text-xs text-gray-400">PDF, DOCX — до 10 МБ</span></p>
           </div>
         )}
@@ -149,11 +150,11 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
             <div className="flex gap-2 mb-3">
               {vid === "Плавка" ? (
                 <>
-                  <Btn size="sm" onClick={() => show("Шихтовая карта добавлена")}>+ Выдать по ШК</Btn>
-                  <Btn size="sm" variant="secondary" onClick={() => show("Позиция добавлена")}>+ Добавить</Btn>
+                  <Btn size="sm" onClick={() => show("Шихтовая карта добавлена")}><Plus className="w-4 h-4" />Выдать по ШК</Btn>
+                  <Btn size="sm" variant="secondary" onClick={() => show("Позиция добавлена")}><Plus className="w-4 h-4" />Добавить</Btn>
                 </>
               ) : (
-                <Btn size="sm" onClick={() => show("Позиция добавлена")}>+ Добавить позицию</Btn>
+                <Btn size="sm" onClick={() => show("Позиция добавлена")}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               )}
               <ExportBtn onToast={show} />
             </div>
@@ -200,7 +201,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <>
           {!readOnly && (
             <div className="flex gap-2 mb-3">
-              <Btn size="sm" onClick={() => show("Позиция добавлена")}>+ Добавить позицию</Btn>
+              <Btn size="sm" onClick={() => show("Позиция добавлена")}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               <ExportBtn onToast={show} />
             </div>
           )}
@@ -378,7 +379,7 @@ export function DvizhenieMateriаla() {
                 <td className="px-4 py-3">
                   <button onClick={() => setViewOp(op)} className="flex items-center gap-1 text-gray-600 hover:text-blue-600">
                     {op.positions}
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    <Eye className="w-3.5 h-3.5" />
                   </button>
                 </td>
                 <td className="px-4 py-3 text-blue-600">{op.document}</td>

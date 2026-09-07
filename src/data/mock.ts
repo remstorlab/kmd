@@ -255,7 +255,6 @@ export const initialLogs: LogEntry[] = [
 export const spravochniki = {
   "Номенклатуры": {
     count: 214,
-    icon: "📋",
     items: [
       { code: "GP-KOL-585-01", value: "Кольцо обручальное 585", status: "Активно" },
       { code: "GP-CEP-750-03", value: "Цепочка золотая Бисмарк", status: "Активно" },
@@ -266,7 +265,6 @@ export const spravochniki = {
   },
   "Единицы измерения": {
     count: 6,
-    icon: "⚖️",
     items: [
       { code: "г", value: "Грамм", status: "Активно" },
       { code: "кг", value: "Килограмм", status: "Активно" },
@@ -278,7 +276,6 @@ export const spravochniki = {
   },
   "Типы документов": {
     count: 9,
-    icon: "📄",
     items: [
       { code: "ПО", value: "Приходный ордер", status: "Активно" },
       { code: "НП", value: "Накладная на приём", status: "Активно" },
@@ -293,7 +290,6 @@ export const spravochniki = {
   },
   "Классы материалов": {
     count: 4,
-    icon: "🔷",
     items: [
       { code: "СЛ", value: "Слиток", status: "Активно" },
       { code: "СТ", value: "Стружка", status: "Активно" },
@@ -303,7 +299,6 @@ export const spravochniki = {
   },
   "Организации": {
     count: 18,
-    icon: "🏢",
     items: [
       { code: "ОРГ-001", value: "АО «МонетаДМ»", status: "Активно" },
       { code: "ОРГ-002", value: "ОО «АурумПоставка»", status: "Активно" },
@@ -314,7 +309,6 @@ export const spravochniki = {
   },
   "Подотчётные сотрудники": {
     count: 8,
-    icon: "👤",
     items: [
       { code: "ТН-001", value: "Нурланов Асхат Бекович", status: "Активно" },
       { code: "ТН-002", value: "Петров Сергей Владимирович", status: "Активно" },
@@ -325,7 +319,6 @@ export const spravochniki = {
   },
   "Типы операций": {
     count: 7,
-    icon: "⚙️",
     items: [
       { code: "ОП-01", value: "Выдача", status: "Активно" },
       { code: "ОП-02", value: "Возврат", status: "Активно" },
@@ -338,7 +331,6 @@ export const spravochniki = {
   },
   "Коды материалов": {
     count: 5,
-    icon: "🏷️",
     items: [
       { code: "AU", value: "Золото", status: "Активно" },
       { code: "AG", value: "Серебро", status: "Активно" },

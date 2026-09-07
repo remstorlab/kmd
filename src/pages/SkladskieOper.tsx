@@ -5,15 +5,16 @@ import {
   ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, FileChip, useConfirm, ConfirmDialog,
 } from "../components/ui";
 import { SkladDoc } from "../data/mock";
+import { Inbox, Send, Repeat, Plus, X, LucideIcon } from "lucide-react";
 
 // ── Hub ───────────────────────────────────────────────────────────────────────
 
 export function SkladskieOperHub() {
   const { navigate } = useApp();
-  const cards = [
-    { title: "Приход на склад", sub: "Приходные ордера и накладные", icon: "📥", page: "prihod-list" as const },
-    { title: "Выдача ГП", sub: "Документы отгрузки ГП", icon: "📤", page: "vydacha-list" as const },
-    { title: "Движение материала (операции)", sub: "Журнал операций", icon: "↔️", page: "dvizhenie-mat" as const },
+  const cards: { title: string; sub: string; icon: LucideIcon; page: "prihod-list" | "vydacha-list" | "dvizhenie-mat" }[] = [
+    { title: "Приход на склад", sub: "Приходные ордера и накладные", icon: Inbox, page: "prihod-list" },
+    { title: "Выдача ГП", sub: "Документы отгрузки ГП", icon: Send, page: "vydacha-list" },
+    { title: "Движение материала (операции)", sub: "Журнал операций", icon: Repeat, page: "dvizhenie-mat" },
   ];
   return (
     <div>
@@ -21,7 +22,9 @@ export function SkladskieOperHub() {
       <div className="grid grid-cols-3 gap-6">
         {cards.map(c => (
           <button key={c.page} onClick={() => navigate(c.page)} className="bg-white rounded-xl border border-gray-200 p-6 text-left hover:shadow-md transition-shadow hover:border-blue-300">
-            <div className="text-3xl mb-4">{c.icon}</div>
+            <div className="w-11 h-11 mb-4 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+              <c.icon className="w-6 h-6" />
+            </div>
             <h3 className="font-semibold text-gray-900 mb-1">{c.title}</h3>
             <p className="text-sm text-gray-500">{c.sub}</p>
           </button>
@@ -100,7 +103,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
           <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции прихода</h3>
           {!ro && (
             <div className="flex gap-2">
-              <Btn size="sm" onClick={() => setShowAdd(true)}>+ Добавить позицию</Btn>
+              <Btn size="sm" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               <ExportBtn onToast={show} />
             </div>
           )}
@@ -129,7 +132,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
                 <td className="px-3 py-2">{p.net}</td>
                 <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                 {!ro && <td className="px-3 py-2">
-                  <button onClick={() => setPositions(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors text-xs">✕</button>
+                  <button onClick={() => setPositions(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                 </td>}
               </tr>
             ))}
@@ -219,7 +222,7 @@ function DocList({
         actions={
           <>
             <Btn onClick={() => setShowModal(true)}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              <Plus className="w-4 h-4" />
               {addLabel}
             </Btn>
             {showPrint && <Btn variant="secondary" onClick={() => show("Печать ярлыков ДМ")}>Печать ярлыков ДМ</Btn>}

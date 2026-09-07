@@ -2,14 +2,22 @@ import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import { Badge, Btn, Modal, EyeIcon, PageHeader, useToast, Toast, Tabs } from "../components/ui";
 import { Podotchetnik } from "../data/mock";
+import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, LucideIcon } from "lucide-react";
+
+const vidIcon: Record<string, LucideIcon> = {
+  "Плавка": Flame,
+  "Анализ в ЛКИ": FlaskConical,
+  "Отбор пробы": Microscope,
+  "Гальванопокрытие": Zap,
+};
 
 const currentProcesses = [
-  { icon: "🔥", name: "Плавка золотых слитков", date: "19.08.2026, 09:00", vid: "Плавка" },
-  { icon: "🧪", name: "Анализ пробы Au-999", date: "18.08.2026, 14:30", vid: "Анализ в ЛКИ" },
+  { name: "Плавка золотых слитков", date: "19.08.2026, 09:00", vid: "Плавка" },
+  { name: "Анализ пробы Au-999", date: "18.08.2026, 14:30", vid: "Анализ в ЛКИ" },
 ];
 const completedProcesses = [
-  { icon: "🔬", name: "Отбор пробы Ag-925", date: "15.08.2026, 11:00", vid: "Отбор пробы" },
-  { icon: "✅", name: "Гальванопокрытие кольца", date: "10.08.2026, 09:45", vid: "Гальванопокрытие" },
+  { name: "Отбор пробы Ag-925", date: "15.08.2026, 11:00", vid: "Отбор пробы" },
+  { name: "Гальванопокрытие кольца", date: "10.08.2026, 09:45", vid: "Гальванопокрытие" },
 ];
 
 function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: () => void }) {
@@ -22,7 +30,7 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
     <div>
       <div className="flex items-center gap-3 mb-4">
         <button onClick={onBack} className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+          <ArrowLeft className="w-4 h-4" />
           Назад к реестру
         </button>
       </div>
@@ -75,13 +83,15 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <Tabs tabs={["Текущие процессы", "Завершённые процессы"]} active={tab} onChange={setTab} />
         <div className="space-y-2">
-          {processes.map((p, i) => (
+          {processes.map((p, i) => {
+            const Icon = vidIcon[p.vid] ?? Flame;
+            return (
             <button
               key={i}
               onClick={() => show(`Открытие операции: ${p.name}`)}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-100 hover:border-blue-300 hover:bg-blue-50 transition-colors text-left"
             >
-              <span className="text-xl">{p.icon}</span>
+              <Icon className="w-5 h-5 text-gray-500 shrink-0" />
               <div className="flex-1">
                 <div className="text-sm font-medium text-gray-900">{p.name}</div>
                 <div className="text-xs text-gray-400">{p.vid}</div>
@@ -89,7 +99,8 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
               <span className="text-xs text-gray-400 shrink-0">{p.date}</span>
               {tab === "Завершённые процессы" && <Badge label="Закрыто" />}
             </button>
-          ))}
+            );
+          })}
           {processes.length === 0 && (
             <p className="text-center text-sm text-gray-400 py-4">Процессы не найдены</p>
           )}

@@ -1,8 +1,20 @@
 import React, { useState } from "react";
 import { PageHeader, Btn, Modal, EditIcon, Badge, useToast, Toast, Field, Input, Select } from "../components/ui";
 import { spravochniki } from "../data/mock";
+import { ArrowLeft, Plus, Package, Scale, FileText, Shapes, Building2, UserRound, Settings2, Tag, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
+
+const dictIcon: Record<SpravKey, LucideIcon> = {
+  "Номенклатуры": Package,
+  "Единицы измерения": Scale,
+  "Типы документов": FileText,
+  "Классы материалов": Shapes,
+  "Организации": Building2,
+  "Подотчётные сотрудники": UserRound,
+  "Типы операций": Settings2,
+  "Коды материалов": Tag,
+};
 
 function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const dict = spravochniki[name];
@@ -25,7 +37,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   return (
     <div>
       <button onClick={onBack} className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium mb-4">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+        <ArrowLeft className="w-4 h-4" />
         Назад к справочникам
       </button>
 
@@ -34,7 +46,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
       <PageHeader
         title={name}
         subtitle={`${dict.count} значений`}
-        actions={<Btn onClick={() => setShowAdd(true)}>+ Добавить запись</Btn>}
+        actions={<Btn onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить запись</Btn>}
       />
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -97,17 +109,22 @@ export function Spravochniki() {
       />
 
       <div className="grid grid-cols-4 gap-4">
-        {(Object.entries(spravochniki) as [SpravKey, typeof spravochniki[SpravKey]][]).map(([key, val]) => (
-          <button
-            key={key}
-            onClick={() => setSelected(key)}
-            className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md transition-all hover:border-blue-300 group"
-          >
-            <div className="text-2xl mb-3">{val.icon}</div>
-            <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{key}</h3>
-            <p className="text-sm text-gray-400">{val.count} значений</p>
-          </button>
-        ))}
+        {(Object.entries(spravochniki) as [SpravKey, typeof spravochniki[SpravKey]][]).map(([key, val]) => {
+          const Icon = dictIcon[key];
+          return (
+            <button
+              key={key}
+              onClick={() => setSelected(key)}
+              className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md transition-all hover:border-blue-300 group"
+            >
+              <div className="w-10 h-10 mb-3 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                <Icon className="w-5 h-5" />
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{key}</h3>
+              <p className="text-sm text-gray-400">{val.count} значений</p>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

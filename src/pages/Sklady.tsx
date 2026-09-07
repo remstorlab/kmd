@@ -3,16 +3,15 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, Toggle,
+  Field, Input, Select,
 } from "../components/ui";
 import { GPItem, DMItem } from "../data/mock";
+import { Gem, Coins, Plus } from "lucide-react";
 
 // ── Склады ХАБ ───────────────────────────────────────────────────────────────
 
 export function SkladyHub() {
   const { navigate } = useApp();
-  const [gpOn, setGpOn] = useState(true);
-  const [dmOn, setDmOn] = useState(true);
 
   return (
     <div>
@@ -21,10 +20,7 @@ export function SkladyHub() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("ostatok-gp")}>
           <div className="flex justify-between items-start mb-4">
             <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">💍</span>
-            </div>
-            <div onClick={e => e.stopPropagation()}>
-              <Toggle checked={gpOn} onChange={setGpOn} />
+              <Gem className="w-5 h-5 text-yellow-600" />
             </div>
           </div>
           <h3 className="font-semibold text-gray-900 mb-1">Остатки на складе ГП</h3>
@@ -33,10 +29,7 @@ export function SkladyHub() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("ostatok-dm")}>
           <div className="flex justify-between items-start mb-4">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">🔶</span>
-            </div>
-            <div onClick={e => e.stopPropagation()}>
-              <Toggle checked={dmOn} onChange={setDmOn} />
+              <Coins className="w-5 h-5 text-blue-600" />
             </div>
           </div>
           <h3 className="font-semibold text-gray-900 mb-1">Остатки на складе ДМ</h3>
@@ -104,7 +97,7 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции приёма</h3>
           <div className="flex gap-2">
-            <Btn size="sm" onClick={() => setShowAdd(true)}>+ Добавить позицию</Btn>
+            <Btn size="sm" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
           </div>
         </div>
         {items.length === 0 ? (
@@ -202,7 +195,7 @@ export function OstatokGP() {
         actions={
           <>
             <Btn onClick={() => setShowPrihod(true)}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              <Plus className="w-4 h-4" />
               Принять на склад
             </Btn>
             <Btn variant="secondary" onClick={() => setShowVydacha(true)}>Выдать со склада</Btn>
