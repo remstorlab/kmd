@@ -12,6 +12,7 @@ import { Operation } from "../data/mock";
 function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
   const [reason, setReason] = useState("");
   const [hasFile, setHasFile] = useState(false);
+  const { toast, show, clear } = useToast();
 
   return (
     <Modal title="Списание разницы" onClose={onClose} footer={
@@ -37,7 +38,7 @@ function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm:
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-2">Акт списания (обязательно)</label>
         {hasFile ? (
-          <FileChip name="Акт списания ДМ-000123.pdf" onDownload={() => {}} />
+          <FileChip name="Акт списания ДМ-000123.pdf" onDownload={() => show("Загрузка файла...")} />
         ) : (
           <div
             className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 transition-colors"
@@ -48,6 +49,7 @@ function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm:
           </div>
         )}
       </div>
+      {toast && <Toast message={toast} onDone={clear} />}
     </Modal>
   );
 }
@@ -70,6 +72,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [tab, setTab] = useState<TabName>("Выдача");
   const [vid, setVid] = useState<"Отбор пробы" | "Анализ в ЛКИ" | "Плавка" | "Гальванопокрытие" | "Производство ГП">(op?.vid || "Плавка");
   const [type, setType] = useState<"Выдача" | "Возврат" | "Выдача-Возврат">(op?.type || "Выдача");
+  const [vydacha, setVydacha] = useState(vydachaPositions);
+  const [vozvrat, setVozvrat] = useState(vozvratPositions);
   const [showSpisanie, setShowSpisanie] = useState(false);
   const { toast, show, clear } = useToast();
 
@@ -83,7 +87,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       date: new Date().toLocaleDateString("ru-RU"),
       type: type as any,
       vid: vid as any,
-      positions: vydachaPositions.length,
+      positions: vydacha.length,
       document: `ДВ-${Math.floor(Math.random() * 90000 + 10000)}`,
       responsible: "Нурланов А.Б.",
       statusVydacha: "Выдано",
@@ -168,7 +172,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               {!readOnly && <th className="w-16"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {vydachaPositions.map(p => (
+              {vydacha.map(p => (
                 <tr key={p.n} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-400">{p.n}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -179,7 +183,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 text-gray-400">{p.ag}</td>
                   <td className="px-3 py-2 text-gray-400">{p.cu}</td>
                   <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                  {!readOnly && <td className="px-3 py-2"><DeleteIcon onClick={() => {}} /></td>}
+                  {!readOnly && <td className="px-3 py-2"><DeleteIcon onClick={() => setVydacha(prev => prev.filter(x => x.n !== p.n))} /></td>}
                 </tr>
               ))}
             </tbody>
@@ -213,7 +217,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               {!readOnly && <th className="w-16"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {vozvratPositions.map(p => (
+              {vozvrat.map(p => (
                 <tr key={p.n} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-400">{p.n}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -223,7 +227,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 font-medium">{p.ves}</td>
                   <td className="px-3 py-2 text-gray-400">{p.ag}</td>
                   <td className="px-3 py-2 text-gray-400">{p.cu}</td>
-                  {!readOnly && <td className="px-3 py-2"><DeleteIcon onClick={() => {}} /></td>}
+                  {!readOnly && <td className="px-3 py-2"><DeleteIcon onClick={() => setVozvrat(prev => prev.filter(x => x.n !== p.n))} /></td>}
                 </tr>
               ))}
             </tbody>
@@ -259,7 +263,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
             </div>
             <div className="p-4">
               <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Выдача</div>
-              {vydachaPositions.map((p, i) => (
+              {vydacha.map((p, i) => (
                 <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
                   <div className="text-sm text-gray-900">{p.name} <span className="text-gray-400 text-xs">{p.nomenkl}</span></div>
                   <div className="flex items-center gap-3">
@@ -270,7 +274,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               ))}
               <div className="flex items-center justify-center py-2 text-gray-400 text-xs">↓ связь ↓</div>
               <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Возврат</div>
-              {vozvratPositions.map((p, i) => (
+              {vozvrat.map((p, i) => (
                 <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
                   <div className="text-sm text-gray-900">{p.name} <span className="text-gray-400 text-xs">{p.nomenkl}</span></div>
                   <div className="flex items-center gap-3">

@@ -23,7 +23,9 @@ export function SkladyHub() {
             <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
               <span className="text-xl">💍</span>
             </div>
-            <Toggle checked={gpOn} onChange={setGpOn} />
+            <div onClick={e => e.stopPropagation()}>
+              <Toggle checked={gpOn} onChange={setGpOn} />
+            </div>
           </div>
           <h3 className="font-semibold text-gray-900 mb-1">Остатки на складе ГП</h3>
           <p className="text-sm text-gray-500">Готовая продукция</p>
@@ -33,7 +35,9 @@ export function SkladyHub() {
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <span className="text-xl">🔶</span>
             </div>
-            <Toggle checked={dmOn} onChange={setDmOn} />
+            <div onClick={e => e.stopPropagation()}>
+              <Toggle checked={dmOn} onChange={setDmOn} />
+            </div>
           </div>
           <h3 className="font-semibold text-gray-900 mb-1">Остатки на складе ДМ</h3>
           <p className="text-sm text-gray-500">Драгоценные материалы</p>
@@ -169,9 +173,10 @@ export function OstatokGP() {
 
   const filtered = gpItems.filter(it => {
     const matchSearch = !search || it.name.toLowerCase().includes(search.toLowerCase());
+    const matchSklad = filterSklad === "Все склады" || filterSklad === "Склад ГП";
     const matchCode = filterCode === "Все коды" || it.code.startsWith(filterCode.replace(" (все)", ""));
     const matchStatus = filterStatus === "Все статусы" || it.status === filterStatus;
-    return matchSearch && matchCode && matchStatus;
+    return matchSearch && matchSklad && matchCode && matchStatus;
   });
 
   const pageItems = filtered.slice((page - 1) * perPage, page * perPage);
@@ -338,6 +343,7 @@ export function OstatokDM() {
   const { dmItems, setDmItems } = useApp();
   const { toast, show, clear } = useToast();
   const [search, setSearch] = useState("");
+  const [filterKlass, setFilterKlass] = useState("Все классы");
   const [filterStatus, setFilterStatus] = useState("Все статусы");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -348,8 +354,9 @@ export function OstatokDM() {
   const perPage = 8;
   const filtered = dmItems.filter(it => {
     const matchSearch = !search || it.name.toLowerCase().includes(search.toLowerCase());
+    const matchKlass = filterKlass === "Все классы" || it.klass === filterKlass;
     const matchStatus = filterStatus === "Все статусы" || it.status === filterStatus;
-    return matchSearch && matchStatus;
+    return matchSearch && matchKlass && matchStatus;
   });
   const pageItems = filtered.slice((page - 1) * perPage, page * perPage);
 
@@ -410,7 +417,7 @@ export function OstatokDM() {
         </div>
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Класс материала</label>
-          <select className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+          <select value={filterKlass} onChange={e => setFilterKlass(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
             {["Все классы", "Слиток", "Стружка", "Проба", "Раствор"].map(o => <option key={o}>{o}</option>)}
           </select>
         </div>
@@ -420,7 +427,7 @@ export function OstatokDM() {
             {["Все статусы", "На складе", "Зарезервировано", "В подотчёте"].map(o => <option key={o}>{o}</option>)}
           </select>
         </div>
-        <button onClick={() => { setSearch(""); setFilterStatus("Все статусы"); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus("Все статусы"); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
           Сбросить фильтры
         </button>
       </div>

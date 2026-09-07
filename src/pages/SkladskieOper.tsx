@@ -185,14 +185,12 @@ function VydachaGPModal({ onClose, onSave, readOnly = false }: { onClose: () => 
 function DocList({
   title,
   docs,
-  onAdd,
   addLabel,
   onSave,
   showPrint,
 }: {
   title: string;
   docs: SkladDoc[];
-  onAdd: () => void;
   addLabel: string;
   onSave: (d: SkladDoc) => void;
   showPrint?: boolean;
@@ -297,7 +295,6 @@ export function PrihodList() {
     <DocList
       title="Приход на склад"
       docs={skladDocs}
-      onAdd={() => {}}
       addLabel="Принять на склад"
       onSave={d => setSkladDocs(prev => [d, ...prev])}
       showPrint
