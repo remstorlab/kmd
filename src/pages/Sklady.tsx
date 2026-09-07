@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Badge, Btn, Modal, EyeIcon, Pagination, PageHeader,
+  Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select,
+  Field, Input, Select, FileChip, Toggle,
 } from "../components/ui";
 import { GPItem, DMItem } from "../data/mock";
 import { Gem, Coins, Plus } from "lucide-react";
@@ -141,6 +141,89 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
   );
 }
 
+// ── Выдача со склада GP modal ─────────────────────────────────────────────────
+
+function VydachaGPModal({ gpItems, onClose, onSave }: { gpItems: GPItem[]; onClose: () => void; onSave: () => void }) {
+  const [items, setItems] = useState<{ name: string; nomenkl: string; qty: string; klass: string; code: string }[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ nomenkl: gpItems[0]?.nomenkl || "", qty: "" });
+
+  const addItem = () => {
+    const src = gpItems.find(i => i.nomenkl === form.nomenkl);
+    if (!src) return;
+    setItems(prev => [...prev, { name: src.name, nomenkl: src.nomenkl, qty: form.qty || "1", klass: src.klass, code: src.code }]);
+    setShowAdd(false);
+    setForm({ nomenkl: gpItems[0]?.nomenkl || "", qty: "" });
+  };
+
+  return (
+    <Modal
+      title="Накладная на отгрузку ГП"
+      onClose={onClose}
+      wide
+      footer={
+        <>
+          <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+          <Btn onClick={onSave}>Оформить выдачу</Btn>
+        </>
+      }
+    >
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <Field label="Тип документа"><Select value="Накладная на отгрузку ГП" options={["Накладная на отгрузку ГП"]} /></Field>
+        <Field label="Номер"><Input value="НО-0206" disabled /></Field>
+        <Field label="Дата"><Input value="19.08.2026" disabled /></Field>
+        <Field label="Получатель"><Select value="ТД «Золото Казахстана»" options={["ТД «Золото Казахстана»", "ИП Сейткали А.М."]} /></Field>
+        <Field label="Счёт-фактура" full><Input value="" placeholder="Номер счёт-фактуры" /></Field>
+      </div>
+
+      <div className="border-t border-gray-200 pt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции выдачи</h3>
+          <div className="flex gap-2">
+            <Btn size="sm" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+          </div>
+        </div>
+        {items.length === 0 ? (
+          <div className="text-center py-6 text-gray-400 text-sm">Нет позиций. Нажмите «+ Добавить позицию»</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-gray-500 text-xs">
+              <th className="px-3 py-2 text-left">Наименование</th>
+              <th className="px-3 py-2 text-left">Кол-во</th>
+              <th className="px-3 py-2 text-left">Класс</th>
+              <th className="px-3 py-2 text-left">Код</th>
+            </tr></thead>
+            <tbody>{items.map((it, i) => (
+              <tr key={i} className="border-t border-gray-100">
+                <td className="px-3 py-2">{it.name}</td>
+                <td className="px-3 py-2">{it.qty} шт</td>
+                <td className="px-3 py-2">{it.klass}</td>
+                <td className="px-3 py-2 text-blue-600">{it.code}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </div>
+
+      {showAdd && (
+        <Modal title="Добавить позицию для выдачи" onClose={() => setShowAdd(false)} footer={
+          <>
+            <Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn>
+            <Btn onClick={addItem}>Добавить</Btn>
+          </>
+        }>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Номенкл. номер" full>
+              <Select value={form.nomenkl} options={gpItems.map(i => i.nomenkl)} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} />
+            </Field>
+            <Field label="Количество"><Input value={form.qty} onChange={v => setForm(f => ({ ...f, qty: v }))} placeholder="0" /></Field>
+          </div>
+        </Modal>
+      )}
+    </Modal>
+  );
+}
+
 // ── Остатки на складе ГП ──────────────────────────────────────────────────────
 
 export function OstatokGP() {
@@ -269,18 +352,11 @@ export function OstatokGP() {
       {viewItem && <GPViewModal item={viewItem} onClose={() => setViewItem(null)} />}
       {showPrihod && <PrihodGPModal onClose={() => setShowPrihod(false)} onSave={() => { setShowPrihod(false); show("Накладная сохранена"); }} />}
       {showVydacha && (
-        <Modal title="Накладная на отгрузку ГП" onClose={() => setShowVydacha(false)} wide footer={<><Btn variant="secondary" onClick={() => setShowVydacha(false)}>Отмена</Btn><Btn onClick={() => { setShowVydacha(false); show("Выдача оформлена"); }}>Оформить выдачу</Btn></>}>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Тип документа"><Select value="Накладная на отгрузку ГП" options={["Накладная на отгрузку ГП"]} /></Field>
-            <Field label="Номер"><Input value="НО-0206" /></Field>
-            <Field label="Дата"><Input value="19.08.2026" /></Field>
-            <Field label="Получатель"><Select value="ТД «Золото Казахстана»" options={["ТД «Золото Казахстана»", "ИП Сейткали А.М."]} /></Field>
-            <Field label="Счёт-фактура" full><Input value="" placeholder="Номер счёт-фактуры" /></Field>
-          </div>
-          <div className="mt-4 text-sm text-gray-500 text-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-            Добавьте позиции для выдачи
-          </div>
-        </Modal>
+        <VydachaGPModal
+          gpItems={gpItems}
+          onClose={() => setShowVydacha(false)}
+          onSave={() => { setShowVydacha(false); show("Выдача оформлена"); }}
+        />
       )}
       {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
@@ -326,6 +402,246 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
   );
 }
 
+// ── Приходный ордер ДМ modal ───────────────────────────────────────────────────
+
+function PrihodnyOrderDMModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
+  const [positions, setPositions] = useState([
+    { nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au", proba: "999.9", lig: "1000.0", net: "999.9", loc: "Сейф 1/Полка 1" },
+    { nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag", proba: "925.0", lig: "318.6", net: "294.7", loc: "Сейф 2/Полка 3" },
+  ]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [ownProperty, setOwnProperty] = useState(true);
+  const [form, setForm] = useState({ nomenkl: "НН-72103", klass: "Слиток", code: "Au", name: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
+  const { toast, show, clear } = useToast();
+
+  const addPos = () => {
+    setPositions(p => [...p, { nomenkl: form.nomenkl, name: form.name || "Позиция ДМ", klass: form.klass, code: form.code, proba: form.proba, lig: form.lig, net: form.net, loc: `${form.sey}, ${form.polka}` }]);
+    setShowAdd(false);
+    setForm({ nomenkl: "НН-72103", klass: "Слиток", code: "Au", name: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
+  };
+
+  return (
+    <Modal
+      title="Приходный ордер"
+      onClose={onClose}
+      extraWide
+      footer={
+        <>
+          <Btn variant="secondary" onClick={() => show("Ярлыки отправлены на печать")}>Печать Ярлыков ДМ</Btn>
+          <Btn variant="secondary" onClick={onSave}>Сохранить</Btn>
+          <Btn onClick={onSave}>Сохранить и печать</Btn>
+        </>
+      }
+    >
+      <div className="grid grid-cols-3 gap-4 mb-5">
+        <Field label="Тип документа"><Input value="Приходный ордер" disabled /></Field>
+        <Field label="Номер"><Input value="ПО-0342" disabled /></Field>
+        <Field label="Дата"><Input value="19.08.2026" disabled /></Field>
+        <Field label="Отправитель"><Select value="ООО «Аффинаж-Сервис»" options={["ООО «Аффинаж-Сервис»", "АО «Металл Инвест»"]} /></Field>
+        <Field label="Получатель"><Select value="Склад №1" options={["Склад №1", "Склад №2"]} /></Field>
+        <Field label="№ счёт-фактуры"><Input value="СФ-0091" disabled /></Field>
+        <Field label="Дата счёт-фактуры"><Input value="15.08.2026" disabled /></Field>
+        <Field label="Номер договора"><Input value="ДОГ-2026-045" disabled /></Field>
+        <Field label="Дата договора"><Input value="19.08.2026" disabled /></Field>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
+          <Toggle checked={ownProperty} onChange={setOwnProperty} label={ownProperty ? "Да" : "Нет"} />
+        </div>
+        <Field label="Номер паспорта"><Input value="ПМ-000456" disabled /></Field>
+        <Field label="Номер платёжного документа"><Input value="ПД-001234" disabled /></Field>
+        <Field label="Дата платёжного документа"><Input value="01.09.2026" disabled /></Field>
+        <Field label="Лигатурный вес по документу"><Input value="1 000.00 г" disabled /></Field>
+        <Field label="Масса по документу"><Input value="999.90 г" disabled /></Field>
+        <Field label="Принято лигатурный вес"><Input value="999.50 г" disabled /></Field>
+        <Field label="Принято чистый вес"><Input value="998.80 г" disabled /></Field>
+        <Field label="Цена за единицу, тг"><Input value="32 500.00" disabled /></Field>
+        <Field label="Сумма в тенге"><Input value="32 467 500.00" disabled /></Field>
+        <Field label="Позиция годового плана"><Input value="План-2026/Q3-AU" disabled /></Field>
+      </div>
+
+      <div className="mb-4">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
+        <FileChip name="Приходный ордер ПО-0342.pdf" onDownload={() => show("Загрузка файла...")} />
+      </div>
+
+      <div className="border-t border-gray-200 pt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции прихода</h3>
+          <div className="flex gap-2">
+            <Btn size="sm" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+            <ExportBtn onToast={show} />
+          </div>
+        </div>
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+            <th className="px-3 py-2 text-left">Номенкл. №</th>
+            <th className="px-3 py-2 text-left">Наименование</th>
+            <th className="px-3 py-2 text-left">Класс</th>
+            <th className="px-3 py-2 text-left">Код материала</th>
+            <th className="px-3 py-2 text-left">Проба</th>
+            <th className="px-3 py-2 text-left">Лигат.</th>
+            <th className="px-3 py-2 text-left">Чистый</th>
+            <th className="px-3 py-2 text-left">Размещение</th>
+            <th className="w-24"></th>
+          </tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {positions.map((p, i) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                <td className="px-3 py-2 font-medium">{p.name}</td>
+                <td className="px-3 py-2">{p.klass}</td>
+                <td className="px-3 py-2 text-blue-600">{p.code}</td>
+                <td className="px-3 py-2">{p.proba}</td>
+                <td className="px-3 py-2 font-medium">{p.lig}</td>
+                <td className="px-3 py-2 text-blue-600">{p.net}</td>
+                <td className="px-3 py-2 text-gray-500">{p.loc}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => show(`Позиция: ${p.name}`)} />
+                    <EditIcon onClick={() => show(`Редактирование: ${p.name}`)} />
+                    <DeleteIcon onClick={() => setPositions(prev => prev.filter((_, j) => j !== i))} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showAdd && (
+        <Modal title="Добавить позицию ДМ" onClose={() => setShowAdd(false)} footer={
+          <>
+            <Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn>
+            <Btn onClick={addPos}>Добавить</Btn>
+          </>
+        }>
+          <div className="grid grid-cols-3 gap-4">
+            <Field label="Номенкл. номер"><Input value={form.nomenkl} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} /></Field>
+            <Field label="Класс"><Select value={form.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
+            <Field label="Код материала"><Select value={form.code} options={["Au", "Ag", "Pt", "Pd"]} onChange={v => setForm(f => ({ ...f, code: v }))} /></Field>
+            <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
+            <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
+            <Field label="Масса лигатурная"><Input value={form.lig} onChange={v => setForm(f => ({ ...f, lig: v }))} placeholder="0.00" /></Field>
+            <Field label="Масса чистая"><Input value={form.net} onChange={v => setForm(f => ({ ...f, net: v }))} placeholder="0.00" /></Field>
+            <Field label="Сейф"><Select value={form.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setForm(f => ({ ...f, sey: v }))} /></Field>
+            <Field label="Полка"><Select value={form.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setForm(f => ({ ...f, polka: v }))} /></Field>
+          </div>
+        </Modal>
+      )}
+      {toast && <Toast message={toast} onDone={clear} />}
+    </Modal>
+  );
+}
+
+// ── Накладная на приём ДМ modal ───────────────────────────────────────────────
+
+function NakladnayaDMModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
+  const [positions, setPositions] = useState([
+    { nomenkl: "AU-SL-12000", name: "Монета Атамекен", kol: "2000", klass: "Монета", code: "200", loc: "Сейф №1, Полка 5" },
+    { nomenkl: "AU-SL-01000", name: "Орден Алтын алка", kol: "300", klass: "Орден", code: "200", loc: "Сейф №1, Полка 7" },
+  ]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ nomenkl: "", klass: "Монета", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+  const { toast, show, clear } = useToast();
+
+  const addPos = () => {
+    setPositions(p => [...p, { nomenkl: form.nomenkl || `AU-SL-${Math.floor(Math.random() * 90000 + 10000)}`, name: form.name || "Позиция ДМ", kol: form.kol || "0", klass: form.klass, code: form.code, loc: `${form.sey}, ${form.polka}` }]);
+    setShowAdd(false);
+    setForm({ nomenkl: "", klass: "Монета", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+  };
+
+  return (
+    <Modal
+      title="Накладная на приём ДМ"
+      onClose={onClose}
+      extraWide
+      footer={
+        <>
+          <Btn variant="secondary" onClick={() => show("Ярлыки отправлены на печать")}>Сохранить и печать</Btn>
+          <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+          <Btn onClick={onSave}>Сохранить</Btn>
+        </>
+      }
+    >
+      <div className="grid grid-cols-2 gap-4 mb-5">
+        <Field label="Тип документа"><Input value="Накладная на приём ДМ" disabled /></Field>
+        <Field label="Номер"><Input value="НП-001234" disabled /></Field>
+        <Field label="Дата"><Input value="21.08.2026" disabled /></Field>
+        <Field label="Заказчик"><Select value="Национальный банк" options={["Национальный банк", "Монетный двор"]} /></Field>
+        <Field label="Склад-отправитель"><Select value="СДМ" options={["СДМ", "Производственный цех"]} /></Field>
+        <Field label="Склад-получатель"><Select value="Склад ДМ №1" options={["Склад ДМ №1", "Склад ДМ №2"]} /></Field>
+        <Field label="Сотрудник склада-получателя" full><Select value="Петров А.Н." options={["Петров А.Н.", "Ким Александр Юрьевич"]} /></Field>
+      </div>
+
+      <div className="mb-4">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
+        <FileChip name="Накладная_НП-001234.pdf" onDownload={() => show("Загрузка файла...")} />
+      </div>
+
+      <div className="border-t border-gray-200 pt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции приёма</h3>
+          <div className="flex gap-2">
+            <Btn size="sm" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+            <ExportBtn onToast={show} />
+          </div>
+        </div>
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+            <th className="px-3 py-2 text-left">Номенкл. №</th>
+            <th className="px-3 py-2 text-left">Наименование</th>
+            <th className="px-3 py-2 text-left">Кол-во</th>
+            <th className="px-3 py-2 text-left">Класс</th>
+            <th className="px-3 py-2 text-left">Код материала</th>
+            <th className="px-3 py-2 text-left">Размещение</th>
+            <th className="w-24"></th>
+          </tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {positions.map((p, i) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                <td className="px-3 py-2 font-medium">{p.name}</td>
+                <td className="px-3 py-2">{p.kol}</td>
+                <td className="px-3 py-2">{p.klass}</td>
+                <td className="px-3 py-2 font-medium">{p.code}</td>
+                <td className="px-3 py-2 text-gray-500">{p.loc}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => show(`Позиция: ${p.name}`)} />
+                    <EditIcon onClick={() => show(`Редактирование: ${p.name}`)} />
+                    <DeleteIcon onClick={() => setPositions(prev => prev.filter((_, j) => j !== i))} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showAdd && (
+        <Modal title="Добавить позицию ДМ" onClose={() => setShowAdd(false)} footer={
+          <>
+            <Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn>
+            <Btn onClick={addPos}>Добавить</Btn>
+          </>
+        }>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Номенкл. номер"><Input value={form.nomenkl} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} placeholder="AU-SL-XXXXX" /></Field>
+            <Field label="Класс"><Select value={form.klass} options={["Монета", "Слиток", "Орден", "Медаль"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
+            <Field label="Код материала"><Select value={form.code} options={["AU-585", "AU-750", "AU-999", "AG-925", "PT-950"]} onChange={v => setForm(f => ({ ...f, code: v }))} /></Field>
+            <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Введите наименование" /></Field>
+            <Field label="Количество"><Input value={form.kol} onChange={v => setForm(f => ({ ...f, kol: v }))} placeholder="0" /></Field>
+            <Field label="Ед. изм."><Select value={form.unit} options={["шт", "г", "кг"]} onChange={v => setForm(f => ({ ...f, unit: v }))} /></Field>
+            <Field label="Сейф"><Select value={form.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setForm(f => ({ ...f, sey: v }))} /></Field>
+            <Field label="Полка"><Select value={form.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setForm(f => ({ ...f, polka: v }))} /></Field>
+          </div>
+        </Modal>
+      )}
+      {toast && <Toast message={toast} onDone={clear} />}
+    </Modal>
+  );
+}
+
 // ── Остатки на складе ДМ ──────────────────────────────────────────────────────
 
 export function OstatokDM() {
@@ -339,6 +655,8 @@ export function OstatokDM() {
   const [viewItem, setViewItem] = useState<DMItem | null>(null);
   const [showMerge, setShowMerge] = useState(false);
   const [showPrihod, setShowPrihod] = useState(false);
+  const [showOrder, setShowOrder] = useState(false);
+  const [showNakladnaya, setShowNakladnaya] = useState(false);
 
   const perPage = 8;
   const filtered = dmItems.filter(it => {
@@ -476,16 +794,28 @@ export function OstatokDM() {
         <Modal title="Принять на склад" onClose={() => setShowPrihod(false)} footer={<><Btn variant="secondary" onClick={() => setShowPrihod(false)}>Отмена</Btn></>}>
           <p className="text-sm text-gray-500 mb-4">Выберите способ оформления приёма на склад</p>
           <div className="grid grid-cols-2 gap-4">
-            <button onClick={() => { setShowPrihod(false); show("Приходный ордер создан"); }} className="bg-blue-600 text-white rounded-xl p-4 text-left hover:bg-blue-700 transition-colors">
+            <button onClick={() => { setShowPrihod(false); setShowOrder(true); }} className="bg-blue-600 text-white rounded-xl p-4 text-left hover:bg-blue-700 transition-colors">
               <div className="font-semibold mb-1">По приходному ордеру</div>
               <div className="text-xs text-blue-100">Оформить поступление ДМ приходным ордером</div>
             </button>
-            <button onClick={() => { setShowPrihod(false); show("Накладная создана"); }} className="bg-white border-2 border-gray-200 rounded-xl p-4 text-left hover:border-blue-400 transition-colors">
+            <button onClick={() => { setShowPrihod(false); setShowNakladnaya(true); }} className="bg-white border-2 border-gray-200 rounded-xl p-4 text-left hover:border-blue-400 transition-colors">
               <div className="font-semibold text-gray-900 mb-1">По накладной</div>
               <div className="text-xs text-gray-400">Оформить по накладной на приём</div>
             </button>
           </div>
         </Modal>
+      )}
+      {showOrder && (
+        <PrihodnyOrderDMModal
+          onClose={() => setShowOrder(false)}
+          onSave={() => { setShowOrder(false); show("Приходный ордер создан"); }}
+        />
+      )}
+      {showNakladnaya && (
+        <NakladnayaDMModal
+          onClose={() => setShowNakladnaya(false)}
+          onSave={() => { setShowNakladnaya(false); show("Накладная создана"); }}
+        />
       )}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
