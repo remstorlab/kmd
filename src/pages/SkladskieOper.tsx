@@ -36,14 +36,20 @@ export function SkladskieOperHub() {
 
 // ── Приходный ордер modal ─────────────────────────────────────────────────────
 
+type PrihodDocType = "Приходный ордер" | "Накладная";
+
 function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSave: (d: SkladDoc) => void; doc?: SkladDoc | null; readOnly?: boolean }) {
+  const ro = !!doc;
+  const [docType, setDocType] = useState<PrihodDocType>("Приходный ордер");
+  const isOrder = ro || docType === "Приходный ордер";
+  const { toast, show, clear } = useToast();
+
+  // Приходный ордер state
   const [positions, setPositions] = useState([
     { nomenkl: "DM-001", name: "Слиток золота ЗлА-1", klass: "Слиток", code: "AU", proba: "999", lig: "500.25", net: "498.12", loc: "Сейф №1, Полка А" },
   ]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
-  const { toast, show, clear } = useToast();
-  const ro = !!doc;
 
   const addPos = () => {
     setPositions(p => [...p, { nomenkl: form.nomenkl, name: form.name || "Позиция ДМ", klass: form.klass, code: form.code, proba: form.proba, lig: form.lig, net: form.net, loc: `${form.sey}, ${form.polka}` }]);
@@ -51,8 +57,21 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
     setForm({ nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
   };
 
+  // Накладная state
+  const [nakladPositions, setNakladPositions] = useState([
+    { nomenkl: "DM-005", name: "Слиток серебра СрБ-3", kol: "1", klass: "Слиток", code: "AG", loc: "Сейф №2, Полка Б" },
+  ]);
+  const [showAddNaklad, setShowAddNaklad] = useState(false);
+  const [nakladForm, setNakladForm] = useState({ nomenkl: "", klass: "Слиток", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+
+  const addNakladPos = () => {
+    setNakladPositions(p => [...p, { nomenkl: nakladForm.nomenkl || `DM-${Math.floor(Math.random() * 900 + 100)}`, name: nakladForm.name || "Позиция ДМ", kol: nakladForm.kol || "0", klass: nakladForm.klass, code: nakladForm.code, loc: `${nakladForm.sey}, ${nakladForm.polka}` }]);
+    setShowAddNaklad(false);
+    setNakladForm({ nomenkl: "", klass: "Слиток", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+  };
+
   const save = () => {
-    const d: SkladDoc = {
+    const d: SkladDoc = isOrder ? {
       id: `sd-${Date.now()}`,
       date: new Date().toLocaleDateString("ru-RU"),
       type: "Приходный ордер",
@@ -60,13 +79,21 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
       status: "Выполнено",
       sender: "ОО «АурумПоставка»",
       receiver: "Склад ДМ №1",
+    } : {
+      id: `sd-${Date.now()}`,
+      date: new Date().toLocaleDateString("ru-RU"),
+      type: "Накладная на приём ДМ",
+      number: `НП-${Math.floor(Math.random() * 900 + 100)}`,
+      status: "Выполнено",
+      sender: "СДМ",
+      receiver: "Склад ДМ №1",
     };
     onSave(d);
   };
 
   return (
     <Modal
-      title={doc ? `Приходный ордер ${doc.number}` : "Новый приходный ордер"}
+      title={doc ? `Приходный ордер ${doc.number}` : (isOrder ? "Новый приходный ордер" : "Новая накладная на приём ДМ")}
       onClose={onClose}
       extraWide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
@@ -78,67 +105,119 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
         </>
       )}
     >
-      <div className="grid grid-cols-3 gap-4 mb-5">
-        <Field label="Тип документа"><Input value="Приходный ордер" disabled /></Field>
-        <Field label="Номер"><Input value={doc?.number || "ПО-0342"} disabled={ro} /></Field>
-        <Field label="Дата"><Input value={doc?.date || "19.08.2026"} disabled={ro} /></Field>
-        <Field label="Отправитель"><Select value={doc?.sender || "ОО «АурумПоставка»"} options={["ОО «АурумПоставка»", "АО «Металл Инвест»"]} disabled={ro} /></Field>
-        <Field label="Получатель"><Select value={doc?.receiver || "Склад ДМ №1"} options={["Склад ДМ №1", "Склад ДМ №2"]} disabled={ro} /></Field>
-        <Field label="№ счёт-фактуры"><Input value="СФ-2026-1234" disabled={ro} /></Field>
-        <Field label="Дата счёт-фактуры"><Input value="15.08.2026" disabled={ro} /></Field>
-        <Field label="Номер договора"><Input value="ДОГ-2025-089" disabled={ro} /></Field>
-        <Field label="Дата договора"><Input value="01.01.2025" disabled={ro} /></Field>
-        <Field label="Лигатурный вес по документу (г)"><Input value="500.25" disabled={ro} /></Field>
-        <Field label="Принято лигатурный вес (г)"><Input value="500.25" disabled={ro} /></Field>
-        <Field label="Принято чистый вес (г)"><Input value="498.12" disabled={ro} /></Field>
-      </div>
+      {isOrder ? (
+        <div className="grid grid-cols-3 gap-4 mb-5">
+          <Field label="Тип документа">
+            {ro ? <Input value="Приходный ордер" disabled /> : <Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} />}
+          </Field>
+          <Field label="Номер"><Input value={doc?.number || "ПО-0342"} disabled={ro} /></Field>
+          <Field label="Дата"><Input value={doc?.date || "19.08.2026"} disabled={ro} /></Field>
+          <Field label="Отправитель"><Select value={doc?.sender || "ОО «АурумПоставка»"} options={["ОО «АурумПоставка»", "АО «Металл Инвест»"]} disabled={ro} /></Field>
+          <Field label="Получатель"><Select value={doc?.receiver || "Склад ДМ №1"} options={["Склад ДМ №1", "Склад ДМ №2"]} disabled={ro} /></Field>
+          <Field label="№ счёт-фактуры"><Input value="СФ-2026-1234" disabled={ro} /></Field>
+          <Field label="Дата счёт-фактуры"><Input value="15.08.2026" disabled={ro} /></Field>
+          <Field label="Номер договора"><Input value="ДОГ-2025-089" disabled={ro} /></Field>
+          <Field label="Дата договора"><Input value="01.01.2025" disabled={ro} /></Field>
+          <Field label="Лигатурный вес по документу (г)"><Input value="500.25" disabled={ro} /></Field>
+          <Field label="Принято лигатурный вес (г)"><Input value="500.25" disabled={ro} /></Field>
+          <Field label="Принято чистый вес (г)"><Input value="498.12" disabled={ro} /></Field>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 mb-5">
+          <Field label="Тип документа"><Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} /></Field>
+          <Field label="Номер"><Input value="НП-001234" disabled /></Field>
+          <Field label="Дата"><Input value="21.08.2026" disabled /></Field>
+          <Field label="Заказчик"><Select value="Монетный двор" options={["Монетный двор", "Национальный банк"]} /></Field>
+          <Field label="Склад-отправитель"><Select value="СДМ" options={["СДМ", "Производственный цех"]} /></Field>
+          <Field label="Склад-получатель"><Select value="Склад ДМ №1" options={["Склад ДМ №1", "Склад ДМ №2"]} /></Field>
+          <Field label="Сотрудник склада-получателя" full><Select value="Ким Александр Юрьевич" options={["Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} /></Field>
+        </div>
+      )}
 
       <div className="mb-4">
         <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
-        <FileChip name="Приходный ордер ПО-0342.pdf" onDownload={() => show("Загрузка файла...")} />
+        <FileChip name={isOrder ? "Приходный ордер ПО-0342.pdf" : "Накладная_НП-001234.pdf"} onDownload={() => show("Загрузка файла...")} />
       </div>
 
-      <div className="border-t border-gray-200 pt-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции прихода</h3>
-          {!ro && (
+      {isOrder ? (
+        <div className="border-t border-gray-200 pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции прихода</h3>
+            {!ro && (
+              <div className="flex gap-2">
+                <Btn size="sm" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+                <ExportBtn onToast={show} />
+              </div>
+            )}
+          </div>
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+              <th className="px-3 py-2 text-left">Номенкл.№</th>
+              <th className="px-3 py-2 text-left">Наименование</th>
+              <th className="px-3 py-2 text-left">Класс</th>
+              <th className="px-3 py-2 text-left">Код</th>
+              <th className="px-3 py-2 text-left">Проба</th>
+              <th className="px-3 py-2 text-left">Лигат.г</th>
+              <th className="px-3 py-2 text-left">Чистый г</th>
+              <th className="px-3 py-2 text-left">Размещение</th>
+              {!ro && <th className="w-16"></th>}
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {positions.map((p, i) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                  <td className="px-3 py-2 font-medium">{p.name}</td>
+                  <td className="px-3 py-2">{p.klass}</td>
+                  <td className="px-3 py-2 text-blue-600">{p.code}</td>
+                  <td className="px-3 py-2">{p.proba}</td>
+                  <td className="px-3 py-2">{p.lig}</td>
+                  <td className="px-3 py-2">{p.net}</td>
+                  <td className="px-3 py-2 text-gray-500">{p.loc}</td>
+                  {!ro && <td className="px-3 py-2">
+                    <button onClick={() => setPositions(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                  </td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="border-t border-gray-200 pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции приёма</h3>
             <div className="flex gap-2">
-              <Btn size="sm" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+              <Btn size="sm" onClick={() => setShowAddNaklad(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               <ExportBtn onToast={show} />
             </div>
-          )}
+          </div>
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+              <th className="px-3 py-2 text-left">Номенкл.№</th>
+              <th className="px-3 py-2 text-left">Наименование</th>
+              <th className="px-3 py-2 text-left">Кол-во</th>
+              <th className="px-3 py-2 text-left">Класс</th>
+              <th className="px-3 py-2 text-left">Код материала</th>
+              <th className="px-3 py-2 text-left">Размещение</th>
+              <th className="w-16"></th>
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {nakladPositions.map((p, i) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                  <td className="px-3 py-2 font-medium">{p.name}</td>
+                  <td className="px-3 py-2">{p.kol}</td>
+                  <td className="px-3 py-2">{p.klass}</td>
+                  <td className="px-3 py-2 font-medium">{p.code}</td>
+                  <td className="px-3 py-2 text-gray-500">{p.loc}</td>
+                  <td className="px-3 py-2">
+                    <button onClick={() => setNakladPositions(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-            <th className="px-3 py-2 text-left">Номенкл.№</th>
-            <th className="px-3 py-2 text-left">Наименование</th>
-            <th className="px-3 py-2 text-left">Класс</th>
-            <th className="px-3 py-2 text-left">Код</th>
-            <th className="px-3 py-2 text-left">Проба</th>
-            <th className="px-3 py-2 text-left">Лигат.г</th>
-            <th className="px-3 py-2 text-left">Чистый г</th>
-            <th className="px-3 py-2 text-left">Размещение</th>
-            {!ro && <th className="w-16"></th>}
-          </tr></thead>
-          <tbody className="divide-y divide-gray-100">
-            {positions.map((p, i) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
-                <td className="px-3 py-2 font-medium">{p.name}</td>
-                <td className="px-3 py-2">{p.klass}</td>
-                <td className="px-3 py-2 text-blue-600">{p.code}</td>
-                <td className="px-3 py-2">{p.proba}</td>
-                <td className="px-3 py-2">{p.lig}</td>
-                <td className="px-3 py-2">{p.net}</td>
-                <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                {!ro && <td className="px-3 py-2">
-                  <button onClick={() => setPositions(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
-                </td>}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      )}
 
       {showAdd && (
         <Modal title="Добавить позицию ДМ" onClose={() => setShowAdd(false)} footer={<><Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn><Btn onClick={addPos}>Добавить</Btn></>}>
@@ -152,6 +231,21 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
             <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
             <Field label="Сейф"><Select value={form.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setForm(f => ({ ...f, sey: v }))} /></Field>
             <Field label="Полка"><Select value={form.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setForm(f => ({ ...f, polka: v }))} /></Field>
+          </div>
+        </Modal>
+      )}
+
+      {showAddNaklad && (
+        <Modal title="Добавить позицию ДМ" onClose={() => setShowAddNaklad(false)} footer={<><Btn variant="secondary" onClick={() => setShowAddNaklad(false)}>Отмена</Btn><Btn onClick={addNakladPos}>Добавить</Btn></>}>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Номенкл. номер"><Input value={nakladForm.nomenkl} onChange={v => setNakladForm(f => ({ ...f, nomenkl: v }))} placeholder="DM-XXX" /></Field>
+            <Field label="Класс"><Select value={nakladForm.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setNakladForm(f => ({ ...f, klass: v }))} /></Field>
+            <Field label="Код материала"><Select value={nakladForm.code} options={["AU-585", "AU-750", "AU-999", "AG-925", "PT-950"]} onChange={v => setNakladForm(f => ({ ...f, code: v }))} /></Field>
+            <Field label="Наименование" full><Input value={nakladForm.name} onChange={v => setNakladForm(f => ({ ...f, name: v }))} placeholder="Введите наименование" /></Field>
+            <Field label="Количество"><Input value={nakladForm.kol} onChange={v => setNakladForm(f => ({ ...f, kol: v }))} placeholder="0" /></Field>
+            <Field label="Ед. изм."><Select value={nakladForm.unit} options={["шт", "г", "кг"]} onChange={v => setNakladForm(f => ({ ...f, unit: v }))} /></Field>
+            <Field label="Сейф"><Select value={nakladForm.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setNakladForm(f => ({ ...f, sey: v }))} /></Field>
+            <Field label="Полка"><Select value={nakladForm.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setNakladForm(f => ({ ...f, polka: v }))} /></Field>
           </div>
         </Modal>
       )}

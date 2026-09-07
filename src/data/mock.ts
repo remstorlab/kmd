@@ -33,7 +33,7 @@ export interface DMItem {
 export interface SkladDoc {
   id: string;
   date: string;
-  type: "Приходный ордер" | "Накладная на приём ГП" | "Накладная на отгрузку ГП" | "Накладная на отгрузку";
+  type: "Приходный ордер" | "Накладная на приём ГП" | "Накладная на приём ДМ" | "Накладная на отгрузку ГП" | "Накладная на отгрузку";
   number: string;
   status: DocStatus;
   sender: string;
