@@ -1,0 +1,252 @@
+import React, { useState } from "react";
+import { useApp } from "../store/AppContext";
+import {
+  Badge, Btn, Modal, EyeIcon, Pagination, PageHeader,
+  ExportBtn, useToast, Toast, Field, Input, Select, useConfirm, ConfirmDialog,
+} from "../components/ui";
+import { ShihtovayaKarta } from "../data/mock";
+
+const shihtaMaterials = [
+  { mat: "Слиток золота ЗлА-1", klass: "Слиток", fe: "0.001", sb: "0.001", bi: "0.0005", pb: "0.001", p: "0.0005", ves: 500.25, dola: 89.2 },
+  { mat: "Стружка золотая", klass: "Стружка", fe: "0.002", sb: "0.001", bi: "0.001", pb: "0.001", p: "0.001", ves: 45.80, dola: 8.2 },
+  { mat: "Лом золота 585", klass: "Лом", fe: "0.005", sb: "0.003", bi: "0.002", pb: "0.003", p: "0.001", ves: 14.20, dola: 2.6 },
+];
+
+function ShihtaConstructor({ karta, onClose, onSave }: { karta?: ShihtovayaKarta | null; onClose: () => void; onSave: (k: ShihtovayaKarta) => void }) {
+  const [name, setName] = useState(karta?.name || "");
+  const [plavkaNo, setPlavkaNo] = useState(karta?.plavkaNo || "");
+  const [materials, setMaterials] = useState(shihtaMaterials);
+  const [showFromSklad, setShowFromSklad] = useState(false);
+  const [showAddDop, setShowAddDop] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+  const { toast, show, clear } = useToast();
+  const ro = !!karta && karta.status === "Выполнено";
+
+  const gostResult = [
+    { element: "Золото (Au)", pct: "99.85%", norm: "≥99.5%", ok: true },
+    { element: "Серебро (Ag)", pct: "0.08%", norm: "≤0.10%", ok: true },
+    { element: "Медь (Cu)", pct: "0.06%", norm: "≤0.10%", ok: true },
+  ];
+
+  const save = () => {
+    const k: ShihtovayaKarta = {
+      id: karta?.id || `sk-${Date.now()}`,
+      date: new Date().toLocaleDateString("ru-RU"),
+      name: name || "Новая шихтовая карта",
+      plavkaNo: plavkaNo || `П-2026-${Math.floor(Math.random() * 9000 + 1000)}`,
+      status: "Подготовлена к плавке",
+    };
+    onSave(k);
+  };
+
+  return (
+    <Modal
+      title="Конструктор шихтовой карты"
+      onClose={onClose}
+      extraWide
+      footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
+        <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={save}>Сохранить карту</Btn></>
+      )}
+    >
+      <div className="grid grid-cols-2 gap-4 mb-5">
+        <Field label="Наименование" full><Input value={name} onChange={setName} placeholder="Наименование шихты" disabled={ro} /></Field>
+        <Field label="Номер плавки"><Input value={plavkaNo} onChange={setPlavkaNo} placeholder="П-2026-XXXX" disabled={ro} /></Field>
+        <Field label="Номер оборота"><Input value="О-2026-001" disabled={ro} /></Field>
+        <Field label="Назначение слитков"><Select value="Слитки для реализации" options={["Слитки для реализации", "Производство ГП"]} disabled={ro} /></Field>
+        <Field label="Основание" full><Input value="Приказ №234-П от 15.08.2026" disabled={ro} /></Field>
+      </div>
+
+      <div className="border-t border-gray-200 pt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Шихтовые материалы</h3>
+          {!ro && (
+            <div className="flex gap-2">
+              <Btn size="sm" onClick={() => setShowFromSklad(true)}>+ Добавить со склада</Btn>
+              <Btn size="sm" variant="secondary" onClick={() => setShowAddDop(true)}>+ Добавить доп. материал</Btn>
+            </div>
+          )}
+        </div>
+
+        <table className="w-full text-sm mb-4">
+          <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+            <th className="px-3 py-2 text-left">Материал</th>
+            <th className="px-3 py-2 text-left">Класс</th>
+            <th className="px-3 py-2 text-right">Fe г</th>
+            <th className="px-3 py-2 text-right">Sb г</th>
+            <th className="px-3 py-2 text-right">Bi г</th>
+            <th className="px-3 py-2 text-right">Pb г</th>
+            <th className="px-3 py-2 text-right">P г</th>
+            <th className="px-3 py-2 text-right">Вес г</th>
+            <th className="px-3 py-2 text-right">Доля %</th>
+            {!ro && <th className="w-16"></th>}
+          </tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {materials.map((m, i) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="px-3 py-2 font-medium">{m.mat}</td>
+                <td className="px-3 py-2">{m.klass}</td>
+                <td className="px-3 py-2 text-right text-gray-600">{m.fe}</td>
+                <td className="px-3 py-2 text-right text-gray-600">{m.sb}</td>
+                <td className="px-3 py-2 text-right text-gray-600">{m.bi}</td>
+                <td className="px-3 py-2 text-right text-gray-600">{m.pb}</td>
+                <td className="px-3 py-2 text-right text-gray-600">{m.p}</td>
+                <td className="px-3 py-2 text-right font-medium">{m.ves}</td>
+                <td className="px-3 py-2 text-right text-blue-600">{m.dola}%</td>
+                {!ro && <td className="px-3 py-2 text-center">
+                  <button onClick={() => setMaterials(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors text-xs">✕</button>
+                </td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {!ro && (
+          <Btn size="sm" variant="secondary" onClick={() => setShowResult(true)}>
+            🧮 Рассчитать
+          </Btn>
+        )}
+
+        {(showResult || ro) && (
+          <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Результат: Соответствие ГОСТ
+            </div>
+            <div className="divide-y divide-gray-100">
+              {gostResult.map(g => (
+                <div key={g.element} className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm font-medium text-gray-900">{g.element}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-gray-600">{g.pct}</span>
+                    <span className="text-xs text-gray-400">норма {g.norm}</span>
+                    <Badge label={g.ok ? "Соответствует" : "Не соответствует"} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* From sklad modal */}
+      {showFromSklad && (
+        <Modal title="Добавить материал со склада" onClose={() => setShowFromSklad(false)} wide footer={
+          <><Btn variant="secondary" onClick={() => setShowFromSklad(false)}>Отмена</Btn>
+          <Btn onClick={() => {
+            setMaterials(prev => [...prev, { mat: "Золотой порошок Au", klass: "Порошок", fe: "0.001", sb: "0.0005", bi: "0.0003", pb: "0.001", p: "0.0002", ves: 25.00, dola: 0 }]);
+            setShowFromSklad(false);
+            show("Материал добавлен");
+          }}>Добавить выбранные</Btn></>
+        }>
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+              <th className="w-8 px-3 py-2"></th>
+              <th className="px-3 py-2 text-left">Наименование</th>
+              <th className="px-3 py-2 text-left">Номенкл.№</th>
+              <th className="px-3 py-2 text-left">Класс</th>
+              <th className="px-3 py-2 text-right">Лигат.вес г</th>
+              <th className="px-3 py-2 text-right">Чист.вес г</th>
+              <th className="px-3 py-2 text-left">Место</th>
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {[
+                { name: "Слиток золота ЗлА-1", nom: "DM-001", klass: "Слиток", lig: 500.25, net: 498.12, loc: "Сейф №1, Полка А" },
+                { name: "Золотой порошок Au", nom: "DM-008", klass: "Порошок", lig: 25.00, net: 24.95, loc: "Сейф №3, Полка В" },
+              ].map((r, i) => (
+                <tr key={i} className="hover:bg-gray-50"><td className="px-3 py-2"><input type="checkbox" /></td>
+                  <td className="px-3 py-2 font-medium">{r.name}</td><td className="px-3 py-2 text-gray-500">{r.nom}</td>
+                  <td className="px-3 py-2">{r.klass}</td><td className="px-3 py-2 text-right">{r.lig}</td>
+                  <td className="px-3 py-2 text-right">{r.net}</td><td className="px-3 py-2 text-gray-500">{r.loc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Modal>
+      )}
+
+      {/* Add dop material */}
+      {showAddDop && (
+        <Modal title="Добавить дополнительный материал" onClose={() => setShowAddDop(false)} footer={
+          <><Btn variant="secondary" onClick={() => setShowAddDop(false)}>Отмена</Btn>
+          <Btn onClick={() => {
+            setMaterials(prev => [...prev, { mat: "Лигатура Cu", klass: "Лигатура", fe: "0.01", sb: "0.001", bi: "0.001", pb: "0.001", p: "0.001", ves: 5.00, dola: 0 }]);
+            setShowAddDop(false);
+            show("Материал добавлен");
+          }}>Добавить</Btn></>
+        }>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Наименование материала" full><Input value="" placeholder="Название" /></Field>
+            <Field label="Код материала"><Input value="" placeholder="AU, AG..." /></Field>
+            <Field label="Класс"><Select value="Лигатура" options={["Лигатура", "Флюс", "Добавка"]} /></Field>
+            <Field label="Проба"><Input value="" placeholder="999" /></Field>
+            <Field label="Ед. измерения"><Select value="г" options={["г", "кг", "шт"]} /></Field>
+            <Field label="Вес г"><Input value="" placeholder="0.00" /></Field>
+          </div>
+        </Modal>
+      )}
+      {toast && <Toast message={toast} onDone={clear} />}
+    </Modal>
+  );
+}
+
+export function ShihtovyeKarty() {
+  const { shihtovyeKarty, setShihtovyeKarty } = useApp();
+  const { toast, show, clear } = useToast();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
+  const [page, setPage] = useState(1);
+  const [viewKarta, setViewKarta] = useState<ShihtovayaKarta | null>(null);
+  const [showNew, setShowNew] = useState(false);
+  const perPage = 8;
+
+  return (
+    <div>
+      <PageHeader
+        title="Шихтовые карты"
+        subtitle="Расчёт состава шихты для плавки слитков"
+        breadcrumb={["Шихтовые карты"]}
+        actions={<Btn onClick={() => setShowNew(true)}>+ Новая шихтовая карта</Btn>}
+      />
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Дата</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Наименование</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">№ плавки</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Статус</th>
+              <th className="w-12"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {shihtovyeKarty.slice((page - 1) * perPage, page * perPage).map(karta => (
+              <tr key={karta.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 text-gray-500">{karta.date}</td>
+                <td className="px-4 py-3 font-medium text-gray-900">{karta.name}</td>
+                <td className="px-4 py-3 text-blue-600">{karta.plavkaNo}</td>
+                <td className="px-4 py-3"><Badge label={karta.status} /></td>
+                <td className="px-4 py-3"><EyeIcon onClick={() => setViewKarta(karta)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <Pagination page={page} total={shihtovyeKarty.length} perPage={perPage} onPage={setPage} />
+      </div>
+
+      {viewKarta && (
+        <ShihtaConstructor
+          karta={viewKarta}
+          onClose={() => setViewKarta(null)}
+          onSave={k => { setShihtovyeKarty(prev => prev.map(s => s.id === k.id ? k : s)); setViewKarta(null); show("Карта обновлена"); }}
+        />
+      )}
+      {showNew && (
+        <ShihtaConstructor
+          onClose={() => setShowNew(false)}
+          onSave={k => { setShihtovyeKarty(prev => [k, ...prev]); setShowNew(false); show("Шихтовая карта создана"); }}
+        />
+      )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
+      {toast && <Toast message={toast} onDone={clear} />}
+    </div>
+  );
+}

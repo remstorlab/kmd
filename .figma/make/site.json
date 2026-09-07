@@ -1,0 +1,10 @@
+{
+  "description": "This web platform offers a user-friendly interface for seamless navigation and interaction, designed to enhance user experience and engagement.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
