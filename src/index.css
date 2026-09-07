@@ -8,25 +8,138 @@ body,
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+/* ── Scrollbars ───────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
   scrollbar-color: #334155 transparent;
 }
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background-color: #334155; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background-color: #475569; }
+
+input[type='checkbox'] { accent-color: #2563eb; }
+
+/* ── Animations ───────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
-::-webkit-scrollbar-thumb {
-  background-color: #334155;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background-color: #475569;
+.animate-spin { animation: spin 0.8s linear infinite; }
+
+/* ════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES
+   Applied via html.dark class set by ThemeContext
+   ════════════════════════════════════════════════════════════ */
+
+/* Content area background */
+html.dark main {
+  background-color: #0f172a;
 }
 
-input[type='checkbox'] {
-  accent-color: #2563eb;
+/* Cards, modals, panels, table bodies */
+html.dark .bg-white {
+  background-color: #1e293b !important;
 }
+
+/* Subtle backgrounds (table headers, filter rows, hover states) */
+html.dark .bg-gray-50 {
+  background-color: #162032 !important;
+}
+
+/* ── Text ──────────────────────────────────────────────────── */
+html.dark .text-gray-900 { color: #f1f5f9 !important; }
+html.dark .text-gray-800 { color: #e2e8f0 !important; }
+html.dark .text-gray-700 { color: #cbd5e1 !important; }
+html.dark .text-gray-600 { color: #94a3b8 !important; }
+html.dark .text-gray-500 { color: #64748b !important; }
+html.dark .text-gray-400 { color: #475569 !important; }
+
+/* ── Borders ───────────────────────────────────────────────── */
+html.dark .border-gray-200 { border-color: #1e3a5f !important; }
+html.dark .border-gray-100 { border-color: #1e293b !important; }
+html.dark .border-dashed { border-color: #334155 !important; }
+
+/* Table row dividers */
+html.dark .divide-y > * + * { border-color: #1e293b !important; }
+html.dark .divide-gray-100 > * + * { border-color: #1e293b !important; }
+
+/* ── Hover states ──────────────────────────────────────────── */
+html.dark .hover\:bg-gray-50:hover { background-color: #1a2e47 !important; }
+html.dark .hover\:bg-gray-100:hover { background-color: #243447 !important; }
+
+/* ── Form controls ─────────────────────────────────────────── */
+html.dark input:not([type='checkbox']):not([type='radio']),
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #475569 !important;
+}
+
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Disabled inputs in dark mode */
+html.dark input:disabled,
+html.dark select:disabled,
+html.dark textarea:disabled {
+  background-color: #1e293b !important;
+  color: #475569 !important;
+  border-color: #1e3a5f !important;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+/* Secondary (white + border) → dark surface */
+html.dark .border-gray-300 { border-color: #334155 !important; }
+
+/* Button hover bg-gray-50 */
+html.dark .hover\:bg-gray-50:hover { background-color: #243447 !important; }
+
+/* ── Modals ─────────────────────────────────────────────────── */
+/* Modal backdrop is already semi-transparent black — fine */
+/* Modal container bg-white already covered above */
+
+/* ── Status badge backgrounds (keep colored) ─────────────────
+   Badge backgrounds are deliberately kept as-is in dark mode
+   (green/yellow/blue/red pills remain vibrant).
+   ──────────────────────────────────────────────────────────── */
+
+/* ── Misc utility overrides ──────────────────────────────────── */
+html.dark .bg-blue-50 { background-color: #1e3a5f !important; }
+html.dark .border-blue-200 { border-color: #1e4d8c !important; }
+html.dark .text-blue-800 { color: #93c5fd !important; }
+html.dark .bg-yellow-50 { background-color: #2d2507 !important; }
+html.dark .border-yellow-200 { border-color: #78350f !important; }
+html.dark .text-yellow-800 { color: #fde68a !important; }
+html.dark .bg-red-50 { background-color: #2d0707 !important; }
+html.dark .border-red-200 { border-color: #991b1b !important; }
+html.dark .text-red-800 { color: #fca5a5 !important; }
+html.dark .bg-green-50 { background-color: #052e16 !important; }
+html.dark .border-green-200 { border-color: #14532d !important; }
+html.dark .text-green-800 { color: #86efac !important; }
+
+/* Confirm/compare panels */
+html.dark .bg-red-50.border-red-200,
+html.dark .bg-red-50 { background-color: #1e0a0a !important; }
+html.dark .bg-green-50.border-green-200,
+html.dark .bg-green-50 { background-color: #0a1e0e !important; }
+html.dark .text-red-800 { color: #fca5a5 !important; }
+html.dark .text-green-800 { color: #86efac !important; }
+
+/* Slate-50 used in logging compare section */
+html.dark .bg-slate-50 { background-color: #0f172a !important; }
