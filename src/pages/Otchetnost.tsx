@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { PageHeader, Btn, Modal, useToast, Toast } from "../components/ui";
+import { ClipboardCheck, Coins, Gem, FileText, LucideIcon } from "lucide-react";
 
-const reports = [
+const reports: { title: string; desc: string; icon: LucideIcon; data: { nom: string; name: string; kol: string; ves: string; status: string }[] }[] = [
   {
     title: "Акт по итогам инвентаризации НЗП",
     desc: "Унифицированная форма ИНВ-3 — инвентаризационная опись незавершённого производства",
-    icon: "📋",
+    icon: ClipboardCheck,
     data: [
       { nom: "DM-001", name: "Слиток золота ЗлА-1", kol: "1 ед.", ves: "500.25 г", status: "В норме" },
       { nom: "DM-003", name: "Стружка золотая", kol: "1 ед.", ves: "45.80 г", status: "В норме" },
@@ -15,7 +16,7 @@ const reports = [
   {
     title: "Инвентаризационная опись ДМ",
     desc: "Опись фактических остатков драгоценных металлов на всех складах",
-    icon: "🔶",
+    icon: Coins,
     data: [
       { nom: "DM-001", name: "Слиток золота ЗлА-1", kol: "500.25 г", ves: "Сейф №1 А", status: "Соответствует" },
       { nom: "DM-002", name: "Слиток серебра СрА-2", kol: "1000.50 г", ves: "Сейф №1 Б", status: "Соответствует" },
@@ -25,7 +26,7 @@ const reports = [
   {
     title: "Опись хранения драгоценных камней",
     desc: "Инвентаризация драгоценных камней в производстве и на хранении",
-    icon: "💎",
+    icon: Gem,
     data: [
       { nom: "DK-001", name: "Бриллиант 0.5ct", kol: "8 шт", ves: "Сейф №2", status: "Соответствует" },
       { nom: "DK-002", name: "Изумруд 1ct", kol: "3 шт", ves: "Сейф №2", status: "Соответствует" },
@@ -34,7 +35,7 @@ const reports = [
   {
     title: "Накладные",
     desc: "Сводный журнал приходных и расходных документов за период",
-    icon: "📄",
+    icon: FileText,
     data: [
       { nom: "ПО-0342", name: "Приходный ордер", kol: "19.08.2026", ves: "Выполнено", status: "Завершён" },
       { nom: "НО-0205", name: "Накладная на отгрузку ГП", kol: "19.08.2026", ves: "В работе", status: "Открыт" },
@@ -59,7 +60,9 @@ export function Otchetnost() {
         {reports.map((r, i) => (
           <div key={i} className="bg-white rounded-xl border border-gray-200 p-6 flex flex-col gap-4">
             <div className="flex items-start gap-3">
-              <div className="text-3xl">{r.icon}</div>
+              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                <r.icon className="w-5 h-5" />
+              </div>
               <div>
                 <h3 className="font-semibold text-gray-900 mb-1">{r.title}</h3>
                 <p className="text-sm text-gray-500">{r.desc}</p>

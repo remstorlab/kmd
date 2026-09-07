@@ -36,7 +36,7 @@ export const t: Record<Lang, Record<string, string>> = {
     "nav.log": "Логирование",
     "nav.admin": "Панель администрирования",
     // Login
-    "login.title": "ДМ-УПРАВЛЕНИЕ",
+    "login.title": "СДМ",
     "login.sub": "Система учёта драгоценных материалов",
     "login.username": "Имя пользователя",
     "login.password": "Пароль",
@@ -72,7 +72,7 @@ export const t: Record<Lang, Record<string, string>> = {
     "nav.log": "Тіркеу журналы",
     "nav.admin": "Басқару панелі",
     // Login
-    "login.title": "ДМ-БАСҚАРУ",
+    "login.title": "СДМ",
     "login.sub": "Бағалы материалдарды есепке алу жүйесі",
     "login.username": "Пайдаланушы аты",
     "login.password": "Құпия сөз",

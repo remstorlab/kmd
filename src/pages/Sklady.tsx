@@ -18,19 +18,15 @@ export function SkladyHub() {
       <PageHeader title="Склады" subtitle="Выберите раздел" breadcrumb={["Склады"]} />
       <div className="grid grid-cols-2 gap-6 max-w-2xl">
         <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("ostatok-gp")}>
-          <div className="flex justify-between items-start mb-4">
-            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Gem className="w-5 h-5 text-yellow-600" />
-            </div>
+          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-4">
+            <Gem className="w-5 h-5 text-blue-600" />
           </div>
           <h3 className="font-semibold text-gray-900 mb-1">Остатки на складе ГП</h3>
           <p className="text-sm text-gray-500">Готовая продукция</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("ostatok-dm")}>
-          <div className="flex justify-between items-start mb-4">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Coins className="w-5 h-5 text-blue-600" />
-            </div>
+          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-4">
+            <Coins className="w-5 h-5 text-blue-600" />
           </div>
           <h3 className="font-semibold text-gray-900 mb-1">Остатки на складе ДМ</h3>
           <p className="text-sm text-gray-500">Драгоценные материалы</p>
