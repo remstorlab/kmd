@@ -640,7 +640,7 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
 // ── Остатки на складе ДМ ──────────────────────────────────────────────────────
 
 export function OstatokDM() {
-  const { dmItems, setDmItems } = useApp();
+  const { dmItems, setDmItems, navigate } = useApp();
   const { toast, show, clear } = useToast();
   const [search, setSearch] = useState("");
   const [filterKlass, setFilterKlass] = useState("Все классы");
@@ -700,7 +700,7 @@ export function OstatokDM() {
         actions={
           <>
             <Btn onClick={() => setShowPrihod(true)}>Принять на склад</Btn>
-            <Btn variant="secondary" onClick={() => show("Выдача оформлена")}>Выдать со склада</Btn>
+            <Btn variant="secondary" onClick={() => navigate("dvizhenie-mat", { openNew: "1" })}>Выдать со склада</Btn>
             {selected.size >= 2 && (
               <Btn variant="secondary" onClick={() => setShowMerge(true)}>Объединить номенклатуры</Btn>
             )}

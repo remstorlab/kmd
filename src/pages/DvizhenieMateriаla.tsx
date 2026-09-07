@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
@@ -303,7 +303,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 // ── Реестр операций ───────────────────────────────────────────────────────────
 
 export function DvizhenieMateriаla() {
-  const { operations, setOperations } = useApp();
+  const { operations, setOperations, pageParams } = useApp();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
@@ -313,6 +313,10 @@ export function DvizhenieMateriаla() {
   const [editOp, setEditOp] = useState<Operation | null>(null);
   const [showNew, setShowNew] = useState(false);
   const perPage = 8;
+
+  useEffect(() => {
+    if (pageParams.openNew) setShowNew(true);
+  }, [pageParams.openNew]);
 
   const filtered = operations.filter(o => {
     const matchSearch = !search || o.document.toLowerCase().includes(search.toLowerCase()) || o.responsible.toLowerCase().includes(search.toLowerCase());
