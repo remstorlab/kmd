@@ -81,26 +81,14 @@ export default function Login() {
                 </div>
               </div>
 
-              <h1 className="text-3xl font-bold text-white leading-tight mb-3">
-                {lang === "ru" ? "Добро\nпожаловать" : "Қош\nкелдіңіз"}
-              </h1>
+
               <p className="text-slate-400 text-sm leading-relaxed">
                 {tr("login.sub")}
               </p>
             </div>
 
             {/* Bottom stats */}
-            <div className="relative grid grid-cols-2 gap-3">
-              {[
-                { label: lang === "ru" ? "Позиций на учёте" : "Есептегі позиция", value: "2 450+" },
-                { label: lang === "ru" ? "Операций в день" : "Күнделікті операция", value: "180+" },
-              ].map((s, i) => (
-                <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-3">
-                  <div className="text-blue-300 font-bold text-xl">{s.value}</div>
-                  <div className="text-slate-500 text-xs mt-1">{s.label}</div>
-                </div>
-              ))}
-            </div>
+    
           </div>
 
           {/* Right panel — form */}
