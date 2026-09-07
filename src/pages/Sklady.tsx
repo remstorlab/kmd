@@ -94,7 +94,7 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
         <Field label="Тип документа"><Input value="Накладная на приём ГП" disabled /></Field>
         <Field label="Номер"><Input value={`НП-${Math.floor(Math.random() * 900 + 100)}`} disabled /></Field>
         <Field label="Дата"><Input value="19.08.2026" disabled /></Field>
-        <Field label="Заказчик"><Select value="АО «МонетаДМ»" options={["АО «МонетаДМ»", "ОО «АурумПоставка»"]} /></Field>
+        <Field label="Заказчик"><Select value="Монетный двор" options={["Монетный двор", "ОО «АурумПоставка»"]} /></Field>
         <Field label="Склад-отправитель"><Select value="Производственный цех" options={["Производственный цех", "Ювелирный цех"]} /></Field>
         <Field label="Склад-получатель"><Select value="Склад ГП" options={["Склад ГП", "Склад ДМ №1"]} /></Field>
         <Field label="Сотрудник склада-получателя" full><Select value="Ким Александр Юрьевич" options={["Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} /></Field>

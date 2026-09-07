@@ -189,8 +189,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <span className="text-white font-bold text-sm">Au</span>
             </div>
             <div>
-              <div className="text-white font-semibold text-sm leading-tight tracking-tight">ДМ-УПРАВЛЕНИЕ</div>
-              <div className="text-slate-500 text-[10px] leading-tight mt-0.5">АО «МонетаДМ»</div>
+              <div className="text-white font-semibold text-sm leading-tight tracking-tight">СДМ</div>
+              <div className="text-slate-500 text-[10px] leading-tight mt-0.5">Монетный Двор</div>
             </div>
           </div>
         </div>

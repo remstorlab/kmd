@@ -130,7 +130,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <Field label="Тип документа"><Select value="Приказ" options={["Приказ", "Заказ-наряд"]} disabled={readOnly} /></Field>
         <Field label="Номер документа"><Input value={op?.document || "ДВ-001234"} disabled /></Field>
         <Field label="Дата операции"><Input value={op?.date || "19.08.2026"} disabled={readOnly} /></Field>
-        <Field label="Заказчик"><Select value="АО «МонетаДМ»" options={["АО «МонетаДМ»"]} disabled={readOnly} /></Field>
+        <Field label="Заказчик"><Select value="Монетный двор" options={["Монетный двор"]} disabled={readOnly} /></Field>
         <Field label="Подотчётное лицо" full><Select value={op?.responsible || "Нурланов Асхат Бекович"} options={["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"]} disabled={readOnly} /></Field>
         {vid === "Плавка" && <>
           <Field label="Материал"><Select value="Золото (Au)" options={["Золото (Au)", "Серебро (Ag)", "Платина (Pt)"]} disabled={readOnly} /></Field>

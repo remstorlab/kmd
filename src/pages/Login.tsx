@@ -84,7 +84,7 @@ export default function Login() {
                 </div>
                 <div>
                   <div className="text-white font-bold text-lg leading-tight">{tr("login.title")}</div>
-                  <div className="text-blue-400 text-xs mt-0.5">АО «МонетаДМ»</div>
+                  <div className="text-blue-400 text-xs mt-0.5">Монетный двор</div>
                 </div>
               </div>
 
@@ -224,7 +224,7 @@ export default function Login() {
 
             {/* Footer */}
             <p className="text-slate-700 text-xs text-center mt-8">
-              © 2026 АО «МонетаДМ» · {lang === "ru" ? "Все права защищены" : "Барлық құқықтар қорғалған"}
+              © 2026 Монетный двор · {lang === "ru" ? "Все права защищены" : "Барлық құқықтар қорғалған"}
             </p>
           </div>
         </div>
