@@ -13,7 +13,7 @@ export function SkladskieOperHub() {
   const { navigate } = useApp();
   const cards: { title: string; sub: string; icon: LucideIcon; page: "prihod-list" | "vydacha-list" | "dvizhenie-mat" }[] = [
     { title: "Приход на склад", sub: "Приходные ордера и накладные", icon: Inbox, page: "prihod-list" },
-    { title: "Выдача ГП", sub: "Документы отгрузки ГП", icon: Send, page: "vydacha-list" },
+    { title: "Выдача со склада", sub: "Документы отгрузки", icon: Send, page: "vydacha-list" },
     { title: "Движение материала (операции)", sub: "Журнал операций", icon: Repeat, page: "dvizhenie-mat" },
   ];
   return (
@@ -438,9 +438,9 @@ export function VydachaList() {
   return (
     <div>
       <PageHeader
-        title="Выдача ГП"
+        title="Выдача со склада"
         subtitle="Документы отгрузки готовой продукции"
-        breadcrumb={["Складские операции", "Выдача ГП"]}
+        breadcrumb={["Складские операции", "Выдача со склада"]}
         actions={
           <>
             <Btn onClick={() => setShowNew(true)}>Выдать со склада</Btn>
