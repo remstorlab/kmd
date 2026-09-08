@@ -59,6 +59,14 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
   const [items, setItems] = useState<{ name: string; qty: string; klass: string; code: string }[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", nomenkl: "", klass: "Монета", code: "AU-585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+  const [head, setHead] = useState(() => ({
+    number: `НП-${Math.floor(Math.random() * 900 + 100)}`,
+    date: new Date().toLocaleDateString("ru-RU"),
+    zakazchik: "Монетный двор",
+    skladOtpr: "Производственный цех",
+    skladPoluch: "Склад ГП",
+    sotrudnik: "Ким Александр Юрьевич",
+  }));
 
   const addItem = () => {
     setItems(prev => [...prev, { name: form.name || "Позиция ГП", qty: form.qty, klass: form.klass, code: form.code }]);
@@ -81,12 +89,12 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
     >
       <div className="grid grid-cols-2 gap-4 mb-6">
         <Field label="Тип документа"><Input value="Накладная на приём ГП" disabled /></Field>
-        <Field label="Номер"><Input value={`НП-${Math.floor(Math.random() * 900 + 100)}`} disabled /></Field>
-        <Field label="Дата"><Input value="19.08.2026" disabled /></Field>
-        <Field label="Заказчик"><Select value="Монетный двор" options={["Монетный двор", "ОО «АурумПоставка»"]} /></Field>
-        <Field label="Склад-отправитель"><Select value="Производственный цех" options={["Производственный цех", "Ювелирный цех"]} /></Field>
-        <Field label="Склад-получатель"><Select value="Склад ГП" options={["Склад ГП", "Склад ДМ №1"]} /></Field>
-        <Field label="Сотрудник склада-получателя" full><Select value="Ким Александр Юрьевич" options={["Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} /></Field>
+        <Field label="Номер"><Input value={head.number} onChange={v => setHead(h => ({ ...h, number: v }))} /></Field>
+        <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} /></Field>
+        <Field label="Заказчик"><Select value={head.zakazchik} options={["Монетный двор", "ОО «АурумПоставка»"]} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} /></Field>
+        <Field label="Склад-отправитель"><Select value={head.skladOtpr} options={["Производственный цех", "Ювелирный цех"]} onChange={v => setHead(h => ({ ...h, skladOtpr: v }))} /></Field>
+        <Field label="Склад-получатель"><Select value={head.skladPoluch} options={["Склад ГП", "Склад ДМ №1"]} onChange={v => setHead(h => ({ ...h, skladPoluch: v }))} /></Field>
+        <Field label="Сотрудник склада-получателя" full><Select value={head.sotrudnik} options={["Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} onChange={v => setHead(h => ({ ...h, sotrudnik: v }))} /></Field>
       </div>
 
       <div className="border-t border-gray-200 pt-4">
@@ -147,6 +155,12 @@ function VydachaGPModal({ gpItems, onClose, onSave }: { gpItems: GPItem[]; onClo
   const [items, setItems] = useState<{ name: string; nomenkl: string; qty: string; klass: string; code: string }[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ nomenkl: gpItems[0]?.nomenkl || "", qty: "" });
+  const [head, setHead] = useState(() => ({
+    number: `НО-${Math.floor(Math.random() * 900 + 100)}`,
+    date: new Date().toLocaleDateString("ru-RU"),
+    poluchatel: "ТД «Золото Казахстана»",
+    schetFaktura: "",
+  }));
 
   const addItem = () => {
     const src = gpItems.find(i => i.nomenkl === form.nomenkl);
@@ -170,10 +184,10 @@ function VydachaGPModal({ gpItems, onClose, onSave }: { gpItems: GPItem[]; onClo
     >
       <div className="grid grid-cols-2 gap-4 mb-6">
         <Field label="Тип документа"><Select value="Накладная на отгрузку ГП" options={["Накладная на отгрузку ГП"]} /></Field>
-        <Field label="Номер"><Input value="НО-0206" disabled /></Field>
-        <Field label="Дата"><Input value="19.08.2026" disabled /></Field>
-        <Field label="Получатель"><Select value="ТД «Золото Казахстана»" options={["ТД «Золото Казахстана»", "ИП Сейткали А.М."]} /></Field>
-        <Field label="Счёт-фактура" full><Input value="" placeholder="Номер счёт-фактуры" /></Field>
+        <Field label="Номер"><Input value={head.number} onChange={v => setHead(h => ({ ...h, number: v }))} /></Field>
+        <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} /></Field>
+        <Field label="Получатель"><Select value={head.poluchatel} options={["ТД «Золото Казахстана»", "ИП Сейткали А.М."]} onChange={v => setHead(h => ({ ...h, poluchatel: v }))} /></Field>
+        <Field label="Счёт-фактура" full><Input value={head.schetFaktura} onChange={v => setHead(h => ({ ...h, schetFaktura: v }))} placeholder="Номер счёт-фактуры" /></Field>
       </div>
 
       <div className="border-t border-gray-200 pt-4">
@@ -409,6 +423,34 @@ type PrihodDocType = "Приходный ордер" | "Накладная";
 function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
   const [docType, setDocType] = useState<PrihodDocType>("Приходный ордер");
   const { toast, show, clear } = useToast();
+  const today = new Date().toLocaleDateString("ru-RU");
+
+  const [head, setHead] = useState(() => ({
+    number: "ПО-0342",
+    date: today,
+    otpravitel: "ООО «Аффинаж-Сервис»",
+    poluchatel: "Склад №1",
+    schetFaktura: "СФ-0091",
+    schetFakturaData: today,
+    dogovor: "ДОГ-2026-045",
+    dogovorData: today,
+    pasport: "ПМ-000456",
+    platDoc: "ПД-001234",
+    platDocData: today,
+    ligByDoc: "1 000.00 г",
+    massByDoc: "999.90 г",
+    ligAccepted: "999.50 г",
+    netAccepted: "998.80 г",
+    price: "32 500.00",
+    sum: "32 467 500.00",
+    planPos: "План-2026/Q3-AU",
+    nakladNumber: "НП-001234",
+    nakladDate: today,
+    zakazchik: "Национальный банк",
+    skladOtpr: "СДМ",
+    skladPoluch: "Склад ДМ №1",
+    sotrudnik: "Петров А.Н.",
+  }));
 
   // Приходный ордер state
   const [ownProperty, setOwnProperty] = useState(true);
@@ -463,38 +505,38 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
       {isOrder ? (
         <div className="grid grid-cols-3 gap-4 mb-5">
           <Field label="Тип документа"><Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} /></Field>
-          <Field label="Номер"><Input value="ПО-0342" disabled /></Field>
-          <Field label="Дата"><Input value="19.08.2026" disabled /></Field>
-          <Field label="Отправитель"><Select value="ООО «Аффинаж-Сервис»" options={["ООО «Аффинаж-Сервис»", "АО «Металл Инвест»"]} /></Field>
-          <Field label="Получатель"><Select value="Склад №1" options={["Склад №1", "Склад №2"]} /></Field>
-          <Field label="№ счёт-фактуры"><Input value="СФ-0091" disabled /></Field>
-          <Field label="Дата счёт-фактуры"><Input value="15.08.2026" disabled /></Field>
-          <Field label="Номер договора"><Input value="ДОГ-2026-045" disabled /></Field>
-          <Field label="Дата договора"><Input value="19.08.2026" disabled /></Field>
+          <Field label="Номер"><Input value={head.number} onChange={v => setHead(h => ({ ...h, number: v }))} /></Field>
+          <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} /></Field>
+          <Field label="Отправитель"><Select value={head.otpravitel} options={["ООО «Аффинаж-Сервис»", "АО «Металл Инвест»"]} onChange={v => setHead(h => ({ ...h, otpravitel: v }))} /></Field>
+          <Field label="Получатель"><Select value={head.poluchatel} options={["Склад №1", "Склад №2"]} onChange={v => setHead(h => ({ ...h, poluchatel: v }))} /></Field>
+          <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={v => setHead(h => ({ ...h, schetFaktura: v }))} /></Field>
+          <Field label="Дата счёт-фактуры"><Input value={head.schetFakturaData} onChange={v => setHead(h => ({ ...h, schetFakturaData: v }))} /></Field>
+          <Field label="Номер договора"><Input value={head.dogovor} onChange={v => setHead(h => ({ ...h, dogovor: v }))} /></Field>
+          <Field label="Дата договора"><Input value={head.dogovorData} onChange={v => setHead(h => ({ ...h, dogovorData: v }))} /></Field>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
             <Toggle checked={ownProperty} onChange={setOwnProperty} label={ownProperty ? "Да" : "Нет"} />
           </div>
-          <Field label="Номер паспорта"><Input value="ПМ-000456" disabled /></Field>
-          <Field label="Номер платёжного документа"><Input value="ПД-001234" disabled /></Field>
-          <Field label="Дата платёжного документа"><Input value="01.09.2026" disabled /></Field>
-          <Field label="Лигатурный вес по документу"><Input value="1 000.00 г" disabled /></Field>
-          <Field label="Масса по документу"><Input value="999.90 г" disabled /></Field>
-          <Field label="Принято лигатурный вес"><Input value="999.50 г" disabled /></Field>
-          <Field label="Принято чистый вес"><Input value="998.80 г" disabled /></Field>
-          <Field label="Цена за единицу, тг"><Input value="32 500.00" disabled /></Field>
-          <Field label="Сумма в тенге"><Input value="32 467 500.00" disabled /></Field>
-          <Field label="Позиция годового плана"><Input value="План-2026/Q3-AU" disabled /></Field>
+          <Field label="Номер паспорта"><Input value={head.pasport} onChange={v => setHead(h => ({ ...h, pasport: v }))} /></Field>
+          <Field label="Номер платёжного документа"><Input value={head.platDoc} onChange={v => setHead(h => ({ ...h, platDoc: v }))} /></Field>
+          <Field label="Дата платёжного документа"><Input value={head.platDocData} onChange={v => setHead(h => ({ ...h, platDocData: v }))} /></Field>
+          <Field label="Лигатурный вес по документу"><Input value={head.ligByDoc} onChange={v => setHead(h => ({ ...h, ligByDoc: v }))} /></Field>
+          <Field label="Масса по документу"><Input value={head.massByDoc} onChange={v => setHead(h => ({ ...h, massByDoc: v }))} /></Field>
+          <Field label="Принято лигатурный вес"><Input value={head.ligAccepted} onChange={v => setHead(h => ({ ...h, ligAccepted: v }))} /></Field>
+          <Field label="Принято чистый вес"><Input value={head.netAccepted} onChange={v => setHead(h => ({ ...h, netAccepted: v }))} /></Field>
+          <Field label="Цена за единицу, тг"><Input value={head.price} onChange={v => setHead(h => ({ ...h, price: v }))} /></Field>
+          <Field label="Сумма в тенге"><Input value={head.sum} onChange={v => setHead(h => ({ ...h, sum: v }))} /></Field>
+          <Field label="Позиция годового плана"><Input value={head.planPos} onChange={v => setHead(h => ({ ...h, planPos: v }))} /></Field>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 mb-5">
           <Field label="Тип документа"><Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} /></Field>
-          <Field label="Номер"><Input value="НП-001234" disabled /></Field>
-          <Field label="Дата"><Input value="21.08.2026" disabled /></Field>
-          <Field label="Заказчик"><Select value="Национальный банк" options={["Национальный банк", "Монетный двор"]} /></Field>
-          <Field label="Склад-отправитель"><Select value="СДМ" options={["СДМ", "Производственный цех"]} /></Field>
-          <Field label="Склад-получатель"><Select value="Склад ДМ №1" options={["Склад ДМ №1", "Склад ДМ №2"]} /></Field>
-          <Field label="Сотрудник склада-получателя" full><Select value="Петров А.Н." options={["Петров А.Н.", "Ким Александр Юрьевич"]} /></Field>
+          <Field label="Номер"><Input value={head.nakladNumber} onChange={v => setHead(h => ({ ...h, nakladNumber: v }))} /></Field>
+          <Field label="Дата"><Input value={head.nakladDate} onChange={v => setHead(h => ({ ...h, nakladDate: v }))} /></Field>
+          <Field label="Заказчик"><Select value={head.zakazchik} options={["Национальный банк", "Монетный двор"]} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} /></Field>
+          <Field label="Склад-отправитель"><Select value={head.skladOtpr} options={["СДМ", "Производственный цех"]} onChange={v => setHead(h => ({ ...h, skladOtpr: v }))} /></Field>
+          <Field label="Склад-получатель"><Select value={head.skladPoluch} options={["Склад ДМ №1", "Склад ДМ №2"]} onChange={v => setHead(h => ({ ...h, skladPoluch: v }))} /></Field>
+          <Field label="Сотрудник склада-получателя" full><Select value={head.sotrudnik} options={["Петров А.Н.", "Ким Александр Юрьевич"]} onChange={v => setHead(h => ({ ...h, sotrudnik: v }))} /></Field>
         </div>
       )}
 
@@ -678,6 +720,7 @@ export function OstatokDM() {
       id: `dm-merged-${Date.now()}`,
       name: `Объединённая позиция (${selectedItems.length} ед.)`,
       nomenkl: `DM-M${Date.now().toString().slice(-4)}`,
+      metal: selectedItems[0].metal,
       klass: "Слиток",
       proba: avgProba,
       ligWeight: totalLig,
@@ -740,6 +783,7 @@ export function OstatokDM() {
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Наименование</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Номенкл. №</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Класс</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Металл</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Проба</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Лигат. вес г</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Чистый вес г</th>
@@ -755,6 +799,7 @@ export function OstatokDM() {
                 <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
                 <td className="px-4 py-3">{item.klass}</td>
+                <td className="px-4 py-3 text-blue-600 font-medium">{item.metal}</td>
                 <td className="px-4 py-3">{item.proba}</td>
                 <td className="px-4 py-3">{item.ligWeight}</td>
                 <td className="px-4 py-3">{item.netWeight}</td>
@@ -774,6 +819,7 @@ export function OstatokDM() {
             <Field label="Наименование" full><Input value={viewItem.name} disabled /></Field>
             <Field label="Номенкл. №"><Input value={viewItem.nomenkl} disabled /></Field>
             <Field label="Класс"><Input value={viewItem.klass} disabled /></Field>
+            <Field label="Металл"><Input value={viewItem.metal} disabled /></Field>
             <Field label="Проба"><Input value={String(viewItem.proba)} disabled /></Field>
             <Field label="Лигатурный вес г"><Input value={String(viewItem.ligWeight)} disabled /></Field>
             <Field label="Чистый вес г"><Input value={String(viewItem.netWeight)} disabled /></Field>

@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useApp, Page, Lang } from "../store/AppContext";
-import { Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, Languages, LogOut } from "lucide-react";
+import { LayoutDashboard, Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, Languages, LogOut } from "lucide-react";
 
 const menuItems: { key: string; page: Page; icon: React.ReactNode }[] = [
+  { key: "nav.dashboard", page: "dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
   { key: "nav.sklady", page: "sklady-hub", icon: <Warehouse className="w-5 h-5" /> },
   { key: "nav.skladOper", page: "sklad-oper-hub", icon: <ArrowLeftRight className="w-5 h-5" /> },
   { key: "nav.dvizhenie", page: "dvizhenie-mat", icon: <Repeat className="w-5 h-5" /> },

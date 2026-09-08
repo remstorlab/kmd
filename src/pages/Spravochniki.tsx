@@ -21,13 +21,23 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const [items, setItems] = useState(dict.items);
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<{ code: string; value: string; status: string } | null>(null);
+  const [form, setForm] = useState({ code: "", value: "", status: "Активно" });
   const { toast, show, clear } = useToast();
 
-  const save = (item: { code: string; value: string; status: string }) => {
+  const openAdd = () => {
+    setForm({ code: "", value: "", status: "Активно" });
+    setShowAdd(true);
+  };
+  const openEdit = (item: { code: string; value: string; status: string }) => {
+    setForm(item);
+    setEditItem(item);
+  };
+
+  const save = () => {
     if (editItem) {
-      setItems(prev => prev.map(i => i.code === editItem.code ? item : i));
+      setItems(prev => prev.map(i => i.code === editItem.code ? form : i));
     } else {
-      setItems(prev => [...prev, item]);
+      setItems(prev => [...prev, form]);
     }
     setShowAdd(false);
     setEditItem(null);
@@ -46,7 +56,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
       <PageHeader
         title={name}
         subtitle={`${dict.count} значений`}
-        actions={<Btn onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить запись</Btn>}
+        actions={<Btn onClick={openAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
       />
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -63,7 +73,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                 <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-gray-900">{item.value}</td>
                 <td className="px-4 py-3"><Badge label={item.status} /></td>
-                <td className="px-4 py-3"><EditIcon onClick={() => setEditItem(item)} /></td>
+                <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
               </tr>
             ))}
           </tbody>
@@ -77,14 +87,14 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
           footer={
             <>
               <Btn variant="secondary" onClick={() => { setShowAdd(false); setEditItem(null); }}>Отмена</Btn>
-              <Btn onClick={() => save({ code: editItem?.code || "", value: editItem?.value || "", status: "Активно" })}>Сохранить</Btn>
+              <Btn onClick={save}>Сохранить</Btn>
             </>
           }
         >
           <div className="space-y-4">
-            <Field label="Код"><Input value={editItem?.code || ""} onChange={v => editItem && setEditItem({ ...editItem, code: v })} disabled={!!editItem} /></Field>
-            <Field label="Значение"><Input value={editItem?.value || ""} onChange={v => editItem && setEditItem({ ...editItem, value: v })} /></Field>
-            <Field label="Статус"><Select value="Активно" options={["Активно", "Неактивно"]} /></Field>
+            <Field label="Код"><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} /></Field>
+            <Field label="Значение"><Input value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} /></Field>
+            <Field label="Статус"><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>
           </div>
         </Modal>
       )}

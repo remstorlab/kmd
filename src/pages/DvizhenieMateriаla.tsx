@@ -78,6 +78,18 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [showSpisanie, setShowSpisanie] = useState(false);
   const { toast, show, clear } = useToast();
 
+  const [head, setHead] = useState(() => ({
+    docType: "Приказ",
+    document: op?.document || "ДВ-001234",
+    date: op?.date || new Date().toLocaleDateString("ru-RU"),
+    zakazchik: "Монетный двор",
+    responsible: op?.responsible || "Нурланов Асхат Бекович",
+    material: "Золото (Au)",
+    plavkaNo: "П-2026-0089",
+    vydal: "Ким Александр Юрьевич",
+    poluchil: op?.responsible || "Нурланов Асхат Бекович",
+  }));
+
   const delta = -10.35;
   const deltaSign = delta >= 0 ? "+" : "";
   const inNorm = Math.abs(delta) <= 5;
@@ -85,12 +97,12 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const save = () => {
     const o: Operation = {
       id: op?.id || `op-${Date.now()}`,
-      date: new Date().toLocaleDateString("ru-RU"),
+      date: head.date,
       type: type as any,
       vid: vid as any,
       positions: vydacha.length,
-      document: `ДВ-${Math.floor(Math.random() * 90000 + 10000)}`,
-      responsible: "Нурланов А.Б.",
+      document: head.document,
+      responsible: head.responsible,
       statusVydacha: "Выдано",
       statusVozvrat: "Не начат",
       statusClose: "Не закрыто",
@@ -128,17 +140,17 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <Field label="Вид">
           <Select value={vid} options={["Отбор пробы", "Анализ в ЛКИ", "Плавка", "Гальванопокрытие", "Производство ГП"]} onChange={v => setVid(v as any)} disabled={readOnly || !!op} />
         </Field>
-        <Field label="Тип документа"><Select value="Приказ" options={["Приказ", "Заказ-наряд"]} disabled={readOnly} /></Field>
-        <Field label="Номер документа"><Input value={op?.document || "ДВ-001234"} disabled /></Field>
-        <Field label="Дата операции"><Input value={op?.date || "19.08.2026"} disabled={readOnly} /></Field>
-        <Field label="Заказчик"><Select value="Монетный двор" options={["Монетный двор"]} disabled={readOnly} /></Field>
-        <Field label="Подотчётное лицо" full><Select value={op?.responsible || "Нурланов Асхат Бекович"} options={["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"]} disabled={readOnly} /></Field>
+        <Field label="Тип документа"><Select value={head.docType} options={["Приказ", "Заказ-наряд"]} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={readOnly} /></Field>
+        <Field label="Номер документа"><Input value={head.document} onChange={v => setHead(h => ({ ...h, document: v }))} disabled={readOnly || !!op} /></Field>
+        <Field label="Дата операции"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={readOnly} /></Field>
+        <Field label="Заказчик"><Select value={head.zakazchik} options={["Монетный двор"]} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={readOnly} /></Field>
+        <Field label="Подотчётное лицо" full><Select value={head.responsible} options={["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"]} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={readOnly} /></Field>
         {vid === "Плавка" && <>
-          <Field label="Материал"><Select value="Золото (Au)" options={["Золото (Au)", "Серебро (Ag)", "Платина (Pt)"]} disabled={readOnly} /></Field>
-          <Field label="Номер плавки"><Input value="П-2026-0089" disabled={readOnly} /></Field>
+          <Field label="Материал"><Select value={head.material} options={["Золото (Au)", "Серебро (Ag)", "Платина (Pt)"]} onChange={v => setHead(h => ({ ...h, material: v }))} disabled={readOnly} /></Field>
+          <Field label="Номер плавки"><Input value={head.plavkaNo} onChange={v => setHead(h => ({ ...h, plavkaNo: v }))} disabled={readOnly} /></Field>
         </>}
-        <Field label="Выдал"><Select value="Ким Александр Юрьевич" options={["Ким Александр Юрьевич", "Жумабаев Даурен"]} disabled={readOnly} /></Field>
-        <Field label="Получил"><Select value={op?.responsible || "Нурланов Асхат Бекович"} options={["Нурланов Асхат Бекович", "Петров Сергей Владимирович"]} disabled={readOnly} /></Field>
+        <Field label="Выдал"><Select value={head.vydal} options={["Ким Александр Юрьевич", "Жумабаев Даурен"]} onChange={v => setHead(h => ({ ...h, vydal: v }))} disabled={readOnly} /></Field>
+        <Field label="Получил"><Select value={head.poluchil} options={["Нурланов Асхат Бекович", "Петров Сергей Владимирович"]} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={readOnly} /></Field>
       </div>
 
       {/* Tabs */}

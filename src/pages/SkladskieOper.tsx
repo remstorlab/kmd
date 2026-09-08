@@ -43,6 +43,27 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
   const [docType, setDocType] = useState<PrihodDocType>("Приходный ордер");
   const isOrder = ro || docType === "Приходный ордер";
   const { toast, show, clear } = useToast();
+  const today = new Date().toLocaleDateString("ru-RU");
+
+  const [head, setHead] = useState(() => ({
+    number: doc?.number || "ПО-0342",
+    date: doc?.date || today,
+    otpravitel: doc?.sender || "ОО «АурумПоставка»",
+    poluchatel: doc?.receiver || "Склад ДМ №1",
+    schetFaktura: "СФ-2026-1234",
+    schetFakturaData: today,
+    dogovor: "ДОГ-2025-089",
+    dogovorData: today,
+    ligByDoc: "500.25",
+    ligAccepted: "500.25",
+    netAccepted: "498.12",
+    nakladNumber: "НП-001234",
+    nakladDate: today,
+    zakazchik: "Монетный двор",
+    skladOtpr: "СДМ",
+    skladPoluch: "Склад ДМ №1",
+    sotrudnik: "Ким Александр Юрьевич",
+  }));
 
   // Приходный ордер state
   const [positions, setPositions] = useState([
@@ -110,27 +131,27 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
           <Field label="Тип документа">
             {ro ? <Input value="Приходный ордер" disabled /> : <Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} />}
           </Field>
-          <Field label="Номер"><Input value={doc?.number || "ПО-0342"} disabled={ro} /></Field>
-          <Field label="Дата"><Input value={doc?.date || "19.08.2026"} disabled={ro} /></Field>
-          <Field label="Отправитель"><Select value={doc?.sender || "ОО «АурумПоставка»"} options={["ОО «АурумПоставка»", "АО «Металл Инвест»"]} disabled={ro} /></Field>
-          <Field label="Получатель"><Select value={doc?.receiver || "Склад ДМ №1"} options={["Склад ДМ №1", "Склад ДМ №2"]} disabled={ro} /></Field>
-          <Field label="№ счёт-фактуры"><Input value="СФ-2026-1234" disabled={ro} /></Field>
-          <Field label="Дата счёт-фактуры"><Input value="15.08.2026" disabled={ro} /></Field>
-          <Field label="Номер договора"><Input value="ДОГ-2025-089" disabled={ro} /></Field>
-          <Field label="Дата договора"><Input value="01.01.2025" disabled={ro} /></Field>
-          <Field label="Лигатурный вес по документу (г)"><Input value="500.25" disabled={ro} /></Field>
-          <Field label="Принято лигатурный вес (г)"><Input value="500.25" disabled={ro} /></Field>
-          <Field label="Принято чистый вес (г)"><Input value="498.12" disabled={ro} /></Field>
+          <Field label="Номер"><Input value={head.number} onChange={v => setHead(h => ({ ...h, number: v }))} disabled={ro} /></Field>
+          <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={ro} /></Field>
+          <Field label="Отправитель"><Select value={head.otpravitel} options={["ОО «АурумПоставка»", "АО «Металл Инвест»"]} onChange={v => setHead(h => ({ ...h, otpravitel: v }))} disabled={ro} /></Field>
+          <Field label="Получатель"><Select value={head.poluchatel} options={["Склад ДМ №1", "Склад ДМ №2"]} onChange={v => setHead(h => ({ ...h, poluchatel: v }))} disabled={ro} /></Field>
+          <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={v => setHead(h => ({ ...h, schetFaktura: v }))} disabled={ro} /></Field>
+          <Field label="Дата счёт-фактуры"><Input value={head.schetFakturaData} onChange={v => setHead(h => ({ ...h, schetFakturaData: v }))} disabled={ro} /></Field>
+          <Field label="Номер договора"><Input value={head.dogovor} onChange={v => setHead(h => ({ ...h, dogovor: v }))} disabled={ro} /></Field>
+          <Field label="Дата договора"><Input value={head.dogovorData} onChange={v => setHead(h => ({ ...h, dogovorData: v }))} disabled={ro} /></Field>
+          <Field label="Лигатурный вес по документу (г)"><Input value={head.ligByDoc} onChange={v => setHead(h => ({ ...h, ligByDoc: v }))} disabled={ro} /></Field>
+          <Field label="Принято лигатурный вес (г)"><Input value={head.ligAccepted} onChange={v => setHead(h => ({ ...h, ligAccepted: v }))} disabled={ro} /></Field>
+          <Field label="Принято чистый вес (г)"><Input value={head.netAccepted} onChange={v => setHead(h => ({ ...h, netAccepted: v }))} disabled={ro} /></Field>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 mb-5">
           <Field label="Тип документа"><Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} /></Field>
-          <Field label="Номер"><Input value="НП-001234" disabled /></Field>
-          <Field label="Дата"><Input value="21.08.2026" disabled /></Field>
-          <Field label="Заказчик"><Select value="Монетный двор" options={["Монетный двор", "Национальный банк"]} /></Field>
-          <Field label="Склад-отправитель"><Select value="СДМ" options={["СДМ", "Производственный цех"]} /></Field>
-          <Field label="Склад-получатель"><Select value="Склад ДМ №1" options={["Склад ДМ №1", "Склад ДМ №2"]} /></Field>
-          <Field label="Сотрудник склада-получателя" full><Select value="Ким Александр Юрьевич" options={["Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} /></Field>
+          <Field label="Номер"><Input value={head.nakladNumber} onChange={v => setHead(h => ({ ...h, nakladNumber: v }))} /></Field>
+          <Field label="Дата"><Input value={head.nakladDate} onChange={v => setHead(h => ({ ...h, nakladDate: v }))} /></Field>
+          <Field label="Заказчик"><Select value={head.zakazchik} options={["Монетный двор", "Национальный банк"]} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} /></Field>
+          <Field label="Склад-отправитель"><Select value={head.skladOtpr} options={["СДМ", "Производственный цех"]} onChange={v => setHead(h => ({ ...h, skladOtpr: v }))} /></Field>
+          <Field label="Склад-получатель"><Select value={head.skladPoluch} options={["Склад ДМ №1", "Склад ДМ №2"]} onChange={v => setHead(h => ({ ...h, skladPoluch: v }))} /></Field>
+          <Field label="Сотрудник склада-получателя" full><Select value={head.sotrudnik} options={["Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} onChange={v => setHead(h => ({ ...h, sotrudnik: v }))} /></Field>
         </div>
       )}
 
@@ -257,6 +278,13 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
 // ── Выдача ГП modal ───────────────────────────────────────────────────────────
 
 function VydachaGPModal({ onClose, onSave, readOnly = false }: { onClose: () => void; onSave: () => void; readOnly?: boolean }) {
+  const [head, setHead] = useState(() => ({
+    number: "НО-0205",
+    date: new Date().toLocaleDateString("ru-RU"),
+    poluchatel: "ТД «Золото Казахстана»",
+    schetFaktura: "СФ-2026-0199",
+  }));
+
   return (
     <Modal title="Накладная на отгрузку ГП" onClose={onClose} wide footer={
       readOnly
@@ -265,10 +293,10 @@ function VydachaGPModal({ onClose, onSave, readOnly = false }: { onClose: () => 
     }>
       <div className="grid grid-cols-2 gap-4 mb-4">
         <Field label="Тип документа"><Select value="Накладная на отгрузку ГП" options={["Накладная на отгрузку ГП"]} disabled={readOnly} /></Field>
-        <Field label="Номер"><Input value="НО-0205" disabled /></Field>
-        <Field label="Дата"><Input value="19.08.2026" disabled /></Field>
-        <Field label="Получатель"><Select value="ТД «Золото Казахстана»" options={["ТД «Золото Казахстана»", "ИП Сейткали А.М."]} disabled={readOnly} /></Field>
-        <Field label="Счёт-фактура" full><Input value="СФ-2026-0199" disabled={readOnly} /></Field>
+        <Field label="Номер"><Input value={head.number} onChange={v => setHead(h => ({ ...h, number: v }))} disabled={readOnly} /></Field>
+        <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={readOnly} /></Field>
+        <Field label="Получатель"><Select value={head.poluchatel} options={["ТД «Золото Казахстана»", "ИП Сейткали А.М."]} onChange={v => setHead(h => ({ ...h, poluchatel: v }))} disabled={readOnly} /></Field>
+        <Field label="Счёт-фактура" full><Input value={head.schetFaktura} onChange={v => setHead(h => ({ ...h, schetFaktura: v }))} disabled={readOnly} /></Field>
       </div>
       <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
         Список позиций для выдачи

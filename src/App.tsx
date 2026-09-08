@@ -2,6 +2,7 @@ import React from "react";
 import { AppProvider, useApp } from "./store/AppContext";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
+import { Dashboard } from "./pages/Dashboard";
 import { SkladyHub, OstatokGP, OstatokDM } from "./pages/Sklady";
 import { SkladskieOperHub, PrihodList, VydachaList } from "./pages/SkladskieOper";
 import { DvizhenieMateriаla } from "./pages/DvizhenieMateriаla";
@@ -15,6 +16,7 @@ import { PanelAdmin } from "./pages/Admin";
 function PageRouter() {
   const { page } = useApp();
   switch (page) {
+    case "dashboard":        return <Dashboard />;
     case "sklady-hub":        return <SkladyHub />;
     case "ostatok-gp":        return <OstatokGP />;
     case "ostatok-dm":        return <OstatokDM />;
@@ -31,7 +33,7 @@ function PageRouter() {
     case "logirovanie":       return <Logirovanie />;
     case "admin-users":       return <PanelAdmin />;
     case "admin-roles":       return <PanelAdmin />;
-    default:                  return <OstatokGP />;
+    default:                  return <Dashboard />;
   }
 }
 

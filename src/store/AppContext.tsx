@@ -8,6 +8,7 @@ import {
 } from "../data/mock";
 
 export type Page =
+  | "dashboard"
   | "sklady-hub" | "ostatok-gp" | "ostatok-dm"
   | "sklad-oper-hub" | "prihod-list" | "vydacha-list"
   | "dvizhenie-mat"
@@ -26,6 +27,7 @@ export type Lang = "ru" | "kz";
 export const t: Record<Lang, Record<string, string>> = {
   ru: {
     // Nav
+    "nav.dashboard": "Главная",
     "nav.sklady": "Склады",
     "nav.skladOper": "Складские операции",
     "nav.dvizhenie": "Движение материала",
@@ -37,7 +39,7 @@ export const t: Record<Lang, Record<string, string>> = {
     "nav.admin": "Панель администрирования",
     // Login
     "login.title": "СДМ",
-    "login.sub": "Система учёта драгоценных материалов",
+    "login.sub": "Система учёта ДМ",
     "login.username": "Имя пользователя",
     "login.password": "Пароль",
     "login.remember": "Запомнить меня",
@@ -62,6 +64,7 @@ export const t: Record<Lang, Record<string, string>> = {
   },
   kz: {
     // Nav
+    "nav.dashboard": "Басты бет",
     "nav.sklady": "Қоймалар",
     "nav.skladOper": "Қойма операциялары",
     "nav.dvizhenie": "Материал қозғалысы",
@@ -160,7 +163,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return (localStorage.getItem("dm-lang") as Lang) || "ru";
   });
 
-  const [page, setPage] = useState<Page>("ostatok-gp");
+  const [page, setPage] = useState<Page>("dashboard");
   const [pageParams, setPageParams] = useState<Record<string, string>>({});
 
   // Apply dark class to <html>
@@ -195,7 +198,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
-    setPage("ostatok-gp");
+    setPage("dashboard");
   };
 
   const navigate = (p: Page, params: Record<string, string> = {}) => {
