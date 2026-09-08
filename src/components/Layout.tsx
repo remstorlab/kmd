@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useApp, Page, Lang } from "../store/AppContext";
-import { LayoutDashboard, Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, Languages, LogOut } from "lucide-react";
+import { Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, Languages, LogOut } from "lucide-react";
 
 const menuItems: { key: string; page: Page; icon: React.ReactNode }[] = [
-  { key: "nav.dashboard", page: "dashboard", icon: <LayoutDashboard className="w-5 h-5" /> },
   { key: "nav.sklady", page: "sklady-hub", icon: <Warehouse className="w-5 h-5" /> },
   { key: "nav.skladOper", page: "sklad-oper-hub", icon: <ArrowLeftRight className="w-5 h-5" /> },
   { key: "nav.dvizhenie", page: "dvizhenie-mat", icon: <Repeat className="w-5 h-5" /> },
@@ -140,15 +139,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <aside className="w-56 shrink-0 bg-slate-900 flex flex-col h-full overflow-hidden">
         {/* Logo */}
         <div className="px-4 py-4 border-b border-slate-700/60">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-900/50">
+          <button
+            onClick={() => navigate("dashboard")}
+            className="flex items-center gap-2.5 w-full text-left rounded-lg -m-1 p-1 hover:bg-slate-800 transition-colors"
+            title="Перейти на главную"
+          >
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-900/50 shrink-0">
               <span className="text-white font-bold text-sm">Au</span>
             </div>
             <div>
               <div className="text-white font-semibold text-sm leading-tight tracking-tight">СДМ</div>
               <div className="text-slate-500 text-[10px] leading-tight mt-0.5">Монетный Двор</div>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Nav */}
@@ -185,12 +188,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Header */}
         <header className="h-14 bg-slate-900 border-b border-slate-700/40 flex items-center justify-between px-5 shrink-0">
           {/* Left: breadcrumb hint */}
-          <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("dashboard")}
+            className="flex items-center gap-2 hover:text-white transition-colors"
+            title="Перейти на главную"
+          >
             <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             <span className="text-slate-400 text-sm">
               {tr("login.sub").split(" ").slice(0, 3).join(" ")}
             </span>
-          </div>
+          </button>
 
           {/* Right: controls */}
           <div className="flex items-center gap-2">

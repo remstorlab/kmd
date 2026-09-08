@@ -2,7 +2,7 @@ import React from "react";
 import { useApp } from "../store/AppContext";
 import { PageHeader, Badge } from "../components/ui";
 import { Metal } from "../data/mock";
-import { Coins, Repeat, Gem, Activity, Clock } from "lucide-react";
+import { Coins, Repeat, Send, Activity, Clock } from "lucide-react";
 
 const metalName: Record<Metal, string> = {
   Au: "Золото",
@@ -16,14 +16,6 @@ const metalColor: Record<Metal, string> = {
   Ag: "bg-slate-400",
   Pt: "bg-blue-500",
   Pd: "bg-indigo-400",
-};
-
-const statusColor: Record<string, string> = {
-  "На складе": "bg-green-500",
-  "Резерв": "bg-yellow-500",
-  "В обработке": "bg-blue-500",
-  "Зарезервировано": "bg-yellow-500",
-  "В подотчёте": "bg-blue-500",
 };
 
 function fmt(n: number, digits = 1) {
@@ -76,7 +68,7 @@ function BarRow({ label, value, max, unit, color }: { label: string; value: numb
 }
 
 export function Dashboard() {
-  const { dmItems, gpItems, podotchetniki, operations, logs, currentUser, navigate } = useApp();
+  const { dmItems, vydachaDocs, podotchetniki, operations, logs, currentUser, navigate } = useApp();
 
   // ── Часть 1: всего на складе (ДМ), по видам металла ──────────────────────
   const dmByMetal = dmItems.reduce((acc, i) => {
@@ -95,14 +87,12 @@ export function Dashboard() {
   const issuedTotal = inCirculation.reduce((s, p) => s + p.weight, 0);
   const maxIssued = Math.max(...inCirculation.map(p => p.weight), 1);
 
-  // ── Часть 3: готовая продукция на складе ─────────────────────────────────
-  const gpByStatus = gpItems.reduce((acc, i) => {
-    acc[i.status] = (acc[i.status] || 0) + i.qty;
+  // ── Часть 3: выдано со склада ─────────────────────────────────────────────
+  const vydByStatus = vydachaDocs.reduce((acc, d) => {
+    acc[d.status] = (acc[d.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-  const gpInStockQty = gpByStatus["На складе"] || 0;
-  const gpTotalQty = Object.values(gpByStatus).reduce((s, v) => s + v, 0);
-  const maxGpStatus = Math.max(...Object.values(gpByStatus), 1);
+  const vydTotal = vydachaDocs.length;
 
   const openOps = operations.filter(o => o.statusClose !== "Закрыто" && o.statusClose !== "Закрыто: списано").length;
   const recentLogs = logs.slice(0, 5);
@@ -132,11 +122,11 @@ export function Dashboard() {
           onClick={() => navigate("podotchetniki")}
         />
         <StatCard
-          icon={<Gem className="w-5 h-5" />}
-          label="Готовая продукция на складе"
-          value={`${gpInStockQty} шт`}
-          sub={`Всего выпущено ${gpTotalQty} шт`}
-          onClick={() => navigate("ostatok-gp")}
+          icon={<Send className="w-5 h-5" />}
+          label="Выдано со склада"
+          value={`${vydTotal} накладных`}
+          sub={Object.entries(vydByStatus).map(([s, c]) => `${s}: ${c}`).join(" · ")}
+          onClick={() => navigate("vydacha-list")}
         />
       </div>
 
@@ -152,17 +142,6 @@ export function Dashboard() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Готовая продукция по статусам</h3>
-          <div className="space-y-4">
-            {Object.keys(gpByStatus).map(s => (
-              <BarRow key={s} label={s} value={gpByStatus[s]} max={maxGpStatus} unit="шт" color={statusColor[s] || "bg-blue-600"} />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">В обороте по подотчётным лицам</h3>
           {inCirculation.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-4">Материалы никому не выданы</p>
@@ -174,29 +153,29 @@ export function Dashboard() {
             </div>
           )}
         </div>
+      </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Последние события</h3>
-            <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
-              <Activity className="w-3.5 h-3.5 text-blue-600" />
-              {openOps} операций в работе
-            </span>
-          </div>
-          <div className="space-y-3">
-            {recentLogs.map(log => (
-              <div key={log.id} className="flex items-start gap-2.5">
-                <Clock className="w-3.5 h-3.5 text-gray-300 mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <div className="text-sm text-gray-800 truncate">{log.description}</div>
-                  <div className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
-                    {log.datetime} · {log.user}
-                    <Badge label={log.type} />
-                  </div>
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Последние события</h3>
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+            <Activity className="w-3.5 h-3.5 text-blue-600" />
+            {openOps} операций в работе
+          </span>
+        </div>
+        <div className="space-y-3">
+          {recentLogs.map(log => (
+            <div key={log.id} className="flex items-start gap-2.5">
+              <Clock className="w-3.5 h-3.5 text-gray-300 mt-0.5 shrink-0" />
+              <div className="min-w-0 flex-1 flex items-center justify-between gap-3">
+                <div className="text-sm text-gray-800 truncate">{log.description}</div>
+                <div className="text-xs text-gray-400 flex items-center gap-1.5 shrink-0">
+                  {log.datetime} · {log.user}
+                  <Badge label={log.type} />
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
