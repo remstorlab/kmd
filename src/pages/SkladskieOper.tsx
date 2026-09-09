@@ -67,15 +67,15 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
 
   // Приходный ордер state
   const [positions, setPositions] = useState([
-    { nomenkl: "DM-001", name: "Слиток золота ЗлА-1", klass: "Слиток", code: "AU", proba: "999", lig: "500.25", net: "498.12", loc: "Сейф №1, Полка А" },
+    { nomenkl: "DM-001", name: "Слиток золота ЗлА-1", klass: "Слиток", code: "AU", kol: "1", proba: "999", lig: "500.25", net: "498.12", loc: "Сейф №1, Полка А" },
   ]);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
+  const [form, setForm] = useState({ nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
 
   const addPos = () => {
-    setPositions(p => [...p, { nomenkl: form.nomenkl, name: form.name || "Позиция ДМ", klass: form.klass, code: form.code, proba: form.proba, lig: form.lig, net: form.net, loc: `${form.sey}, ${form.polka}` }]);
+    setPositions(p => [...p, { nomenkl: form.nomenkl, name: form.name || "Позиция ДМ", klass: form.klass, code: form.code, kol: form.kol || "1", proba: form.proba, lig: form.lig, net: form.net, loc: `${form.sey}, ${form.polka}` }]);
     setShowAdd(false);
-    setForm({ nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
+    setForm({ nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
   };
 
   // Накладная state
@@ -177,6 +177,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
               <th className="px-3 py-2 text-left">Наименование</th>
               <th className="px-3 py-2 text-left">Класс</th>
               <th className="px-3 py-2 text-left">Код</th>
+              <th className="px-3 py-2 text-left">Кол-во</th>
               <th className="px-3 py-2 text-left">Проба</th>
               <th className="px-3 py-2 text-left">Лигат.г</th>
               <th className="px-3 py-2 text-left">Чистый г</th>
@@ -190,6 +191,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2">{p.klass}</td>
                   <td className="px-3 py-2 text-blue-600">{p.code}</td>
+                  <td className="px-3 py-2">{p.kol}</td>
                   <td className="px-3 py-2">{p.proba}</td>
                   <td className="px-3 py-2">{p.lig}</td>
                   <td className="px-3 py-2">{p.net}</td>
@@ -247,6 +249,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
             <Field label="Класс"><Select value={form.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Код материала"><Select value={form.code} options={["AU", "AG", "PT", "PD"]} onChange={v => setForm(f => ({ ...f, code: v }))} /></Field>
             <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
+            <Field label="Количество"><Input value={form.kol} onChange={v => setForm(f => ({ ...f, kol: v }))} placeholder="1" /></Field>
             <Field label="Масса лигатурная г"><Input value={form.lig} onChange={v => setForm(f => ({ ...f, lig: v }))} placeholder="0.00" /></Field>
             <Field label="Масса чистая г"><Input value={form.net} onChange={v => setForm(f => ({ ...f, net: v }))} placeholder="0.00" /></Field>
             <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>

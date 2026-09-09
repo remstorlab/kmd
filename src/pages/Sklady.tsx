@@ -47,6 +47,7 @@ function GPViewModal({ item, onClose }: { item: GPItem; onClose: () => void }) {
         <Field label="Количество"><Input value={`${item.qty} ${item.unit}`} disabled /></Field>
         <Field label="Класс"><Input value={item.klass} disabled /></Field>
         <Field label="Код материала"><Input value={item.code} disabled /></Field>
+        <Field label="Место хранения"><Input value={item.location} disabled /></Field>
         <Field label="Статус"><Badge label={item.status} /></Field>
       </div>
     </Modal>
@@ -337,6 +338,7 @@ export function OstatokGP() {
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Количество</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Класс</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Код материала</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Место хранения</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Статус</th>
               <th className="w-12"></th>
             </tr>
@@ -352,6 +354,7 @@ export function OstatokGP() {
                 <td className="px-4 py-3">{item.qty} {item.unit}</td>
                 <td className="px-4 py-3 text-gray-700">{item.klass}</td>
                 <td className="px-4 py-3 text-blue-600 font-medium">{item.code}</td>
+                <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><Badge label={item.status} /></td>
                 <td className="px-4 py-3">
                   <EyeIcon onClick={() => setViewItem(item)} />
@@ -455,16 +458,16 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
   // Приходный ордер state
   const [ownProperty, setOwnProperty] = useState(true);
   const [orderPositions, setOrderPositions] = useState([
-    { nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au", proba: "999.9", lig: "1000.0", net: "999.9", loc: "Сейф 1/Полка 1" },
-    { nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag", proba: "925.0", lig: "318.6", net: "294.7", loc: "Сейф 2/Полка 3" },
+    { nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au", kol: "1", proba: "999.9", lig: "1000.0", net: "999.9", loc: "Сейф 1/Полка 1" },
+    { nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag", kol: "1", proba: "925.0", lig: "318.6", net: "294.7", loc: "Сейф 2/Полка 3" },
   ]);
   const [showAddOrder, setShowAddOrder] = useState(false);
-  const [orderForm, setOrderForm] = useState({ nomenkl: "НН-72103", klass: "Слиток", code: "Au", name: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
+  const [orderForm, setOrderForm] = useState({ nomenkl: "НН-72103", klass: "Слиток", code: "Au", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
 
   const addOrderPos = () => {
-    setOrderPositions(p => [...p, { nomenkl: orderForm.nomenkl, name: orderForm.name || "Позиция ДМ", klass: orderForm.klass, code: orderForm.code, proba: orderForm.proba, lig: orderForm.lig, net: orderForm.net, loc: `${orderForm.sey}, ${orderForm.polka}` }]);
+    setOrderPositions(p => [...p, { nomenkl: orderForm.nomenkl, name: orderForm.name || "Позиция ДМ", klass: orderForm.klass, code: orderForm.code, kol: orderForm.kol || "1", proba: orderForm.proba, lig: orderForm.lig, net: orderForm.net, loc: `${orderForm.sey}, ${orderForm.polka}` }]);
     setShowAddOrder(false);
-    setOrderForm({ nomenkl: "НН-72103", klass: "Слиток", code: "Au", name: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
+    setOrderForm({ nomenkl: "НН-72103", klass: "Слиток", code: "Au", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
   };
 
   // Накладная state
@@ -563,6 +566,7 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
               <th className="px-3 py-2 text-left">Наименование</th>
               <th className="px-3 py-2 text-left">Класс</th>
               <th className="px-3 py-2 text-left">Код материала</th>
+              <th className="px-3 py-2 text-left">Кол-во</th>
               <th className="px-3 py-2 text-left">Проба</th>
               <th className="px-3 py-2 text-left">Лигат.</th>
               <th className="px-3 py-2 text-left">Чистый</th>
@@ -576,6 +580,7 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2">{p.klass}</td>
                   <td className="px-3 py-2 text-blue-600">{p.code}</td>
+                  <td className="px-3 py-2">{p.kol}</td>
                   <td className="px-3 py-2">{p.proba}</td>
                   <td className="px-3 py-2 font-medium">{p.lig}</td>
                   <td className="px-3 py-2 text-blue-600">{p.net}</td>
@@ -646,6 +651,7 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
             <Field label="Класс"><Select value={orderForm.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setOrderForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Код материала"><Select value={orderForm.code} options={["Au", "Ag", "Pt", "Pd"]} onChange={v => setOrderForm(f => ({ ...f, code: v }))} /></Field>
             <Field label="Наименование" full><Input value={orderForm.name} onChange={v => setOrderForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
+            <Field label="Количество"><Input value={orderForm.kol} onChange={v => setOrderForm(f => ({ ...f, kol: v }))} placeholder="1" /></Field>
             <Field label="Проба"><Input value={orderForm.proba} onChange={v => setOrderForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
             <Field label="Масса лигатурная"><Input value={orderForm.lig} onChange={v => setOrderForm(f => ({ ...f, lig: v }))} placeholder="0.00" /></Field>
             <Field label="Масса чистая"><Input value={orderForm.net} onChange={v => setOrderForm(f => ({ ...f, net: v }))} placeholder="0.00" /></Field>
@@ -716,12 +722,14 @@ export function OstatokDM() {
     const totalLig = selectedItems.reduce((s, i) => s + i.ligWeight, 0);
     const avgProba = Math.round(selectedItems.reduce((s, i) => s + i.proba * i.ligWeight, 0) / totalLig);
     const totalNet = selectedItems.reduce((s, i) => s + i.netWeight, 0);
+    const totalQty = selectedItems.reduce((s, i) => s + i.qty, 0);
     const merged: DMItem = {
       id: `dm-merged-${Date.now()}`,
       name: `Объединённая позиция (${selectedItems.length} ед.)`,
       nomenkl: `DM-M${Date.now().toString().slice(-4)}`,
       metal: selectedItems[0].metal,
       klass: "Слиток",
+      qty: totalQty,
       proba: avgProba,
       ligWeight: totalLig,
       netWeight: totalNet,
@@ -784,6 +792,7 @@ export function OstatokDM() {
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Номенкл. №</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Класс</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Металл</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Количество</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Проба</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Лигат. вес г</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Чистый вес г</th>
@@ -800,6 +809,7 @@ export function OstatokDM() {
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
                 <td className="px-4 py-3">{item.klass}</td>
                 <td className="px-4 py-3 text-blue-600 font-medium">{item.metal}</td>
+                <td className="px-4 py-3">{item.qty}</td>
                 <td className="px-4 py-3">{item.proba}</td>
                 <td className="px-4 py-3">{item.ligWeight}</td>
                 <td className="px-4 py-3">{item.netWeight}</td>
@@ -820,6 +830,7 @@ export function OstatokDM() {
             <Field label="Номенкл. №"><Input value={viewItem.nomenkl} disabled /></Field>
             <Field label="Класс"><Input value={viewItem.klass} disabled /></Field>
             <Field label="Металл"><Input value={viewItem.metal} disabled /></Field>
+            <Field label="Количество"><Input value={String(viewItem.qty)} disabled /></Field>
             <Field label="Проба"><Input value={String(viewItem.proba)} disabled /></Field>
             <Field label="Лигатурный вес г"><Input value={String(viewItem.ligWeight)} disabled /></Field>
             <Field label="Чистый вес г"><Input value={String(viewItem.netWeight)} disabled /></Field>

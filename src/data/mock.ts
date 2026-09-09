@@ -15,6 +15,7 @@ export interface GPItem {
   unit: string;
   klass: string;
   code: string;
+  location: string;
   status: StatusGP;
 }
 
@@ -26,6 +27,7 @@ export interface DMItem {
   nomenkl: string;
   klass: string;
   metal: Metal;
+  qty: number;
   proba: number;
   ligWeight: number;
   netWeight: number;
@@ -101,52 +103,52 @@ export interface LogEntry {
 
 // --- GP Items (34 total) ---
 export const initialGPItems: GPItem[] = [
-  { id: "gp1", name: "Кольцо обручальное 585", nomenkl: "GP-KOL-585-01", qty: 24, unit: "шт", klass: "Золото", code: "AU-585", status: "На складе" },
-  { id: "gp2", name: "Цепочка золотая Бисмарк", nomenkl: "GP-CEP-750-03", qty: 12, unit: "шт", klass: "Золото", code: "AU-750", status: "На складе" },
-  { id: "gp3", name: "Серьги с бриллиантами 0.5ct", nomenkl: "GP-SER-585-07", qty: 8, unit: "шт", klass: "Золото", code: "AU-585", status: "Резерв" },
-  { id: "gp4", name: "Браслет серебряный", nomenkl: "GP-BRA-925-02", qty: 36, unit: "шт", klass: "Серебро", code: "AG-925", status: "На складе" },
-  { id: "gp5", name: "Подвеска платиновая", nomenkl: "GP-POD-950-01", qty: 6, unit: "шт", klass: "Платина", code: "PT-950", status: "В обработке" },
-  { id: "gp6", name: "Запонки золотые", nomenkl: "GP-ZAP-750-04", qty: 18, unit: "шт", klass: "Золото", code: "AU-750", status: "На складе" },
-  { id: "gp7", name: "Колье серебряное ажурное", nomenkl: "GP-KLY-925-05", qty: 14, unit: "шт", klass: "Серебро", code: "AG-925", status: "Резерв" },
-  { id: "gp8", name: "Печатка мужская золотая", nomenkl: "GP-PCH-585-09", qty: 10, unit: "шт", klass: "Золото", code: "AU-585", status: "В обработке" },
-  { id: "gp9", name: "Кулон сердце серебро", nomenkl: "GP-KUL-925-11", qty: 22, unit: "шт", klass: "Серебро", code: "AG-925", status: "На складе" },
-  { id: "gp10", name: "Браслет золотой плетёный", nomenkl: "GP-BRA-585-06", qty: 9, unit: "шт", klass: "Золото", code: "AU-585", status: "На складе" },
-  { id: "gp11", name: "Серьги серебряные с топазом", nomenkl: "GP-SER-925-13", qty: 16, unit: "шт", klass: "Серебро", code: "AG-925", status: "Резерв" },
-  { id: "gp12", name: "Кольцо с изумрудом 750", nomenkl: "GP-KOL-750-14", qty: 4, unit: "шт", klass: "Золото", code: "AU-750", status: "В обработке" },
-  { id: "gp13", name: "Цепочка серебряная якорная", nomenkl: "GP-CEP-925-15", qty: 30, unit: "шт", klass: "Серебро", code: "AG-925", status: "На складе" },
-  { id: "gp14", name: "Перстень золотой с рубином", nomenkl: "GP-PER-585-16", qty: 5, unit: "шт", klass: "Золото", code: "AU-585", status: "На складе" },
-  { id: "gp15", name: "Брошь серебряная", nomenkl: "GP-BRO-925-17", qty: 11, unit: "шт", klass: "Серебро", code: "AG-925", status: "На складе" },
-  { id: "gp16", name: "Медальон золотой 585", nomenkl: "GP-MED-585-18", qty: 7, unit: "шт", klass: "Золото", code: "AU-585", status: "Резерв" },
-  { id: "gp17", name: "Кольцо обручальное 750", nomenkl: "GP-KOL-750-19", qty: 20, unit: "шт", klass: "Золото", code: "AU-750", status: "На складе" },
-  { id: "gp18", name: "Подвеска серебряная луна", nomenkl: "GP-POD-925-20", qty: 19, unit: "шт", klass: "Серебро", code: "AG-925", status: "На складе" },
-  { id: "gp19", name: "Серьги золотые пуссеты", nomenkl: "GP-SER-585-21", qty: 28, unit: "шт", klass: "Золото", code: "AU-585", status: "На складе" },
-  { id: "gp20", name: "Браслет платиновый тонкий", nomenkl: "GP-BRA-950-22", qty: 3, unit: "шт", klass: "Платина", code: "PT-950", status: "В обработке" },
-  { id: "gp21", name: "Колье золотое с жемчугом", nomenkl: "GP-KLY-585-23", qty: 6, unit: "шт", klass: "Золото", code: "AU-585", status: "Резерв" },
-  { id: "gp22", name: "Кулон серебряный якорь", nomenkl: "GP-KUL-925-24", qty: 15, unit: "шт", klass: "Серебро", code: "AG-925", status: "На складе" },
-  { id: "gp23", name: "Часы золотые Au-750", nomenkl: "GP-CHA-750-25", qty: 2, unit: "шт", klass: "Золото", code: "AU-750", status: "В обработке" },
-  { id: "gp24", name: "Кольцо серебряное с ониксом", nomenkl: "GP-KOL-925-26", qty: 13, unit: "шт", klass: "Серебро", code: "AG-925", status: "На складе" },
-  { id: "gp25", name: "Брошь золотая бабочка", nomenkl: "GP-BRO-585-27", qty: 8, unit: "шт", klass: "Золото", code: "AU-585", status: "На складе" },
-  { id: "gp26", name: "Цепочка золотая гурмет", nomenkl: "GP-CEP-750-28", qty: 11, unit: "шт", klass: "Золото", code: "AU-750", status: "Резерв" },
-  { id: "gp27", name: "Серьги серебряные геометрия", nomenkl: "GP-SER-925-29", qty: 25, unit: "шт", klass: "Серебро", code: "AG-925", status: "На складе" },
-  { id: "gp28", name: "Перстень золотой классика", nomenkl: "GP-PER-750-30", qty: 9, unit: "шт", klass: "Золото", code: "AU-750", status: "На складе" },
-  { id: "gp29", name: "Ожерелье серебряное rose", nomenkl: "GP-OZH-925-31", qty: 7, unit: "шт", klass: "Серебро", code: "AG-925", status: "В обработке" },
-  { id: "gp30", name: "Кольцо платиновое обручальное", nomenkl: "GP-KOL-950-32", qty: 17, unit: "шт", klass: "Платина", code: "PT-950", status: "На складе" },
-  { id: "gp31", name: "Браслет серебряный шармы", nomenkl: "GP-BRA-925-33", qty: 21, unit: "шт", klass: "Серебро", code: "AG-925", status: "На складе" },
-  { id: "gp32", name: "Серьги золотые капли", nomenkl: "GP-SER-585-34", qty: 14, unit: "шт", klass: "Золото", code: "AU-585", status: "Резерв" },
-  { id: "gp33", name: "Колье платиновое с бриллиантом", nomenkl: "GP-KLY-950-35", qty: 1, unit: "шт", klass: "Платина", code: "PT-950", status: "В обработке" },
-  { id: "gp34", name: "Кулон золотой infinity", nomenkl: "GP-KUL-585-36", qty: 16, unit: "шт", klass: "Золото", code: "AU-585", status: "На складе" },
+  { id: "gp1", name: "Кольцо обручальное 585", nomenkl: "GP-KOL-585-01", qty: 24, unit: "шт", klass: "Золото", code: "AU-585", location: "Сейф №1, Полка А", status: "На складе" },
+  { id: "gp2", name: "Цепочка золотая Бисмарк", nomenkl: "GP-CEP-750-03", qty: 12, unit: "шт", klass: "Золото", code: "AU-750", location: "Сейф №1, Полка Б", status: "На складе" },
+  { id: "gp3", name: "Серьги с бриллиантами 0.5ct", nomenkl: "GP-SER-585-07", qty: 8, unit: "шт", klass: "Золото", code: "AU-585", location: "Сейф №2, Полка А", status: "Резерв" },
+  { id: "gp4", name: "Браслет серебряный", nomenkl: "GP-BRA-925-02", qty: 36, unit: "шт", klass: "Серебро", code: "AG-925", location: "Сейф №2, Полка Б", status: "На складе" },
+  { id: "gp5", name: "Подвеска платиновая", nomenkl: "GP-POD-950-01", qty: 6, unit: "шт", klass: "Платина", code: "PT-950", location: "Витрина №1", status: "В обработке" },
+  { id: "gp6", name: "Запонки золотые", nomenkl: "GP-ZAP-750-04", qty: 18, unit: "шт", klass: "Золото", code: "AU-750", location: "Витрина №2", status: "На складе" },
+  { id: "gp7", name: "Колье серебряное ажурное", nomenkl: "GP-KLY-925-05", qty: 14, unit: "шт", klass: "Серебро", code: "AG-925", location: "Сейф №3, Полка А", status: "Резерв" },
+  { id: "gp8", name: "Печатка мужская золотая", nomenkl: "GP-PCH-585-09", qty: 10, unit: "шт", klass: "Золото", code: "AU-585", location: "Сейф №3, Полка Б", status: "В обработке" },
+  { id: "gp9", name: "Кулон сердце серебро", nomenkl: "GP-KUL-925-11", qty: 22, unit: "шт", klass: "Серебро", code: "AG-925", location: "Сейф №1, Полка А", status: "На складе" },
+  { id: "gp10", name: "Браслет золотой плетёный", nomenkl: "GP-BRA-585-06", qty: 9, unit: "шт", klass: "Золото", code: "AU-585", location: "Сейф №1, Полка Б", status: "На складе" },
+  { id: "gp11", name: "Серьги серебряные с топазом", nomenkl: "GP-SER-925-13", qty: 16, unit: "шт", klass: "Серебро", code: "AG-925", location: "Сейф №2, Полка А", status: "Резерв" },
+  { id: "gp12", name: "Кольцо с изумрудом 750", nomenkl: "GP-KOL-750-14", qty: 4, unit: "шт", klass: "Золото", code: "AU-750", location: "Сейф №2, Полка Б", status: "В обработке" },
+  { id: "gp13", name: "Цепочка серебряная якорная", nomenkl: "GP-CEP-925-15", qty: 30, unit: "шт", klass: "Серебро", code: "AG-925", location: "Витрина №1", status: "На складе" },
+  { id: "gp14", name: "Перстень золотой с рубином", nomenkl: "GP-PER-585-16", qty: 5, unit: "шт", klass: "Золото", code: "AU-585", location: "Витрина №2", status: "На складе" },
+  { id: "gp15", name: "Брошь серебряная", nomenkl: "GP-BRO-925-17", qty: 11, unit: "шт", klass: "Серебро", code: "AG-925", location: "Сейф №3, Полка А", status: "На складе" },
+  { id: "gp16", name: "Медальон золотой 585", nomenkl: "GP-MED-585-18", qty: 7, unit: "шт", klass: "Золото", code: "AU-585", location: "Сейф №3, Полка Б", status: "Резерв" },
+  { id: "gp17", name: "Кольцо обручальное 750", nomenkl: "GP-KOL-750-19", qty: 20, unit: "шт", klass: "Золото", code: "AU-750", location: "Сейф №1, Полка А", status: "На складе" },
+  { id: "gp18", name: "Подвеска серебряная луна", nomenkl: "GP-POD-925-20", qty: 19, unit: "шт", klass: "Серебро", code: "AG-925", location: "Сейф №1, Полка Б", status: "На складе" },
+  { id: "gp19", name: "Серьги золотые пуссеты", nomenkl: "GP-SER-585-21", qty: 28, unit: "шт", klass: "Золото", code: "AU-585", location: "Сейф №2, Полка А", status: "На складе" },
+  { id: "gp20", name: "Браслет платиновый тонкий", nomenkl: "GP-BRA-950-22", qty: 3, unit: "шт", klass: "Платина", code: "PT-950", location: "Сейф №2, Полка Б", status: "В обработке" },
+  { id: "gp21", name: "Колье золотое с жемчугом", nomenkl: "GP-KLY-585-23", qty: 6, unit: "шт", klass: "Золото", code: "AU-585", location: "Витрина №1", status: "Резерв" },
+  { id: "gp22", name: "Кулон серебряный якорь", nomenkl: "GP-KUL-925-24", qty: 15, unit: "шт", klass: "Серебро", code: "AG-925", location: "Витрина №2", status: "На складе" },
+  { id: "gp23", name: "Часы золотые Au-750", nomenkl: "GP-CHA-750-25", qty: 2, unit: "шт", klass: "Золото", code: "AU-750", location: "Сейф №3, Полка А", status: "В обработке" },
+  { id: "gp24", name: "Кольцо серебряное с ониксом", nomenkl: "GP-KOL-925-26", qty: 13, unit: "шт", klass: "Серебро", code: "AG-925", location: "Сейф №3, Полка Б", status: "На складе" },
+  { id: "gp25", name: "Брошь золотая бабочка", nomenkl: "GP-BRO-585-27", qty: 8, unit: "шт", klass: "Золото", code: "AU-585", location: "Сейф №1, Полка А", status: "На складе" },
+  { id: "gp26", name: "Цепочка золотая гурмет", nomenkl: "GP-CEP-750-28", qty: 11, unit: "шт", klass: "Золото", code: "AU-750", location: "Сейф №1, Полка Б", status: "Резерв" },
+  { id: "gp27", name: "Серьги серебряные геометрия", nomenkl: "GP-SER-925-29", qty: 25, unit: "шт", klass: "Серебро", code: "AG-925", location: "Сейф №2, Полка А", status: "На складе" },
+  { id: "gp28", name: "Перстень золотой классика", nomenkl: "GP-PER-750-30", qty: 9, unit: "шт", klass: "Золото", code: "AU-750", location: "Сейф №2, Полка Б", status: "На складе" },
+  { id: "gp29", name: "Ожерелье серебряное rose", nomenkl: "GP-OZH-925-31", qty: 7, unit: "шт", klass: "Серебро", code: "AG-925", location: "Витрина №1", status: "В обработке" },
+  { id: "gp30", name: "Кольцо платиновое обручальное", nomenkl: "GP-KOL-950-32", qty: 17, unit: "шт", klass: "Платина", code: "PT-950", location: "Витрина №2", status: "На складе" },
+  { id: "gp31", name: "Браслет серебряный шармы", nomenkl: "GP-BRA-925-33", qty: 21, unit: "шт", klass: "Серебро", code: "AG-925", location: "Сейф №3, Полка А", status: "На складе" },
+  { id: "gp32", name: "Серьги золотые капли", nomenkl: "GP-SER-585-34", qty: 14, unit: "шт", klass: "Золото", code: "AU-585", location: "Сейф №3, Полка Б", status: "Резерв" },
+  { id: "gp33", name: "Колье платиновое с бриллиантом", nomenkl: "GP-KLY-950-35", qty: 1, unit: "шт", klass: "Платина", code: "PT-950", location: "Сейф №1, Полка А", status: "В обработке" },
+  { id: "gp34", name: "Кулон золотой infinity", nomenkl: "GP-KUL-585-36", qty: 16, unit: "шт", klass: "Золото", code: "AU-585", location: "Сейф №1, Полка Б", status: "На складе" },
 ];
 
 // --- DM Items ---
 export const initialDMItems: DMItem[] = [
-  { id: "dm1", name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", metal: "Au", proba: 999, ligWeight: 500.25, netWeight: 498.12, location: "Сейф №1, Полка А", status: "На складе" },
-  { id: "dm2", name: "Слиток серебра СрА-2", nomenkl: "DM-002", klass: "Слиток", metal: "Ag", proba: 999, ligWeight: 1000.50, netWeight: 998.30, location: "Сейф №1, Полка Б", status: "На складе" },
-  { id: "dm3", name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", metal: "Au", proba: 585, ligWeight: 45.80, netWeight: 26.79, location: "Сейф №2, Полка А", status: "На складе" },
-  { id: "dm4", name: "Проба золота Au-750", nomenkl: "DM-004", klass: "Проба", metal: "Au", proba: 750, ligWeight: 12.30, netWeight: 9.22, location: "Сейф №2, Полка В", status: "Зарезервировано" },
-  { id: "dm5", name: "Раствор серебра AgNO3", nomenkl: "DM-005", klass: "Раствор", metal: "Ag", proba: 999, ligWeight: 250.00, netWeight: 249.10, location: "Сейф №3, Полка А", status: "В подотчёте" },
-  { id: "dm6", name: "Слиток платины ПлА-1", nomenkl: "DM-006", klass: "Слиток", metal: "Pt", proba: 999, ligWeight: 300.00, netWeight: 299.50, location: "Сейф №1, Полка В", status: "На складе" },
-  { id: "dm7", name: "Лом золота 585", nomenkl: "DM-007", klass: "Лом", metal: "Au", proba: 585, ligWeight: 88.40, netWeight: 51.71, location: "Сейф №2, Полка Б", status: "На складе" },
-  { id: "dm8", name: "Золотой порошок Au", nomenkl: "DM-008", klass: "Порошок", metal: "Au", proba: 999, ligWeight: 25.00, netWeight: 24.95, location: "Сейф №3, Полка В", status: "Зарезервировано" },
+  { id: "dm1", name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", metal: "Au", qty: 1, proba: 999, ligWeight: 500.25, netWeight: 498.12, location: "Сейф №1, Полка А", status: "На складе" },
+  { id: "dm2", name: "Слиток серебра СрА-2", nomenkl: "DM-002", klass: "Слиток", metal: "Ag", qty: 1, proba: 999, ligWeight: 1000.50, netWeight: 998.30, location: "Сейф №1, Полка Б", status: "На складе" },
+  { id: "dm3", name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", metal: "Au", qty: 1, proba: 585, ligWeight: 45.80, netWeight: 26.79, location: "Сейф №2, Полка А", status: "На складе" },
+  { id: "dm4", name: "Проба золота Au-750", nomenkl: "DM-004", klass: "Проба", metal: "Au", qty: 1, proba: 750, ligWeight: 12.30, netWeight: 9.22, location: "Сейф №2, Полка В", status: "Зарезервировано" },
+  { id: "dm5", name: "Раствор серебра AgNO3", nomenkl: "DM-005", klass: "Раствор", metal: "Ag", qty: 1, proba: 999, ligWeight: 250.00, netWeight: 249.10, location: "Сейф №3, Полка А", status: "В подотчёте" },
+  { id: "dm6", name: "Слиток платины ПлА-1", nomenkl: "DM-006", klass: "Слиток", metal: "Pt", qty: 1, proba: 999, ligWeight: 300.00, netWeight: 299.50, location: "Сейф №1, Полка В", status: "На складе" },
+  { id: "dm7", name: "Лом золота 585", nomenkl: "DM-007", klass: "Лом", metal: "Au", qty: 1, proba: 585, ligWeight: 88.40, netWeight: 51.71, location: "Сейф №2, Полка Б", status: "На складе" },
+  { id: "dm8", name: "Золотой порошок Au", nomenkl: "DM-008", klass: "Порошок", metal: "Au", qty: 1, proba: 999, ligWeight: 25.00, netWeight: 24.95, location: "Сейф №3, Полка В", status: "Зарезервировано" },
 ];
 
 // --- Складские документы ---
