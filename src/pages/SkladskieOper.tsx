@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Badge, Btn, Modal, EyeIcon, PrintIcon, Pagination, PageHeader,
+  Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, FileChip, useConfirm, ConfirmDialog,
 } from "../components/ui";
-import { SkladDoc } from "../data/mock";
+import { SkladDoc, GPItem } from "../data/mock";
 import { Inbox, Send, Repeat, Plus, X, LucideIcon } from "lucide-react";
 
 // ── Hub ───────────────────────────────────────────────────────────────────────
@@ -280,19 +280,58 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
 
 // ── Выдача ГП modal ───────────────────────────────────────────────────────────
 
-function VydachaGPModal({ onClose, onSave, readOnly = false }: { onClose: () => void; onSave: () => void; readOnly?: boolean }) {
+function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: () => void; onSave: (d: SkladDoc) => void; doc?: SkladDoc | null; readOnly?: boolean }) {
+  const { gpItems } = useApp();
   const [head, setHead] = useState(() => ({
-    number: "НО-0205",
-    date: new Date().toLocaleDateString("ru-RU"),
-    poluchatel: "ТД «Золото Казахстана»",
+    number: doc?.number || "НО-0205",
+    date: doc?.date || new Date().toLocaleDateString("ru-RU"),
+    poluchatel: doc?.receiver || "ТД «Золото Казахстана»",
     schetFaktura: "СФ-2026-0199",
   }));
+
+  const [positions, setPositions] = useState<{ nomenkl: string; name: string; code: string; location: string; qty: number }[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+
+  const availableItems = gpItems.filter(i => i.status === "На складе" && i.qty > 0);
+  const itemLabel = (i: GPItem) => `${i.nomenkl} — ${i.name} (доступно: ${i.qty} ${i.unit})`;
+  const [addForm, setAddForm] = useState({ label: availableItems[0] ? itemLabel(availableItems[0]) : "", qty: "1" });
+  const selectedItem = availableItems.find(i => itemLabel(i) === addForm.label);
+
+  const openAdd = () => {
+    setAddForm({ label: availableItems[0] ? itemLabel(availableItems[0]) : "", qty: "1" });
+    setShowAdd(true);
+  };
+
+  const addPosition = () => {
+    if (!selectedItem) return;
+    const qty = Math.max(1, Math.min(parseInt(addForm.qty, 10) || 1, selectedItem.qty));
+    setPositions(prev => [...prev, { nomenkl: selectedItem.nomenkl, name: selectedItem.name, code: selectedItem.code, location: selectedItem.location, qty }]);
+    setShowAdd(false);
+  };
+
+  const save = () => {
+    const d: SkladDoc = doc ? {
+      ...doc,
+      number: head.number,
+      date: head.date,
+      receiver: head.poluchatel,
+    } : {
+      id: `vd-${Date.now()}`,
+      date: head.date,
+      type: "Накладная на отгрузку ГП",
+      number: head.number,
+      status: "В работе",
+      sender: "Склад ГП",
+      receiver: head.poluchatel,
+    };
+    onSave(d);
+  };
 
   return (
     <Modal title="Накладная на отгрузку ГП" onClose={onClose} wide footer={
       readOnly
         ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn>
-        : <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={onSave}>Оформить выдачу</Btn></>
+        : <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={save}>Оформить выдачу</Btn></>
     }>
       <div className="grid grid-cols-2 gap-4 mb-4">
         <Field label="Тип документа"><Select value="Накладная на отгрузку ГП" options={["Накладная на отгрузку ГП"]} disabled={readOnly} /></Field>
@@ -301,9 +340,58 @@ function VydachaGPModal({ onClose, onSave, readOnly = false }: { onClose: () => 
         <Field label="Получатель"><Select value={head.poluchatel} options={["ТД «Золото Казахстана»", "ИП Сейткали А.М."]} onChange={v => setHead(h => ({ ...h, poluchatel: v }))} disabled={readOnly} /></Field>
         <Field label="Счёт-фактура" full><Input value={head.schetFaktura} onChange={v => setHead(h => ({ ...h, schetFaktura: v }))} disabled={readOnly} /></Field>
       </div>
-      <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-        Список позиций для выдачи
+
+      <div className="border-t border-gray-200 pt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции для выдачи</h3>
+          {!readOnly && (
+            <Btn size="sm" onClick={openAdd} disabled={availableItems.length === 0}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+          )}
+        </div>
+        {positions.length === 0 ? (
+          <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
+            Список позиций для выдачи пуст
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+              <th className="px-3 py-2 text-left">Номенкл.№</th>
+              <th className="px-3 py-2 text-left">Наименование</th>
+              <th className="px-3 py-2 text-left">Код</th>
+              <th className="px-3 py-2 text-left">Кол-во</th>
+              <th className="px-3 py-2 text-left">Размещение</th>
+              {!readOnly && <th className="w-16"></th>}
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {positions.map((p, i) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                  <td className="px-3 py-2 font-medium">{p.name}</td>
+                  <td className="px-3 py-2 text-blue-600">{p.code}</td>
+                  <td className="px-3 py-2">{p.qty}</td>
+                  <td className="px-3 py-2 text-gray-500">{p.location}</td>
+                  {!readOnly && <td className="px-3 py-2">
+                    <button onClick={() => setPositions(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                  </td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
+
+      {showAdd && (
+        <Modal title="Добавить позицию ГП" onClose={() => setShowAdd(false)} footer={<><Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn><Btn onClick={addPosition}>Добавить</Btn></>}>
+          <div className="grid grid-cols-1 gap-4">
+            <Field label="Позиция (доступно на складе ГП)">
+              <Select value={addForm.label} options={availableItems.map(itemLabel)} onChange={v => setAddForm({ label: v, qty: "1" })} />
+            </Field>
+            <Field label="Количество к выдаче">
+              <Input value={addForm.qty} onChange={v => setAddForm(f => ({ ...f, qty: v }))} placeholder="1" />
+            </Field>
+          </div>
+        </Modal>
+      )}
     </Modal>
   );
 }
@@ -433,8 +521,10 @@ export function PrihodList() {
 export function VydachaList() {
   const { vydachaDocs, setVydachaDocs } = useApp();
   const { toast, show, clear } = useToast();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
   const [viewDoc, setViewDoc] = useState<SkladDoc | null>(null);
+  const [editDoc, setEditDoc] = useState<SkladDoc | null>(null);
   const [showNew, setShowNew] = useState(false);
   const perPage = 8;
 
@@ -458,10 +548,9 @@ export function VydachaList() {
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Дата</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Тип документа</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Номер</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Статус</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Отправитель</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Получатель</th>
-              <th className="w-20"></th>
+              <th className="w-28"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -470,11 +559,12 @@ export function VydachaList() {
                 <td className="px-4 py-3 text-gray-500">{doc.date}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{doc.type}</td>
                 <td className="px-4 py-3 text-blue-600 font-medium">{doc.number}</td>
-                <td className="px-4 py-3"><Badge label={doc.status} /></td>
                 <td className="px-4 py-3 text-gray-600">{doc.sender}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
-                <td className="px-4 py-3 flex gap-1">
+                <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewDoc(doc)} />
+                  <EditIcon onClick={() => setEditDoc(doc)} />
+                  <DeleteIcon onClick={() => confirm(`Удалить документ ${doc.number}?`, () => setVydachaDocs(prev => prev.filter(d => d.id !== doc.id)))} />
                   <PrintIcon onClick={() => show(`Документ ${doc.number} отправлен на печать`)} />
                 </td>
               </tr>
@@ -484,18 +574,29 @@ export function VydachaList() {
         <Pagination page={page} total={vydachaDocs.length} perPage={perPage} onPage={setPage} />
       </div>
 
-      {viewDoc && <VydachaGPModal onClose={() => setViewDoc(null)} onSave={() => setViewDoc(null)} readOnly />}
+      {viewDoc && <VydachaGPModal doc={viewDoc} onClose={() => setViewDoc(null)} onSave={() => setViewDoc(null)} readOnly />}
+      {editDoc && (
+        <VydachaGPModal
+          doc={editDoc}
+          onClose={() => setEditDoc(null)}
+          onSave={d => {
+            setVydachaDocs(prev => prev.map(x => x.id === d.id ? d : x));
+            setEditDoc(null);
+            show(`Документ ${d.number} обновлён`);
+          }}
+        />
+      )}
       {showNew && (
         <VydachaGPModal
           onClose={() => setShowNew(false)}
-          onSave={() => {
-            const d: SkladDoc = { id: `vd-${Date.now()}`, date: new Date().toLocaleDateString("ru-RU"), type: "Накладная на отгрузку ГП", number: `НО-${Math.floor(Math.random() * 900 + 100)}`, status: "В работе", sender: "Склад ГП", receiver: "ТД «Золото Казахстана»" };
+          onSave={d => {
             setVydachaDocs(prev => [d, ...prev]);
             setShowNew(false);
             show("Выдача оформлена");
           }}
         />
       )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );
