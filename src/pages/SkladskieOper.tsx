@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
+  Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, FileChip, useConfirm, ConfirmDialog,
 } from "../components/ui";
 import { SkladDoc, GPItem } from "../data/mock";
@@ -38,8 +38,8 @@ export function SkladskieOperHub() {
 
 type PrihodDocType = "Приходный ордер" | "Накладная";
 
-function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSave: (d: SkladDoc) => void; doc?: SkladDoc | null; readOnly?: boolean }) {
-  const ro = !!doc;
+function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose: () => void; onSave: (d: SkladDoc) => void; doc?: SkladDoc | null; readOnly?: boolean }) {
+  const ro = readOnly;
   const [docType, setDocType] = useState<PrihodDocType>("Приходный ордер");
   const isOrder = ro || docType === "Приходный ордер";
   const { toast, show, clear } = useToast();
@@ -92,6 +92,11 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
   };
 
   const save = () => {
+    if (doc) {
+      const d: SkladDoc = { ...doc, number: head.number, date: head.date, sender: head.otpravitel, receiver: head.poluchatel };
+      onSave(d);
+      return;
+    }
     const d: SkladDoc = isOrder ? {
       id: `sd-${Date.now()}`,
       date: new Date().toLocaleDateString("ru-RU"),
@@ -482,19 +487,25 @@ function DocList({
   docs,
   addLabel,
   onSave,
+  onUpdate,
+  onDelete,
   showPrint,
 }: {
   title: string;
   docs: SkladDoc[];
   addLabel: string;
   onSave: (d: SkladDoc) => void;
+  onUpdate: (d: SkladDoc) => void;
+  onDelete: (id: string) => void;
   showPrint?: boolean;
 }) {
   const { toast, show, clear } = useToast();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("Все статусы");
   const [page, setPage] = useState(1);
   const [viewDoc, setViewDoc] = useState<SkladDoc | null>(null);
+  const [editDoc, setEditDoc] = useState<SkladDoc | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   const filtered = docs.filter(d => {
@@ -544,10 +555,9 @@ function DocList({
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Дата</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Тип документа</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Номер</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Статус</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Отправитель</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Получатель</th>
-              <th className="w-20"></th>
+              <th className="w-32"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -556,11 +566,12 @@ function DocList({
                 <td className="px-4 py-3 text-gray-500">{doc.date}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{doc.type}</td>
                 <td className="px-4 py-3 text-blue-600 font-medium">{doc.number}</td>
-                <td className="px-4 py-3"><Badge label={doc.status} /></td>
                 <td className="px-4 py-3 text-gray-600">{doc.sender}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewDoc(doc)} />
+                  <EditIcon onClick={() => setEditDoc(doc)} />
+                  <DeleteIcon onClick={() => confirm(`Удалить документ ${doc.number}?`, () => { onDelete(doc.id); show(`Документ ${doc.number} удалён`); })} />
                   <PrintIcon onClick={() => show(`Документ ${doc.number} отправлен на печать`)} />
                 </td>
               </tr>
@@ -571,12 +582,20 @@ function DocList({
       </div>
 
       {viewDoc && <PrihodnyOrdModal doc={viewDoc} onClose={() => setViewDoc(null)} onSave={() => setViewDoc(null)} readOnly />}
+      {editDoc && (
+        <PrihodnyOrdModal
+          doc={editDoc}
+          onClose={() => setEditDoc(null)}
+          onSave={d => { onUpdate(d); setEditDoc(null); show(`Документ ${d.number} обновлён`); }}
+        />
+      )}
       {showModal && (
         <PrihodnyOrdModal
           onClose={() => setShowModal(false)}
           onSave={d => { onSave(d); setShowModal(false); show(`Документ ${d.number} сохранён`); }}
         />
       )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );
@@ -592,6 +611,8 @@ export function PrihodList() {
       docs={skladDocs}
       addLabel="Принять на склад"
       onSave={d => setSkladDocs(prev => [d, ...prev])}
+      onUpdate={d => setSkladDocs(prev => prev.map(x => x.id === d.id ? d : x))}
+      onDelete={id => setSkladDocs(prev => prev.filter(x => x.id !== id))}
       showPrint
     />
   );
