@@ -70,6 +70,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       name: name || "Новая шихтовая карта",
       plavkaNo: plavkaNo || `П-2026-${Math.floor(Math.random() * 9000 + 1000)}`,
       status: "Новая",
+      materials: [],
     };
     onSave(k);
   };

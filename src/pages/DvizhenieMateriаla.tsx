@@ -5,7 +5,7 @@ import {
   ExportBtn, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, Tabs, Textarea, FileChip, SortTh, useSort, parseRuDate,
 } from "../components/ui";
-import { Operation } from "../data/mock";
+import { Operation, ShihtovayaKarta } from "../data/mock";
 import { Eye, Plus, Paperclip } from "lucide-react";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
@@ -55,6 +55,120 @@ function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm:
   );
 }
 
+// ── Добавить позицию ДМ со склада ─────────────────────────────────────────────
+
+type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; loc: string };
+
+function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
+  const { dmItems } = useApp();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const availableItems = dmItems.filter(i => i.status === "На складе");
+
+  const { sorted, sort, toggleSort } = useSort(availableItems, {
+    name: i => i.name,
+    nomenkl: i => i.nomenkl,
+    klass: i => i.klass,
+    proba: i => i.proba,
+    netWeight: i => i.netWeight,
+    location: i => i.location,
+  });
+
+  const toggle = (id: string) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+
+  const add = () => {
+    const chosen = availableItems.filter(i => selected.has(i.id));
+    if (chosen.length === 0) return;
+    onAdd(chosen.map(i => ({ name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.netWeight, ag: "-", cu: "-", loc: i.location })));
+  };
+
+  return (
+    <Modal
+      title="Добавить позицию ДМ со склада"
+      onClose={onClose}
+      wide
+      footer={<>
+        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+        <Btn onClick={add} disabled={selected.size === 0}>Добавить{selected.size > 0 ? ` (${selected.size})` : ""}</Btn>
+      </>}
+    >
+      {availableItems.length === 0 ? (
+        <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
+          Нет доступных позиций на складе ДМ
+        </div>
+      ) : (
+        <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0"><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+              <th className="w-10 px-3 py-2"></th>
+              <SortTh sortKey="name" sort={sort} onSort={toggleSort} className="px-3 py-2">Наименование</SortTh>
+              <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл.№</SortTh>
+              <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
+              <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
+              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый вес г</SortTh>
+              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {sorted.map(i => {
+                const checked = selected.has(i.id);
+                return (
+                  <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
+                    <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(i.id)} className="w-4 h-4 accent-blue-600" /></td>
+                    <td className="px-3 py-2 font-medium">{i.name}</td>
+                    <td className="px-3 py-2 text-gray-500">{i.nomenkl}</td>
+                    <td className="px-3 py-2">{i.klass}</td>
+                    <td className="px-3 py-2">{i.proba}</td>
+                    <td className="px-3 py-2">{i.netWeight}</td>
+                    <td className="px-3 py-2 text-gray-500">{i.location}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ── Выдача по шихтовой карте ──────────────────────────────────────────────────
+
+function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k: ShihtovayaKarta) => void }) {
+  const { shihtovyeKarty } = useApp();
+  const available = shihtovyeKarty.filter(k => k.status === "Новая");
+
+  return (
+    <Modal title="Выдача по шихтовой карте" onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Отмена</Btn>}>
+      {available.length === 0 ? (
+        <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
+          Нет шихтовых карт в статусе «Новая»
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+          {available.map(k => (
+            <button
+              key={k.id}
+              onClick={() => onPick(k)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-blue-50 transition-colors text-left"
+            >
+              <div>
+                <div className="text-sm font-medium text-gray-900">{k.name}</div>
+                <div className="text-xs text-gray-400">{k.plavkaNo} · {k.date}</div>
+              </div>
+              <Badge label={k.status} />
+            </button>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 // ── Operation modal ───────────────────────────────────────────────────────────
 
 type TabName = "Выдача" | "Возврат" | "Итого";
@@ -73,10 +187,20 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [tab, setTab] = useState<TabName>("Выдача");
   const [vid, setVid] = useState<"Отбор пробы" | "Анализ в ЛКИ" | "Плавка" | "Гальванопокрытие" | "Производство ГП">(op?.vid || "Плавка");
   const [type, setType] = useState<"Выдача" | "Возврат" | "Выдача-Возврат">(op?.type || "Выдача");
-  const [vydacha, setVydacha] = useState(vydachaPositions);
-  const [vozvrat, setVozvrat] = useState(vozvratPositions);
+  const [vydacha, setVydacha] = useState<OperPosition[]>(op ? vydachaPositions : []);
+  const [vozvrat, setVozvrat] = useState<OperPosition[]>(op ? vozvratPositions : []);
   const [showSpisanie, setShowSpisanie] = useState(false);
+  const [addDMTarget, setAddDMTarget] = useState<null | "vydacha" | "vozvrat">(null);
+  const [showShihtaPick, setShowShihtaPick] = useState(false);
   const { toast, show, clear } = useToast();
+
+  const appendPositions = (target: "vydacha" | "vozvrat", rows: Omit<OperPosition, "n">[]) => {
+    const setFn = target === "vydacha" ? setVydacha : setVozvrat;
+    setFn(prev => {
+      const maxN = prev.reduce((m, p) => Math.max(m, p.n), 0);
+      return [...prev, ...rows.map((r, i) => ({ n: maxN + i + 1, ...r }))];
+    });
+  };
 
   const { sorted: sortedVydacha, sort: vydachaSort, toggleSort: toggleVydachaSort } = useSort(vydacha, {
     name: p => p.name,
@@ -99,16 +223,19 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   });
 
   const [head, setHead] = useState(() => ({
-    docType: "Приказ",
-    document: op?.document || "ДВ-001234",
+    docType: op ? "Приказ" : "",
+    document: op?.document || "",
     date: op?.date || new Date().toLocaleDateString("ru-RU"),
-    zakazchik: "Монетный двор",
-    responsible: op?.responsible || "Нурланов Асхат Бекович",
-    material: "Золото (Au)",
-    plavkaNo: "П-2026-0089",
-    vydal: "Ким Александр Юрьевич",
-    poluchil: op?.responsible || "Нурланов Асхат Бекович",
+    zakazchik: op ? "Монетный двор" : "",
+    responsible: op?.responsible || "",
+    material: op ? "Золото (Au)" : "",
+    plavkaNo: op ? "П-2026-0089" : "",
+    vydal: op ? "Ким Александр Юрьевич" : "",
+    poluchil: op?.responsible || "",
   }));
+
+  // Blank options list for a brand-new operation so pickers start unselected.
+  const withBlank = (opts: string[]) => (op ? opts : ["", ...opts]);
 
   const delta = -10.35;
   const deltaSign = delta >= 0 ? "+" : "";
@@ -160,17 +287,17 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <Field label="Вид">
           <Select value={vid} options={["Отбор пробы", "Анализ в ЛКИ", "Плавка", "Гальванопокрытие", "Производство ГП"]} onChange={v => setVid(v as any)} disabled={readOnly || !!op} />
         </Field>
-        <Field label="Тип документа"><Select value={head.docType} options={["Приказ", "Заказ-наряд"]} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={readOnly} /></Field>
+        <Field label="Тип документа"><Select value={head.docType} options={withBlank(["Приказ", "Заказ-наряд"])} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={readOnly} /></Field>
         <Field label="Номер документа"><Input value={head.document} onChange={v => setHead(h => ({ ...h, document: v }))} disabled={readOnly || !!op} /></Field>
         <Field label="Дата операции"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={readOnly} /></Field>
-        <Field label="Заказчик"><Select value={head.zakazchik} options={["Монетный двор"]} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={readOnly} /></Field>
-        <Field label="Подотчётное лицо" full><Select value={head.responsible} options={["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"]} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={readOnly} /></Field>
+        <Field label="Заказчик"><Select value={head.zakazchik} options={withBlank(["Монетный двор"])} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={readOnly} /></Field>
+        <Field label="Подотчётное лицо" full><Select value={head.responsible} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"])} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={readOnly} /></Field>
         {vid === "Плавка" && <>
-          <Field label="Материал"><Select value={head.material} options={["Золото (Au)", "Серебро (Ag)", "Платина (Pt)"]} onChange={v => setHead(h => ({ ...h, material: v }))} disabled={readOnly} /></Field>
+          <Field label="Материал"><Select value={head.material} options={withBlank(["Золото (Au)", "Серебро (Ag)", "Платина (Pt)"])} onChange={v => setHead(h => ({ ...h, material: v }))} disabled={readOnly} /></Field>
           <Field label="Номер плавки"><Input value={head.plavkaNo} onChange={v => setHead(h => ({ ...h, plavkaNo: v }))} disabled={readOnly} /></Field>
         </>}
-        <Field label="Выдал"><Select value={head.vydal} options={["Ким Александр Юрьевич", "Жумабаев Даурен"]} onChange={v => setHead(h => ({ ...h, vydal: v }))} disabled={readOnly} /></Field>
-        <Field label="Получил"><Select value={head.poluchil} options={["Нурланов Асхат Бекович", "Петров Сергей Владимирович"]} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={readOnly} /></Field>
+        <Field label="Выдал"><Select value={head.vydal} options={withBlank(["Ким Александр Юрьевич", "Жумабаев Даурен"])} onChange={v => setHead(h => ({ ...h, vydal: v }))} disabled={readOnly} /></Field>
+        <Field label="Получил"><Select value={head.poluchil} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович"])} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={readOnly} /></Field>
       </div>
 
       {/* Tabs */}
@@ -182,11 +309,11 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
             <div className="flex gap-2 mb-3">
               {vid === "Плавка" ? (
                 <>
-                  <Btn size="sm" onClick={() => show("Шихтовая карта добавлена")}><Plus className="w-4 h-4" />Выдать по ШК</Btn>
-                  <Btn size="sm" variant="secondary" onClick={() => show("Позиция добавлена")}><Plus className="w-4 h-4" />Добавить</Btn>
+                  <Btn size="sm" onClick={() => setShowShihtaPick(true)}><Plus className="w-4 h-4" />Выдать по ШК</Btn>
+                  <Btn size="sm" variant="secondary" onClick={() => setAddDMTarget("vydacha")}><Plus className="w-4 h-4" />Добавить</Btn>
                 </>
               ) : (
-                <Btn size="sm" onClick={() => show("Позиция добавлена")}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+                <Btn size="sm" onClick={() => setAddDMTarget("vydacha")}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               )}
               <ExportBtn onToast={show} />
             </div>
@@ -233,7 +360,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <>
           {!readOnly && (
             <div className="flex gap-2 mb-3">
-              <Btn size="sm" onClick={() => show("Позиция добавлена")}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+              <Btn size="sm" onClick={() => setAddDMTarget("vozvrat")}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               <ExportBtn onToast={show} />
             </div>
           )}
@@ -325,6 +452,23 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <SpisanieModal
           onClose={() => setShowSpisanie(false)}
           onConfirm={() => { setShowSpisanie(false); show("Разница списана"); onSave({ ...op!, statusClose: "Закрыто: списано" }); }}
+        />
+      )}
+      {addDMTarget && (
+        <AddDMPositionModal
+          onClose={() => setAddDMTarget(null)}
+          onAdd={rows => { appendPositions(addDMTarget, rows); setAddDMTarget(null); show("Позиции добавлены"); }}
+        />
+      )}
+      {showShihtaPick && (
+        <ShihtaPickModal
+          onClose={() => setShowShihtaPick(false)}
+          onPick={k => {
+            appendPositions("vydacha", k.materials.map(m => ({ ...m, ag: "-", cu: "-" })));
+            setHead(h => ({ ...h, plavkaNo: k.plavkaNo }));
+            setShowShihtaPick(false);
+            show(`Позиции шихтовой карты «${k.name}» добавлены`);
+          }}
         />
       )}
       {toast && <Toast message={toast} onDone={clear} />}

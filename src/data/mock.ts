@@ -58,12 +58,22 @@ export interface Operation {
   statusClose: "Не закрыто" | "Закрыто: списано" | "Закрыто";
 }
 
+export interface ShihtaMaterial {
+  name: string;
+  nomenkl: string;
+  klass: string;
+  proba: number;
+  ves: number;
+  loc: string;
+}
+
 export interface ShihtovayaKarta {
   id: string;
   date: string;
   name: string;
   plavkaNo: string;
   status: ShihtaStatus;
+  materials: ShihtaMaterial[];
 }
 
 export interface Podotchetnik {
@@ -178,10 +188,31 @@ export const initialOperations: Operation[] = [
 
 // --- Шихтовые карты ---
 export const initialShihtovyeKarty: ShihtovayaKarta[] = [
-  { id: "sk1", date: "19.08.2026", name: "Шихта для плавки Au-585 (партия А)", plavkaNo: "П-2026-0089", status: "Новая" },
-  { id: "sk2", date: "15.08.2026", name: "Шихта золото 750 пробы", plavkaNo: "П-2026-0088", status: "Новая" },
-  { id: "sk3", date: "10.08.2026", name: "Шихта серебро 925 (кольца)", plavkaNo: "П-2026-0087", status: "Выполнена" },
-  { id: "sk4", date: "05.08.2026", name: "Шихта Au-999 слитки партия Б", plavkaNo: "П-2026-0086", status: "Выполнена" },
+  {
+    id: "sk1", date: "19.08.2026", name: "Шихта для плавки Au-585 (партия А)", plavkaNo: "П-2026-0089", status: "Новая",
+    materials: [
+      { name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, ves: 500.25, loc: "Сейф №1, Полка А" },
+      { name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", proba: 585, ves: 45.80, loc: "Сейф №2, Полка А" },
+    ],
+  },
+  {
+    id: "sk2", date: "15.08.2026", name: "Шихта золото 750 пробы", plavkaNo: "П-2026-0088", status: "Новая",
+    materials: [
+      { name: "Слиток золота 750", nomenkl: "DM-010", klass: "Слиток", proba: 750, ves: 320.00, loc: "Сейф №1, Полка Б" },
+    ],
+  },
+  {
+    id: "sk3", date: "10.08.2026", name: "Шихта серебро 925 (кольца)", plavkaNo: "П-2026-0087", status: "Выполнена",
+    materials: [
+      { name: "Слиток серебра СрА-2", nomenkl: "DM-002", klass: "Слиток", proba: 925, ves: 1000.50, loc: "Сейф №1, Полка Б" },
+    ],
+  },
+  {
+    id: "sk4", date: "05.08.2026", name: "Шихта Au-999 слитки партия Б", plavkaNo: "П-2026-0086", status: "Выполнена",
+    materials: [
+      { name: "Слиток золота стандартный", nomenkl: "НН-72101", klass: "Слиток", proba: 999, ves: 1000.00, loc: "Сейф 1/Полка 1" },
+    ],
+  },
 ];
 
 // --- Подотчётники ---
