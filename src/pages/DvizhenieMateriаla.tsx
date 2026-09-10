@@ -136,6 +136,87 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
   );
 }
 
+// ── Добавить позицию возврата (из выдачи или новую) ───────────────────────────
+
+function VozvratPickModal({ vydacha, onClose, onAdd }: { vydacha: OperPosition[]; onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [showAddNew, setShowAddNew] = useState(false);
+
+  const toggle = (n: number) => {
+    setSelected(prev => {
+      const s = new Set(prev);
+      s.has(n) ? s.delete(n) : s.add(n);
+      return s;
+    });
+  };
+
+  const addSelected = () => {
+    const chosen = vydacha.filter(p => selected.has(p.n));
+    if (chosen.length === 0) return;
+    onAdd(chosen.map(({ n, ...rest }) => rest));
+  };
+
+  return (
+    <Modal
+      title="Добавить позицию возврата"
+      onClose={onClose}
+      wide
+      footer={<>
+        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+        <Btn onClick={addSelected} disabled={selected.size === 0}>Добавить{selected.size > 0 ? ` (${selected.size})` : ""}</Btn>
+      </>}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции из выдачи</h3>
+        <Btn size="sm" variant="secondary" onClick={() => setShowAddNew(true)}><Plus className="w-4 h-4" />Добавить новую</Btn>
+      </div>
+
+      {vydacha.length === 0 ? (
+        <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
+          В выдаче пока нет позиций
+        </div>
+      ) : (
+        <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0"><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+              <th className="w-10 px-3 py-2"></th>
+              <th className="px-3 py-2 text-left">Наименование</th>
+              <th className="px-3 py-2 text-left">Номенкл.№</th>
+              <th className="px-3 py-2 text-left">Класс</th>
+              <th className="px-3 py-2 text-left">Проба</th>
+              <th className="px-3 py-2 text-left">Вес г</th>
+              <th className="px-3 py-2 text-left">Размещение</th>
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {vydacha.map(p => {
+                const checked = selected.has(p.n);
+                return (
+                  <tr key={p.n} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
+                    <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(p.n)} className="w-4 h-4 accent-blue-600" /></td>
+                    <td className="px-3 py-2 font-medium">{p.name}</td>
+                    <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                    <td className="px-3 py-2">{p.klass}</td>
+                    <td className="px-3 py-2">{p.proba}</td>
+                    <td className="px-3 py-2">{p.ves}</td>
+                    <td className="px-3 py-2 text-gray-500">{p.loc}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showAddNew && (
+        <AddDMPositionModal
+          onClose={() => setShowAddNew(false)}
+          onAdd={rows => { onAdd(rows); setShowAddNew(false); }}
+        />
+      )}
+    </Modal>
+  );
+}
+
 // ── Выдача по шихтовой карте ──────────────────────────────────────────────────
 
 function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k: ShihtovayaKarta) => void }) {
@@ -190,7 +271,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [vydacha, setVydacha] = useState<OperPosition[]>(op ? vydachaPositions : []);
   const [vozvrat, setVozvrat] = useState<OperPosition[]>(op ? vozvratPositions : []);
   const [showSpisanie, setShowSpisanie] = useState(false);
-  const [addDMTarget, setAddDMTarget] = useState<null | "vydacha" | "vozvrat">(null);
+  const [showAddDM, setShowAddDM] = useState(false);
+  const [showVozvratPick, setShowVozvratPick] = useState(false);
   const [showShihtaPick, setShowShihtaPick] = useState(false);
   const { toast, show, clear } = useToast();
 
@@ -310,10 +392,10 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               {vid === "Плавка" ? (
                 <>
                   <Btn size="sm" onClick={() => setShowShihtaPick(true)}><Plus className="w-4 h-4" />Выдать по ШК</Btn>
-                  <Btn size="sm" variant="secondary" onClick={() => setAddDMTarget("vydacha")}><Plus className="w-4 h-4" />Добавить</Btn>
+                  <Btn size="sm" variant="secondary" onClick={() => setShowAddDM(true)}><Plus className="w-4 h-4" />Добавить</Btn>
                 </>
               ) : (
-                <Btn size="sm" onClick={() => setAddDMTarget("vydacha")}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+                <Btn size="sm" onClick={() => setShowAddDM(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               )}
               <ExportBtn onToast={show} />
             </div>
@@ -360,7 +442,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <>
           {!readOnly && (
             <div className="flex gap-2 mb-3">
-              <Btn size="sm" onClick={() => setAddDMTarget("vozvrat")}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+              <Btn size="sm" onClick={() => setShowVozvratPick(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               <ExportBtn onToast={show} />
             </div>
           )}
@@ -454,10 +536,17 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           onConfirm={() => { setShowSpisanie(false); show("Разница списана"); onSave({ ...op!, statusClose: "Закрыто: списано" }); }}
         />
       )}
-      {addDMTarget && (
+      {showAddDM && (
         <AddDMPositionModal
-          onClose={() => setAddDMTarget(null)}
-          onAdd={rows => { appendPositions(addDMTarget, rows); setAddDMTarget(null); show("Позиции добавлены"); }}
+          onClose={() => setShowAddDM(false)}
+          onAdd={rows => { appendPositions("vydacha", rows); setShowAddDM(false); show("Позиции добавлены"); }}
+        />
+      )}
+      {showVozvratPick && (
+        <VozvratPickModal
+          vydacha={vydacha}
+          onClose={() => setShowVozvratPick(false)}
+          onAdd={rows => { appendPositions("vozvrat", rows); setShowVozvratPick(false); show("Позиции возврата добавлены"); }}
         />
       )}
       {showShihtaPick && (
