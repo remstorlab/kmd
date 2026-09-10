@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, FileChip, useConfirm, ConfirmDialog,
 } from "../components/ui";
 import { SkladDoc, GPItem } from "../data/mock";
-import { Inbox, Send, Repeat, Plus, X, LucideIcon } from "lucide-react";
+import { Inbox, Send, Repeat, Plus, X, Paperclip, LucideIcon } from "lucide-react";
 
 // ── Hub ───────────────────────────────────────────────────────────────────────
 
@@ -282,6 +282,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc }: { onClose: () => void; onSav
 
 function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: () => void; onSave: (d: SkladDoc) => void; doc?: SkladDoc | null; readOnly?: boolean }) {
   const { gpItems } = useApp();
+  const { toast, show, clear } = useToast();
   const [head, setHead] = useState(() => ({
     number: doc?.number || "НО-0205",
     date: doc?.date || new Date().toLocaleDateString("ru-RU"),
@@ -289,23 +290,43 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
     schetFaktura: "СФ-2026-0199",
   }));
 
+  const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [positions, setPositions] = useState<{ nomenkl: string; name: string; code: string; location: string; qty: number }[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [selectedQty, setSelectedQty] = useState<Record<string, string>>({});
 
   const availableItems = gpItems.filter(i => i.status === "На складе" && i.qty > 0);
-  const itemLabel = (i: GPItem) => `${i.nomenkl} — ${i.name} (доступно: ${i.qty} ${i.unit})`;
-  const [addForm, setAddForm] = useState({ label: availableItems[0] ? itemLabel(availableItems[0]) : "", qty: "1" });
-  const selectedItem = availableItems.find(i => itemLabel(i) === addForm.label);
+  const selectedCount = Object.keys(selectedQty).length;
 
   const openAdd = () => {
-    setAddForm({ label: availableItems[0] ? itemLabel(availableItems[0]) : "", qty: "1" });
+    setSelectedQty({});
     setShowAdd(true);
   };
 
-  const addPosition = () => {
-    if (!selectedItem) return;
-    const qty = Math.max(1, Math.min(parseInt(addForm.qty, 10) || 1, selectedItem.qty));
-    setPositions(prev => [...prev, { nomenkl: selectedItem.nomenkl, name: selectedItem.name, code: selectedItem.code, location: selectedItem.location, qty }]);
+  const toggleItem = (id: string) => {
+    setSelectedQty(prev => {
+      const next = { ...prev };
+      if (id in next) delete next[id];
+      else next[id] = "1";
+      return next;
+    });
+  };
+
+  const setItemQty = (id: string, v: string) => {
+    setSelectedQty(prev => (id in prev ? { ...prev, [id]: v } : prev));
+  };
+
+  const addPositions = () => {
+    const additions = availableItems
+      .filter(i => i.id in selectedQty)
+      .map((i): { nomenkl: string; name: string; code: string; location: string; qty: number } => {
+        const raw = parseInt(selectedQty[i.id], 10) || 1;
+        return { nomenkl: i.nomenkl, name: i.name, code: i.code, location: i.location, qty: Math.max(1, Math.min(raw, i.qty)) };
+      });
+    if (additions.length === 0) return;
+    setPositions(prev => [...prev, ...additions]);
     setShowAdd(false);
   };
 
@@ -339,6 +360,27 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
         <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={readOnly} /></Field>
         <Field label="Получатель"><Select value={head.poluchatel} options={["ТД «Золото Казахстана»", "ИП Сейткали А.М."]} onChange={v => setHead(h => ({ ...h, poluchatel: v }))} disabled={readOnly} /></Field>
         <Field label="Счёт-фактура" full><Input value={head.schetFaktura} onChange={v => setHead(h => ({ ...h, schetFaktura: v }))} disabled={readOnly} /></Field>
+      </div>
+
+      <div className="mb-4">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документ</h4>
+        {file ? (
+          <div className="flex items-center gap-2">
+            <FileChip name={file.name} onDownload={() => show("Скачивание файла...")} />
+            {!readOnly && (
+              <button onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Удалить файл">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        ) : readOnly ? (
+          doc ? <FileChip name={`Накладная_${doc.number}.pdf`} onDownload={() => show("Загрузка файла...")} /> : <span className="text-sm text-gray-400">Файл не прикреплён</span>
+        ) : (
+          <>
+            <input ref={fileInputRef} type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
+            <Btn variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}><Paperclip className="w-4 h-4" />Прикрепить файл</Btn>
+          </>
+        )}
       </div>
 
       <div className="border-t border-gray-200 pt-4">
@@ -381,17 +423,54 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
       </div>
 
       {showAdd && (
-        <Modal title="Добавить позицию ГП" onClose={() => setShowAdd(false)} footer={<><Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn><Btn onClick={addPosition}>Добавить</Btn></>}>
-          <div className="grid grid-cols-1 gap-4">
-            <Field label="Позиция (доступно на складе ГП)">
-              <Select value={addForm.label} options={availableItems.map(itemLabel)} onChange={v => setAddForm({ label: v, qty: "1" })} />
-            </Field>
-            <Field label="Количество к выдаче">
-              <Input value={addForm.qty} onChange={v => setAddForm(f => ({ ...f, qty: v }))} placeholder="1" />
-            </Field>
-          </div>
+        <Modal
+          title="Добавить позиции со склада ГП"
+          onClose={() => setShowAdd(false)}
+          footer={<>
+            <Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn>
+            <Btn onClick={addPositions} disabled={selectedCount === 0}>Добавить{selectedCount > 0 ? ` (${selectedCount})` : ""}</Btn>
+          </>}
+        >
+          {availableItems.length === 0 ? (
+            <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
+              Нет доступных позиций на складе ГП
+            </div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0"><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+                  <th className="w-10 px-3 py-2"></th>
+                  <th className="px-3 py-2 text-left">Номенкл.№</th>
+                  <th className="px-3 py-2 text-left">Наименование</th>
+                  <th className="px-3 py-2 text-left">Код</th>
+                  <th className="px-3 py-2 text-left">Доступно</th>
+                  <th className="px-3 py-2 text-left w-32">Кол-во к выдаче</th>
+                </tr></thead>
+                <tbody className="divide-y divide-gray-100">
+                  {availableItems.map(i => {
+                    const checked = i.id in selectedQty;
+                    return (
+                      <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
+                        <td className="px-3 py-2">
+                          <input type="checkbox" checked={checked} onChange={() => toggleItem(i.id)} className="w-4 h-4 accent-blue-600" />
+                        </td>
+                        <td className="px-3 py-2 text-gray-500">{i.nomenkl}</td>
+                        <td className="px-3 py-2 font-medium">{i.name}</td>
+                        <td className="px-3 py-2 text-blue-600">{i.code}</td>
+                        <td className="px-3 py-2 text-gray-500">{i.qty} {i.unit}</td>
+                        <td className="px-3 py-2">
+                          <Input value={selectedQty[i.id] ?? ""} onChange={v => setItemQty(i.id, v)} placeholder="1" disabled={!checked} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Modal>
       )}
+      {toast && <Toast message={toast} onDone={clear} />}
     </Modal>
   );
 }
