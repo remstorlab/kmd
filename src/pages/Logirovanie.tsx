@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
-import { Badge, PageHeader, useToast, Toast } from "../components/ui";
+import { Badge, PageHeader, useToast, Toast, SortTh, useSort, parseRuDate } from "../components/ui";
 import { LogEntry } from "../data/mock";
 import { ChevronDown, Eye } from "lucide-react";
 
@@ -17,6 +17,14 @@ export function Logirovanie() {
     const matchSection = filterSection === "Все разделов" || filterSection === "Все разделы" || l.section === filterSection;
     const matchUser = filterUser === "Все пользователи" || l.user.includes(filterUser.split(" ")[0]);
     return matchType && matchSection && matchUser;
+  });
+
+  const { sorted, sort, toggleSort } = useSort(filtered, {
+    datetime: l => parseRuDate(l.datetime),
+    user: l => l.user,
+    section: l => l.section,
+    type: l => l.type,
+    description: l => l.description,
   });
 
   const toggleExpand = (id: string) => {
@@ -66,16 +74,16 @@ export function Logirovanie() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Дата и время</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Пользователь</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Раздел</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Тип события</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Описание</th>
+              <SortTh sortKey="datetime" sort={sort} onSort={toggleSort}>Дата и время</SortTh>
+              <SortTh sortKey="user" sort={sort} onSort={toggleSort}>Пользователь</SortTh>
+              <SortTh sortKey="section" sort={sort} onSort={toggleSort}>Раздел</SortTh>
+              <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип события</SortTh>
+              <SortTh sortKey="description" sort={sort} onSort={toggleSort}>Описание</SortTh>
               <th className="w-12"></th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map(log => (
+            {sorted.map(log => (
               <React.Fragment key={log.id}>
                 <tr className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{log.datetime}</td>

@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, Tabs, Textarea, FileChip,
+  Field, Input, Select, Tabs, Textarea, FileChip, SortTh, useSort, parseRuDate,
 } from "../components/ui";
 import { Operation } from "../data/mock";
 import { Eye, Plus, Paperclip } from "lucide-react";
@@ -77,6 +77,26 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [vozvrat, setVozvrat] = useState(vozvratPositions);
   const [showSpisanie, setShowSpisanie] = useState(false);
   const { toast, show, clear } = useToast();
+
+  const { sorted: sortedVydacha, sort: vydachaSort, toggleSort: toggleVydachaSort } = useSort(vydacha, {
+    name: p => p.name,
+    nomenkl: p => p.nomenkl,
+    klass: p => p.klass,
+    proba: p => p.proba,
+    ves: p => p.ves,
+    ag: p => p.ag,
+    cu: p => p.cu,
+    loc: p => p.loc,
+  });
+  const { sorted: sortedVozvrat, sort: vozvratSort, toggleSort: toggleVozvratSort } = useSort(vozvrat, {
+    name: p => p.name,
+    nomenkl: p => p.nomenkl,
+    klass: p => p.klass,
+    proba: p => p.proba,
+    ves: p => p.ves,
+    ag: p => p.ag,
+    cu: p => p.cu,
+  });
 
   const [head, setHead] = useState(() => ({
     docType: "Приказ",
@@ -174,18 +194,18 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <th className="px-3 py-2 text-left">№</th>
-              <th className="px-3 py-2 text-left">Наименование</th>
-              <th className="px-3 py-2 text-left">Номенкл.№</th>
-              <th className="px-3 py-2 text-left">Класс</th>
-              <th className="px-3 py-2 text-left">Проба</th>
-              <th className="px-3 py-2 text-left">Вес г</th>
-              <th className="px-3 py-2 text-left">Ag</th>
-              <th className="px-3 py-2 text-left">Cu</th>
-              <th className="px-3 py-2 text-left">Размещение</th>
+              <SortTh sortKey="name" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Наименование</SortTh>
+              <SortTh sortKey="nomenkl" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Номенкл.№</SortTh>
+              <SortTh sortKey="klass" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Класс</SortTh>
+              <SortTh sortKey="proba" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Проба</SortTh>
+              <SortTh sortKey="ves" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Вес г</SortTh>
+              <SortTh sortKey="ag" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Ag</SortTh>
+              <SortTh sortKey="cu" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Cu</SortTh>
+              <SortTh sortKey="loc" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Размещение</SortTh>
               {!readOnly && <th className="w-16"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {vydacha.map(p => (
+              {sortedVydacha.map(p => (
                 <tr key={p.n} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-400">{p.n}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -220,17 +240,17 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <th className="px-3 py-2 text-left">№</th>
-              <th className="px-3 py-2 text-left">Наименование</th>
-              <th className="px-3 py-2 text-left">Номенкл.№</th>
-              <th className="px-3 py-2 text-left">Класс</th>
-              <th className="px-3 py-2 text-left">Проба</th>
-              <th className="px-3 py-2 text-left">Вес г</th>
-              <th className="px-3 py-2 text-left">Ag</th>
-              <th className="px-3 py-2 text-left">Cu</th>
+              <SortTh sortKey="name" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Наименование</SortTh>
+              <SortTh sortKey="nomenkl" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Номенкл.№</SortTh>
+              <SortTh sortKey="klass" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Класс</SortTh>
+              <SortTh sortKey="proba" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Проба</SortTh>
+              <SortTh sortKey="ves" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Вес г</SortTh>
+              <SortTh sortKey="ag" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Ag</SortTh>
+              <SortTh sortKey="cu" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Cu</SortTh>
               {!readOnly && <th className="w-16"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {vozvrat.map(p => (
+              {sortedVozvrat.map(p => (
                 <tr key={p.n} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-400">{p.n}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -336,6 +356,16 @@ export function DvizhenieMateriаla() {
     return matchSearch && matchVid;
   });
 
+  const { sorted, sort, toggleSort } = useSort(filtered, {
+    date: o => parseRuDate(o.date),
+    type: o => o.type,
+    vid: o => o.vid,
+    positions: o => o.positions,
+    document: o => o.document,
+    responsible: o => o.responsible,
+    statusVydacha: o => o.statusVydacha,
+  });
+
   const typeColor: Record<string, string> = {
     "Выдача": "text-green-600",
     "Возврат": "text-blue-600",
@@ -374,18 +404,18 @@ export function DvizhenieMateriаla() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Дата</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Тип</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Вид операции</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Позиции</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Документ</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Подотчётник</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Статус выдачи</th>
+              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
+              <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип</SortTh>
+              <SortTh sortKey="vid" sort={sort} onSort={toggleSort}>Вид операции</SortTh>
+              <SortTh sortKey="positions" sort={sort} onSort={toggleSort}>Позиции</SortTh>
+              <SortTh sortKey="document" sort={sort} onSort={toggleSort}>Документ</SortTh>
+              <SortTh sortKey="responsible" sort={sort} onSort={toggleSort}>Подотчётник</SortTh>
+              <SortTh sortKey="statusVydacha" sort={sort} onSort={toggleSort}>Статус выдачи</SortTh>
               <th className="w-24"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.slice((page - 1) * perPage, page * perPage).map(op => (
+            {sorted.slice((page - 1) * perPage, page * perPage).map(op => (
               <tr key={op.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-500">{op.date}</td>
                 <td className={`px-4 py-3 font-medium ${typeColor[op.type] || "text-gray-700"}`}>{op.type}</td>

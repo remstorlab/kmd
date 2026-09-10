@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Badge, Btn, Modal, EyeIcon, Pagination, PageHeader,
+  Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, useToast, Toast, Field, Input, Select, useConfirm, ConfirmDialog,
+  SortTh, useSort, parseRuDate,
 } from "../components/ui";
 import { ShihtovayaKarta } from "../data/mock";
 import { Plus, X, Calculator } from "lucide-react";
@@ -13,7 +14,7 @@ const shihtaMaterials = [
   { mat: "Лом золота 585", klass: "Лом", fe: "0.005", sb: "0.003", bi: "0.002", pb: "0.003", p: "0.001", ves: 14.20, dola: 2.6 },
 ];
 
-function ShihtaConstructor({ karta, onClose, onSave }: { karta?: ShihtovayaKarta | null; onClose: () => void; onSave: (k: ShihtovayaKarta) => void }) {
+function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta?: ShihtovayaKarta | null; onClose: () => void; onSave: (k: ShihtovayaKarta) => void; readOnly?: boolean }) {
   const [name, setName] = useState(karta?.name || "");
   const [plavkaNo, setPlavkaNo] = useState(karta?.plavkaNo || "");
   const [oborotNo, setOborotNo] = useState("О-2026-001");
@@ -25,7 +26,32 @@ function ShihtaConstructor({ karta, onClose, onSave }: { karta?: ShihtovayaKarta
   const [dopForm, setDopForm] = useState({ name: "", code: "", klass: "Лигатура", proba: "", unit: "г", ves: "" });
   const [showResult, setShowResult] = useState(false);
   const { toast, show, clear } = useToast();
-  const ro = !!karta && karta.status === "Выполнено";
+  const ro = readOnly;
+
+  const skladPickerItems = [
+    { name: "Слиток золота ЗлА-1", nom: "DM-001", klass: "Слиток", lig: 500.25, net: 498.12, loc: "Сейф №1, Полка А" },
+    { name: "Золотой порошок Au", nom: "DM-008", klass: "Порошок", lig: 25.00, net: 24.95, loc: "Сейф №3, Полка В" },
+  ];
+  const { sorted: sortedSkladPicker, sort: skladPickerSort, toggleSort: toggleSkladPickerSort } = useSort(skladPickerItems, {
+    name: r => r.name,
+    nom: r => r.nom,
+    klass: r => r.klass,
+    lig: r => r.lig,
+    net: r => r.net,
+    loc: r => r.loc,
+  });
+
+  const { sorted: sortedMaterials, sort: matSort, toggleSort: toggleMatSort } = useSort(materials, {
+    mat: m => m.mat,
+    klass: m => m.klass,
+    fe: m => parseFloat(m.fe),
+    sb: m => parseFloat(m.sb),
+    bi: m => parseFloat(m.bi),
+    pb: m => parseFloat(m.pb),
+    p: m => parseFloat(m.p),
+    ves: m => m.ves,
+    dola: m => m.dola,
+  });
 
   const gostResult = [
     { element: "Золото (Au)", pct: "99.85%", norm: "≥99.5%", ok: true },
@@ -34,12 +60,16 @@ function ShihtaConstructor({ karta, onClose, onSave }: { karta?: ShihtovayaKarta
   ];
 
   const save = () => {
-    const k: ShihtovayaKarta = {
-      id: karta?.id || `sk-${Date.now()}`,
+    const k: ShihtovayaKarta = karta ? {
+      ...karta,
+      name: name || karta.name,
+      plavkaNo: plavkaNo || karta.plavkaNo,
+    } : {
+      id: `sk-${Date.now()}`,
       date: new Date().toLocaleDateString("ru-RU"),
       name: name || "Новая шихтовая карта",
       plavkaNo: plavkaNo || `П-2026-${Math.floor(Math.random() * 9000 + 1000)}`,
-      status: "Подготовлена к плавке",
+      status: "Новая",
     };
     onSave(k);
   };
@@ -74,19 +104,19 @@ function ShihtaConstructor({ karta, onClose, onSave }: { karta?: ShihtovayaKarta
 
         <table className="w-full text-sm mb-4">
           <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-            <th className="px-3 py-2 text-left">Материал</th>
-            <th className="px-3 py-2 text-left">Класс</th>
-            <th className="px-3 py-2 text-right">Fe г</th>
-            <th className="px-3 py-2 text-right">Sb г</th>
-            <th className="px-3 py-2 text-right">Bi г</th>
-            <th className="px-3 py-2 text-right">Pb г</th>
-            <th className="px-3 py-2 text-right">P г</th>
-            <th className="px-3 py-2 text-right">Вес г</th>
-            <th className="px-3 py-2 text-right">Доля %</th>
+            <SortTh sortKey="mat" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Материал</SortTh>
+            <SortTh sortKey="klass" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Класс</SortTh>
+            <SortTh sortKey="fe" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Fe г</SortTh>
+            <SortTh sortKey="sb" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Sb г</SortTh>
+            <SortTh sortKey="bi" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Bi г</SortTh>
+            <SortTh sortKey="pb" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Pb г</SortTh>
+            <SortTh sortKey="p" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">P г</SortTh>
+            <SortTh sortKey="ves" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Вес г</SortTh>
+            <SortTh sortKey="dola" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Доля %</SortTh>
             {!ro && <th className="w-16"></th>}
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
-            {materials.map((m, i) => (
+            {sortedMaterials.map((m, i) => (
               <tr key={i} className="hover:bg-gray-50">
                 <td className="px-3 py-2 font-medium">{m.mat}</td>
                 <td className="px-3 py-2">{m.klass}</td>
@@ -98,7 +128,7 @@ function ShihtaConstructor({ karta, onClose, onSave }: { karta?: ShihtovayaKarta
                 <td className="px-3 py-2 text-right font-medium">{m.ves}</td>
                 <td className="px-3 py-2 text-right text-blue-600">{m.dola}%</td>
                 {!ro && <td className="px-3 py-2 text-center">
-                  <button onClick={() => setMaterials(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setMaterials(prev => prev.filter(x => x !== m))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                 </td>}
               </tr>
             ))}
@@ -145,18 +175,15 @@ function ShihtaConstructor({ karta, onClose, onSave }: { karta?: ShihtovayaKarta
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <th className="w-8 px-3 py-2"></th>
-              <th className="px-3 py-2 text-left">Наименование</th>
-              <th className="px-3 py-2 text-left">Номенкл.№</th>
-              <th className="px-3 py-2 text-left">Класс</th>
-              <th className="px-3 py-2 text-right">Лигат.вес г</th>
-              <th className="px-3 py-2 text-right">Чист.вес г</th>
-              <th className="px-3 py-2 text-left">Место</th>
+              <SortTh sortKey="name" sort={skladPickerSort} onSort={toggleSkladPickerSort} className="px-3 py-2">Наименование</SortTh>
+              <SortTh sortKey="nom" sort={skladPickerSort} onSort={toggleSkladPickerSort} className="px-3 py-2">Номенкл.№</SortTh>
+              <SortTh sortKey="klass" sort={skladPickerSort} onSort={toggleSkladPickerSort} className="px-3 py-2">Класс</SortTh>
+              <SortTh sortKey="lig" sort={skladPickerSort} onSort={toggleSkladPickerSort} align="right" className="px-3 py-2">Лигат.вес г</SortTh>
+              <SortTh sortKey="net" sort={skladPickerSort} onSort={toggleSkladPickerSort} align="right" className="px-3 py-2">Чист.вес г</SortTh>
+              <SortTh sortKey="loc" sort={skladPickerSort} onSort={toggleSkladPickerSort} className="px-3 py-2">Место</SortTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {[
-                { name: "Слиток золота ЗлА-1", nom: "DM-001", klass: "Слиток", lig: 500.25, net: 498.12, loc: "Сейф №1, Полка А" },
-                { name: "Золотой порошок Au", nom: "DM-008", klass: "Порошок", lig: 25.00, net: 24.95, loc: "Сейф №3, Полка В" },
-              ].map((r, i) => (
+              {sortedSkladPicker.map((r, i) => (
                 <tr key={i} className="hover:bg-gray-50"><td className="px-3 py-2"><input type="checkbox" /></td>
                   <td className="px-3 py-2 font-medium">{r.name}</td><td className="px-3 py-2 text-gray-500">{r.nom}</td>
                   <td className="px-3 py-2">{r.klass}</td><td className="px-3 py-2 text-right">{r.lig}</td>
@@ -200,8 +227,16 @@ export function ShihtovyeKarty() {
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
   const [viewKarta, setViewKarta] = useState<ShihtovayaKarta | null>(null);
+  const [editKarta, setEditKarta] = useState<ShihtovayaKarta | null>(null);
   const [showNew, setShowNew] = useState(false);
   const perPage = 8;
+
+  const { sorted, sort, toggleSort } = useSort(shihtovyeKarty, {
+    date: k => parseRuDate(k.date),
+    name: k => k.name,
+    plavkaNo: k => k.plavkaNo,
+    status: k => k.status,
+  });
 
   return (
     <div>
@@ -216,21 +251,25 @@ export function ShihtovyeKarty() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Дата</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Наименование</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">№ плавки</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Статус</th>
-              <th className="w-12"></th>
+              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
+              <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
+              <SortTh sortKey="plavkaNo" sort={sort} onSort={toggleSort}>№ плавки</SortTh>
+              <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
+              <th className="w-28"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {shihtovyeKarty.slice((page - 1) * perPage, page * perPage).map(karta => (
+            {sorted.slice((page - 1) * perPage, page * perPage).map(karta => (
               <tr key={karta.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-500">{karta.date}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{karta.name}</td>
                 <td className="px-4 py-3 text-blue-600">{karta.plavkaNo}</td>
                 <td className="px-4 py-3"><Badge label={karta.status} /></td>
-                <td className="px-4 py-3"><EyeIcon onClick={() => setViewKarta(karta)} /></td>
+                <td className="px-4 py-3 flex items-center gap-1">
+                  <EyeIcon onClick={() => setViewKarta(karta)} />
+                  <EditIcon onClick={() => setEditKarta(karta)} />
+                  <DeleteIcon onClick={() => confirm(`Удалить шихтовую карту «${karta.name}»?`, () => setShihtovyeKarty(prev => prev.filter(s => s.id !== karta.id)))} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -238,11 +277,12 @@ export function ShihtovyeKarty() {
         <Pagination page={page} total={shihtovyeKarty.length} perPage={perPage} onPage={setPage} />
       </div>
 
-      {viewKarta && (
+      {viewKarta && <ShihtaConstructor karta={viewKarta} onClose={() => setViewKarta(null)} onSave={() => setViewKarta(null)} readOnly />}
+      {editKarta && (
         <ShihtaConstructor
-          karta={viewKarta}
-          onClose={() => setViewKarta(null)}
-          onSave={k => { setShihtovyeKarty(prev => prev.map(s => s.id === k.id ? k : s)); setViewKarta(null); show("Карта обновлена"); }}
+          karta={editKarta}
+          onClose={() => setEditKarta(null)}
+          onSave={k => { setShihtovyeKarty(prev => prev.map(s => s.id === k.id ? k : s)); setEditKarta(null); show("Карта обновлена"); }}
         />
       )}
       {showNew && (

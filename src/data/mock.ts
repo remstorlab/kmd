@@ -5,7 +5,7 @@ export type OpType = "Выдача" | "Возврат" | "Выдача-Возв�
 export type OpVid = "Отбор пробы" | "Анализ в ЛКИ" | "Плавка" | "Гальванопокрытие" | "Производство ГП";
 export type UserStatus = "Активен" | "Заблокирован";
 export type LogType = "Создание" | "Изменение" | "Удаление" | "Закрытие";
-export type ShihtaStatus = "Подготовлена к плавке" | "Выполнено" | "В работе";
+export type ShihtaStatus = "Новая" | "Выполнена";
 
 export interface GPItem {
   id: string;
@@ -178,10 +178,10 @@ export const initialOperations: Operation[] = [
 
 // --- Шихтовые карты ---
 export const initialShihtovyeKarty: ShihtovayaKarta[] = [
-  { id: "sk1", date: "19.08.2026", name: "Шихта для плавки Au-585 (партия А)", plavkaNo: "П-2026-0089", status: "В работе" },
-  { id: "sk2", date: "15.08.2026", name: "Шихта золото 750 пробы", plavkaNo: "П-2026-0088", status: "Подготовлена к плавке" },
-  { id: "sk3", date: "10.08.2026", name: "Шихта серебро 925 (кольца)", plavkaNo: "П-2026-0087", status: "Выполнено" },
-  { id: "sk4", date: "05.08.2026", name: "Шихта Au-999 слитки партия Б", plavkaNo: "П-2026-0086", status: "Выполнено" },
+  { id: "sk1", date: "19.08.2026", name: "Шихта для плавки Au-585 (партия А)", plavkaNo: "П-2026-0089", status: "Новая" },
+  { id: "sk2", date: "15.08.2026", name: "Шихта золото 750 пробы", plavkaNo: "П-2026-0088", status: "Новая" },
+  { id: "sk3", date: "10.08.2026", name: "Шихта серебро 925 (кольца)", plavkaNo: "П-2026-0087", status: "Выполнена" },
+  { id: "sk4", date: "05.08.2026", name: "Шихта Au-999 слитки партия Б", plavkaNo: "П-2026-0086", status: "Выполнена" },
 ];
 
 // --- Подотчётники ---

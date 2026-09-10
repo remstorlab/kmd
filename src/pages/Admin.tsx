@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PageHeader,
   useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, Toggle,
+  Field, Input, Select, Toggle, SortTh, useSort,
 } from "../components/ui";
 import { AppUser, Role } from "../data/mock";
 import { ArrowLeft, Plus } from "lucide-react";
@@ -41,6 +41,11 @@ function NewRoleModal({ onClose, onSave }: { onClose: () => void; onSave: (r: Ro
     });
   };
 
+  const { sorted: sortedSections, sort: sectionsSort, toggleSort: toggleSectionsSort } = useSort(sections, {
+    section: s => s,
+    ...Object.fromEntries(permissions.map(p => [p, (s: string) => (perms[s]?.has(p) ? 1 : 0)])),
+  });
+
   return (
     <Modal
       title="Новая роль"
@@ -62,14 +67,14 @@ function NewRoleModal({ onClose, onSave }: { onClose: () => void; onSave: (r: Ro
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-3 py-2 text-left font-medium text-gray-600 text-xs">Раздел системы</th>
+              <SortTh sortKey="section" sort={sectionsSort} onSort={toggleSectionsSort} className="px-3 py-2 font-medium text-gray-600 text-xs">Раздел системы</SortTh>
               {permissions.map(p => (
-                <th key={p} className="px-3 py-2 text-center font-medium text-gray-500 text-xs">{p}</th>
+                <SortTh key={p} sortKey={p} sort={sectionsSort} onSort={toggleSectionsSort} align="center" className="px-3 py-2 font-medium text-gray-500 text-xs">{p}</SortTh>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {sections.map(sec => (
+            {sortedSections.map(sec => (
               <tr key={sec} className="hover:bg-gray-50">
                 <td className="px-3 py-2 font-medium text-gray-900">{sec}</td>
                 {permissions.map(perm => (
@@ -210,6 +215,13 @@ export function PanelAdmin() {
   const [showNewUser, setShowNewUser] = useState(false);
   const [editUser, setEditUser] = useState<AppUser | null>(null);
 
+  const { sorted, sort, toggleSort } = useSort(users, {
+    name: u => u.name,
+    role: u => u.role,
+    email: u => u.email,
+    status: u => u.status,
+  });
+
   if (showRoles) {
     return <RolesPage onBack={() => setShowRoles(false)} />;
   }
@@ -232,15 +244,15 @@ export function PanelAdmin() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">ФИО</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Роль</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Email</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Статус доступа</th>
+              <SortTh sortKey="name" sort={sort} onSort={toggleSort}>ФИО</SortTh>
+              <SortTh sortKey="role" sort={sort} onSort={toggleSort}>Роль</SortTh>
+              <SortTh sortKey="email" sort={sort} onSort={toggleSort}>Email</SortTh>
+              <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус доступа</SortTh>
               <th className="w-20"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {users.map(user => (
+            {sorted.map(user => (
               <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-medium text-gray-900">{user.name}</td>
                 <td className="px-4 py-3 text-gray-600">{user.role}</td>

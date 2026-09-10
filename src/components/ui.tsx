@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 // ── Badge ────────────────────────────────────────────────────────────────────
 
 const badgePalette: Record<string, string> = {
   "На складе": "bg-green-100 text-green-700 border-green-200",
   "Выполнено": "bg-green-100 text-green-700 border-green-200",
+  "Выполнена": "bg-green-100 text-green-700 border-green-200",
   "Соответствует": "bg-green-100 text-green-700 border-green-200",
   "Без изменений": "bg-green-100 text-green-700 border-green-200",
   "Активен": "bg-green-100 text-green-700 border-green-200",
@@ -246,6 +247,66 @@ export function Pagination({
         <button onClick={() => onPage(page + 1)} disabled={page === pages} className="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-blue-400 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronRight className="w-4 h-4" /></button>
       </div>
     </div>
+  );
+}
+
+// ── Table sorting ────────────────────────────────────────────────────────────
+
+export type SortDir = "asc" | "desc";
+export type SortState = { key: string; dir: SortDir } | null;
+
+// Parses "ДД.ММ.ГГГГ" or "ДД.ММ.ГГГГ, ЧЧ:ММ" into a sortable number.
+export function parseRuDate(s: string): number {
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})(?:,\s*(\d{2}):(\d{2}))?/.exec(s);
+  if (!m) return 0;
+  const [, d, mo, y, h = "0", mi = "0"] = m;
+  return Number(y) * 100000000 + Number(mo) * 1000000 + Number(d) * 10000 + Number(h) * 100 + Number(mi);
+}
+
+export function useSort<T>(rows: T[], accessors: Record<string, (row: T) => string | number>) {
+  const [sort, setSort] = useState<SortState>(null);
+  const sorted = useMemo(() => {
+    if (!sort) return rows;
+    const acc = accessors[sort.key];
+    if (!acc) return rows;
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      const va = acc(a), vb = acc(b);
+      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "ru");
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [rows, sort, accessors]);
+  const toggleSort = (key: string) => setSort(prev => (prev?.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  return { sorted, sort, toggleSort };
+}
+
+export function SortTh({
+  children,
+  sortKey,
+  sort,
+  onSort,
+  align = "left",
+  className = "px-4 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide",
+}: {
+  children: React.ReactNode;
+  sortKey: string;
+  sort: SortState;
+  onSort: (key: string) => void;
+  align?: "left" | "right" | "center";
+  className?: string;
+}) {
+  const active = sort?.key === sortKey;
+  const Icon = active ? (sort!.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  const alignCls = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  const justifyCls = align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
+  return (
+    <th className={`${className} ${alignCls}`}>
+      <button type="button" onClick={() => onSort(sortKey)} className={`inline-flex w-full items-center gap-1 ${justifyCls} hover:text-gray-700 transition-colors ${active ? "text-gray-700" : ""}`}>
+        {children}
+        <Icon className={`w-3 h-3 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} />
+      </button>
+    </th>
   );
 }
 

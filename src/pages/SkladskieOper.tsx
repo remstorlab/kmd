@@ -3,6 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, FileChip, useConfirm, ConfirmDialog,
+  SortTh, useSort, parseRuDate,
 } from "../components/ui";
 import { SkladDoc, GPItem } from "../data/mock";
 import { Inbox, Send, Repeat, Plus, X, Paperclip, LucideIcon } from "lucide-react";
@@ -78,6 +79,18 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
     setForm({ nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
   };
 
+  const { sorted: sortedPositions, sort: posSort, toggleSort: togglePosSort } = useSort(positions, {
+    nomenkl: p => p.nomenkl,
+    name: p => p.name,
+    klass: p => p.klass,
+    code: p => p.code,
+    kol: p => parseFloat(p.kol) || 0,
+    proba: p => parseFloat(p.proba) || 0,
+    lig: p => parseFloat(p.lig) || 0,
+    net: p => parseFloat(p.net) || 0,
+    loc: p => p.loc,
+  });
+
   // Накладная state
   const [nakladPositions, setNakladPositions] = useState([
     { nomenkl: "DM-005", name: "Слиток серебра СрБ-3", kol: "1", klass: "Слиток", code: "AG", loc: "Сейф №2, Полка Б" },
@@ -90,6 +103,15 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
     setShowAddNaklad(false);
     setNakladForm({ nomenkl: "", klass: "Слиток", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
   };
+
+  const { sorted: sortedNakladPositions, sort: nakladPosSort, toggleSort: toggleNakladPosSort } = useSort(nakladPositions, {
+    nomenkl: p => p.nomenkl,
+    name: p => p.name,
+    kol: p => parseFloat(p.kol) || 0,
+    klass: p => p.klass,
+    code: p => p.code,
+    loc: p => p.loc,
+  });
 
   const save = () => {
     if (doc) {
@@ -178,19 +200,19 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
           </div>
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <th className="px-3 py-2 text-left">Номенкл.№</th>
-              <th className="px-3 py-2 text-left">Наименование</th>
-              <th className="px-3 py-2 text-left">Класс</th>
-              <th className="px-3 py-2 text-left">Код</th>
-              <th className="px-3 py-2 text-left">Кол-во</th>
-              <th className="px-3 py-2 text-left">Проба</th>
-              <th className="px-3 py-2 text-left">Лигат.г</th>
-              <th className="px-3 py-2 text-left">Чистый г</th>
-              <th className="px-3 py-2 text-left">Размещение</th>
+              <SortTh sortKey="nomenkl" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Номенкл.№</SortTh>
+              <SortTh sortKey="name" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Наименование</SortTh>
+              <SortTh sortKey="klass" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Класс</SortTh>
+              <SortTh sortKey="code" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Код</SortTh>
+              <SortTh sortKey="kol" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Кол-во</SortTh>
+              <SortTh sortKey="proba" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Проба</SortTh>
+              <SortTh sortKey="lig" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Лигат.г</SortTh>
+              <SortTh sortKey="net" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Чистый г</SortTh>
+              <SortTh sortKey="loc" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Размещение</SortTh>
               {!ro && <th className="w-16"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {positions.map((p, i) => (
+              {sortedPositions.map((p, i) => (
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -202,7 +224,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
                   <td className="px-3 py-2">{p.net}</td>
                   <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                   {!ro && <td className="px-3 py-2">
-                    <button onClick={() => setPositions(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setPositions(prev => prev.filter(x => x !== p))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                   </td>}
                 </tr>
               ))}
@@ -220,16 +242,16 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
           </div>
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <th className="px-3 py-2 text-left">Номенкл.№</th>
-              <th className="px-3 py-2 text-left">Наименование</th>
-              <th className="px-3 py-2 text-left">Кол-во</th>
-              <th className="px-3 py-2 text-left">Класс</th>
-              <th className="px-3 py-2 text-left">Код материала</th>
-              <th className="px-3 py-2 text-left">Размещение</th>
+              <SortTh sortKey="nomenkl" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Номенкл.№</SortTh>
+              <SortTh sortKey="name" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Наименование</SortTh>
+              <SortTh sortKey="kol" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Кол-во</SortTh>
+              <SortTh sortKey="klass" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Класс</SortTh>
+              <SortTh sortKey="code" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Код материала</SortTh>
+              <SortTh sortKey="loc" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Размещение</SortTh>
               <th className="w-16"></th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {nakladPositions.map((p, i) => (
+              {sortedNakladPositions.map((p, i) => (
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -238,7 +260,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
                   <td className="px-3 py-2 font-medium">{p.code}</td>
                   <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                   <td className="px-3 py-2">
-                    <button onClick={() => setNakladPositions(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setNakladPositions(prev => prev.filter(x => x !== p))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                   </td>
                 </tr>
               ))}
@@ -304,6 +326,21 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
 
   const availableItems = gpItems.filter(i => i.status === "На складе" && i.qty > 0);
   const selectedCount = Object.keys(selectedQty).length;
+
+  const { sorted: sortedPositions, sort: posSort, toggleSort: togglePosSort } = useSort(positions, {
+    nomenkl: p => p.nomenkl,
+    name: p => p.name,
+    code: p => p.code,
+    qty: p => p.qty,
+    location: p => p.location,
+  });
+
+  const { sorted: sortedAvailable, sort: availSort, toggleSort: toggleAvailSort } = useSort(availableItems, {
+    nomenkl: i => i.nomenkl,
+    name: i => i.name,
+    code: i => i.code,
+    qty: i => i.qty,
+  });
 
   const openAdd = () => {
     setSelectedQty({});
@@ -402,15 +439,15 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
         ) : (
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <th className="px-3 py-2 text-left">Номенкл.№</th>
-              <th className="px-3 py-2 text-left">Наименование</th>
-              <th className="px-3 py-2 text-left">Код</th>
-              <th className="px-3 py-2 text-left">Кол-во</th>
-              <th className="px-3 py-2 text-left">Размещение</th>
+              <SortTh sortKey="nomenkl" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Номенкл.№</SortTh>
+              <SortTh sortKey="name" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Наименование</SortTh>
+              <SortTh sortKey="code" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Код</SortTh>
+              <SortTh sortKey="qty" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Кол-во</SortTh>
+              <SortTh sortKey="location" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Размещение</SortTh>
               {!readOnly && <th className="w-16"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {positions.map((p, i) => (
+              {sortedPositions.map((p, i) => (
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -418,7 +455,7 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
                   <td className="px-3 py-2">{p.qty}</td>
                   <td className="px-3 py-2 text-gray-500">{p.location}</td>
                   {!readOnly && <td className="px-3 py-2">
-                    <button onClick={() => setPositions(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setPositions(prev => prev.filter(x => x !== p))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                   </td>}
                 </tr>
               ))}
@@ -445,14 +482,14 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
               <table className="w-full text-sm">
                 <thead className="sticky top-0"><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
                   <th className="w-10 px-3 py-2"></th>
-                  <th className="px-3 py-2 text-left">Номенкл.№</th>
-                  <th className="px-3 py-2 text-left">Наименование</th>
-                  <th className="px-3 py-2 text-left">Код</th>
-                  <th className="px-3 py-2 text-left">Доступно</th>
+                  <SortTh sortKey="nomenkl" sort={availSort} onSort={toggleAvailSort} className="px-3 py-2">Номенкл.№</SortTh>
+                  <SortTh sortKey="name" sort={availSort} onSort={toggleAvailSort} className="px-3 py-2">Наименование</SortTh>
+                  <SortTh sortKey="code" sort={availSort} onSort={toggleAvailSort} className="px-3 py-2">Код</SortTh>
+                  <SortTh sortKey="qty" sort={availSort} onSort={toggleAvailSort} className="px-3 py-2">Доступно</SortTh>
                   <th className="px-3 py-2 text-left w-32">Кол-во к выдаче</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
-                  {availableItems.map(i => {
+                  {sortedAvailable.map(i => {
                     const checked = i.id in selectedQty;
                     return (
                       <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
@@ -513,8 +550,15 @@ function DocList({
     const matchStatus = filterStatus === "Все статусы" || d.status === filterStatus;
     return matchSearch && matchStatus;
   });
+  const { sorted, sort, toggleSort } = useSort(filtered, {
+    date: d => parseRuDate(d.date),
+    type: d => d.type,
+    number: d => d.number,
+    sender: d => d.sender,
+    receiver: d => d.receiver,
+  });
   const perPage = 8;
-  const pageItems = filtered.slice((page - 1) * perPage, page * perPage);
+  const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
 
   return (
     <div>
@@ -552,11 +596,11 @@ function DocList({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Дата</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Тип документа</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Номер</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Отправитель</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Получатель</th>
+              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
+              <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип документа</SortTh>
+              <SortTh sortKey="number" sort={sort} onSort={toggleSort}>Номер</SortTh>
+              <SortTh sortKey="sender" sort={sort} onSort={toggleSort}>Отправитель</SortTh>
+              <SortTh sortKey="receiver" sort={sort} onSort={toggleSort}>Получатель</SortTh>
               <th className="w-32"></th>
             </tr>
           </thead>
@@ -628,6 +672,14 @@ export function VydachaList() {
   const [showNew, setShowNew] = useState(false);
   const perPage = 8;
 
+  const { sorted, sort, toggleSort } = useSort(vydachaDocs, {
+    date: d => parseRuDate(d.date),
+    type: d => d.type,
+    number: d => d.number,
+    sender: d => d.sender,
+    receiver: d => d.receiver,
+  });
+
   return (
     <div>
       <PageHeader
@@ -645,16 +697,16 @@ export function VydachaList() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Дата</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Тип документа</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Номер</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Отправитель</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Получатель</th>
+              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
+              <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип документа</SortTh>
+              <SortTh sortKey="number" sort={sort} onSort={toggleSort}>Номер</SortTh>
+              <SortTh sortKey="sender" sort={sort} onSort={toggleSort}>Отправитель</SortTh>
+              <SortTh sortKey="receiver" sort={sort} onSort={toggleSort}>Получатель</SortTh>
               <th className="w-28"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {vydachaDocs.map(doc => (
+            {sorted.map(doc => (
               <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-500">{doc.date}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{doc.type}</td>

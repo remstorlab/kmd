@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
-import { Badge, Btn, Modal, EyeIcon, PageHeader, useToast, Toast, Tabs } from "../components/ui";
+import { Badge, Btn, Modal, EyeIcon, PageHeader, useToast, Toast, Tabs, SortTh, useSort } from "../components/ui";
 import { Podotchetnik } from "../data/mock";
 import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, LucideIcon } from "lucide-react";
 
@@ -25,6 +25,12 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
   const { toast, show, clear } = useToast();
 
   const processes = tab === "Текущие процессы" ? currentProcesses : completedProcesses;
+
+  const { sorted: sortedMaterials, sort: matSort, toggleSort: toggleMatSort } = useSort(person.materials, {
+    name: m => m.name,
+    nomenkl: m => m.nomenkl,
+    weight: m => m.weight,
+  });
 
   return (
     <div>
@@ -60,13 +66,13 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
         ) : (
           <table className="w-full text-sm">
             <thead><tr className="text-gray-500 text-xs border-b border-gray-200">
-              <th className="pb-2 text-left">Материал</th>
-              <th className="pb-2 text-left">Номенкл.№</th>
-              <th className="pb-2 text-right">Вес в подотчёте</th>
+              <SortTh sortKey="name" sort={matSort} onSort={toggleMatSort} className="pb-2">Материал</SortTh>
+              <SortTh sortKey="nomenkl" sort={matSort} onSort={toggleMatSort} className="pb-2">Номенкл.№</SortTh>
+              <SortTh sortKey="weight" sort={matSort} onSort={toggleMatSort} align="right" className="pb-2">Вес в подотчёте</SortTh>
               <th className="pb-2 text-left">Статус</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {person.materials.map((m, i) => (
+              {sortedMaterials.map((m, i) => (
                 <tr key={i}>
                   <td className="py-2 font-medium">{m.name}</td>
                   <td className="py-2 text-gray-500">{m.nomenkl}</td>
@@ -115,6 +121,13 @@ export function Podotchetniki() {
   const { podotchetniki } = useApp();
   const [selected, setSelected] = useState<Podotchetnik | null>(null);
 
+  const { sorted, sort, toggleSort } = useSort(podotchetniki, {
+    name: p => p.name,
+    tabelNo: p => p.tabelNo,
+    department: p => p.department,
+    balance: p => (p.materials.length > 0 ? 1 : 0),
+  });
+
   if (selected) {
     return <PodotchetnikCard person={selected} onBack={() => setSelected(null)} />;
   }
@@ -131,15 +144,15 @@ export function Podotchetniki() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">ФИО</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Табельный №</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Подразделение</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">В балансе</th>
+              <SortTh sortKey="name" sort={sort} onSort={toggleSort}>ФИО</SortTh>
+              <SortTh sortKey="tabelNo" sort={sort} onSort={toggleSort}>Табельный №</SortTh>
+              <SortTh sortKey="department" sort={sort} onSort={toggleSort}>Подразделение</SortTh>
+              <SortTh sortKey="balance" sort={sort} onSort={toggleSort}>В балансе</SortTh>
               <th className="w-12"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {podotchetniki.map(p => (
+            {sorted.map(p => (
               <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                 <td className="px-4 py-3 text-blue-600">{p.tabelNo}</td>

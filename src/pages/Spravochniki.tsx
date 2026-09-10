@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { PageHeader, Btn, Modal, EditIcon, Badge, useToast, Toast, Field, Input, Select } from "../components/ui";
+import { PageHeader, Btn, Modal, EditIcon, Badge, useToast, Toast, Field, Input, Select, SortTh, useSort } from "../components/ui";
 import { spravochniki } from "../data/mock";
 import { ArrowLeft, Plus, Package, Scale, FileText, Shapes, Building2, UserRound, Settings2, Tag, LucideIcon } from "lucide-react";
 
@@ -23,6 +23,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const [editItem, setEditItem] = useState<{ code: string; value: string; status: string } | null>(null);
   const [form, setForm] = useState({ code: "", value: "", status: "Активно" });
   const { toast, show, clear } = useToast();
+  const { sorted, sort, toggleSort } = useSort(items, {
+    code: i => i.code,
+    value: i => i.value,
+    status: i => i.status,
+  });
 
   const openAdd = () => {
     setForm({ code: "", value: "", status: "Активно" });
@@ -62,13 +67,13 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
-            <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Код</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Значение</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Статус</th>
+            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
+            <SortTh sortKey="value" sort={sort} onSort={toggleSort}>Значение</SortTh>
+            <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
             <th className="w-12"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
-            {items.map((item, i) => (
+            {sorted.map((item, i) => (
               <tr key={i} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-gray-900">{item.value}</td>

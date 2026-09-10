@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
-import { PageHeader, Btn, Modal, Field, Input, Select, useToast, Toast } from "../components/ui";
+import { PageHeader, Btn, Modal, Field, Input, Select, useToast, Toast, SortTh, useSort } from "../components/ui";
 import { Metal } from "../data/mock";
 import { ClipboardCheck, Coins, Gem, FileText, LucideIcon } from "lucide-react";
 
@@ -218,6 +218,14 @@ export function Otchetnost() {
   const [viewReport, setViewReport] = useState<typeof reports[0] | null>(null);
   const [showInvOpis, setShowInvOpis] = useState(false);
 
+  const { sorted: sortedReportRows, sort: reportSort, toggleSort: toggleReportSort } = useSort(viewReport?.data ?? [], {
+    nom: r => r.nom,
+    name: r => r.name,
+    kol: r => r.kol,
+    ves: r => r.ves,
+    status: r => r.status,
+  });
+
   return (
     <div>
       <PageHeader
@@ -261,14 +269,14 @@ export function Otchetnost() {
           <p className="text-sm text-gray-500 mb-4">{viewReport.desc}</p>
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <th className="px-3 py-2 text-left">Номер/Код</th>
-              <th className="px-3 py-2 text-left">Наименование</th>
-              <th className="px-3 py-2 text-left">Кол-во / Дата</th>
-              <th className="px-3 py-2 text-left">Место / Статус</th>
-              <th className="px-3 py-2 text-left">Результат</th>
+              <SortTh sortKey="nom" sort={reportSort} onSort={toggleReportSort} className="px-3 py-2">Номер/Код</SortTh>
+              <SortTh sortKey="name" sort={reportSort} onSort={toggleReportSort} className="px-3 py-2">Наименование</SortTh>
+              <SortTh sortKey="kol" sort={reportSort} onSort={toggleReportSort} className="px-3 py-2">Кол-во / Дата</SortTh>
+              <SortTh sortKey="ves" sort={reportSort} onSort={toggleReportSort} className="px-3 py-2">Место / Статус</SortTh>
+              <SortTh sortKey="status" sort={reportSort} onSort={toggleReportSort} className="px-3 py-2">Результат</SortTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {viewReport.data.map((row, i) => (
+              {sortedReportRows.map((row, i) => (
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-blue-600 font-medium">{row.nom}</td>
                   <td className="px-3 py-2 font-medium">{row.name}</td>
