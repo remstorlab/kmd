@@ -117,7 +117,7 @@ export function Btn({
   const sizes = { sm: "px-3 py-1.5 text-xs", md: "px-4 py-2 text-sm" };
   const variants = {
     primary: "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300",
-    secondary: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-50",
+    secondary: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:hover:bg-gray-100 disabled:cursor-not-allowed",
     danger: "border border-red-500 text-red-600 hover:bg-red-50 disabled:opacity-50",
     ghost: "text-blue-600 hover:bg-blue-50 disabled:opacity-50",
   };

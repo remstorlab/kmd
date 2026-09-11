@@ -414,7 +414,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
 
   return (
     <Modal
-      title="Объединение номенклатур"
+      title="Объединение позиций"
       onClose={onClose}
       wide
       footer={<><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={onConfirm}>Подтвердить объединение</Btn></>}
@@ -796,7 +796,7 @@ export function OstatokDM() {
     setDmItems(prev => [...prev.filter(it => !selected.has(it.id)), merged]);
     setSelected(new Set());
     setShowMerge(false);
-    show("Номенклатуры объединены");
+    show("Позиции объединены");
   };
 
   return (
@@ -809,9 +809,7 @@ export function OstatokDM() {
           <>
             <Btn onClick={() => setShowPrihod(true)}>Принять на склад</Btn>
             <Btn variant="secondary" onClick={() => navigate("dvizhenie-mat", { openNew: "1" })}>Выдать со склада</Btn>
-            {selected.size >= 2 && (
-              <Btn variant="secondary" onClick={() => setShowMerge(true)}>Объединить номенклатуры</Btn>
-            )}
+            <Btn variant="secondary" disabled={selected.size < 2} onClick={() => setShowMerge(true)}>Объединить позиции</Btn>
             <ExportBtn onToast={show} />
           </>
         }
