@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
-import { Badge, PageHeader, useToast, Toast, SortTh, useSort, parseRuDate } from "../components/ui";
-import { LogEntry } from "../data/mock";
-import { ChevronDown, Eye } from "lucide-react";
+import { Badge, PageHeader, Modal, useToast, Toast, SortTh, useSort, parseRuDate } from "../components/ui";
+import { LogEntry, LogSnapshotItem } from "../data/mock";
+import { Eye } from "lucide-react";
 
 export function Logirovanie() {
   const { logs } = useApp();
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [detailLog, setDetailLog] = useState<LogEntry | null>(null);
   const [filterType, setFilterType] = useState("Все типы");
   const [filterSection, setFilterSection] = useState("Все разделы");
   const [filterUser, setFilterUser] = useState("Все пользователи");
@@ -26,14 +26,6 @@ export function Logirovanie() {
     type: l => l.type,
     description: l => l.description,
   });
-
-  const toggleExpand = (id: string) => {
-    setExpanded(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
-  };
 
   const sections = ["Все разделы", "Склады", "Складские операции", "Движение материала", "Шихтовые карты", "Администрирование"];
   const users = ["Все пользователи", "Ковалева Е.", "Нурланов А.Б.", "Петров С.В.", "Иванова М.С.", "Ким А.Ю."];
@@ -77,59 +69,93 @@ export function Logirovanie() {
               <SortTh sortKey="datetime" sort={sort} onSort={toggleSort}>Дата и время</SortTh>
               <SortTh sortKey="user" sort={sort} onSort={toggleSort}>Пользователь</SortTh>
               <SortTh sortKey="section" sort={sort} onSort={toggleSort}>Раздел</SortTh>
-              <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип события</SortTh>
+              <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Статус действия</SortTh>
               <SortTh sortKey="description" sort={sort} onSort={toggleSort}>Описание</SortTh>
               <th className="w-12"></th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map(log => (
-              <React.Fragment key={log.id}>
-                <tr className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+            {sorted.map(log => {
+              const hasDetails = (log.before && log.before.length > 0) || (log.after && log.after.length > 0);
+              return (
+                <tr key={log.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{log.datetime}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{log.user}</td>
                   <td className="px-4 py-3 text-gray-600">{log.section}</td>
                   <td className="px-4 py-3"><Badge label={log.type} /></td>
                   <td className="px-4 py-3 text-gray-700">{log.description}</td>
                   <td className="px-4 py-3">
-                    {log.type === "Изменение" ? (
-                      <button
-                        onClick={() => toggleExpand(log.id)}
-                        className="text-gray-400 hover:text-blue-600 transition-colors"
-                        title="Показать сравнение"
-                      >
-                        <ChevronDown className={`w-4 h-4 transition-transform ${expanded.has(log.id) ? "rotate-180" : ""}`} />
-                      </button>
-                    ) : (
-                      <button onClick={() => show(`Просмотр события: ${log.description}`)} className="text-blue-500 hover:text-blue-700 transition-colors p-0.5">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => hasDetails ? setDetailLog(log) : show(`Просмотр события: ${log.description}`)}
+                      className="text-blue-500 hover:text-blue-700 transition-colors p-0.5"
+                      title="Просмотр"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
-                {expanded.has(log.id) && log.before && log.after && (
-                  <tr className="border-t border-gray-100 bg-slate-50">
-                    <td colSpan={6} className="px-4 py-4">
-                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Сравнение изменений</div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                          <div className="text-xs font-semibold text-red-600 mb-2">Было:</div>
-                          <code className="text-xs text-red-800 font-mono">{log.before}</code>
-                        </div>
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                          <div className="text-xs font-semibold text-green-600 mb-2">Стало:</div>
-                          <code className="text-xs text-green-800 font-mono">{log.after}</code>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
+      {detailLog && <LogDetailModal log={detailLog} onClose={() => setDetailLog(null)} />}
       {toast && <Toast message={toast} onDone={clear} />}
+    </div>
+  );
+}
+
+// ── Log detail modal (Было / Стало) ─────────────────────────────────────────
+
+function LogDetailModal({ log, onClose }: { log: LogEntry; onClose: () => void }) {
+  const before = log.before ?? [];
+  const after = log.after ?? [];
+
+  return (
+    <Modal title={log.description} onClose={onClose} extraWide>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Было</div>
+          <div className="space-y-3">
+            {before.length === 0 && (
+              <div className="text-sm text-gray-400 italic bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">Позиция отсутствовала</div>
+            )}
+            {before.map((item, i) => <SnapshotCard key={i} item={item} counterpart={after.length === 1 ? after[0] : undefined} />)}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Стало</div>
+          <div className="space-y-3">
+            {after.length === 0 && (
+              <div className="text-sm text-gray-400 italic bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">Позиция отсутствует</div>
+            )}
+            {after.map((item, i) => <SnapshotCard key={i} item={item} counterpart={before.length === 1 ? before[0] : undefined} />)}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function SnapshotCard({ item, counterpart }: { item: LogSnapshotItem; counterpart?: LogSnapshotItem }) {
+  return (
+    <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <span className="font-medium text-gray-900 text-sm">{item.title}</span>
+        <Badge label={item.status} />
+      </div>
+      <div className="space-y-1">
+        {item.attrs.map(a => {
+          const other = counterpart?.attrs.find(x => x.label === a.label);
+          const changed = counterpart !== undefined && other !== undefined && other.value !== a.value;
+          return (
+            <div key={a.label} className={`text-xs flex items-center justify-between gap-2 py-1 px-1.5 rounded ${changed ? "bg-amber-100" : ""}`}>
+              <span className="text-gray-500">{a.label}</span>
+              <span className={`font-medium text-right ${changed ? "text-amber-800" : "text-gray-800"}`}>{a.value}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

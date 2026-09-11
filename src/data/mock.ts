@@ -100,6 +100,14 @@ export interface Role {
   active: boolean;
 }
 
+export type LogItemStatus = "Новая" | "Изменена" | "Без изменений" | "Удалена" | "Объединена" | "Преобразована" | "Исчезла";
+
+export interface LogSnapshotItem {
+  title: string;
+  status: LogItemStatus;
+  attrs: { label: string; value: string }[];
+}
+
 export interface LogEntry {
   id: string;
   datetime: string;
@@ -107,8 +115,8 @@ export interface LogEntry {
   section: string;
   type: LogType;
   description: string;
-  before?: string;
-  after?: string;
+  before?: LogSnapshotItem[];
+  after?: LogSnapshotItem[];
 }
 
 // --- GP Items (34 total) ---
@@ -277,14 +285,131 @@ export const initialRoles: Role[] = [
 
 // --- Логи ---
 export const initialLogs: LogEntry[] = [
-  { id: "l1", datetime: "19.08.2026, 09:42", user: "Ковалева Е.", section: "Склады", type: "Создание", description: "Принят приходный ордер ПО-0342 на 3 позиции ДМ" },
-  { id: "l2", datetime: "19.08.2026, 09:15", user: "Нурланов А.Б.", section: "Движение материала", type: "Изменение", description: "Изменено место хранения позиции DM-001", before: 'место_хранения: "Сейф №2, Полка А"', after: 'место_хранения: "Сейф №1, Полка А"' },
-  { id: "l3", datetime: "18.08.2026, 16:30", user: "Петров С.В.", section: "Складские операции", type: "Создание", description: "Создана накладная на приём ГП НП-0118" },
-  { id: "l4", datetime: "18.08.2026, 14:10", user: "Ковалева Е.", section: "Шихтовые карты", type: "Изменение", description: "Обновлена шихтовая карта П-2026-0089", before: 'статус: "Подготовлена к плавке"', after: 'статус: "В работе"' },
-  { id: "l5", datetime: "17.08.2026, 11:20", user: "Иванова М.С.", section: "Движение материала", type: "Создание", description: "Открыта операция выдачи ДВ-001234 (Гальванопокрытие)" },
-  { id: "l6", datetime: "16.08.2026, 15:45", user: "Ким А.Ю.", section: "Склады", type: "Удаление", description: "Удалена позиция GP-BRA-925-02 из списка (ошибочный ввод)" },
-  { id: "l7", datetime: "15.08.2026, 09:00", user: "Нурланов А.Б.", section: "Движение материала", type: "Закрытие", description: "Закрыта операция ДВ-001231 (Анализ в ЛКИ) со списанием" },
-  { id: "l8", datetime: "14.08.2026, 13:25", user: "Ковалева Е.", section: "Администрирование", type: "Создание", description: "Добавлен новый пользователь m.ivanova" },
+  {
+    id: "l1", datetime: "19.08.2026, 09:42", user: "Ковалева Е.", section: "Склады", type: "Создание",
+    description: "Принят приходный ордер ПО-0342 на 3 позиции ДМ",
+    before: [],
+    after: [
+      { title: "DM-101 · Слиток золота ЗлА-5", status: "Новая", attrs: [
+        { label: "Наименование", value: "Слиток золота ЗлА-5" }, { label: "Номенкл. №", value: "DM-101" }, { label: "Класс", value: "Слиток" }, { label: "Металл", value: "Au" },
+        { label: "Кол-во", value: "1" }, { label: "Проба", value: "999" }, { label: "Лигатурный вес", value: "1000.00 г" }, { label: "Чистый вес", value: "999.00 г" },
+        { label: "Место хранения", value: "Сейф №1, Полка А" }, { label: "Статус", value: "На складе" },
+      ] },
+      { title: "DM-102 · Слиток серебра СрА-3", status: "Новая", attrs: [
+        { label: "Наименование", value: "Слиток серебра СрА-3" }, { label: "Номенкл. №", value: "DM-102" }, { label: "Класс", value: "Слиток" }, { label: "Металл", value: "Ag" },
+        { label: "Кол-во", value: "1" }, { label: "Проба", value: "925" }, { label: "Лигатурный вес", value: "500.00 г" }, { label: "Чистый вес", value: "462.50 г" },
+        { label: "Место хранения", value: "Сейф №1, Полка Б" }, { label: "Статус", value: "На складе" },
+      ] },
+      { title: "DM-103 · Стружка золотая", status: "Новая", attrs: [
+        { label: "Наименование", value: "Стружка золотая" }, { label: "Номенкл. №", value: "DM-103" }, { label: "Класс", value: "Стружка" }, { label: "Металл", value: "Au" },
+        { label: "Кол-во", value: "1" }, { label: "Проба", value: "750" }, { label: "Лигатурный вес", value: "120.00 г" }, { label: "Чистый вес", value: "90.00 г" },
+        { label: "Место хранения", value: "Сейф №2, Полка А" }, { label: "Статус", value: "На складе" },
+      ] },
+    ],
+  },
+  {
+    id: "l2", datetime: "19.08.2026, 09:15", user: "Нурланов А.Б.", section: "Движение материала", type: "Изменение",
+    description: "Изменено место хранения позиции DM-001",
+    before: [{ title: "DM-001 · Слиток золота ЗлА-1", status: "Изменена", attrs: [
+      { label: "Наименование", value: "Слиток золота ЗлА-1" }, { label: "Номенкл. №", value: "DM-001" }, { label: "Класс", value: "Слиток" }, { label: "Металл", value: "Au" },
+      { label: "Кол-во", value: "1" }, { label: "Проба", value: "999" }, { label: "Лигатурный вес", value: "850.00 г" }, { label: "Чистый вес", value: "849.15 г" },
+      { label: "Место хранения", value: "Сейф №2, Полка А" }, { label: "Статус", value: "На складе" },
+    ] }],
+    after: [{ title: "DM-001 · Слиток золота ЗлА-1", status: "Изменена", attrs: [
+      { label: "Наименование", value: "Слиток золота ЗлА-1" }, { label: "Номенкл. №", value: "DM-001" }, { label: "Класс", value: "Слиток" }, { label: "Металл", value: "Au" },
+      { label: "Кол-во", value: "1" }, { label: "Проба", value: "999" }, { label: "Лигатурный вес", value: "850.00 г" }, { label: "Чистый вес", value: "849.15 г" },
+      { label: "Место хранения", value: "Сейф №1, Полка А" }, { label: "Статус", value: "На складе" },
+    ] }],
+  },
+  {
+    id: "l3", datetime: "18.08.2026, 16:30", user: "Петров С.В.", section: "Складские операции", type: "Создание",
+    description: "Создана накладная на приём ГП НП-0118",
+    before: [],
+    after: [{ title: "GP-KOL-585-22 · Кольцо обручальное 585", status: "Новая", attrs: [
+      { label: "Наименование", value: "Кольцо обручальное 585" }, { label: "Номенкл. №", value: "GP-KOL-585-22" }, { label: "Класс", value: "Золото" }, { label: "Код", value: "AU-585" },
+      { label: "Кол-во", value: "6 шт" }, { label: "Место хранения", value: "Сейф №1, Полка А" }, { label: "Статус", value: "На складе" },
+    ] }],
+  },
+  {
+    id: "l4", datetime: "18.08.2026, 14:10", user: "Ковалева Е.", section: "Шихтовые карты", type: "Изменение",
+    description: "Обновлена шихтовая карта П-2026-0089",
+    before: [{ title: "П-2026-0089 · Шихтовая карта", status: "Изменена", attrs: [
+      { label: "Наименование", value: "Шихта на переплавку" }, { label: "Номер плавки", value: "П-2026-0089" }, { label: "Статус", value: "Подготовлена к плавке" },
+    ] }],
+    after: [{ title: "П-2026-0089 · Шихтовая карта", status: "Изменена", attrs: [
+      { label: "Наименование", value: "Шихта на переплавку" }, { label: "Номер плавки", value: "П-2026-0089" }, { label: "Статус", value: "В работе" },
+    ] }],
+  },
+  {
+    id: "l5", datetime: "17.08.2026, 11:20", user: "Иванова М.С.", section: "Движение материала", type: "Создание",
+    description: "Открыта операция выдачи ДВ-001234 (Гальванопокрытие)",
+    before: [],
+    after: [{ title: "ДВ-001234 · Операция выдачи", status: "Новая", attrs: [
+      { label: "Тип", value: "Выдача" }, { label: "Вид операции", value: "Гальванопокрытие" }, { label: "Статус выдачи", value: "Не выдано" }, { label: "Статус возврата", value: "Не начат" },
+    ] }],
+  },
+  {
+    id: "l6", datetime: "16.08.2026, 15:45", user: "Ким А.Ю.", section: "Склады", type: "Удаление",
+    description: "Удалена позиция GP-BRA-925-02 из списка (ошибочный ввод)",
+    before: [{ title: "GP-BRA-925-02 · Браслет серебряный", status: "Удалена", attrs: [
+      { label: "Наименование", value: "Браслет серебряный" }, { label: "Номенкл. №", value: "GP-BRA-925-02" }, { label: "Класс", value: "Серебро" }, { label: "Код", value: "AG-925" },
+      { label: "Кол-во", value: "36 шт" }, { label: "Место хранения", value: "Сейф №2, Полка Б" }, { label: "Статус", value: "На складе" },
+    ] }],
+    after: [],
+  },
+  {
+    id: "l7", datetime: "15.08.2026, 09:00", user: "Нурланов А.Б.", section: "Движение материала", type: "Закрытие",
+    description: "Закрыта операция ДВ-001231 (Анализ в ЛКИ) со списанием",
+    before: [{ title: "DM-090 · Проба на анализ", status: "Исчезла", attrs: [
+      { label: "Наименование", value: "Проба на анализ" }, { label: "Номенкл. №", value: "DM-090" }, { label: "Класс", value: "Проба" }, { label: "Металл", value: "Au" },
+      { label: "Кол-во", value: "1" }, { label: "Проба", value: "585" }, { label: "Лигатурный вес", value: "12.40 г" }, { label: "Чистый вес", value: "7.25 г" },
+      { label: "Место хранения", value: "Лаборатория" }, { label: "Статус", value: "В подотчёте" },
+    ] }],
+    after: [],
+  },
+  {
+    id: "l8", datetime: "14.08.2026, 13:25", user: "Ковалева Е.", section: "Администрирование", type: "Создание",
+    description: "Добавлен новый пользователь m.ivanova",
+    before: [],
+    after: [{ title: "m.ivanova · Иванова М.С.", status: "Новая", attrs: [
+      { label: "ФИО", value: "Иванова М.С." }, { label: "Логин", value: "m.ivanova" }, { label: "Роль", value: "Оператор склада" }, { label: "Email", value: "m.ivanova@kmd.kz" }, { label: "Статус", value: "Активен" },
+    ] }],
+  },
+  {
+    id: "l9", datetime: "20.08.2026, 10:05", user: "Петров С.В.", section: "Склады", type: "Изменение",
+    description: "Объединены позиции DM-005 и DM-006 в новую позицию DM-M9931",
+    before: [
+      { title: "DM-005 · Слиток золота ЗлБ-2", status: "Объединена", attrs: [
+        { label: "Наименование", value: "Слиток золота ЗлБ-2" }, { label: "Номенкл. №", value: "DM-005" }, { label: "Класс", value: "Слиток" }, { label: "Металл", value: "Au" },
+        { label: "Кол-во", value: "1" }, { label: "Проба", value: "958" }, { label: "Лигатурный вес", value: "300.00 г" }, { label: "Чистый вес", value: "287.40 г" },
+        { label: "Место хранения", value: "Сейф №3, Полка А" }, { label: "Статус", value: "На складе" },
+      ] },
+      { title: "DM-006 · Слиток золота ЗлБ-3", status: "Объединена", attrs: [
+        { label: "Наименование", value: "Слиток золота ЗлБ-3" }, { label: "Номенкл. №", value: "DM-006" }, { label: "Класс", value: "Слиток" }, { label: "Металл", value: "Au" },
+        { label: "Кол-во", value: "1" }, { label: "Проба", value: "999" }, { label: "Лигатурный вес", value: "200.00 г" }, { label: "Чистый вес", value: "199.80 г" },
+        { label: "Место хранения", value: "Сейф №3, Полка А" }, { label: "Статус", value: "На складе" },
+      ] },
+    ],
+    after: [{ title: "DM-M9931 · Объединённая позиция (2 ед.)", status: "Новая", attrs: [
+      { label: "Наименование", value: "Объединённая позиция (2 ед.)" }, { label: "Номенкл. №", value: "DM-M9931" }, { label: "Класс", value: "Слиток" }, { label: "Металл", value: "Au" },
+      { label: "Кол-во", value: "2" }, { label: "Проба", value: "974" }, { label: "Лигатурный вес", value: "500.00 г" }, { label: "Чистый вес", value: "487.20 г" },
+      { label: "Место хранения", value: "Сейф №3, Полка А" }, { label: "Статус", value: "На складе" },
+    ] }],
+  },
+  {
+    id: "l10", datetime: "20.08.2026, 08:30", user: "Ким А.Ю.", section: "Шихтовые карты", type: "Изменение",
+    description: "Слиток DM-014 переплавлен в стружку DM-014-С по шихтовой карте П-2026-0091",
+    before: [{ title: "DM-014 · Слиток золота ЗлВ-1", status: "Преобразована", attrs: [
+      { label: "Наименование", value: "Слиток золота ЗлВ-1" }, { label: "Номенкл. №", value: "DM-014" }, { label: "Класс", value: "Слиток" }, { label: "Металл", value: "Au" },
+      { label: "Кол-во", value: "1" }, { label: "Проба", value: "916" }, { label: "Лигатурный вес", value: "410.00 г" }, { label: "Чистый вес", value: "375.60 г" },
+      { label: "Место хранения", value: "Сейф №2, Полка Б" }, { label: "Статус", value: "На складе" },
+    ] }],
+    after: [{ title: "DM-014-С · Стружка золотая ЗлВ-1", status: "Преобразована", attrs: [
+      { label: "Наименование", value: "Стружка золотая ЗлВ-1" }, { label: "Номенкл. №", value: "DM-014-С" }, { label: "Класс", value: "Стружка" }, { label: "Металл", value: "Au" },
+      { label: "Кол-во", value: "1" }, { label: "Проба", value: "916" }, { label: "Лигатурный вес", value: "405.00 г" }, { label: "Чистый вес", value: "371.00 г" },
+      { label: "Место хранения", value: "Сейф №2, Полка Б" }, { label: "Статус", value: "На складе" },
+    ] }],
+  },
 ];
 
 // --- Справочники ---

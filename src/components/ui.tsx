@@ -31,6 +31,8 @@ const badgePalette: Record<string, string> = {
   "Заблокирован": "bg-red-100 text-red-700 border-red-200",
   "Утрачена": "bg-red-100 text-red-700 border-red-200",
   "Удаление": "bg-red-100 text-red-700 border-red-200",
+  "Удалена": "bg-red-100 text-red-700 border-red-200",
+  "Исчезла": "bg-red-100 text-red-700 border-red-200",
 
   "Закрыт": "bg-gray-100 text-gray-600 border-gray-200",
   "Закрыто": "bg-gray-100 text-gray-600 border-gray-200",
@@ -41,6 +43,8 @@ const badgePalette: Record<string, string> = {
   "Закрытие": "bg-gray-100 text-gray-600 border-gray-200",
 
   "Преобразован": "bg-purple-100 text-purple-700 border-purple-200",
+  "Преобразована": "bg-purple-100 text-purple-700 border-purple-200",
+  "Объединена": "bg-purple-100 text-purple-700 border-purple-200",
 };
 
 export function Badge({ label }: { label: string }) {
