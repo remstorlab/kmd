@@ -398,11 +398,100 @@ function RolesPage({ onBack }: { onBack: () => void }) {
   );
 }
 
+function SettingsPage({ onBack }: { onBack: () => void }) {
+  const { securityPolicy, setSecurityPolicy } = useApp();
+  const { toast, show, clear } = useToast();
+  const [form, setForm] = useState({
+    minLength: String(securityPolicy.minLength),
+    minCharTypes: String(securityPolicy.minCharTypes),
+    expiryDays: String(securityPolicy.expiryDays),
+    historyDepth: String(securityPolicy.historyDepth),
+    minDiffPositions: String(securityPolicy.minDiffPositions),
+    sessionTimeoutMinutes: String(securityPolicy.sessionTimeoutMinutes),
+  });
+
+  const save = () => {
+    setSecurityPolicy({
+      minLength: Math.max(1, parseInt(form.minLength, 10) || 8),
+      minCharTypes: Math.min(4, Math.max(1, parseInt(form.minCharTypes, 10) || 3)),
+      expiryDays: Math.max(1, parseInt(form.expiryDays, 10) || 90),
+      historyDepth: Math.max(1, parseInt(form.historyDepth, 10) || 3),
+      minDiffPositions: Math.max(1, parseInt(form.minDiffPositions, 10) || 3),
+      sessionTimeoutMinutes: Math.max(1, parseInt(form.sessionTimeoutMinutes, 10) || 30),
+    });
+    show("Настройки сохранены");
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-xs text-gray-500">Панель администрирования / Настройки</div>
+        <span className="text-xs text-gray-400">Обновлено: {new Date().toLocaleDateString("ru-RU")}</span>
+      </div>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Настройки</h1>
+          <p className="text-sm text-gray-500 mt-1">Параметры процессов авторизации, сессии и смены пароля</p>
+        </div>
+        <div className="flex gap-2">
+          <Btn variant="secondary" onClick={onBack}><ArrowLeft className="w-4 h-4" />Назад к пользователям</Btn>
+          <Btn onClick={save}>Сохранить</Btn>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+        <h3 className="font-semibold text-gray-900 mb-1">Парольная политика</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Аутентификация пользователей должна осуществляться по логину и паролю с обязательным соблюдением парольной политики.
+        </p>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <Field label="Минимальная длина пароля, символов">
+            <Input value={form.minLength} onChange={v => setForm(f => ({ ...f, minLength: v }))} placeholder="8" />
+          </Field>
+          <Field label="Минимальное число типов символов">
+            <Select value={form.minCharTypes} options={["2", "3", "4"]} onChange={v => setForm(f => ({ ...f, minCharTypes: v }))} />
+          </Field>
+          <Field label="Периодичность смены пароля, дней">
+            <Input value={form.expiryDays} onChange={v => setForm(f => ({ ...f, expiryDays: v }))} placeholder="90" />
+          </Field>
+          <Field label="Запрет повтора: последних паролей">
+            <Input value={form.historyDepth} onChange={v => setForm(f => ({ ...f, historyDepth: v }))} placeholder="3" />
+          </Field>
+          <Field label="Минимальное отличие пароля, позиций">
+            <Input value={form.minDiffPositions} onChange={v => setForm(f => ({ ...f, minDiffPositions: v }))} placeholder="3" />
+          </Field>
+        </div>
+        <ul className="text-xs text-gray-500 list-disc list-inside space-y-1 bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <li>Минимальная длина пароля: {form.minLength || 0} (восемь) символов.</li>
+          <li>Сложность пароля: состоит не менее чем из {form.minCharTypes || 0} типов символов (букв в верхнем регистре, букв в нижнем регистре, цифр и других символов, знаков пунктуации).</li>
+          <li>Обязательная смена пароля: не реже 1 раза в {Math.round((parseInt(form.expiryDays, 10) || 0) / 30)} мес. ({form.expiryDays || 0} дн.).</li>
+          <li>Отличие нового пароля: от {form.historyDepth || 0} предыдущих и не менее чем в {form.minDiffPositions || 0} позициях символов.</li>
+        </ul>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h3 className="font-semibold text-gray-900 mb-1">Политика сессии</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Сессия пользователя должна автоматически завершаться по истечении установленного периода неактивности.
+        </p>
+        <div className="max-w-xs">
+          <Field label="Таймаут неактивности сессии, минут">
+            <Input value={form.sessionTimeoutMinutes} onChange={v => setForm(f => ({ ...f, sessionTimeoutMinutes: v }))} placeholder="30" />
+          </Field>
+        </div>
+      </div>
+
+      {toast && <Toast message={toast} onDone={clear} />}
+    </div>
+  );
+}
+
 export function PanelAdmin() {
   const { users, setUsers } = useApp();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [showRoles, setShowRoles] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showNewUser, setShowNewUser] = useState(false);
   const [editUser, setEditUser] = useState<AppUser | null>(null);
 
@@ -416,6 +505,9 @@ export function PanelAdmin() {
   if (showRoles) {
     return <RolesPage onBack={() => setShowRoles(false)} />;
   }
+  if (showSettings) {
+    return <SettingsPage onBack={() => setShowSettings(false)} />;
+  }
 
   return (
     <div>
@@ -427,6 +519,7 @@ export function PanelAdmin() {
           <>
             <Btn onClick={() => setShowNewUser(true)}><Plus className="w-4 h-4" />Добавить пользователя</Btn>
             <Btn variant="secondary" onClick={() => setShowRoles(true)}>Управление ролями</Btn>
+            <Btn variant="secondary" onClick={() => setShowSettings(true)}>Настройки</Btn>
           </>
         }
       />

@@ -99,6 +99,24 @@ export interface RolePermissions {
   actions: Record<string, string[]>;
 }
 
+export interface SecurityPolicy {
+  minLength: number;
+  minCharTypes: number;
+  expiryDays: number;
+  historyDepth: number;
+  minDiffPositions: number;
+  sessionTimeoutMinutes: number;
+}
+
+export const initialSecurityPolicy: SecurityPolicy = {
+  minLength: 8,
+  minCharTypes: 3,
+  expiryDays: 90,
+  historyDepth: 3,
+  minDiffPositions: 3,
+  sessionTimeoutMinutes: 30,
+};
+
 export interface Role {
   id: string;
   name: string;

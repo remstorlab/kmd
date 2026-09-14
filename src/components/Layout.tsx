@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useApp, Page, Lang } from "../store/AppContext";
-import { Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, Languages, LogOut } from "lucide-react";
+import { useApp, Page, Lang, daysSince, evaluatePasswordRules } from "../store/AppContext";
+import { Modal, Btn, Field, Input } from "./ui";
+import { Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, Languages, LogOut, KeyRound, ShieldAlert } from "lucide-react";
 
 const menuItems: { key: string; page: Page; icon: React.ReactNode }[] = [
   { key: "nav.sklady", page: "sklady-hub", icon: <Warehouse className="w-5 h-5" /> },
@@ -18,15 +19,73 @@ function isActive(menuPage: Page, currentPage: Page): boolean {
   if (menuPage === currentPage) return true;
   if (menuPage === "sklady-hub" && ["ostatok-gp", "ostatok-dm"].includes(currentPage)) return true;
   if (menuPage === "sklad-oper-hub" && ["prihod-list", "vydacha-list"].includes(currentPage)) return true;
-  if (menuPage === "admin-users" && currentPage === "admin-roles") return true;
+  if (menuPage === "admin-users" && (currentPage === "admin-roles" || currentPage === "admin-settings")) return true;
   if (menuPage === "podotchetniki" && currentPage === "podotchetnik-card") return true;
   if (menuPage === "spravochniki" && currentPage === "spravochnik-detail") return true;
   return false;
 }
 
+// ── Смена пароля ─────────────────────────────────────────────────────────────
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const { changePassword, securityPolicy } = useApp();
+  const [oldPwd, setOldPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const liveErrors = newPwd ? evaluatePasswordRules(newPwd, securityPolicy) : [];
+
+  const submit = () => {
+    setError(null);
+    if (!oldPwd || !newPwd || !confirmPwd) { setError("Заполните все поля"); return; }
+    if (newPwd !== confirmPwd) { setError("Новый пароль и подтверждение не совпадают"); return; }
+    const result = changePassword(oldPwd, newPwd);
+    if (result) { setError(result); return; }
+    onClose();
+  };
+
+  return (
+    <Modal
+      title="Смена пароля"
+      onClose={onClose}
+      footer={<>
+        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+        <Btn onClick={submit} disabled={!oldPwd || !newPwd || !confirmPwd || liveErrors.length > 0}>Сохранить</Btn>
+      </>}
+    >
+      <div className="space-y-4">
+        <Field label="Текущий пароль"><Input value={oldPwd} onChange={setOldPwd} placeholder="••••••••" /></Field>
+        <Field label="Новый пароль"><Input value={newPwd} onChange={setNewPwd} placeholder="••••••••" /></Field>
+        <Field label="Подтверждение нового пароля"><Input value={confirmPwd} onChange={setConfirmPwd} placeholder="••••••••" /></Field>
+
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-500 space-y-1">
+          <div>Требования к паролю:</div>
+          <ul className="list-disc list-inside space-y-0.5">
+            <li>не менее {securityPolicy.minLength} символов;</li>
+            <li>не менее {securityPolicy.minCharTypes} из 4 типов символов (заглавные, строчные буквы, цифры, спецсимволы);</li>
+            <li>должен отличаться от последних {securityPolicy.historyDepth} паролей не менее чем в {securityPolicy.minDiffPositions} позициях.</li>
+          </ul>
+        </div>
+
+        {liveErrors.length > 0 && (
+          <div className="text-xs text-amber-600 space-y-0.5">
+            {liveErrors.map(e => <div key={e}>• {e}</div>)}
+          </div>
+        )}
+        {error && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // ── User dropdown ─────────────────────────────────────────────────────────────
 
-function UserDropdown() {
+function UserDropdown({ onChangePassword }: { onChangePassword: () => void }) {
   const { currentUser, logout, theme, toggleTheme, lang, setLang, tr } = useApp();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -114,6 +173,15 @@ function UserDropdown() {
             </div>
           </div>
 
+          {/* Смена пароля */}
+          <button
+            onClick={() => { setOpen(false); onChangePassword(); }}
+            className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/40 transition-colors border-b border-slate-700"
+          >
+            <KeyRound className="w-4 h-4 text-slate-400" />
+            Сменить пароль
+          </button>
+
           {/* Logout */}
           <button
             onClick={() => { setOpen(false); logout(); }}
@@ -128,10 +196,37 @@ function UserDropdown() {
   );
 }
 
+// ── Сессия: автозавершение по неактивности ────────────────────────────────────
+
+function useSessionTimeout(timeoutMinutes: number, onTimeout: () => void) {
+  useEffect(() => {
+    if (!timeoutMinutes || timeoutMinutes <= 0) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(onTimeout, timeoutMinutes * 60 * 1000);
+    };
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    events.forEach(e => window.addEventListener(e, reset));
+    reset();
+    return () => {
+      clearTimeout(timer);
+      events.forEach(e => window.removeEventListener(e, reset));
+    };
+  }, [timeoutMinutes, onTimeout]);
+}
+
 // ── Layout ────────────────────────────────────────────────────────────────────
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { page, navigate, tr, theme, toggleTheme } = useApp();
+  const { page, navigate, tr, theme, toggleTheme, currentUser, logout, securityPolicy } = useApp();
+  const [showChangePassword, setShowChangePassword] = useState(false);
+
+  useSessionTimeout(securityPolicy.sessionTimeoutMinutes, () => {
+    logout("Сессия завершена по истечении периода неактивности. Войдите снова.");
+  });
+
+  const passwordExpired = currentUser ? daysSince(currentUser.passwordChangedAt) >= securityPolicy.expiryDays : false;
 
   return (
     <div className="flex h-full" style={{ backgroundColor: theme === "dark" ? "#0f172a" : "#f8fafc" }}>
@@ -211,15 +306,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </button>
 
             {/* User dropdown */}
-            <UserDropdown />
+            <UserDropdown onChangePassword={() => setShowChangePassword(true)} />
           </div>
         </header>
+
+        {/* Password expiry banner */}
+        {passwordExpired && (
+          <div className="shrink-0 bg-amber-50 border-b border-amber-200 px-5 py-2.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-amber-800">
+              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+              Истёк срок действия пароля (обязательная смена не реже 1 раза в {Math.round(securityPolicy.expiryDays / 30)} мес.). Пожалуйста, смените пароль.
+            </div>
+            <Btn size="sm" onClick={() => setShowChangePassword(true)}>Сменить пароль</Btn>
+          </div>
+        )}
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: theme === "dark" ? "#0f172a" : "#f8fafc" }}>
           {children}
         </main>
       </div>
+
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useApp, Lang } from "../store/AppContext";
 import { Moon, Sun, User, Lock, Eye, EyeOff, CircleAlert, Loader2 } from "lucide-react";
 
 export default function Login() {
-  const { login, lang, setLang, tr, theme, toggleTheme } = useApp();
+  const { login, lang, setLang, tr, theme, toggleTheme, sessionEndedReason, clearSessionEndedReason } = useApp();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -113,7 +113,7 @@ export default function Login() {
                   <input
                     type="text"
                     value={username}
-                    onChange={e => { setUsername(e.target.value); setError(false); }}
+                    onChange={e => { setUsername(e.target.value); setError(false); clearSessionEndedReason(); }}
                     placeholder="admin"
                     autoComplete="username"
                     className={`w-full bg-slate-800 border ${error ? "border-red-500" : "border-slate-700"} text-white placeholder-slate-600 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
@@ -147,6 +147,14 @@ export default function Login() {
                   </button>
                 </div>
               </div>
+
+              {/* Session ended */}
+              {sessionEndedReason && !error && (
+                <div className="flex items-center gap-2 bg-amber-900/20 border border-amber-700/40 rounded-xl px-4 py-3 text-sm">
+                  <CircleAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-amber-300">{sessionEndedReason}</span>
+                </div>
+              )}
 
               {/* Error */}
               {error && (

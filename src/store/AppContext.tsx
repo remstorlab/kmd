@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import {
   GPItem, DMItem, SkladDoc, Operation, ShihtovayaKarta,
-  Podotchetnik, AppUser, Role, LogEntry,
+  Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy,
   initialGPItems, initialDMItems, initialSkladDocs, initialVydachaDocs,
   initialOperations, initialShihtovyeKarty, initialPodotchetniki,
-  initialUsers, initialRoles, initialLogs,
+  initialUsers, initialRoles, initialLogs, initialSecurityPolicy,
 } from "../data/mock";
 
 export type Page =
@@ -17,7 +17,51 @@ export type Page =
   | "otchetnost"
   | "spravochniki" | "spravochnik-detail"
   | "logirovanie"
-  | "admin-users" | "admin-roles";
+  | "admin-users" | "admin-roles" | "admin-settings";
+
+// ── Password policy helpers ─────────────────────────────────────────────────
+
+export function evaluatePasswordRules(pwd: string, policy: SecurityPolicy): string[] {
+  const errors: string[] = [];
+  if (pwd.length < policy.minLength) {
+    errors.push(`Минимальная длина пароля — ${policy.minLength} символов`);
+  }
+  const hasUpper = /[A-ZА-ЯЁ]/.test(pwd);
+  const hasLower = /[a-zа-яё]/.test(pwd);
+  const hasDigit = /[0-9]/.test(pwd);
+  const hasSpecial = /[^A-Za-zА-Яа-яЁё0-9]/.test(pwd);
+  const typeCount = [hasUpper, hasLower, hasDigit, hasSpecial].filter(Boolean).length;
+  if (typeCount < policy.minCharTypes) {
+    errors.push(`Пароль должен содержать символы не менее чем ${policy.minCharTypes} типов из 4 (заглавные буквы, строчные буквы, цифры, спецсимволы)`);
+  }
+  return errors;
+}
+
+export function passwordDiffPositions(a: string, b: string): number {
+  const maxLen = Math.max(a.length, b.length);
+  let diff = 0;
+  for (let i = 0; i < maxLen; i++) if (a[i] !== b[i]) diff++;
+  return diff;
+}
+
+export function daysSince(dateStr: string): number {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+interface AuthUser {
+  username: string;
+  password: string;
+  name: string;
+  email: string;
+  initials: string;
+  passwordChangedAt: string;
+  passwordHistory: string[];
+}
+
+const initialAuthUsers: AuthUser[] = [
+  { username: "admin", password: "admin", name: "Е. Ковалева", email: "e.kovaleva@monetka-dm.ru", initials: "ЕК", passwordChangedAt: "2026-05-01", passwordHistory: [] },
+  { username: "nurlanov", password: "1234", name: "А.Б. Нурланов", email: "a.nurlanov@monetka-dm.ru", initials: "АН", passwordChangedAt: "2026-09-01", passwordHistory: [] },
+];
 
 export type Theme = "light" | "dark";
 export type Lang = "ru" | "kz";
@@ -104,9 +148,16 @@ export const t: Record<Lang, Record<string, string>> = {
 interface AppCtx {
   // Auth
   isLoggedIn: boolean;
-  currentUser: { name: string; email: string; initials: string } | null;
+  currentUser: { name: string; email: string; initials: string; username: string; passwordChangedAt: string } | null;
   login: (username: string, password: string) => boolean;
-  logout: () => void;
+  logout: (reason?: string) => void;
+  sessionEndedReason: string | null;
+  clearSessionEndedReason: () => void;
+  changePassword: (oldPwd: string, newPwd: string) => string | null;
+
+  // Security policy
+  securityPolicy: SecurityPolicy;
+  setSecurityPolicy: React.Dispatch<React.SetStateAction<SecurityPolicy>>;
 
   // Theme
   theme: Theme;
@@ -147,14 +198,12 @@ interface AppCtx {
 
 const Ctx = createContext<AppCtx>(null!);
 
-const MOCK_USERS = [
-  { username: "admin", password: "admin", name: "Е. Ковалева", email: "e.kovaleva@monetka-dm.ru", initials: "ЕК" },
-  { username: "nurlanov", password: "1234", name: "А.Б. Нурланов", email: "a.nurlanov@monetka-dm.ru", initials: "АН" },
-];
-
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppCtx["currentUser"]>(null);
+  const [authUsers, setAuthUsers] = useState<AuthUser[]>(initialAuthUsers);
+  const [sessionEndedReason, setSessionEndedReason] = useState<string | null>(null);
+  const [securityPolicy, setSecurityPolicy] = useState<SecurityPolicy>(initialSecurityPolicy);
 
   const [theme, setTheme] = useState<Theme>(() => {
     return (localStorage.getItem("dm-theme") as Theme) || "light";
@@ -186,19 +235,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const tr = (key: string) => t[lang][key] ?? t["ru"][key] ?? key;
 
   const login = (username: string, password: string): boolean => {
-    const user = MOCK_USERS.find(u => u.username === username && u.password === password);
+    const user = authUsers.find(u => u.username === username && u.password === password);
     if (user) {
       setIsLoggedIn(true);
-      setCurrentUser({ name: user.name, email: user.email, initials: user.initials });
+      setCurrentUser({ name: user.name, email: user.email, initials: user.initials, username: user.username, passwordChangedAt: user.passwordChangedAt });
       return true;
     }
     return false;
   };
 
-  const logout = () => {
+  const logout = (reason?: string) => {
     setIsLoggedIn(false);
     setCurrentUser(null);
     setPage("dashboard");
+    if (reason) setSessionEndedReason(reason);
+  };
+
+  const clearSessionEndedReason = () => setSessionEndedReason(null);
+
+  const changePassword = (oldPwd: string, newPwd: string): string | null => {
+    const au = authUsers.find(u => u.username === currentUser?.username);
+    if (!au) return "Пользователь не найден";
+    if (au.password !== oldPwd) return "Текущий пароль указан неверно";
+
+    const ruleErrors = evaluatePasswordRules(newPwd, securityPolicy);
+    if (ruleErrors.length > 0) return ruleErrors[0];
+
+    const history = [au.password, ...au.passwordHistory].slice(0, securityPolicy.historyDepth);
+    for (const old of history) {
+      if (newPwd === old) return "Новый пароль совпадает с одним из последних использованных паролей";
+      if (passwordDiffPositions(newPwd, old) < securityPolicy.minDiffPositions) {
+        return `Новый пароль должен отличаться от предыдущих не менее чем в ${securityPolicy.minDiffPositions} позициях символов`;
+      }
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    setAuthUsers(prev => prev.map(u => u.username === au.username
+      ? { ...u, password: newPwd, passwordChangedAt: today, passwordHistory: history }
+      : u
+    ));
+    setCurrentUser(cu => cu ? { ...cu, passwordChangedAt: today } : cu);
+    return null;
   };
 
   const navigate = (p: Page, params: Record<string, string> = {}) => {
@@ -220,6 +297,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       isLoggedIn, currentUser, login, logout,
+      sessionEndedReason, clearSessionEndedReason, changePassword,
+      securityPolicy, setSecurityPolicy,
       theme, toggleTheme,
       lang, setLang, tr,
       page, pageParams, navigate,

@@ -33,6 +33,7 @@ function PageRouter() {
     case "logirovanie":       return <Logirovanie />;
     case "admin-users":       return <PanelAdmin />;
     case "admin-roles":       return <PanelAdmin />;
+    case "admin-settings":    return <PanelAdmin />;
     default:                  return <Dashboard />;
   }
 }
