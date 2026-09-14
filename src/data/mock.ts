@@ -94,10 +94,16 @@ export interface AppUser {
   username: string;
 }
 
+export interface RolePermissions {
+  base: Record<string, string[]>;
+  actions: Record<string, string[]>;
+}
+
 export interface Role {
   id: string;
   name: string;
   active: boolean;
+  permissions?: RolePermissions;
 }
 
 export type LogItemStatus = "Новая" | "Изменена" | "Без изменений" | "Удалена" | "Объединена" | "Преобразована" | "Исчезла";
