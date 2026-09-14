@@ -136,6 +136,49 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
   );
 }
 
+// ── Добавить позицию ДМ (новая, вручную) ──────────────────────────────────────
+
+function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
+  const [form, setForm] = useState({ nomenkl: "", klass: "Слиток", name: "", proba: "999", ves: "", ag: "-", cu: "-", sey: "Сейф №1", polka: "Полка А" });
+
+  const add = () => {
+    if (!form.name || !form.nomenkl) return;
+    onAdd([{
+      name: form.name,
+      nomenkl: form.nomenkl,
+      klass: form.klass,
+      proba: parseFloat(form.proba) || 0,
+      ves: parseFloat(form.ves) || 0,
+      ag: form.ag || "-",
+      cu: form.cu || "-",
+      loc: `${form.sey}, ${form.polka}`,
+    }]);
+  };
+
+  return (
+    <Modal
+      title="Добавить позицию ДМ"
+      onClose={onClose}
+      footer={<>
+        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+        <Btn onClick={add} disabled={!form.name || !form.nomenkl}>Добавить</Btn>
+      </>}
+    >
+      <div className="grid grid-cols-3 gap-4">
+        <Field label="Номенкл. номер"><Input value={form.nomenkl} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} placeholder="DM-XXX" /></Field>
+        <Field label="Класс"><Select value={form.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
+        <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
+        <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
+        <Field label="Вес г"><Input value={form.ves} onChange={v => setForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>
+        <Field label="Ag, г"><Input value={form.ag} onChange={v => setForm(f => ({ ...f, ag: v }))} /></Field>
+        <Field label="Cu, г"><Input value={form.cu} onChange={v => setForm(f => ({ ...f, cu: v }))} /></Field>
+        <Field label="Сейф"><Select value={form.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setForm(f => ({ ...f, sey: v }))} /></Field>
+        <Field label="Полка"><Select value={form.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setForm(f => ({ ...f, polka: v }))} /></Field>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Добавить позицию возврата (из выдачи или новую) ───────────────────────────
 
 function VozvratPickModal({ vydacha, onClose, onAdd }: { vydacha: OperPosition[]; onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
@@ -208,7 +251,7 @@ function VozvratPickModal({ vydacha, onClose, onAdd }: { vydacha: OperPosition[]
       )}
 
       {showAddNew && (
-        <AddDMPositionModal
+        <NewDMPositionModal
           onClose={() => setShowAddNew(false)}
           onAdd={rows => { onAdd(rows); setShowAddNew(false); }}
         />
