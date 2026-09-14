@@ -494,9 +494,16 @@ export function PanelAdmin() {
   const [showSettings, setShowSettings] = useState(false);
   const [showNewUser, setShowNewUser] = useState(false);
   const [editUser, setEditUser] = useState<AppUser | null>(null);
+  const [search, setSearch] = useState("");
 
-  const { sorted, sort, toggleSort } = useSort(users, {
+  const filtered = users.filter(u => {
+    const q = search.trim().toLowerCase();
+    return !q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
+  });
+
+  const { sorted, sort, toggleSort } = useSort(filtered, {
     name: u => u.name,
+    username: u => u.username,
     role: u => u.role,
     email: u => u.email,
     status: u => u.status,
@@ -524,30 +531,43 @@ export function PanelAdmin() {
         }
       />
 
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+        <div className="max-w-xs">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
+          <SearchInput value={search} onChange={setSearch} placeholder="ФИО, username, роль..." />
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>ФИО</SortTh>
+              <SortTh sortKey="username" sort={sort} onSort={toggleSort}>Username</SortTh>
               <SortTh sortKey="role" sort={sort} onSort={toggleSort}>Роль</SortTh>
               <SortTh sortKey="email" sort={sort} onSort={toggleSort}>Email</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус доступа</SortTh>
-              <th className="w-20"></th>
+              <th className="w-24"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {sorted.map(user => (
               <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-medium text-gray-900">{user.name}</td>
+                <td className="px-4 py-3 text-gray-500">{user.username}</td>
                 <td className="px-4 py-3 text-gray-600">{user.role}</td>
                 <td className="px-4 py-3 text-gray-500">{user.email}</td>
                 <td className="px-4 py-3"><Badge label={user.status} /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => show(`Пользователь: ${user.name}`)} />
                   <EditIcon onClick={() => setEditUser(user)} />
+                  <DeleteIcon onClick={() => confirm(`Удалить пользователя «${user.name}»?`, () => { setUsers(prev => prev.filter(u => u.id !== user.id)); show("Пользователь удалён"); })} />
                 </td>
               </tr>
             ))}
+            {sorted.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">Пользователи не найдены</td></tr>
+            )}
           </tbody>
         </table>
       </div>
