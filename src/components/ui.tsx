@@ -13,6 +13,7 @@ const badgePalette: Record<string, string> = {
   "Активно": "bg-green-100 text-green-700 border-green-200",
   "Выдано": "bg-green-100 text-green-700 border-green-200",
   "Создание": "bg-green-100 text-green-700 border-green-200",
+  "Доступно": "bg-green-100 text-green-700 border-green-200",
 
   "Резерв": "bg-yellow-100 text-yellow-700 border-yellow-200",
   "В работе": "bg-yellow-100 text-yellow-700 border-yellow-200",
@@ -27,6 +28,7 @@ const badgePalette: Record<string, string> = {
   "В норме": "bg-blue-100 text-blue-700 border-blue-200",
 
   "Заблокирован": "bg-red-100 text-red-700 border-red-200",
+  "Заблокировано": "bg-red-100 text-red-700 border-red-200",
   "Утрачена": "bg-red-100 text-red-700 border-red-200",
   "Удаление": "bg-red-100 text-red-700 border-red-200",
   "Удалена": "bg-red-100 text-red-700 border-red-200",

@@ -543,3 +543,35 @@ export const initialMaterialCodes: MaterialCode[] = [
   { code: "7000", name: "Сплав ЗлСрМ 375-100", shortName: "ЗлСрМ 375-100" },
   { code: "0050", name: "Бриллиантовые вставки", shortName: "Брилл. вставки" },
 ];
+
+// --- Места хранения (иерархический справочник: Склад → Сейф → Полка) ---
+export type StorageLocationType = "sklad" | "seyf" | "polka";
+
+export interface StorageLocation {
+  id: string;
+  parentId: string | null;
+  type: StorageLocationType;
+  name: string;
+  code: string;
+  isLeaf: boolean;
+  available: boolean;
+}
+
+export const initialStorageLocations: StorageLocation[] = [
+  { id: "sl-sklad-1", parentId: null, type: "sklad", name: "Склад ДМ №1", code: "СДМ1", isLeaf: false, available: true },
+  { id: "sl-1-seyf-1", parentId: "sl-sklad-1", type: "seyf", name: "Сейф №1", code: "СДМ1-С1", isLeaf: false, available: true },
+  { id: "sl-1-seyf-1-polka-1", parentId: "sl-1-seyf-1", type: "polka", name: "Полка №1", code: "СДМ1-С1-П1", isLeaf: true, available: true },
+  { id: "sl-1-seyf-1-polka-2", parentId: "sl-1-seyf-1", type: "polka", name: "Полка №2", code: "СДМ1-С1-П2", isLeaf: true, available: true },
+  { id: "sl-1-seyf-2", parentId: "sl-sklad-1", type: "seyf", name: "Сейф №2", code: "СДМ1-С2", isLeaf: false, available: true },
+  { id: "sl-1-seyf-2-polka-1", parentId: "sl-1-seyf-2", type: "polka", name: "Полка №1", code: "СДМ1-С2-П1", isLeaf: true, available: true },
+  { id: "sl-1-seyf-2-polka-2", parentId: "sl-1-seyf-2", type: "polka", name: "Полка №2", code: "СДМ1-С2-П2", isLeaf: true, available: false },
+  { id: "sl-1-seyf-3", parentId: "sl-sklad-1", type: "seyf", name: "Сейф №3", code: "СДМ1-С3", isLeaf: false, available: true },
+  { id: "sl-1-seyf-3-polka-1", parentId: "sl-1-seyf-3", type: "polka", name: "Полка №1", code: "СДМ1-С3-П1", isLeaf: true, available: true },
+
+  { id: "sl-sklad-2", parentId: null, type: "sklad", name: "Склад ДМ №2", code: "СДМ2", isLeaf: false, available: true },
+  { id: "sl-2-seyf-1", parentId: "sl-sklad-2", type: "seyf", name: "Сейф №1", code: "СДМ2-С1", isLeaf: false, available: true },
+  { id: "sl-2-seyf-1-polka-1", parentId: "sl-2-seyf-1", type: "polka", name: "Полка №1", code: "СДМ2-С1-П1", isLeaf: true, available: true },
+  { id: "sl-2-seyf-1-polka-2", parentId: "sl-2-seyf-1", type: "polka", name: "Полка №2", code: "СДМ2-С1-П2", isLeaf: true, available: true },
+  { id: "sl-2-seyf-2", parentId: "sl-sklad-2", type: "seyf", name: "Сейф №2", code: "СДМ2-С2", isLeaf: false, available: true },
+  { id: "sl-2-seyf-2-polka-1", parentId: "sl-2-seyf-2", type: "polka", name: "Полка №1", code: "СДМ2-С2-П1", isLeaf: true, available: true },
+];
