@@ -3,12 +3,18 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PageHeader,
   useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, Toggle, SearchInput, SortTh, useSort,
+  Field, Input, Select, Toggle, SearchInput, SortTh, useSort, Pagination,
 } from "../components/ui";
 import { AppUser, Role } from "../data/mock";
 import { ArrowLeft, Plus, ChevronRight } from "lucide-react";
 
 const permissions = ["Создать", "Редактировать", "Удалить", "Просмотр", "Экспорт", "Печать"];
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 interface PermNode {
   key: string;
@@ -152,6 +158,7 @@ function PermTreeRows({
 }
 
 function NewRoleModal({ role, readOnly = false, onClose, onSave }: { role?: Role; readOnly?: boolean; onClose: () => void; onSave: (r: Role) => void }) {
+  const { currentUser } = useApp();
   const [roleName, setRoleName] = useState(role?.name || "");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(permTree.filter(n => n.children).map(n => n.key)));
   const [baseState, setBaseState] = useState<Record<string, Set<string>>>(() =>
@@ -192,7 +199,14 @@ function NewRoleModal({ role, readOnly = false, onClose, onSave }: { role?: Role
       base[n.key] = [...baseState[n.key]];
       if (actionState[n.key]?.size) actions[n.key] = [...actionState[n.key]];
     });
-    onSave({ id: role?.id || `r-${Date.now()}`, name: roleName || "Новая роль", active: role?.active ?? true, permissions: { base, actions } });
+    onSave({
+      id: role?.id || `r-${Date.now()}`,
+      name: roleName || "Новая роль",
+      active: role?.active ?? true,
+      permissions: { base, actions },
+      createdAt: role?.createdAt || new Date().toISOString(),
+      createdBy: role?.createdBy || currentUser?.name || "—",
+    });
   };
 
   return (
@@ -308,8 +322,11 @@ function RolesPage({ onBack }: { onBack: () => void }) {
   const [showNew, setShowNew] = useState(false);
   const [viewRole, setViewRole] = useState<Role | null>(null);
   const [editRole, setEditRole] = useState<Role | null>(null);
+  const [page, setPage] = useState(1);
+  const perPage = 20;
 
   const filtered = roles.filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase()));
+  const pageItems = filtered.slice((page - 1) * perPage, page * perPage);
 
   return (
     <div>
@@ -341,10 +358,11 @@ function RolesPage({ onBack }: { onBack: () => void }) {
               <th className="px-4 py-3 text-left font-medium text-gray-600 text-xs">Наименование роли</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 text-xs">Статус</th>
               <th className="w-28"></th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600 text-xs">Дата создания и пользователь</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.map(role => (
+            {pageItems.map(role => (
               <tr key={role.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-medium text-gray-900">{role.name}</td>
                 <td className="px-4 py-3">
@@ -367,13 +385,15 @@ function RolesPage({ onBack }: { onBack: () => void }) {
                     <DeleteIcon onClick={() => confirm(`Удалить роль «${role.name}»?`, () => setRoles(prev => prev.filter(r => r.id !== role.id)))} />
                   </div>
                 </td>
+                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(role.createdAt)} - {role.createdBy}</td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Роли не найдены</td></tr>
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">Роли не найдены</td></tr>
             )}
           </tbody>
         </table>
+        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
       </div>
 
       {showNew && (
@@ -495,6 +515,8 @@ export function PanelAdmin() {
   const [showNewUser, setShowNewUser] = useState(false);
   const [editUser, setEditUser] = useState<AppUser | null>(null);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const perPage = 20;
 
   const filtered = users.filter(u => {
     const q = search.trim().toLowerCase();
@@ -502,12 +524,14 @@ export function PanelAdmin() {
   });
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
+    id: u => u.id,
     name: u => u.name,
     username: u => u.username,
     role: u => u.role,
     email: u => u.email,
     status: u => u.status,
   });
+  const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
 
   if (showRoles) {
     return <RolesPage onBack={() => setShowRoles(false)} />;
@@ -542,6 +566,7 @@ export function PanelAdmin() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
+              <SortTh sortKey="id" sort={sort} onSort={toggleSort}>ID</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>ФИО</SortTh>
               <SortTh sortKey="username" sort={sort} onSort={toggleSort}>Username</SortTh>
               <SortTh sortKey="role" sort={sort} onSort={toggleSort}>Роль</SortTh>
@@ -551,8 +576,9 @@ export function PanelAdmin() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {sorted.map(user => (
+            {pageItems.map(user => (
               <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 text-gray-400">{user.id}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{user.name}</td>
                 <td className="px-4 py-3 text-gray-500">{user.username}</td>
                 <td className="px-4 py-3 text-gray-600">{user.role}</td>
@@ -566,10 +592,11 @@ export function PanelAdmin() {
               </tr>
             ))}
             {sorted.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">Пользователи не найдены</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">Пользователи не найдены</td></tr>
             )}
           </tbody>
         </table>
+        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} />
       </div>
 
       {showNewUser && (

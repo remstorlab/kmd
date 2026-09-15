@@ -122,6 +122,8 @@ export interface Role {
   name: string;
   active: boolean;
   permissions?: RolePermissions;
+  createdAt: string;
+  createdBy: string;
 }
 
 export type LogItemStatus = "Новая" | "Изменена" | "Без изменений" | "Удалена" | "Объединена" | "Преобразована" | "Исчезла";
@@ -301,10 +303,10 @@ export const initialUsers: AppUser[] = [
 
 // --- Роли ---
 export const initialRoles: Role[] = [
-  { id: "r1", name: "Администратор", active: true },
-  { id: "r2", name: "Сотрудник склада ДМ", active: true },
-  { id: "r3", name: "Сотрудник ПТО", active: true },
-  { id: "r4", name: "Технолог", active: false },
+  { id: "r1", name: "Администратор", active: true, createdAt: "2026-01-12T09:15:00", createdBy: "Ковалева Елена" },
+  { id: "r2", name: "Сотрудник склада ДМ", active: true, createdAt: "2026-01-12T09:20:00", createdBy: "Ковалева Елена" },
+  { id: "r3", name: "Сотрудник ПТО", active: true, createdAt: "2026-02-03T11:40:00", createdBy: "Ковалева Елена" },
+  { id: "r4", name: "Технолог", active: false, createdAt: "2026-03-18T16:05:00", createdBy: "Нурланов Асхат Бекович" },
 ];
 
 // --- Логи ---
