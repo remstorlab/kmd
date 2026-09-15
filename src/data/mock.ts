@@ -516,14 +516,30 @@ export const spravochniki = {
       { code: "ОП-07", value: "Гальванопокрытие", status: "Активно" },
     ]
   },
-  "Коды материалов": {
-    count: 5,
-    items: [
-      { code: "AU", value: "Золото", status: "Активно" },
-      { code: "AG", value: "Серебро", status: "Активно" },
-      { code: "PT", value: "Платина", status: "Активно" },
-      { code: "PD", value: "Палладий", status: "Активно" },
-      { code: "PR", value: "Прочие", status: "Активно" },
-    ]
-  },
 };
+
+// --- Коды материалов ---
+export interface MaterialCode {
+  code: string;
+  name: string;
+  shortName: string;
+}
+
+export const initialMaterialCodes: MaterialCode[] = [
+  { code: "2000", name: "Серебро чистое", shortName: "Ag чистое" },
+  { code: "3000", name: "Палладий чистый", shortName: "Pd чистый" },
+  { code: "1000", name: "Золото чистое", shortName: "Au чистое" },
+  { code: "0200", name: "Сплав ЗлСрПд 585-250-165", shortName: "ЗлСрПд 585-250-165" },
+  { code: "0300", name: "Сплав ЗлСрМ 750-150", shortName: "ЗлСрМ 750-150" },
+  { code: "0400", name: "Сплав ЗлСрМ 750-125", shortName: "ЗлСрМ 750-125" },
+  { code: "0500", name: "Сплав ЗлСрМ 585-80", shortName: "ЗлСрМ 585-80" },
+  { code: "0100", name: "Сплав ЗлМ 585", shortName: "ЗлМ 585" },
+  { code: "0600", name: "Сплав AuAg", shortName: "AuAg" },
+  { code: "4000", name: "Платина чистое", shortName: "Pt чистое" },
+  { code: "0700", name: "Сплав ЗлСрПдМ 375-100-38", shortName: "ЗлСрПдМ 375-100-38" },
+  { code: "0800", name: "Сплав ЗлСрМ 950", shortName: "ЗлСрМ 950" },
+  { code: "0120", name: "Сигнальные образцы", shortName: "Сигн. образцы" },
+  { code: "8000", name: "Сплав ЗлСрМ 375-20", shortName: "ЗлСрМ 375-20" },
+  { code: "7000", name: "Сплав ЗлСрМ 375-100", shortName: "ЗлСрМ 375-100" },
+  { code: "0050", name: "Бриллиантовые вставки", shortName: "Брилл. вставки" },
+];
