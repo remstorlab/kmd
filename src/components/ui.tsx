@@ -22,7 +22,7 @@ const badgePalette: Record<string, string> = {
 
   "В обработке": "bg-blue-100 text-blue-700 border-blue-200",
   "В подотчёте": "bg-blue-100 text-blue-700 border-blue-200",
-  "Зарезервировано": "bg-blue-100 text-blue-700 border-blue-200",
+  "Резерв": "bg-yellow-100 text-yellow-700 border-yellow-200",
   "Изменена": "bg-blue-100 text-blue-700 border-blue-200",
   "Новая": "bg-blue-100 text-blue-700 border-blue-200",
   "Изменение": "bg-blue-100 text-blue-700 border-blue-200",

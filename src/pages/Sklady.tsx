@@ -830,7 +830,7 @@ export function OstatokDM() {
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {["Все статусы", "На складе", "Зарезервировано", "В подотчёте"].map(o => <option key={o}>{o}</option>)}
+            {["Все статусы", "На складе", "Резерв", "В подотчёте"].map(o => <option key={o}>{o}</option>)}
           </select>
         </div>
         <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus("Все статусы"); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">

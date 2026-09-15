@@ -1,5 +1,5 @@
 export type StatusGP = "На складе" | "Резерв" | "В обработке";
-export type StatusDM = "На складе" | "Зарезервировано" | "В подотчёте";
+export type StatusDM = "На складе" | "Резерв" | "В подотчёте";
 export type DocStatus = "Выполнено" | "В работе" | "Закрыт";
 export type OpType = "Выдача" | "Возврат" | "Выдача-Возврат";
 export type OpVid = "Отбор пробы" | "Анализ в ЛКИ" | "Плавка" | "Гальванопокрытие" | "Производство ГП";
@@ -188,11 +188,11 @@ export const initialDMItems: DMItem[] = [
   { id: "dm1", name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", metal: "Au", qty: 1, proba: 999, ligWeight: 500.25, netWeight: 498.12, location: "Сейф №1, Полка А", status: "На складе" },
   { id: "dm2", name: "Слиток серебра СрА-2", nomenkl: "DM-002", klass: "Слиток", metal: "Ag", qty: 1, proba: 999, ligWeight: 1000.50, netWeight: 998.30, location: "Сейф №1, Полка Б", status: "На складе" },
   { id: "dm3", name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", metal: "Au", qty: 1, proba: 585, ligWeight: 45.80, netWeight: 26.79, location: "Сейф №2, Полка А", status: "На складе" },
-  { id: "dm4", name: "Проба золота Au-750", nomenkl: "DM-004", klass: "Проба", metal: "Au", qty: 1, proba: 750, ligWeight: 12.30, netWeight: 9.22, location: "Сейф №2, Полка В", status: "Зарезервировано" },
+  { id: "dm4", name: "Проба золота Au-750", nomenkl: "DM-004", klass: "Проба", metal: "Au", qty: 1, proba: 750, ligWeight: 12.30, netWeight: 9.22, location: "Сейф №2, Полка В", status: "Резерв" },
   { id: "dm5", name: "Раствор серебра AgNO3", nomenkl: "DM-005", klass: "Раствор", metal: "Ag", qty: 1, proba: 999, ligWeight: 250.00, netWeight: 249.10, location: "Сейф №3, Полка А", status: "В подотчёте" },
   { id: "dm6", name: "Слиток платины ПлА-1", nomenkl: "DM-006", klass: "Слиток", metal: "Pt", qty: 1, proba: 999, ligWeight: 300.00, netWeight: 299.50, location: "Сейф №1, Полка В", status: "На складе" },
   { id: "dm7", name: "Лом золота 585", nomenkl: "DM-007", klass: "Лом", metal: "Au", qty: 1, proba: 585, ligWeight: 88.40, netWeight: 51.71, location: "Сейф №2, Полка Б", status: "На складе" },
-  { id: "dm8", name: "Золотой порошок Au", nomenkl: "DM-008", klass: "Порошок", metal: "Au", qty: 1, proba: 999, ligWeight: 25.00, netWeight: 24.95, location: "Сейф №3, Полка В", status: "Зарезервировано" },
+  { id: "dm8", name: "Золотой порошок Au", nomenkl: "DM-008", klass: "Порошок", metal: "Au", qty: 1, proba: 999, ligWeight: 25.00, netWeight: 24.95, location: "Сейф №3, Полка В", status: "Резерв" },
 ];
 
 // --- Складские документы ---
