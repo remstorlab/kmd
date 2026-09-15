@@ -1,7 +1,11 @@
 import React, { useState } from "react";
-import { PageHeader, Btn, Modal, EditIcon, Badge, Toggle, useToast, Toast, Field, Input, Select, SortTh, useSort, SearchInput, Pagination } from "../components/ui";
+import {
+  PageHeader, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Badge, Toggle,
+  useToast, Toast, useConfirm, ConfirmDialog,
+  Field, Input, Select, SortTh, useSort, SearchInput, Pagination,
+} from "../components/ui";
 import { spravochniki, initialMaterialCodes, MaterialCode, initialStorageLocations, StorageLocation } from "../data/mock";
-import { ArrowLeft, Plus, Package, Scale, FileText, Shapes, Building2, UserRound, Settings2, Tag, MapPin, LucideIcon } from "lucide-react";
+import { ArrowLeft, Plus, Package, Scale, FileText, Shapes, Building2, UserRound, Settings2, Tag, MapPin, Warehouse, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 
@@ -13,6 +17,7 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Организации": Building2,
   "Подотчётные сотрудники": UserRound,
   "Типы операций": Settings2,
+  "Склады": Warehouse,
 };
 
 function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
@@ -221,44 +226,36 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ── Места хранения (иерархический справочник) ───────────────────────────────
+// ── Места хранения (Сейф/Полка, принадлежат складу из справочника «Склады») ──
 
-const SKLAD_OPTIONS = ["Склад ДМ №1", "Склад ДМ №2"];
-const SKLAD_CODE: Record<string, string> = { "Склад ДМ №1": "СДМ1", "Склад ДМ №2": "СДМ2" };
+const SKLAD_OPTIONS = spravochniki["Склады"].items.map(i => i.value);
+const SKLAD_CODE: Record<string, string> = Object.fromEntries(spravochniki["Склады"].items.map(i => [i.value, i.code]));
 
-function pathOf(loc: StorageLocation, all: StorageLocation[]): string {
-  const parts: string[] = [loc.name];
-  let cur = loc;
-  while (cur.parentId) {
-    const parent = all.find(l => l.id === cur.parentId);
-    if (!parent) break;
-    parts.unshift(parent.name);
-    cur = parent;
-  }
-  return parts.join(" / ");
+function placeOf(loc: StorageLocation): string {
+  return loc.polkaNum ? `Сейф № ${loc.seyfNum} / Полка № ${loc.polkaNum}` : `Сейф № ${loc.seyfNum}`;
 }
-
-const typeLabel: Record<StorageLocation["type"], string> = { sklad: "Склад", seyf: "Сейф", polka: "Полка" };
 
 function StorageLocationsPage({ onBack }: { onBack: () => void }) {
   const [items, setItems] = useState(initialStorageLocations);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
+  const [viewItem, setViewItem] = useState<StorageLocation | null>(null);
   const [editItem, setEditItem] = useState<StorageLocation | null>(null);
   const [editAvailable, setEditAvailable] = useState(true);
   const [form, setForm] = useState({ sklad: SKLAD_OPTIONS[0], seyfNum: "", polkaNum: "", available: true });
   const { toast, show, clear } = useToast();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const perPage = 10;
 
   const filtered = items.filter(loc => {
     const q = search.trim().toLowerCase();
-    return !q || pathOf(loc, items).toLowerCase().includes(q) || loc.code.toLowerCase().includes(q);
+    return !q || loc.sklad.toLowerCase().includes(q) || placeOf(loc).toLowerCase().includes(q) || loc.code.toLowerCase().includes(q);
   });
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
-    path: loc => pathOf(loc, items),
-    type: loc => typeLabel[loc.type],
+    sklad: loc => loc.sklad,
+    place: loc => placeOf(loc),
     code: loc => loc.code,
     available: loc => (loc.available ? 1 : 0),
   });
@@ -283,39 +280,17 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
   const addLocation = () => {
     const seyfNum = form.seyfNum.trim();
     if (!seyfNum) { show("Укажите номер сейфа"); return; }
-
-    let next = items;
-    let sklad = next.find(l => l.type === "sklad" && l.name === form.sklad);
-    if (!sklad) {
-      sklad = { id: `sl-${Date.now()}-sklad`, parentId: null, type: "sklad", name: form.sklad, code: SKLAD_CODE[form.sklad] ?? form.sklad, isLeaf: false, available: true };
-      next = [...next, sklad];
-    }
-
-    const seyfName = `Сейф №${seyfNum}`;
-    let seyf = next.find(l => l.type === "seyf" && l.parentId === sklad!.id && l.name === seyfName);
     const polkaNum = form.polkaNum.trim();
 
-    if (!polkaNum) {
-      if (seyf) { show("Такое место хранения уже существует"); return; }
-      seyf = { id: `sl-${Date.now()}-seyf`, parentId: sklad.id, type: "seyf", name: seyfName, code: `${sklad.code}-С${seyfNum}`, isLeaf: true, available: form.available };
-      next = [...next, seyf];
-    } else {
-      if (!seyf) {
-        seyf = { id: `sl-${Date.now()}-seyf`, parentId: sklad.id, type: "seyf", name: seyfName, code: `${sklad.code}-С${seyfNum}`, isLeaf: false, available: true };
-        next = [...next, seyf];
-      } else {
-        next = next.map(l => l.id === seyf!.id ? { ...l, isLeaf: false } : l);
-      }
-      const polkaName = `Полка №${polkaNum}`;
-      if (next.find(l => l.type === "polka" && l.parentId === seyf!.id && l.name === polkaName)) {
-        show("Такое место хранения уже существует");
-        return;
-      }
-      const polka: StorageLocation = { id: `sl-${Date.now()}-polka`, parentId: seyf.id, type: "polka", name: polkaName, code: `${seyf.code}-П${polkaNum}`, isLeaf: true, available: form.available };
-      next = [...next, polka];
+    if (items.some(l => l.sklad === form.sklad && l.seyfNum === seyfNum && l.polkaNum === polkaNum)) {
+      show("Такое место хранения уже существует");
+      return;
     }
 
-    setItems(next);
+    const skladCode = SKLAD_CODE[form.sklad] ?? form.sklad;
+    const code = polkaNum ? `${skladCode}-С${seyfNum}-П${polkaNum}` : `${skladCode}-С${seyfNum}`;
+    const loc: StorageLocation = { id: `sl-${Date.now()}`, sklad: form.sklad, seyfNum, polkaNum, code, available: form.available };
+    setItems(prev => [...prev, loc]);
     setShowAdd(false);
     show("Место хранения добавлено");
   };
@@ -332,33 +307,39 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
       <PageHeader
         title="Места хранения"
         subtitle={`${items.length} значений`}
-        actions={<Btn onClick={openAdd}><Plus className="w-4 h-4" />Добавить место хранения</Btn>}
+        actions={<Btn onClick={openAdd}><Plus className="w-4 h-4" />Добавить</Btn>}
       />
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <div className="max-w-xs">
           <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
-          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Путь, код..." />
+          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Склад, место, код..." />
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
-            <SortTh sortKey="path" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
-            <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип</SortTh>
+            <SortTh sortKey="sklad" sort={sort} onSort={toggleSort}>Склад</SortTh>
+            <SortTh sortKey="place" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
             <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
             <SortTh sortKey="available" sort={sort} onSort={toggleSort}>Статус</SortTh>
-            <th className="w-12"></th>
+            <th className="w-20"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
             {pageItems.map(loc => (
               <tr key={loc.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-gray-900">{pathOf(loc, items)}</td>
-                <td className="px-4 py-3 text-gray-500">{typeLabel[loc.type]}</td>
+                <td className="px-4 py-3 text-gray-900">{loc.sklad}</td>
+                <td className="px-4 py-3 text-gray-700">{placeOf(loc)}</td>
                 <td className="px-4 py-3 font-mono text-blue-600 font-medium">{loc.code}</td>
                 <td className="px-4 py-3"><Badge label={loc.available ? "Доступно" : "Заблокировано"} /></td>
-                <td className="px-4 py-3"><EditIcon onClick={() => openEdit(loc)} /></td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => setViewItem(loc)} />
+                    <EditIcon onClick={() => openEdit(loc)} />
+                    <DeleteIcon onClick={() => confirm(`Удалить место хранения «${loc.sklad} / ${placeOf(loc)}»?`, () => { setItems(prev => prev.filter(l => l.id !== loc.id)); show("Место хранения удалено"); })} />
+                  </div>
+                </td>
               </tr>
             ))}
             {pageItems.length === 0 && (
@@ -382,16 +363,27 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
         >
           <div className="space-y-4">
             <Field label="Склад"><Select value={form.sklad} options={SKLAD_OPTIONS} onChange={v => setForm(f => ({ ...f, sklad: v }))} /></Field>
-            <Field label="Номер сейфа"><Input value={form.seyfNum} onChange={v => setForm(f => ({ ...f, seyfNum: v }))} placeholder="1" /></Field>
-            <Field label="Номер полки (необязательно)"><Input value={form.polkaNum} onChange={v => setForm(f => ({ ...f, polkaNum: v }))} placeholder="4" /></Field>
+            <Field label="Номер сейфа"><Input value={form.seyfNum} onChange={v => setForm(f => ({ ...f, seyfNum: v }))} placeholder="2" /></Field>
+            <Field label="Номер полки (необязательно)"><Input value={form.polkaNum} onChange={v => setForm(f => ({ ...f, polkaNum: v }))} placeholder="5" /></Field>
             <Toggle checked={form.available} onChange={v => setForm(f => ({ ...f, available: v }))} label="Доступно для использования" />
+          </div>
+        </Modal>
+      )}
+
+      {viewItem && (
+        <Modal title={`Место хранения: ${placeOf(viewItem)}`} onClose={() => setViewItem(null)} footer={<Btn variant="secondary" onClick={() => setViewItem(null)}>Закрыть</Btn>}>
+          <div className="space-y-4">
+            <Field label="Склад"><Input value={viewItem.sklad} disabled /></Field>
+            <Field label="Место хранения"><Input value={placeOf(viewItem)} disabled /></Field>
+            <Field label="Код"><Input value={viewItem.code} disabled /></Field>
+            <Toggle checked={viewItem.available} onChange={() => {}} label="Доступно для использования" disabled />
           </div>
         </Modal>
       )}
 
       {editItem && (
         <Modal
-          title={`Место хранения: ${pathOf(editItem, items)}`}
+          title={`Место хранения: ${placeOf(editItem)}`}
           onClose={() => setEditItem(null)}
           footer={
             <>
@@ -401,11 +393,14 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
           }
         >
           <div className="space-y-4">
+            <Field label="Склад"><Input value={editItem.sklad} disabled /></Field>
+            <Field label="Место хранения"><Input value={placeOf(editItem)} disabled /></Field>
             <Field label="Код"><Input value={editItem.code} disabled /></Field>
             <Toggle checked={editAvailable} onChange={setEditAvailable} label="Доступно для использования" />
           </div>
         </Modal>
       )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );
