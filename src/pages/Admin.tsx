@@ -53,7 +53,7 @@ const permTree: PermNode[] = [
     key: "logirovanie", label: "Логирование", base: ["Просмотр"],
   },
   {
-    key: "admin", label: "Панель администрирования", base: ["Просмотр"],
+    key: "admin", label: "Администрирование", base: ["Просмотр"],
     children: [
       { key: "admin-users", label: "Пользователи", base: ["Просмотр", "Создать", "Редактировать"], actions: ["Добавить пользователя"] },
       { key: "admin-roles", label: "Роли и разрешения", base: ["Просмотр", "Создать", "Редактировать", "Удалить"], actions: ["Создать роль"] },
@@ -314,7 +314,7 @@ function RolesPage({ onBack }: { onBack: () => void }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <div className="text-xs text-gray-500">Панель администрирования / Роли и разрешения</div>
+        <div className="text-xs text-gray-500">Администрирование / Роли и разрешения</div>
         <span className="text-xs text-gray-400">Обновлено: {new Date().toLocaleDateString("ru-RU")}</span>
       </div>
       <div className="flex items-start justify-between mb-6">
@@ -425,7 +425,7 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <div className="text-xs text-gray-500">Панель администрирования / Настройки</div>
+        <div className="text-xs text-gray-500">Администрирование / Настройки</div>
         <span className="text-xs text-gray-400">Обновлено: {new Date().toLocaleDateString("ru-RU")}</span>
       </div>
       <div className="flex items-start justify-between mb-6">
@@ -519,7 +519,7 @@ export function PanelAdmin() {
   return (
     <div>
       <PageHeader
-        title="Панель администрирования"
+        title="Администрирование"
         subtitle="Управление пользователями и ролями"
         breadcrumb={["Администрирование", "Пользователи"]}
         actions={

@@ -80,7 +80,7 @@ export const t: Record<Lang, Record<string, string>> = {
     "nav.otchet": "Отчётность",
     "nav.sprav": "Справочники",
     "nav.log": "Логирование",
-    "nav.admin": "Панель администрирования",
+    "nav.admin": "Администрирование",
     // Login
     "login.title": "СДМ",
     "login.sub": "Система учёта ДМ",
