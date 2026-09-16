@@ -177,7 +177,7 @@ export interface LogEntry {
   description: string;
   before?: LogSnapshotItem[];
   after?: LogSnapshotItem[];
-}
+}г
 
 // --- GP Items (34 total) ---
 export const initialGPItems: GPItem[] = [
