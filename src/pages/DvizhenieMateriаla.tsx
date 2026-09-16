@@ -57,7 +57,7 @@ function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm:
 
 // ── Добавить позицию ДМ со склада ─────────────────────────────────────────────
 
-type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; loc: string };
+type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string };
 
 function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
   const { dmItems } = useApp();
@@ -84,7 +84,7 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
   const add = () => {
     const chosen = availableItems.filter(i => selected.has(i.id));
     if (chosen.length === 0) return;
-    onAdd(chosen.map(i => ({ name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.netWeight, ag: "-", cu: "-", loc: i.location })));
+    onAdd(chosen.map(i => ({ name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.netWeight, ag: "-", cu: "-", au: "-", pd: "-", rh: "-", pt: "-", loc: i.location })));
   };
 
   return (
@@ -139,7 +139,7 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
 // ── Добавить позицию ДМ (новая, вручную) ──────────────────────────────────────
 
 function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
-  const [form, setForm] = useState({ nomenkl: "", klass: "Слиток", name: "", proba: "999", ves: "", ag: "-", cu: "-", sey: "Сейф №1", polka: "Полка А" });
+  const [form, setForm] = useState({ nomenkl: "", klass: "Слиток", name: "", proba: "999", ves: "", au: "-", ag: "-", pd: "-", rh: "-", pt: "-", sey: "Сейф №1", polka: "Полка А" });
 
   const add = () => {
     if (!form.name || !form.nomenkl) return;
@@ -150,7 +150,11 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
       proba: parseFloat(form.proba) || 0,
       ves: parseFloat(form.ves) || 0,
       ag: form.ag || "-",
-      cu: form.cu || "-",
+      cu: "-",
+      au: form.au || "-",
+      pd: form.pd || "-",
+      rh: form.rh || "-",
+      pt: form.pt || "-",
       loc: `${form.sey}, ${form.polka}`,
     }]);
   };
@@ -164,16 +168,24 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
         <Btn onClick={add} disabled={!form.name || !form.nomenkl}>Добавить</Btn>
       </>}
     >
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4 mb-4">
         <Field label="Номенкл. номер"><Input value={form.nomenkl} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} placeholder="DM-XXX" /></Field>
         <Field label="Класс"><Select value={form.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
         <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
         <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
         <Field label="Вес г"><Input value={form.ves} onChange={v => setForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>
-        <Field label="Ag, г"><Input value={form.ag} onChange={v => setForm(f => ({ ...f, ag: v }))} /></Field>
-        <Field label="Cu, г"><Input value={form.cu} onChange={v => setForm(f => ({ ...f, cu: v }))} /></Field>
         <Field label="Сейф"><Select value={form.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setForm(f => ({ ...f, sey: v }))} /></Field>
         <Field label="Полка"><Select value={form.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setForm(f => ({ ...f, polka: v }))} /></Field>
+      </div>
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Химический состав (в чистоте), г</h4>
+        <div className="grid grid-cols-5 gap-3">
+          <Field label="Au, г"><Input value={form.au} onChange={v => setForm(f => ({ ...f, au: v }))} placeholder="-" /></Field>
+          <Field label="Ag, г"><Input value={form.ag} onChange={v => setForm(f => ({ ...f, ag: v }))} placeholder="-" /></Field>
+          <Field label="Pd, г"><Input value={form.pd} onChange={v => setForm(f => ({ ...f, pd: v }))} placeholder="-" /></Field>
+          <Field label="Rh, г"><Input value={form.rh} onChange={v => setForm(f => ({ ...f, rh: v }))} placeholder="-" /></Field>
+          <Field label="Pt, г"><Input value={form.pt} onChange={v => setForm(f => ({ ...f, pt: v }))} placeholder="-" /></Field>
+        </div>
       </div>
     </Modal>
   );

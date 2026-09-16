@@ -68,15 +68,16 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
 
   // Приходный ордер state
   const [positions, setPositions] = useState([
-    { nomenkl: "DM-001", name: "Слиток золота ЗлА-1", klass: "Слиток", code: "AU", kol: "1", proba: "999", lig: "500.25", net: "498.12", loc: "Сейф №1, Полка А" },
+    { nomenkl: "DM-001", name: "Слиток золота ЗлА-1", klass: "Слиток", code: "AU", kol: "1", proba: "999", lig: "500.25", net: "498.12", loc: "Сейф №1, Полка А", au: "498.12", ag: "-", pd: "-", rh: "-", pt: "-" },
   ]);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
+  const emptyForm = { nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А", au: "-", ag: "-", pd: "-", rh: "-", pt: "-" };
+  const [form, setForm] = useState(emptyForm);
 
   const addPos = () => {
-    setPositions(p => [...p, { nomenkl: form.nomenkl, name: form.name || "Позиция ДМ", klass: form.klass, code: form.code, kol: form.kol || "1", proba: form.proba, lig: form.lig, net: form.net, loc: `${form.sey}, ${form.polka}` }]);
+    setPositions(p => [...p, { nomenkl: form.nomenkl, name: form.name || "Позиция ДМ", klass: form.klass, code: form.code, kol: form.kol || "1", proba: form.proba, lig: form.lig, net: form.net, loc: `${form.sey}, ${form.polka}`, au: form.au, ag: form.ag, pd: form.pd, rh: form.rh, pt: form.pt }]);
     setShowAdd(false);
-    setForm({ nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
+    setForm(emptyForm);
   };
 
   const { sorted: sortedPositions, sort: posSort, toggleSort: togglePosSort } = useSort(positions, {
@@ -271,7 +272,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
 
       {showAdd && (
         <Modal title="Добавить позицию ДМ" onClose={() => setShowAdd(false)} footer={<><Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn><Btn onClick={addPos}>Добавить</Btn></>}>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-4 mb-4">
             <Field label="Номенкл. номер"><Select value={form.nomenkl} options={["DM-001", "DM-002", "DM-003", "DM-004"]} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} /></Field>
             <Field label="Класс"><Select value={form.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Код материала"><Select value={form.code} options={["AU", "AG", "PT", "PD"]} onChange={v => setForm(f => ({ ...f, code: v }))} /></Field>
@@ -282,6 +283,16 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
             <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
             <Field label="Сейф"><Select value={form.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setForm(f => ({ ...f, sey: v }))} /></Field>
             <Field label="Полка"><Select value={form.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setForm(f => ({ ...f, polka: v }))} /></Field>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Химический состав (в чистоте), г</h4>
+            <div className="grid grid-cols-5 gap-3">
+              <Field label="Au, г"><Input value={form.au} onChange={v => setForm(f => ({ ...f, au: v }))} placeholder="-" /></Field>
+              <Field label="Ag, г"><Input value={form.ag} onChange={v => setForm(f => ({ ...f, ag: v }))} placeholder="-" /></Field>
+              <Field label="Pd, г"><Input value={form.pd} onChange={v => setForm(f => ({ ...f, pd: v }))} placeholder="-" /></Field>
+              <Field label="Rh, г"><Input value={form.rh} onChange={v => setForm(f => ({ ...f, rh: v }))} placeholder="-" /></Field>
+              <Field label="Pt, г"><Input value={form.pt} onChange={v => setForm(f => ({ ...f, pt: v }))} placeholder="-" /></Field>
+            </div>
           </div>
         </Modal>
       )}
