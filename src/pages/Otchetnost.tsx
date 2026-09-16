@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import { PageHeader, Btn, Modal, Field, Input, Select, useToast, Toast, SortTh, useSort } from "../components/ui";
-import { Metal } from "../data/mock";
+import { Metal, baseMetal } from "../data/mock";
 import { ClipboardCheck, Coins, Gem, FileText, LucideIcon } from "lucide-react";
 
 const METAL_CODE: Record<Metal, string> = { Au: "1", Ag: "2", Pt: "3", Pd: "4" };
@@ -15,18 +15,21 @@ function InventarizationOpisModal({ onClose }: { onClose: () => void }) {
   const [sklad, setSklad] = useState("Склад ДМ №1");
   const [generated, setGenerated] = useState(false);
 
-  const rows = dmItems.map(it => ({
-    kodDm: METAL_CODE[it.metal] || "-",
-    kodLig: String(it.proba),
-    name: it.name,
-    nomenkl: it.nomenkl,
-    ligWeight: it.ligWeight,
-    au: it.metal === "Au" ? it.netWeight : 0,
-    ag: it.metal === "Ag" ? it.netWeight : 0,
-    pd: it.metal === "Pd" ? it.netWeight : 0,
-    rh: 0,
-    pt: it.metal === "Pt" ? it.netWeight : 0,
-  }));
+  const rows = dmItems.map(it => {
+    const m = baseMetal(it.metal);
+    return {
+      kodDm: METAL_CODE[m] || "-",
+      kodLig: String(it.proba),
+      name: it.name,
+      nomenkl: it.nomenkl,
+      ligWeight: it.ligWeight,
+      au: m === "Au" ? it.netWeight : 0,
+      ag: m === "Ag" ? it.netWeight : 0,
+      pd: m === "Pd" ? it.netWeight : 0,
+      rh: 0,
+      pt: m === "Pt" ? it.netWeight : 0,
+    };
+  });
 
   const totals = rows.reduce((acc, r) => ({
     ligWeight: acc.ligWeight + r.ligWeight,

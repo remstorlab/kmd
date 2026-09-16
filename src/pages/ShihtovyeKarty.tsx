@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, useToast, Toast, Field, Input, Select, useConfirm, ConfirmDialog,
-  SortTh, useSort, parseRuDate,
+  SortTh, useSort, parseRuDate, formatDateTime,
 } from "../components/ui";
 import { ShihtovayaKarta } from "../data/mock";
 import { Plus, X, Calculator } from "lucide-react";
@@ -15,6 +15,7 @@ const shihtaMaterials = [
 ];
 
 function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta?: ShihtovayaKarta | null; onClose: () => void; onSave: (k: ShihtovayaKarta) => void; readOnly?: boolean }) {
+  const { currentUser } = useApp();
   const [name, setName] = useState(karta?.name || "");
   const [plavkaNo, setPlavkaNo] = useState(karta?.plavkaNo || "");
   const [oborotNo, setOborotNo] = useState("О-2026-001");
@@ -71,6 +72,8 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       plavkaNo: plavkaNo || `П-2026-${Math.floor(Math.random() * 9000 + 1000)}`,
       status: "Новая",
       materials: [],
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser?.name || "—",
     };
     onSave(k);
   };
@@ -237,6 +240,7 @@ export function ShihtovyeKarty() {
     name: k => k.name,
     plavkaNo: k => k.plavkaNo,
     status: k => k.status,
+    createdAt: k => new Date(k.createdAt).getTime(),
   });
 
   return (
@@ -256,6 +260,7 @@ export function ShihtovyeKarty() {
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="plavkaNo" sort={sort} onSort={toggleSort}>№ плавки</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
+              <SortTh sortKey="createdAt" sort={sort} onSort={toggleSort}>Дата создания - пользователь</SortTh>
               <th className="w-28"></th>
             </tr>
           </thead>
@@ -266,6 +271,7 @@ export function ShihtovyeKarty() {
                 <td className="px-4 py-3 font-medium text-gray-900">{karta.name}</td>
                 <td className="px-4 py-3 text-blue-600">{karta.plavkaNo}</td>
                 <td className="px-4 py-3"><Badge label={karta.status} /></td>
+                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(karta.createdAt)} - {karta.createdBy}</td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewKarta(karta)} />
                   <EditIcon onClick={() => setEditKarta(karta)} />

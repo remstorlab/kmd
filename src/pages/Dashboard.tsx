@@ -1,7 +1,7 @@
 import React from "react";
 import { useApp } from "../store/AppContext";
 import { PageHeader, Badge } from "../components/ui";
-import { Metal } from "../data/mock";
+import { Metal, baseMetal } from "../data/mock";
 import { Coins, Repeat, Send, Activity, Clock } from "lucide-react";
 
 const metalName: Record<Metal, string> = {
@@ -72,7 +72,8 @@ export function Dashboard() {
 
   // ── Часть 1: всего на складе (ДМ), по видам металла ──────────────────────
   const dmByMetal = dmItems.reduce((acc, i) => {
-    acc[i.metal] = (acc[i.metal] || 0) + i.netWeight;
+    const m = baseMetal(i.metal);
+    acc[m] = (acc[m] || 0) + i.netWeight;
     return acc;
   }, {} as Record<Metal, number>);
   const dmMetals = (Object.keys(dmByMetal) as Metal[]).sort((a, b) => dmByMetal[b] - dmByMetal[a]);

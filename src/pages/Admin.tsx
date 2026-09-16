@@ -3,18 +3,12 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PageHeader,
   useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, Toggle, SearchInput, SortTh, useSort, Pagination,
+  Field, Input, Select, Toggle, SearchInput, SortTh, useSort, Pagination, formatDateTime,
 } from "../components/ui";
 import { AppUser, Role } from "../data/mock";
 import { ArrowLeft, Plus, ChevronRight } from "lucide-react";
 
 const permissions = ["Создать", "Редактировать", "Удалить", "Просмотр", "Экспорт", "Печать"];
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 interface PermNode {
   key: string;

@@ -269,6 +269,12 @@ export function parseRuDate(s: string): number {
   return Number(y) * 100000000 + Number(mo) * 1000000 + Number(d) * 10000 + Number(h) * 100 + Number(mi);
 }
 
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function useSort<T>(rows: T[], accessors: Record<string, (row: T) => string | number>) {
   const [sort, setSort] = useState<SortState>(null);
   const sorted = useMemo(() => {
