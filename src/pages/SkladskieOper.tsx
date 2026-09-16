@@ -3,9 +3,9 @@ import { useApp } from "../store/AppContext";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, FileChip, useConfirm, ConfirmDialog,
-  SortTh, useSort, parseRuDate,
+  SortTh, useSort, parseRuDate, Badge,
 } from "../components/ui";
-import { SkladDoc, GPItem } from "../data/mock";
+import { SkladDoc, GPItem, DocStatus } from "../data/mock";
 import { Inbox, Send, Repeat, Plus, X, Paperclip, LucideIcon } from "lucide-react";
 
 // ── Hub ───────────────────────────────────────────────────────────────────────
@@ -113,9 +113,9 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
     loc: p => p.loc,
   });
 
-  const save = () => {
+  const save = (targetStatus: DocStatus) => {
     if (doc) {
-      const d: SkladDoc = { ...doc, number: head.number, date: head.date, sender: head.otpravitel, receiver: head.poluchatel };
+      const d: SkladDoc = { ...doc, number: head.number, date: head.date, sender: head.otpravitel, receiver: head.poluchatel, status: targetStatus };
       onSave(d);
       return;
     }
@@ -124,7 +124,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
       date: new Date().toLocaleDateString("ru-RU"),
       type: "Приходный ордер",
       number: `ПО-${Math.floor(Math.random() * 900 + 100)}`,
-      status: "Выполнено",
+      status: targetStatus,
       sender: "ОО «АурумПоставка»",
       receiver: "Склад ДМ №1",
     } : {
@@ -132,7 +132,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
       date: new Date().toLocaleDateString("ru-RU"),
       type: "Накладная на приём ДМ",
       number: `НП-${Math.floor(Math.random() * 900 + 100)}`,
-      status: "Выполнено",
+      status: targetStatus,
       sender: "СДМ",
       receiver: "Склад ДМ №1",
     };
@@ -148,8 +148,8 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
         <>
           <Btn variant="secondary" onClick={() => show("Печать ярлыков ДМ")}>Печать ярлыков ДМ</Btn>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn variant="secondary" onClick={save}>Сохранить и печать</Btn>
-          <Btn onClick={save}>Сохранить</Btn>
+          <Btn onClick={() => save("Оформлено")}>Оформить</Btn>
+          <Btn variant="secondary" onClick={() => save("Редактирование")}>Сохранить черновик</Btn>
         </>
       )}
     >
@@ -372,18 +372,19 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
     setShowAdd(false);
   };
 
-  const save = () => {
+  const save = (targetStatus: DocStatus) => {
     const d: SkladDoc = doc ? {
       ...doc,
       number: head.number,
       date: head.date,
       receiver: head.poluchatel,
+      status: targetStatus,
     } : {
       id: `vd-${Date.now()}`,
       date: head.date,
       type: "Накладная на отгрузку ГП",
       number: head.number,
-      status: "В работе",
+      status: targetStatus,
       sender: "Склад ГП",
       receiver: head.poluchatel,
     };
@@ -394,7 +395,13 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
     <Modal title="Накладная на отгрузку ГП" onClose={onClose} wide footer={
       readOnly
         ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn>
-        : <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={save}>Оформить выдачу</Btn></>
+        : (
+          <>
+            <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+            <Btn onClick={() => save("Оформлено")}>Оформить выдачу</Btn>
+            <Btn variant="secondary" onClick={() => save("Редактирование")}>Сохранить черновик</Btn>
+          </>
+        )
     }>
       <div className="grid grid-cols-2 gap-4 mb-4">
         <Field label="Тип документа"><Select value="Накладная на отгрузку ГП" options={["Накладная на отгрузку ГП"]} disabled={readOnly} /></Field>
@@ -662,6 +669,7 @@ function DocList({
     number: d => d.number,
     sender: d => d.sender,
     receiver: d => d.receiver,
+    status: d => d.status,
   });
   const perPage = 8;
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
@@ -692,7 +700,7 @@ function DocList({
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {["Все статусы", "Выполнено", "В работе", "Закрыт"].map(o => <option key={o}>{o}</option>)}
+            {["Все статусы", "Оформлено", "Редактирование", "Выполнено", "В работе", "Закрыт"].map(o => <option key={o}>{o}</option>)}
           </select>
         </div>
         <button onClick={() => { setSearch(""); setFilterStatus("Все статусы"); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Сбросить</button>
@@ -707,6 +715,7 @@ function DocList({
               <SortTh sortKey="number" sort={sort} onSort={toggleSort}>Номер</SortTh>
               <SortTh sortKey="sender" sort={sort} onSort={toggleSort}>Отправитель</SortTh>
               <SortTh sortKey="receiver" sort={sort} onSort={toggleSort}>Получатель</SortTh>
+              <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <th className="w-32"></th>
             </tr>
           </thead>
@@ -718,6 +727,7 @@ function DocList({
                 <td className="px-4 py-3 text-blue-600 font-medium">{doc.number}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.sender}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
+                <td className="px-4 py-3"><Badge label={doc.status} /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewDoc(doc)} />
                   <EditIcon onClick={() => setEditDoc(doc)} />
@@ -791,6 +801,7 @@ export function VydachaList() {
     number: d => d.number,
     sender: d => d.sender,
     receiver: d => d.receiver,
+    status: d => d.status,
   });
 
   return (
@@ -815,6 +826,7 @@ export function VydachaList() {
               <SortTh sortKey="number" sort={sort} onSort={toggleSort}>Номер</SortTh>
               <SortTh sortKey="sender" sort={sort} onSort={toggleSort}>Отправитель</SortTh>
               <SortTh sortKey="receiver" sort={sort} onSort={toggleSort}>Получатель</SortTh>
+              <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <th className="w-28"></th>
             </tr>
           </thead>
@@ -826,6 +838,7 @@ export function VydachaList() {
                 <td className="px-4 py-3 text-blue-600 font-medium">{doc.number}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.sender}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
+                <td className="px-4 py-3"><Badge label={doc.status} /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewDoc(doc)} />
                   <EditIcon onClick={() => setEditDoc(doc)} />
