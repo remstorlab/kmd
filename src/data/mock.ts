@@ -76,6 +76,28 @@ export interface ShihtovayaKarta {
   materials: ShihtaMaterial[];
 }
 
+export interface PodotchetPosition {
+  name: string;
+  nomenkl: string;
+  klass: string;
+  metal: Metal;
+  qty: number;
+  proba: number;
+  ligWeight: number;
+  netWeight: number;
+  location: string;
+  status: StatusDM;
+}
+
+export interface PodotchetProcess {
+  id: string;
+  name: string;
+  vid: OpVid;
+  date: string;
+  completedDate?: string;
+  positions: PodotchetPosition[];
+}
+
 export interface Podotchetnik {
   id: string;
   name: string;
@@ -83,6 +105,8 @@ export interface Podotchetnik {
   department: string;
   position: string;
   materials: { name: string; nomenkl: string; weight: number }[];
+  currentProcesses: PodotchetProcess[];
+  completedProcesses: PodotchetProcess[];
 }
 
 export interface AppUser {
@@ -206,9 +230,9 @@ export const initialSkladDocs: SkladDoc[] = [
 ];
 
 export const initialVydachaDocs: SkladDoc[] = [
-  { id: "vd1", date: "19.08.2026", type: "Накладная на отгрузку ГП", number: "НО-0205", status: "Редактирование", sender: "Склад ГП", receiver: "ТД «Золото Казахстана»" },
-  { id: "vd2", date: "17.08.2026", type: "Накладная на отгрузку ГП", number: "НО-0204", status: "Оформлено", sender: "Склад ГП", receiver: "ИП Сейткали А.М." },
-  { id: "vd3", date: "15.08.2026", type: "Накладная на отгрузку", number: "НО-0203", status: "Оформлено", sender: "Склад ДМ №1", receiver: "Производство" },
+  { id: "vd1", date: "19.08.2026", type: "Накладная на отгрузку ГП", number: "НО-0205", status: "Редактирование", sender: "Склад ДМ №2", receiver: "ОАО КАЗЦИНК" },
+  { id: "vd2", date: "17.08.2026", type: "Накладная на отгрузку ГП", number: "НО-0204", status: "Оформлено", sender: "Склад ДМ №2", receiver: "НБРК" },
+  { id: "vd3", date: "15.08.2026", type: "Накладная на отгрузку", number: "НО-0203", status: "Оформлено", sender: "Склад ДМ №2", receiver: "Отдел продаж" },
 ];
 
 // --- Операции движения ---
@@ -256,39 +280,99 @@ export const initialPodotchetniki: Podotchetnik[] = [
     materials: [
       { name: "Слиток золота ЗлА-1", nomenkl: "DM-001", weight: 500.25 },
       { name: "Стружка золотая", nomenkl: "DM-003", weight: 45.80 },
-    ]
+    ],
+    currentProcesses: [
+      {
+        id: "pr-p1-1", name: "Плавка золотых слитков", vid: "Плавка", date: "19.08.2026, 09:00",
+        positions: [
+          { name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", metal: "Au", qty: 1, proba: 999, ligWeight: 500.25, netWeight: 499.75, location: "Сейф №1, Полка А", status: "В подотчёте" },
+          { name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", metal: "Au", qty: 1, proba: 750, ligWeight: 45.80, netWeight: 34.35, location: "Сейф №2, Полка А", status: "В подотчёте" },
+        ],
+      },
+    ],
+    completedProcesses: [
+      {
+        id: "pr-p1-c1", name: "Плавка серебряного лома", vid: "Плавка", date: "10.08.2026, 08:30", completedDate: "12.08.2026, 17:15",
+        positions: [
+          { name: "Слиток серебра СрА-2", nomenkl: "DM-002", klass: "Слиток", metal: "Ag", qty: 1, proba: 925, ligWeight: 300.00, netWeight: 277.50, location: "Сейф №1, Полка Б", status: "На складе" },
+        ],
+      },
+    ],
   },
   {
     id: "p2", name: "Петров Сергей Владимирович", tabelNo: "ТН-002", department: "Производственный цех", position: "Ювелир",
     materials: [
       { name: "Проба золота Au-750", nomenkl: "DM-004", weight: 12.30 },
-    ]
+    ],
+    currentProcesses: [
+      {
+        id: "pr-p2-1", name: "Отбор пробы Au-750", vid: "Отбор пробы", date: "18.08.2026, 14:30",
+        positions: [
+          { name: "Проба золота Au-750", nomenkl: "DM-004", klass: "Проба", metal: "Au", qty: 1, proba: 750, ligWeight: 12.30, netWeight: 9.23, location: "Лаборатория", status: "В подотчёте" },
+        ],
+      },
+    ],
+    completedProcesses: [
+      {
+        id: "pr-p2-c1", name: "Производство кольца Au-585", vid: "Производство ГП", date: "05.08.2026, 10:00", completedDate: "07.08.2026, 16:00",
+        positions: [
+          { name: "Слиток золота ЗлБ-1", nomenkl: "DM-006", klass: "Слиток", metal: "Au", qty: 1, proba: 585, ligWeight: 20.00, netWeight: 11.70, location: "Сейф №2, Полка А", status: "На складе" },
+        ],
+      },
+    ],
   },
   {
     id: "p3", name: "Смирнов Константин Дмитриевич", tabelNo: "ТН-003", department: "Лаборатория", position: "Лаборант",
-    materials: []
+    materials: [],
+    currentProcesses: [],
+    completedProcesses: [
+      {
+        id: "pr-p3-c1", name: "Анализ пробы Ag-925", vid: "Анализ в ЛКИ", date: "14.08.2026, 09:15", completedDate: "15.08.2026, 11:00",
+        positions: [
+          { name: "Проба серебра Ag-925", nomenkl: "DM-007", klass: "Проба", metal: "Ag", qty: 1, proba: 925, ligWeight: 8.50, netWeight: 7.86, location: "Лаборатория", status: "На складе" },
+        ],
+      },
+    ],
   },
   {
     id: "p4", name: "Иванова Мария Сергеевна", tabelNo: "ТН-004", department: "Гальванический цех", position: "Гальваник",
     materials: [
       { name: "Раствор серебра AgNO3", nomenkl: "DM-005", weight: 250.00 },
-    ]
+    ],
+    currentProcesses: [
+      {
+        id: "pr-p4-1", name: "Гальванопокрытие изделий", vid: "Гальванопокрытие", date: "17.08.2026, 13:00",
+        positions: [
+          { name: "Раствор серебра AgNO3", nomenkl: "DM-005", klass: "Раствор", metal: "Ag", qty: 1, proba: 0, ligWeight: 250.00, netWeight: 250.00, location: "Гальванический цех", status: "В подотчёте" },
+        ],
+      },
+    ],
+    completedProcesses: [],
   },
   {
     id: "p5", name: "Ким Александр Юрьевич", tabelNo: "ТН-005", department: "Склад ДМ", position: "Кладовщик",
-    materials: []
+    materials: [],
+    currentProcesses: [],
+    completedProcesses: [
+      {
+        id: "pr-p5-c1", name: "Инвентаризация склада ДМ №1", vid: "Отбор пробы", date: "08.08.2026, 08:00", completedDate: "08.08.2026, 18:00",
+        positions: [
+          { name: "Слиток золота ЗлА-3", nomenkl: "DM-008", klass: "Слиток", metal: "Au", qty: 1, proba: 999, ligWeight: 150.00, netWeight: 149.85, location: "Сейф №3, Полка А", status: "На складе" },
+        ],
+      },
+    ],
   },
   {
     id: "p6", name: "Бекова Айгуль Маратовна", tabelNo: "ТН-006", department: "ПТО", position: "Технолог",
-    materials: []
+    materials: [], currentProcesses: [], completedProcesses: [],
   },
   {
     id: "p7", name: "Жумабаев Даурен Серикович", tabelNo: "ТН-007", department: "Ювелирный цех", position: "Мастер-ювелир",
-    materials: []
+    materials: [], currentProcesses: [], completedProcesses: [],
   },
   {
     id: "p8", name: "Орынбекова Динара Кайратовна", tabelNo: "ТН-008", department: "ОТК", position: "Контролёр ОТК",
-    materials: []
+    materials: [], currentProcesses: [], completedProcesses: [],
   },
 ];
 

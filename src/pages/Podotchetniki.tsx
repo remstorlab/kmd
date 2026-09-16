@@ -1,30 +1,77 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
-import { Badge, Btn, Modal, EyeIcon, PageHeader, useToast, Toast, Tabs, SortTh, useSort } from "../components/ui";
-import { Podotchetnik } from "../data/mock";
-import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, LucideIcon } from "lucide-react";
+import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort } from "../components/ui";
+import { Podotchetnik, PodotchetProcess } from "../data/mock";
+import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, LucideIcon } from "lucide-react";
 
 const vidIcon: Record<string, LucideIcon> = {
   "Плавка": Flame,
   "Анализ в ЛКИ": FlaskConical,
   "Отбор пробы": Microscope,
   "Гальванопокрытие": Zap,
+  "Производство ГП": Factory,
 };
 
-const currentProcesses = [
-  { name: "Плавка золотых слитков", date: "19.08.2026, 09:00", vid: "Плавка" },
-  { name: "Анализ пробы Au-999", date: "18.08.2026, 14:30", vid: "Анализ в ЛКИ" },
-];
-const completedProcesses = [
-  { name: "Отбор пробы Ag-925", date: "15.08.2026, 11:00", vid: "Отбор пробы" },
-  { name: "Гальванопокрытие кольца", date: "10.08.2026, 09:45", vid: "Гальванопокрытие" },
-];
+function ProcessCard({ process, showCompletedDate }: { process: PodotchetProcess; showCompletedDate: boolean }) {
+  const Icon = vidIcon[process.vid] ?? Flame;
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">
+        <Icon className="w-5 h-5 text-gray-500 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-gray-900 truncate">{process.name}</div>
+          <div className="text-xs text-gray-400">{process.vid}</div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-xs text-gray-400">Начато: {process.date}</div>
+          {showCompletedDate && process.completedDate && (
+            <div className="text-xs text-green-600 font-medium mt-0.5">Завершено: {process.completedDate}</div>
+          )}
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead><tr className="text-gray-500 text-xs border-b border-gray-100">
+            <th className="px-4 py-2 text-left font-medium">Наименование</th>
+            <th className="px-4 py-2 text-left font-medium">Номенкл.№</th>
+            <th className="px-4 py-2 text-left font-medium">Класс</th>
+            <th className="px-4 py-2 text-left font-medium">Металл</th>
+            <th className="px-4 py-2 text-right font-medium">Кол-во</th>
+            <th className="px-4 py-2 text-right font-medium">Проба</th>
+            <th className="px-4 py-2 text-right font-medium">Лигат. вес г</th>
+            <th className="px-4 py-2 text-right font-medium">Чистый вес г</th>
+            <th className="px-4 py-2 text-left font-medium">Место хранения</th>
+            <th className="px-4 py-2 text-left font-medium">Статус</th>
+          </tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {process.positions.map((pos, i) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="px-4 py-2 font-medium text-gray-900">{pos.name}</td>
+                <td className="px-4 py-2 text-gray-500">{pos.nomenkl}</td>
+                <td className="px-4 py-2">{pos.klass}</td>
+                <td className="px-4 py-2">{pos.metal}</td>
+                <td className="px-4 py-2 text-right">{pos.qty}</td>
+                <td className="px-4 py-2 text-right">{pos.proba}</td>
+                <td className="px-4 py-2 text-right">{pos.ligWeight.toFixed(2)}</td>
+                <td className="px-4 py-2 text-right">{pos.netWeight.toFixed(2)}</td>
+                <td className="px-4 py-2 text-gray-500">{pos.location}</td>
+                <td className="px-4 py-2"><Badge label={pos.status} /></td>
+              </tr>
+            ))}
+            {process.positions.length === 0 && (
+              <tr><td colSpan={10} className="px-4 py-4 text-center text-gray-400 text-xs">Позиции отсутствуют</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: () => void }) {
   const [tab, setTab] = useState("Текущие процессы");
-  const { toast, show, clear } = useToast();
 
-  const processes = tab === "Текущие процессы" ? currentProcesses : completedProcesses;
+  const processes = tab === "Текущие процессы" ? person.currentProcesses : person.completedProcesses;
 
   const { sorted: sortedMaterials, sort: matSort, toggleSort: toggleMatSort } = useSort(person.materials, {
     name: m => m.name,
@@ -88,31 +135,15 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
       {/* Processes */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <Tabs tabs={["Текущие процессы", "Завершённые процессы"]} active={tab} onChange={setTab} />
-        <div className="space-y-2">
-          {processes.map((p, i) => {
-            const Icon = vidIcon[p.vid] ?? Flame;
-            return (
-            <button
-              key={i}
-              onClick={() => show(`Открытие операции: ${p.name}`)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-100 hover:border-blue-300 hover:bg-blue-50 transition-colors text-left"
-            >
-              <Icon className="w-5 h-5 text-gray-500 shrink-0" />
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">{p.name}</div>
-                <div className="text-xs text-gray-400">{p.vid}</div>
-              </div>
-              <span className="text-xs text-gray-400 shrink-0">{p.date}</span>
-              {tab === "Завершённые процессы" && <Badge label="Закрыто" />}
-            </button>
-            );
-          })}
+        <div className="space-y-3">
+          {processes.map(p => (
+            <ProcessCard key={p.id} process={p} showCompletedDate={tab === "Завершённые процессы"} />
+          ))}
           {processes.length === 0 && (
             <p className="text-center text-sm text-gray-400 py-4">Процессы не найдены</p>
           )}
         </div>
       </div>
-      {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );
 }
