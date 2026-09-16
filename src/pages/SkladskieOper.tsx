@@ -146,10 +146,10 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
       extraWide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
         <>
-          <Btn variant="secondary" onClick={() => show("Печать ярлыков ДМ")}>Печать ярлыков ДМ</Btn>
+          <Btn variant="secondary" onClick={() => show("Печать ярлыков ДМ")}>Печать ярлыков</Btn>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
           <Btn onClick={() => save("Оформлено")}>Оформить</Btn>
-          <Btn variant="secondary" onClick={() => save("Редактирование")}>Сохранить черновик</Btn>
+          <Btn variant="secondary" onClick={() => save("Редактирование")}>Сохранить</Btn>
         </>
       )}
     >
@@ -398,8 +398,8 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
         : (
           <>
             <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-            <Btn onClick={() => save("Оформлено")}>Оформить выдачу</Btn>
-            <Btn variant="secondary" onClick={() => save("Редактирование")}>Сохранить черновик</Btn>
+            <Btn onClick={() => save("Оформлено")}>Оформить</Btn>
+            <Btn variant="secondary" onClick={() => save("Редактирование")}>Сохранить</Btn>
           </>
         )
     }>
