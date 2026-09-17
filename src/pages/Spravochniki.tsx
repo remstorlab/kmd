@@ -4,8 +4,8 @@ import {
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination,
 } from "../components/ui";
-import { spravochniki, initialMaterialCodes, MaterialCode, initialStorageLocations, StorageLocation } from "../data/mock";
-import { ArrowLeft, Plus, Package, Scale, FileText, Shapes, Building2, UserRound, Settings2, Tag, MapPin, Warehouse, LucideIcon } from "lucide-react";
+import { spravochniki, initialMaterialCodes, MaterialCode, initialMaterialClasses, MaterialClass, initialStorageLocations, StorageLocation } from "../data/mock";
+import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 
@@ -13,7 +13,6 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Номенклатуры": Package,
   "Единицы измерения": Scale,
   "Типы документов": FileText,
-  "Классы материалов": Shapes,
   "Организации": Building2,
   "Подотчётные сотрудники": UserRound,
   "Типы операций": Settings2,
@@ -226,6 +225,134 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ── Классы материалов ────────────────────────────────────────────────────────
+
+function MaterialClassesPage({ onBack }: { onBack: () => void }) {
+  const [items, setItems] = useState(initialMaterialClasses);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [showAdd, setShowAdd] = useState(false);
+  const [viewItem, setViewItem] = useState<MaterialClass | null>(null);
+  const [editItem, setEditItem] = useState<MaterialClass | null>(null);
+  const [form, setForm] = useState<MaterialClass>({ code: "", name: "" });
+  const { toast, show, clear } = useToast();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
+  const perPage = 10;
+
+  const filtered = items.filter(i => {
+    const q = search.trim().toLowerCase();
+    return !q || i.name.toLowerCase().includes(q);
+  });
+
+  const { sorted, sort, toggleSort } = useSort(filtered, {
+    code: i => i.code,
+    name: i => i.name,
+  });
+  const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
+
+  const openAdd = () => {
+    setForm({ code: "", name: "" });
+    setShowAdd(true);
+  };
+  const openEdit = (item: MaterialClass) => {
+    setForm(item);
+    setEditItem(item);
+  };
+
+  const save = () => {
+    if (editItem) {
+      setItems(prev => prev.map(i => i.code === editItem.code ? form : i));
+    } else {
+      setItems(prev => [...prev, form]);
+    }
+    setShowAdd(false);
+    setEditItem(null);
+    show("Запись сохранена");
+  };
+
+  return (
+    <div>
+      <button onClick={onBack} className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium mb-4">
+        <ArrowLeft className="w-4 h-4" />
+        Назад к справочникам
+      </button>
+
+      <div className="text-xs text-gray-500 mb-4">Справочники / Классы материалов</div>
+
+      <PageHeader
+        title="Классы материалов"
+        subtitle={`${items.length} значений`}
+        actions={<Btn onClick={openAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
+      />
+
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+        <div className="max-w-xs">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Наименование</label>
+          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Поиск по наименованию..." />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 border-b border-gray-200">
+            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
+            <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
+            <th className="w-24"></th>
+          </tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {pageItems.map((item, i) => (
+              <tr key={i} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.code}</td>
+                <td className="px-4 py-3 text-gray-900">{item.name}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => setViewItem(item)} />
+                    <EditIcon onClick={() => openEdit(item)} />
+                    <DeleteIcon onClick={() => confirm(`Удалить класс материала «${item.name}»?`, () => { setItems(prev => prev.filter(x => x.code !== item.code)); show("Класс материала удалён"); })} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {pageItems.length === 0 && (
+              <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+            )}
+          </tbody>
+        </table>
+        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} />
+      </div>
+
+      {(showAdd || editItem) && (
+        <Modal
+          title={editItem ? "Редактировать запись" : "Добавить запись"}
+          onClose={() => { setShowAdd(false); setEditItem(null); }}
+          footer={
+            <>
+              <Btn variant="secondary" onClick={() => { setShowAdd(false); setEditItem(null); }}>Отмена</Btn>
+              <Btn onClick={save}>Сохранить</Btn>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <Field label="Код"><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} /></Field>
+            <Field label="Наименование"><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
+          </div>
+        </Modal>
+      )}
+
+      {viewItem && (
+        <Modal title={`Класс материала: ${viewItem.name}`} onClose={() => setViewItem(null)} footer={<Btn variant="secondary" onClick={() => setViewItem(null)}>Закрыть</Btn>}>
+          <div className="space-y-4">
+            <Field label="Код"><Input value={viewItem.code} disabled /></Field>
+            <Field label="Наименование"><Input value={viewItem.name} disabled /></Field>
+          </div>
+        </Modal>
+      )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
+      {toast && <Toast message={toast} onDone={clear} />}
+    </div>
+  );
+}
+
 // ── Места хранения (Сейф/Полка, принадлежат складу из справочника «Склады») ──
 
 const SKLAD_OPTIONS = spravochniki["Склады"].items.map(i => i.value);
@@ -409,6 +536,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
 export function Spravochniki() {
   const [selected, setSelected] = useState<SpravKey | null>(null);
   const [showMaterialCodes, setShowMaterialCodes] = useState(false);
+  const [showMaterialClasses, setShowMaterialClasses] = useState(false);
   const [showStorageLocations, setShowStorageLocations] = useState(false);
 
   if (selected) {
@@ -416,6 +544,9 @@ export function Spravochniki() {
   }
   if (showMaterialCodes) {
     return <MaterialCodesPage onBack={() => setShowMaterialCodes(false)} />;
+  }
+  if (showMaterialClasses) {
+    return <MaterialClassesPage onBack={() => setShowMaterialClasses(false)} />;
   }
   if (showStorageLocations) {
     return <StorageLocationsPage onBack={() => setShowStorageLocations(false)} />;
@@ -455,6 +586,16 @@ export function Spravochniki() {
           </div>
           <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Коды материалов</h3>
           <p className="text-sm text-gray-400">{initialMaterialCodes.length} значений</p>
+        </button>
+        <button
+          onClick={() => setShowMaterialClasses(true)}
+          className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md transition-all hover:border-blue-300 group"
+        >
+          <div className="w-10 h-10 mb-3 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+            <Shapes className="w-5 h-5" />
+          </div>
+          <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Классы материалов</h3>
+          <p className="text-sm text-gray-400">{initialMaterialClasses.length} значений</p>
         </button>
         <button
           onClick={() => setShowStorageLocations(true)}

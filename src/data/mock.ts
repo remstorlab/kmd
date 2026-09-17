@@ -578,15 +578,6 @@ export const spravochniki = {
       { code: "ШК", value: "Шихтовая карта", status: "Активно" },
     ]
   },
-  "Классы материалов": {
-    count: 4,
-    items: [
-      { code: "СЛ", value: "Слиток", status: "Активно" },
-      { code: "СТ", value: "Стружка", status: "Активно" },
-      { code: "ПР", value: "Проба", status: "Активно" },
-      { code: "РА", value: "Раствор", status: "Активно" },
-    ]
-  },
   "Организации": {
     count: 18,
     items: [
@@ -652,6 +643,28 @@ export const initialMaterialCodes: MaterialCode[] = [
   { code: "8000", name: "Сплав ЗлСрМ 375-20", shortName: "ЗлСрМ 375-20" },
   { code: "7000", name: "Сплав ЗлСрМ 375-100", shortName: "ЗлСрМ 375-100" },
   { code: "0050", name: "Бриллиантовые вставки", shortName: "Брилл. вставки" },
+];
+
+// --- Классы материалов ---
+export interface MaterialClass {
+  code: string;
+  name: string;
+}
+
+export const initialMaterialClasses: MaterialClass[] = [
+  { code: "СЛ", name: "Слиток" },
+  { code: "СТ", name: "Стружка" },
+  { code: "ОП", name: "Основная проба" },
+  { code: "КП", name: "Контрольная проба" },
+  { code: "ПД", name: "Подкат" },
+  { code: "ПФ", name: "Полуфабрикат (ПФ)" },
+  { code: "МН", name: "Монета" },
+  { code: "ПРФ", name: "Перфолента" },
+  { code: "НПЗ", name: "НП заготовки" },
+  { code: "НПЧ", name: "НП чеканки" },
+  { code: "ПЛС", name: "Пластина" },
+  { code: "КОЗ", name: "Козел (хвост-козел)" },
+  { code: "ПФЗ", name: "Полуфабрикат заготовки" },
 ];
 
 // --- Места хранения (Сейф / Полка, принадлежат складу из справочника «Склады») ---
