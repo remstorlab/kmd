@@ -880,7 +880,7 @@ export function OstatokDM() {
 
       {viewItem && (
         <Modal title="Просмотр позиции ДМ" onClose={() => setViewItem(null)} footer={<Btn variant="secondary" onClick={() => setViewItem(null)}>Закрыть</Btn>}>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 mb-4">
             <Field label="Наименование" full><Input value={viewItem.name} disabled /></Field>
             <Field label="Номенкл. №"><Input value={viewItem.nomenkl} disabled /></Field>
             <Field label="Класс"><Input value={viewItem.klass} disabled /></Field>
@@ -891,6 +891,16 @@ export function OstatokDM() {
             <Field label="Чистый вес г"><Input value={String(viewItem.netWeight)} disabled /></Field>
             <Field label="Место хранения" full><Input value={viewItem.location} disabled /></Field>
             <Field label="Статус"><Badge label={viewItem.status} /></Field>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Химический состав (в чистоте), г</h4>
+            <div className="grid grid-cols-5 gap-3">
+              <Field label="Au, г"><Input value={viewItem.au ?? "-"} disabled /></Field>
+              <Field label="Ag, г"><Input value={viewItem.ag ?? "-"} disabled /></Field>
+              <Field label="Pd, г"><Input value={viewItem.pd ?? "-"} disabled /></Field>
+              <Field label="Rh, г"><Input value={viewItem.rh ?? "-"} disabled /></Field>
+              <Field label="Pt, г"><Input value={viewItem.pt ?? "-"} disabled /></Field>
+            </div>
           </div>
         </Modal>
       )}
