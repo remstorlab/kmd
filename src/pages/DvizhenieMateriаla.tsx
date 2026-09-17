@@ -402,8 +402,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       footer={readOnly ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
         <>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn variant="secondary" onClick={save}>Сохранить и печать</Btn>
-          <Btn onClick={save}>Сохранить</Btn>
+          <Btn onClick={save}>Оформить</Btn>
+          <Btn variant="secondary" onClick={save}>Сохранить</Btn>
         </>
       )}
     >
