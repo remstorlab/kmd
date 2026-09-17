@@ -59,8 +59,8 @@ interface AuthUser {
 }
 
 const initialAuthUsers: AuthUser[] = [
-  { username: "admin", password: "admin", name: "Е. Ковалева", email: "e.kovaleva@monetka-dm.ru", initials: "ЕК", passwordChangedAt: "2026-05-01", passwordHistory: [] },
-  { username: "nurlanov", password: "1234", name: "А.Б. Нурланов", email: "a.nurlanov@monetka-dm.ru", initials: "АН", passwordChangedAt: "2026-09-01", passwordHistory: [] },
+  { username: "admin", password: "admin", name: "Е. Ковалева", email: "e.kovaleva@kmd.kz", initials: "ЕК", passwordChangedAt: "2026-05-01", passwordHistory: [] },
+  { username: "nurlanov", password: "1234", name: "А.Б. Нурланов", email: "a.nurlanov@kmd.kz", initials: "АН", passwordChangedAt: "2026-09-01", passwordHistory: [] },
 ];
 
 export type Theme = "light" | "dark";
