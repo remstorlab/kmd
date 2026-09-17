@@ -536,19 +536,14 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
       title={isOrder ? "Приходный ордер" : "Накладная на приём ДМ"}
       onClose={onClose}
       extraWide
-      footer={isOrder ? (
+      footer={
         <>
-          <Btn variant="secondary" onClick={() => show("Ярлыки отправлены на печать")}>Печать Ярлыков ДМ</Btn>
-          <Btn variant="secondary" onClick={onSave}>Сохранить</Btn>
-          <Btn onClick={onSave}>Сохранить и печать</Btn>
-        </>
-      ) : (
-        <>
-          <Btn variant="secondary" onClick={() => show("Ярлыки отправлены на печать")}>Сохранить и печать</Btn>
+          <Btn variant="secondary" onClick={() => show("Ярлыки отправлены на печать")}>Печать ярлыков ДМ</Btn>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn onClick={onSave}>Сохранить</Btn>
+          <Btn onClick={onSave}>Оформить</Btn>
+          <Btn variant="secondary" onClick={onSave}>Сохранить</Btn>
         </>
-      )}
+      }
     >
       {isOrder ? (
         <div className="grid grid-cols-3 gap-4 mb-5">
@@ -585,6 +580,10 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
           <Field label="Склад-отправитель"><Select value={head.skladOtpr} options={["СДМ", "Производственный цех"]} onChange={v => setHead(h => ({ ...h, skladOtpr: v }))} /></Field>
           <Field label="Склад-получатель"><Select value={head.skladPoluch} options={["Склад ДМ №1", "Склад ДМ №2"]} onChange={v => setHead(h => ({ ...h, skladPoluch: v }))} /></Field>
           <Field label="Сотрудник склада-получателя" full><Select value={head.sotrudnik} options={["Петров А.Н.", "Ким Александр Юрьевич"]} onChange={v => setHead(h => ({ ...h, sotrudnik: v }))} /></Field>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
+            <Toggle checked={ownProperty} onChange={setOwnProperty} label={ownProperty ? "Да" : "Нет"} />
+          </div>
         </div>
       )}
 
