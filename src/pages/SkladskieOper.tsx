@@ -1,12 +1,12 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
-  ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, FileChip, useConfirm, ConfirmDialog,
+  ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, Badge,
 } from "../components/ui";
 import { SkladDoc, GPItem, DocStatus } from "../data/mock";
-import { Inbox, Send, Repeat, Plus, X, Paperclip, LucideIcon } from "lucide-react";
+import { Inbox, Send, Repeat, Plus, X, LucideIcon } from "lucide-react";
 
 // ── Hub ───────────────────────────────────────────────────────────────────────
 
@@ -328,8 +328,7 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
     schetFaktura: "СФ-2026-0199",
   }));
 
-  const [file, setFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
 
   const [positions, setPositions] = useState<{ nomenkl: string; name: string; code: string; location: string; qty: number }[]>([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -423,23 +422,11 @@ function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: (
       </div>
 
       <div className="mb-4">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документ</h4>
-        {file ? (
-          <div className="flex items-center gap-2">
-            <FileChip name={file.name} onDownload={() => show("Скачивание файла...")} />
-            {!readOnly && (
-              <button onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Удалить файл">
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        ) : readOnly ? (
-          doc ? <FileChip name={`Накладная_${doc.number}.pdf`} onDownload={() => show("Загрузка файла...")} /> : <span className="text-sm text-gray-400">Файл не прикреплён</span>
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
+        {readOnly && files.length === 0 ? (
+          doc ? <FileChip name={`Накладная_${doc.number}.pdf`} onDownload={() => show("Загрузка файла...")} /> : <span className="text-sm text-gray-400">Файлы не прикреплены</span>
         ) : (
-          <>
-            <input ref={fileInputRef} type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
-            <Btn variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}><Paperclip className="w-4 h-4" />Прикрепить файл</Btn>
-          </>
+          <MultiFileUpload files={files} onChange={setFiles} disabled={readOnly} />
         )}
       </div>
 

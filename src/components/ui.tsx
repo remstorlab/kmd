@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Plus } from "lucide-react";
 
 // ── Badge ────────────────────────────────────────────────────────────────────
 
@@ -466,6 +466,58 @@ export function FileChip({ name, onDownload }: { name: string; onDownload: () =>
       <button onClick={onDownload} className="text-gray-400 hover:text-blue-600 transition-colors ml-1">
         <Download className="w-4 h-4" />
       </button>
+    </div>
+  );
+}
+
+// ── MultiFileUpload ───────────────────────────────────────────────────────────
+
+export function MultiFileUpload({
+  files,
+  onChange,
+  accept,
+  disabled = false,
+}: {
+  files: File[];
+  onChange: (files: File[]) => void;
+  accept?: string;
+  disabled?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const addFiles = (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    onChange([...files, ...Array.from(list)]);
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  const removeFile = (idx: number) => onChange(files.filter((_, i) => i !== idx));
+
+  return (
+    <div className="space-y-2">
+      {files.map((f, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <FileChip name={f.name} onDownload={() => {}} />
+          {!disabled && (
+            <button onClick={() => removeFile(i)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Удалить файл">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      ))}
+      {files.length === 0 && disabled && <span className="text-sm text-gray-400">Файлы не прикреплены</span>}
+      {!disabled && (
+        <>
+          <input ref={inputRef} type="file" multiple className="hidden" accept={accept} onChange={e => addFiles(e.target.files)} />
+          <button
+            onClick={() => inputRef.current?.click()}
+            title="Добавить файл"
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-600 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </>
+      )}
     </div>
   );
 }

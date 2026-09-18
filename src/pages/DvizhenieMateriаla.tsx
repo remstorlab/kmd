@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, Tabs, Textarea, FileChip, SortTh, useSort, parseRuDate,
+  Field, Input, Select, Tabs, Textarea, FileChip, MultiFileUpload, SortTh, useSort, parseRuDate,
 } from "../components/ui";
 import { Operation, ShihtovayaKarta } from "../data/mock";
 import { Eye, Plus, Paperclip } from "lucide-react";
@@ -12,16 +12,16 @@ import { Eye, Plus, Paperclip } from "lucide-react";
 
 function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
   const [reason, setReason] = useState("");
-  const [hasFile, setHasFile] = useState(false);
-  const { toast, show, clear } = useToast();
+  const [files, setFiles] = useState<File[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   return (
     <Modal title="Списание разницы" onClose={onClose} footer={
       <>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
         <button
-          onClick={hasFile && reason ? onConfirm : undefined}
-          disabled={!hasFile || !reason}
+          onClick={files.length > 0 && reason ? onConfirm : undefined}
+          disabled={files.length === 0 || !reason}
           className="px-4 py-2 rounded-lg border border-red-500 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Списать разницу
@@ -38,19 +38,19 @@ function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm:
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-2">Акт списания (обязательно)</label>
-        {hasFile ? (
-          <FileChip name="Акт списания ДМ-000123.pdf" onDownload={() => show("Загрузка файла...")} />
-        ) : (
+        {files.length === 0 ? (
           <div
             className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 transition-colors"
-            onClick={() => setHasFile(true)}
+            onClick={() => inputRef.current?.click()}
           >
+            <input ref={inputRef} type="file" multiple className="hidden" onChange={e => { if (e.target.files?.length) setFiles(Array.from(e.target.files)); }} />
             <Paperclip className="w-6 h-6 mx-auto mb-2 text-gray-400" />
             <p className="text-sm text-gray-500">Прикрепите файл акта списания<br /><span className="text-xs text-gray-400">PDF, DOCX — до 10 МБ</span></p>
           </div>
+        ) : (
+          <MultiFileUpload files={files} onChange={setFiles} />
         )}
       </div>
-      {toast && <Toast message={toast} onDone={clear} />}
     </Modal>
   );
 }
