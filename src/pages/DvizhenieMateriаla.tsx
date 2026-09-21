@@ -632,15 +632,11 @@ export function DvizhenieMateriаla() {
   const [viewOp, setViewOp] = useState<Operation | null>(null);
   const [editOp, setEditOp] = useState<Operation | null>(null);
   const [showNew, setShowNew] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<string | null>(null);
   const perPage = 8;
 
   const toggleSelect = (id: string) => {
-    setSelected(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
+    setSelected(prev => (prev === id ? null : id));
   };
 
   useEffect(() => {
@@ -677,7 +673,7 @@ export function DvizhenieMateriаla() {
         breadcrumb={["Движение материала", "Реестр операций"]}
         actions={
           <>
-            <Btn variant="secondary" disabled={selected.size === 0} onClick={() => setShowNew(true)}>Оформить возврат</Btn>
+            <Btn variant="secondary" disabled={!selected} onClick={() => setShowNew(true)}>Оформить возврат</Btn>
             <Btn onClick={() => setShowNew(true)}>Новая операция</Btn>
           </>
         }
@@ -714,9 +710,9 @@ export function DvizhenieMateriаla() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {sorted.slice((page - 1) * perPage, page * perPage).map(op => (
-              <tr key={op.id} className={`hover:bg-gray-50 transition-colors ${selected.has(op.id) ? "bg-blue-50/50" : ""}`}>
+              <tr key={op.id} className={`hover:bg-gray-50 transition-colors ${selected === op.id ? "bg-blue-50/50" : ""}`}>
                 <td className="px-4 py-3">
-                  <input type="checkbox" checked={selected.has(op.id)} onChange={() => toggleSelect(op.id)} className="w-4 h-4 accent-blue-600" />
+                  <input type="checkbox" checked={selected === op.id} onChange={() => toggleSelect(op.id)} className="w-4 h-4 accent-blue-600" />
                 </td>
                 <td className="px-4 py-3 text-gray-500">{op.date}</td>
                 <td className={`px-4 py-3 font-medium ${typeColor[op.type] || "text-gray-700"}`}>{op.type}</td>
