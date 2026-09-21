@@ -632,7 +632,16 @@ export function DvizhenieMateriаla() {
   const [viewOp, setViewOp] = useState<Operation | null>(null);
   const [editOp, setEditOp] = useState<Operation | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const perPage = 8;
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
 
   useEffect(() => {
     if (pageParams.openNew) setShowNew(true);
@@ -668,7 +677,7 @@ export function DvizhenieMateriаla() {
         breadcrumb={["Движение материала", "Реестр операций"]}
         actions={
           <>
-            <Btn variant="secondary" onClick={() => setShowNew(true)}>Оформить возврат</Btn>
+            <Btn variant="secondary" disabled={selected.size === 0} onClick={() => setShowNew(true)}>Оформить возврат</Btn>
             <Btn onClick={() => setShowNew(true)}>Новая операция</Btn>
           </>
         }
@@ -692,6 +701,7 @@ export function DvizhenieMateriаla() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="w-10 px-4 py-3"></th>
               <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
               <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип</SortTh>
               <SortTh sortKey="vid" sort={sort} onSort={toggleSort}>Вид операции</SortTh>
@@ -704,7 +714,10 @@ export function DvizhenieMateriаla() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {sorted.slice((page - 1) * perPage, page * perPage).map(op => (
-              <tr key={op.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={op.id} className={`hover:bg-gray-50 transition-colors ${selected.has(op.id) ? "bg-blue-50/50" : ""}`}>
+                <td className="px-4 py-3">
+                  <input type="checkbox" checked={selected.has(op.id)} onChange={() => toggleSelect(op.id)} className="w-4 h-4 accent-blue-600" />
+                </td>
                 <td className="px-4 py-3 text-gray-500">{op.date}</td>
                 <td className={`px-4 py-3 font-medium ${typeColor[op.type] || "text-gray-700"}`}>{op.type}</td>
                 <td className="px-4 py-3">
