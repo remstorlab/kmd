@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useApp, Page, Lang, daysSince, evaluatePasswordRules } from "../store/AppContext";
 import { Modal, Btn, Field, Input } from "./ui";
 import { Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, Languages, LogOut, KeyRound, ShieldAlert } from "lucide-react";
+import logoKmd from "../assets/logo-kmd.png";
 
 const menuItems: { key: string; page: Page; icon: React.ReactNode }[] = [
   { key: "nav.sklady", page: "sklady-hub", icon: <Warehouse className="w-5 h-5" /> },
@@ -239,8 +240,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-2.5 w-full text-left rounded-lg -m-1 p-1 hover:bg-slate-800 transition-colors"
             title="Перейти на главную"
           >
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-900/50 shrink-0">
-              <span className="text-white font-bold text-sm">Au</span>
+            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-md shadow-blue-900/50 shrink-0 p-1 ring-1 ring-black/5">
+              <img src={logoKmd} alt="КМД" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="text-white font-semibold text-sm leading-tight tracking-tight">СДМ</div>
