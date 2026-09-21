@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useApp, Lang } from "../store/AppContext";
 import { Moon, Sun, User, Lock, Eye, EyeOff, CircleAlert, Loader2 } from "lucide-react";
-import logoKmd from "../assets/logo-kmd.png";
+import { KmdLogo } from "../components/KmdLogo";
 
 export default function Login() {
   const { login, lang, setLang, tr, theme, toggleTheme, sessionEndedReason, clearSessionEndedReason } = useApp();
@@ -74,7 +74,7 @@ export default function Login() {
               {/* Logo */}
               <div className="flex items-center gap-3 mb-8">
                 <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/50 p-1.5 ring-1 ring-black/5">
-                  <img src={logoKmd} alt="КМД" className="w-full h-full object-contain" />
+                  <KmdLogo className="w-full h-full" />
                 </div>
                 <div>
                   <div className="text-white font-bold text-lg leading-tight">{tr("login.title")}</div>
