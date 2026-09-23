@@ -47,6 +47,9 @@ const badgePalette: Record<string, string> = {
   "Преобразован": "bg-purple-100 text-purple-700 border-purple-200",
   "Преобразована": "bg-purple-100 text-purple-700 border-purple-200",
   "Объединена": "bg-purple-100 text-purple-700 border-purple-200",
+
+  "ГП": "bg-blue-100 text-blue-700 border-blue-200",
+  "ДМ": "bg-amber-100 text-amber-700 border-amber-200",
 };
 
 export function Badge({ label }: { label: string }) {

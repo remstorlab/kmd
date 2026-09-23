@@ -57,7 +57,7 @@ function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm:
 
 // ── Добавить позицию ДМ со склада ─────────────────────────────────────────────
 
-type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string };
+type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string; posType: "ГП" | "ДМ" };
 
 function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
   const { dmItems } = useApp();
@@ -84,7 +84,7 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
   const add = () => {
     const chosen = availableItems.filter(i => selected.has(i.id));
     if (chosen.length === 0) return;
-    onAdd(chosen.map(i => ({ name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.netWeight, ag: "-", cu: "-", au: "-", pd: "-", rh: "-", pt: "-", loc: i.location })));
+    onAdd(chosen.map(i => ({ name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.netWeight, ag: "-", cu: "-", au: "-", pd: "-", rh: "-", pt: "-", loc: i.location, posType: "ДМ" as const })));
   };
 
   return (
@@ -139,7 +139,7 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
 // ── Добавить позицию ДМ (новая, вручную) ──────────────────────────────────────
 
 function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
-  const [form, setForm] = useState({ nomenkl: "", klass: "Слиток", name: "", proba: "999", ves: "", au: "-", ag: "-", pd: "-", rh: "-", pt: "-", sey: "Сейф №1", polka: "Полка А" });
+  const [form, setForm] = useState({ posType: "ДМ" as "ГП" | "ДМ", nomenkl: "", klass: "Слиток", name: "", proba: "999", ves: "", au: "-", ag: "-", pd: "-", rh: "-", pt: "-", sey: "Сейф №1", polka: "Полка А" });
 
   const add = () => {
     if (!form.name || !form.nomenkl) return;
@@ -156,6 +156,7 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
       rh: form.rh || "-",
       pt: form.pt || "-",
       loc: `${form.sey}, ${form.polka}`,
+      posType: form.posType,
     }]);
   };
 
@@ -169,6 +170,7 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
       </>}
     >
       <div className="grid grid-cols-3 gap-4 mb-4">
+        <Field label="Позиция"><Select value={form.posType} options={["ГП", "ДМ"]} onChange={v => setForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
         <Field label="Номенкл. номер"><Input value={form.nomenkl} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} placeholder="DM-XXX" /></Field>
         <Field label="Класс"><Select value={form.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
         <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
@@ -309,14 +311,14 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
 
 type TabName = "Выдача" | "Возврат" | "Итого";
 
-const vydachaPositions = [
-  { n: 1, name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, ves: 500.25, ag: "-", cu: "-", loc: "Сейф №1, Полка А" },
-  { n: 2, name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", proba: 585, ves: 45.80, ag: "0.12", cu: "1.20", loc: "Сейф №2, Полка А" },
+const vydachaPositions: OperPosition[] = [
+  { n: 1, name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, ves: 500.25, ag: "-", cu: "-", loc: "Сейф №1, Полка А", posType: "ДМ" },
+  { n: 2, name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", proba: 585, ves: 45.80, ag: "0.12", cu: "1.20", loc: "Сейф №2, Полка А", posType: "ДМ" },
 ];
-const vozvratPositions = [
-  { n: 1, name: "Подкат 30х20", nomenkl: "DM-R01", klass: "Подкат", proba: 999, ves: 480.10, ag: "-", cu: "-", loc: "Сейф №1, Полка Б" },
-  { n: 2, name: "Королёк №1", nomenkl: "DM-R02", klass: "Королёк", proba: 999, ves: 55.60, ag: "-", cu: "-", loc: "Сейф №2, Полка Б" },
-  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Шлак", proba: 500, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка А" },
+const vozvratPositions: OperPosition[] = [
+  { n: 1, name: "Подкат 30х20", nomenkl: "DM-R01", klass: "Подкат", proba: 999, ves: 480.10, ag: "-", cu: "-", loc: "Сейф №1, Полка Б", posType: "ДМ" },
+  { n: 2, name: "Королёк №1", nomenkl: "DM-R02", klass: "Королёк", proba: 999, ves: 55.60, ag: "-", cu: "-", loc: "Сейф №2, Полка Б", posType: "ДМ" },
+  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Шлак", proba: 500, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка А", posType: "ДМ" },
 ];
 
 function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation | null; onClose: () => void; onSave: (o: Operation) => void; readOnly?: boolean }) {
@@ -342,6 +344,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const { sorted: sortedVydacha, sort: vydachaSort, toggleSort: toggleVydachaSort } = useSort(vydacha, {
     name: p => p.name,
     nomenkl: p => p.nomenkl,
+    posType: p => p.posType,
     klass: p => p.klass,
     proba: p => p.proba,
     ves: p => p.ves,
@@ -352,6 +355,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const { sorted: sortedVozvrat, sort: vozvratSort, toggleSort: toggleVozvratSort } = useSort(vozvrat, {
     name: p => p.name,
     nomenkl: p => p.nomenkl,
+    posType: p => p.posType,
     klass: p => p.klass,
     proba: p => p.proba,
     ves: p => p.ves,
@@ -460,6 +464,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               <th className="px-3 py-2 text-left">№</th>
               <SortTh sortKey="name" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="nomenkl" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Номенкл.№</SortTh>
+              <SortTh sortKey="posType" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Позиция</SortTh>
               <SortTh sortKey="klass" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="proba" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Проба</SortTh>
               <SortTh sortKey="ves" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Вес г</SortTh>
@@ -474,6 +479,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 text-gray-400">{p.n}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                  <td className="px-3 py-2"><Badge label={p.posType} /></td>
                   <td className="px-3 py-2">{p.klass}</td>
                   <td className="px-3 py-2">{p.proba}</td>
                   <td className="px-3 py-2 font-medium">{p.ves}</td>
@@ -506,6 +512,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               <th className="px-3 py-2 text-left">№</th>
               <SortTh sortKey="name" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="nomenkl" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Номенкл.№</SortTh>
+              <SortTh sortKey="posType" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Позиция</SortTh>
               <SortTh sortKey="klass" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="proba" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Проба</SortTh>
               <SortTh sortKey="ves" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Вес г</SortTh>
@@ -519,6 +526,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 text-gray-400">{p.n}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                  <td className="px-3 py-2"><Badge label={p.posType} /></td>
                   <td className="px-3 py-2">{p.klass}</td>
                   <td className="px-3 py-2">{p.proba}</td>
                   <td className="px-3 py-2 font-medium">{p.ves}</td>
@@ -608,7 +616,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <ShihtaPickModal
           onClose={() => setShowShihtaPick(false)}
           onPick={k => {
-            appendPositions("vydacha", k.materials.map(m => ({ ...m, ag: "-", cu: "-" })));
+            appendPositions("vydacha", k.materials.map(m => ({ ...m, ag: "-", cu: "-", posType: "ДМ" as const })));
             setHead(h => ({ ...h, plavkaNo: k.plavkaNo }));
             setShowShihtaPick(false);
             show(`Позиции шихтовой карты «${k.name}» добавлены`);

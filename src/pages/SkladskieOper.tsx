@@ -68,14 +68,14 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
 
   // Приходный ордер state
   const [positions, setPositions] = useState([
-    { nomenkl: "DM-001", name: "Слиток золота ЗлА-1", klass: "Слиток", code: "AU", kol: "1", proba: "999", lig: "500.25", net: "498.12", loc: "Сейф №1, Полка А", au: "498.12", ag: "-", pd: "-", rh: "-", pt: "-" },
+    { nomenkl: "DM-001", name: "Слиток золота ЗлА-1", klass: "Слиток", code: "AU", kol: "1", proba: "999", lig: "500.25", net: "498.12", loc: "Сейф №1, Полка А", posType: "ДМ" as "ГП" | "ДМ", au: "498.12", ag: "-", pd: "-", rh: "-", pt: "-" },
   ]);
   const [showAdd, setShowAdd] = useState(false);
-  const emptyForm = { nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А", au: "-", ag: "-", pd: "-", rh: "-", pt: "-" };
+  const emptyForm = { posType: "ДМ" as "ГП" | "ДМ", nomenkl: "DM-001", klass: "Слиток", code: "AU", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А", au: "-", ag: "-", pd: "-", rh: "-", pt: "-" };
   const [form, setForm] = useState(emptyForm);
 
   const addPos = () => {
-    setPositions(p => [...p, { nomenkl: form.nomenkl, name: form.name || "Позиция ДМ", klass: form.klass, code: form.code, kol: form.kol || "1", proba: form.proba, lig: form.lig, net: form.net, loc: `${form.sey}, ${form.polka}`, au: form.au, ag: form.ag, pd: form.pd, rh: form.rh, pt: form.pt }]);
+    setPositions(p => [...p, { nomenkl: form.nomenkl, name: form.name || "Позиция ДМ", klass: form.klass, code: form.code, kol: form.kol || "1", proba: form.proba, lig: form.lig, net: form.net, loc: `${form.sey}, ${form.polka}`, posType: form.posType, au: form.au, ag: form.ag, pd: form.pd, rh: form.rh, pt: form.pt }]);
     setShowAdd(false);
     setForm(emptyForm);
   };
@@ -83,6 +83,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
   const { sorted: sortedPositions, sort: posSort, toggleSort: togglePosSort } = useSort(positions, {
     nomenkl: p => p.nomenkl,
     name: p => p.name,
+    posType: p => p.posType,
     klass: p => p.klass,
     code: p => p.code,
     kol: p => parseFloat(p.kol) || 0,
@@ -94,20 +95,21 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
 
   // Накладная state
   const [nakladPositions, setNakladPositions] = useState([
-    { nomenkl: "DM-005", name: "Слиток серебра СрБ-3", kol: "1", klass: "Слиток", code: "AG", loc: "Сейф №2, Полка Б" },
+    { nomenkl: "DM-005", name: "Слиток серебра СрБ-3", kol: "1", klass: "Слиток", code: "AG", loc: "Сейф №2, Полка Б", posType: "ДМ" as "ГП" | "ДМ" },
   ]);
   const [showAddNaklad, setShowAddNaklad] = useState(false);
-  const [nakladForm, setNakladForm] = useState({ nomenkl: "", klass: "Слиток", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+  const [nakladForm, setNakladForm] = useState({ posType: "ДМ" as "ГП" | "ДМ", nomenkl: "", klass: "Слиток", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
 
   const addNakladPos = () => {
-    setNakladPositions(p => [...p, { nomenkl: nakladForm.nomenkl || `DM-${Math.floor(Math.random() * 900 + 100)}`, name: nakladForm.name || "Позиция ДМ", kol: nakladForm.kol || "0", klass: nakladForm.klass, code: nakladForm.code, loc: `${nakladForm.sey}, ${nakladForm.polka}` }]);
+    setNakladPositions(p => [...p, { nomenkl: nakladForm.nomenkl || `DM-${Math.floor(Math.random() * 900 + 100)}`, name: nakladForm.name || "Позиция ДМ", kol: nakladForm.kol || "0", klass: nakladForm.klass, code: nakladForm.code, loc: `${nakladForm.sey}, ${nakladForm.polka}`, posType: nakladForm.posType }]);
     setShowAddNaklad(false);
-    setNakladForm({ nomenkl: "", klass: "Слиток", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+    setNakladForm({ posType: "ДМ", nomenkl: "", klass: "Слиток", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
   };
 
   const { sorted: sortedNakladPositions, sort: nakladPosSort, toggleSort: toggleNakladPosSort } = useSort(nakladPositions, {
     nomenkl: p => p.nomenkl,
     name: p => p.name,
+    posType: p => p.posType,
     kol: p => parseFloat(p.kol) || 0,
     klass: p => p.klass,
     code: p => p.code,
@@ -203,6 +205,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <SortTh sortKey="nomenkl" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Номенкл.№</SortTh>
               <SortTh sortKey="name" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Наименование</SortTh>
+              <SortTh sortKey="posType" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Позиция</SortTh>
               <SortTh sortKey="klass" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Код</SortTh>
               <SortTh sortKey="kol" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Кол-во</SortTh>
@@ -217,6 +220,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
+                  <td className="px-3 py-2"><Badge label={p.posType} /></td>
                   <td className="px-3 py-2">{p.klass}</td>
                   <td className="px-3 py-2 text-blue-600">{p.code}</td>
                   <td className="px-3 py-2">{p.kol}</td>
@@ -245,6 +249,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <SortTh sortKey="nomenkl" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Номенкл.№</SortTh>
               <SortTh sortKey="name" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Наименование</SortTh>
+              <SortTh sortKey="posType" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Позиция</SortTh>
               <SortTh sortKey="kol" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Кол-во</SortTh>
               <SortTh sortKey="klass" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Код материала</SortTh>
@@ -256,6 +261,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
+                  <td className="px-3 py-2"><Badge label={p.posType} /></td>
                   <td className="px-3 py-2">{p.kol}</td>
                   <td className="px-3 py-2">{p.klass}</td>
                   <td className="px-3 py-2 font-medium">{p.code}</td>
@@ -273,6 +279,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
       {showAdd && (
         <Modal title="Добавить позицию ДМ" onClose={() => setShowAdd(false)} footer={<><Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn><Btn onClick={addPos}>Добавить</Btn></>}>
           <div className="grid grid-cols-3 gap-4 mb-4">
+            <Field label="Позиция"><Select value={form.posType} options={["ГП", "ДМ"]} onChange={v => setForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
             <Field label="Номенкл. номер"><Select value={form.nomenkl} options={["DM-001", "DM-002", "DM-003", "DM-004"]} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} /></Field>
             <Field label="Класс"><Select value={form.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Код материала"><Select value={form.code} options={["AU", "AG", "PT", "PD"]} onChange={v => setForm(f => ({ ...f, code: v }))} /></Field>
@@ -300,6 +307,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
       {showAddNaklad && (
         <Modal title="Добавить позицию ДМ" onClose={() => setShowAddNaklad(false)} footer={<><Btn variant="secondary" onClick={() => setShowAddNaklad(false)}>Отмена</Btn><Btn onClick={addNakladPos}>Добавить</Btn></>}>
           <div className="grid grid-cols-2 gap-4">
+            <Field label="Позиция"><Select value={nakladForm.posType} options={["ГП", "ДМ"]} onChange={v => setNakladForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
             <Field label="Номенкл. номер"><Input value={nakladForm.nomenkl} onChange={v => setNakladForm(f => ({ ...f, nomenkl: v }))} placeholder="DM-XXX" /></Field>
             <Field label="Класс"><Select value={nakladForm.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setNakladForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Код материала"><Select value={nakladForm.code} options={["AU-585", "AU-750", "AU-999", "AG-925", "PT-950"]} onChange={v => setNakladForm(f => ({ ...f, code: v }))} /></Field>
