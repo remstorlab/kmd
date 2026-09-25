@@ -6,7 +6,7 @@ import {
   Field, Input, Select, Tabs, Textarea, FileChip, MultiFileUpload, SortTh, useSort, parseRuDate,
 } from "../components/ui";
 import { Operation, ShihtovayaKarta } from "../data/mock";
-import { Eye, Plus, Paperclip } from "lucide-react";
+import { Eye, Plus, Paperclip, Upload, Download } from "lucide-react";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
 
@@ -310,7 +310,8 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
 // ── Списание потерь (с промежуточными взвешиваниями для Производства ГП) ─────
 
 type LossKind = "Безвозвратные" | "Возвратные";
-type LossRow = { id: string; name: string; kind: LossKind; ves: string; toVozvrat?: boolean };
+type LossRow = { id: string; date: string; name: string; kind: LossKind; ves: string; toVozvrat?: boolean };
+type SpisanieDoc = { id: string; name: string; size: number; docType: string; uploaded: string };
 // Промежуточное взвешивание: позицию приносят на весы, фиксируют вес и потери,
 // но на склад не сдают — она уходит на следующий этап в рамках той же выдачи.
 type WeighStage = { id: string; etap: string; datetime: string; vesOut: string; losses: LossRow[] };
@@ -322,17 +323,30 @@ const num = (s: string) => parseFloat(String(s).replace(",", ".")) || 0;
 const fmt = (v: number) => v.toFixed(2);
 const nowStr = () => new Date().toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 const uid = () => Math.random().toString(36).slice(2, 9);
-const newLoss = (): LossRow => ({ id: uid(), name: "", kind: "Безвозвратные", ves: "" });
+// Дата строки потерь хранится в ISO (yyyy-mm-dd) для <input type="date">, показывается в формате ru-RU.
+const todayIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const isoToRu = (iso: string) => (iso ? iso.split("-").reverse().join(".") : "");
+const newLoss = (): LossRow => ({ id: uid(), date: todayIso(), name: "", kind: "Безвозвратные", ves: "" });
+
+const docTypes = ["Акт списания", "Акт взвешивания", "Служебная записка", "Протокол", "Прочее"];
+const fmtSize = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
+const seedDocs: SpisanieDoc[] = [
+  { id: "d1", name: "Акт_списания_угар_18082026.pdf", size: 412_000, docType: "Акт списания", uploaded: "18.08.2026, 16:05" },
+  { id: "d2", name: "Скан_взвешивание_этап1.jpg", size: 1_850_000, docType: "Акт взвешивания", uploaded: "18.08.2026, 10:52" },
+];
 const newStage = (etap = ""): WeighStage => ({ id: uid(), etap, datetime: nowStr(), vesOut: "", losses: [newLoss()] });
 
 const seedGpStages: WeighStage[] = [
   { id: "s1", etap: "Прокатка", datetime: "18.08.2026, 10:40", vesOut: "544.90", losses: [
-    { id: "l1", name: "Угар", kind: "Безвозвратные", ves: "0.35" },
-    { id: "l2", name: "Обрезь", kind: "Возвратные", ves: "0.80" },
+    { id: "l1", date: "2026-08-18", name: "Угар", kind: "Безвозвратные", ves: "0.35" },
+    { id: "l2", date: "2026-08-18", name: "Обрезь", kind: "Возвратные", ves: "0.80" },
   ] },
   { id: "s2", etap: "Вырубка кружков", datetime: "18.08.2026, 15:10", vesOut: "544.10", losses: [
-    { id: "l3", name: "Опилки", kind: "Возвратные", ves: "0.60" },
-    { id: "l4", name: "Шлиф-пыль", kind: "Безвозвратные", ves: "0.15" },
+    { id: "l3", date: "2026-08-18", name: "Опилки", kind: "Возвратные", ves: "0.60" },
+    { id: "l4", date: "2026-08-18", name: "Шлиф-пыль", kind: "Безвозвратные", ves: "0.15" },
   ] },
 ];
 
@@ -347,6 +361,7 @@ function LossTable({ losses, readOnly, onChange }: { losses: LossRow[]; readOnly
       <table className="w-full text-sm">
         <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
           <th className="px-3 py-2 text-left w-10">№</th>
+          <th className="px-3 py-2 text-left w-44">Дата</th>
           <th className="px-3 py-2 text-left">Наименование потерь</th>
           <th className="px-3 py-2 text-left w-48">Вид потерь</th>
           <th className="px-3 py-2 text-left w-36">Вес потерь, г</th>
@@ -356,6 +371,15 @@ function LossTable({ losses, readOnly, onChange }: { losses: LossRow[]; readOnly
           {losses.map((l, i) => (
             <tr key={l.id} className="hover:bg-gray-50">
               <td className="px-3 py-2 text-gray-400">{i + 1}</td>
+              <td className="px-3 py-1.5">
+                <input
+                  type="date"
+                  value={l.date}
+                  onChange={e => upd(l.id, { date: e.target.value })}
+                  disabled={readOnly || l.toVozvrat}
+                  className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                />
+              </td>
               <td className="px-3 py-1.5">
                 <input
                   list="loss-names"
@@ -376,7 +400,7 @@ function LossTable({ losses, readOnly, onChange }: { losses: LossRow[]; readOnly
             </tr>
           ))}
           {losses.length === 0 && (
-            <tr><td colSpan={5} className="px-3 py-3 text-center text-xs text-gray-400">Потери не указаны</td></tr>
+            <tr><td colSpan={6} className="px-3 py-3 text-center text-xs text-gray-400">Потери не указаны</td></tr>
           )}
         </tbody>
       </table>
@@ -392,9 +416,93 @@ function LossTable({ losses, readOnly, onChange }: { losses: LossRow[]; readOnly
   );
 }
 
-function SpisanieTab({ stages, setStages, isGP, vesStart, readOnly, onTransferVozvrat }: {
+function SpisanieDocs({ docs, setDocs, readOnly, onDownload }: {
+  docs: SpisanieDoc[];
+  setDocs: React.Dispatch<React.SetStateAction<SpisanieDoc[]>>;
+  readOnly: boolean;
+  onDownload: (d: SpisanieDoc) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [drag, setDrag] = useState(false);
+
+  const addFiles = (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    const ts = nowStr();
+    setDocs(prev => [...prev, ...Array.from(list).map(f => ({
+      id: uid(), name: f.name, size: f.size, uploaded: ts,
+      docType: /акт/i.test(f.name) ? "Акт списания" : "Прочее",
+    }))]);
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  return (
+    <div className="mt-6 border border-gray-200 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200">
+        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Документы списания{docs.length > 0 && ` (${docs.length})`}</span>
+        <span className="text-xs text-gray-400">Сканы актов, служебные записки и прочее</span>
+      </div>
+      <div className="p-4">
+        {docs.length > 0 && (
+          <table className="w-full text-sm mb-3">
+            <thead><tr className="text-gray-500 text-xs border-b border-gray-200">
+              <th className="px-3 py-2 text-left">Файл</th>
+              <th className="px-3 py-2 text-left w-56">Тип документа</th>
+              <th className="px-3 py-2 text-left w-24">Размер</th>
+              <th className="px-3 py-2 text-left w-40">Загружен</th>
+              <th className="w-16"></th>
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {docs.map(d => (
+                <tr key={d.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Paperclip className="w-4 h-4 text-gray-400 shrink-0" />
+                      <span className="truncate text-gray-800" title={d.name}>{d.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <Select value={d.docType} options={docTypes} onChange={v => setDocs(prev => prev.map(x => (x.id === d.id ? { ...x, docType: v } : x)))} disabled={readOnly} />
+                  </td>
+                  <td className="px-3 py-1.5 text-gray-500">{fmtSize(d.size)}</td>
+                  <td className="px-3 py-1.5 text-gray-500">{d.uploaded}</td>
+                  <td className="px-2 py-1.5">
+                    <div className="flex items-center">
+                      <button onClick={() => onDownload(d)} className="text-gray-400 hover:text-blue-600 transition-colors p-1" title="Скачать"><Download className="w-4 h-4" /></button>
+                      {!readOnly && <DeleteIcon onClick={() => setDocs(prev => prev.filter(x => x.id !== d.id))} />}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {readOnly ? (
+          docs.length === 0 && <span className="text-sm text-gray-400">Документы не прикреплены</span>
+        ) : (
+          <div
+            onClick={() => inputRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={e => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
+            className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${drag ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"}`}
+          >
+            <input ref={inputRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.tif,.tiff" className="hidden" onChange={e => addFiles(e.target.files)} />
+            <Upload className="w-6 h-6 mx-auto mb-2 text-gray-400" />
+            <p className="text-sm text-gray-600">Перетащите файлы сюда или <span className="text-blue-600 font-medium">выберите на компьютере</span></p>
+            <p className="text-xs text-gray-400 mt-1">Можно несколько файлов · PDF, DOC/DOCX, JPG, PNG, TIFF — до 10 МБ каждый</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SpisanieTab({ stages, setStages, docs, setDocs, isGP, vesStart, readOnly, onTransferVozvrat, onDownload }: {
   stages: WeighStage[];
   setStages: React.Dispatch<React.SetStateAction<WeighStage[]>>;
+  docs: SpisanieDoc[];
+  setDocs: React.Dispatch<React.SetStateAction<SpisanieDoc[]>>;
+  onDownload: (d: SpisanieDoc) => void;
   isGP: boolean;
   vesStart: number;
   readOnly: boolean;
@@ -498,6 +606,8 @@ function SpisanieTab({ stages, setStages, isGP, vesStart, readOnly, onTransferVo
           )}
         </>
       )}
+
+      <SpisanieDocs docs={docs} setDocs={setDocs} readOnly={readOnly} onDownload={onDownload} />
     </>
   );
 }
@@ -523,6 +633,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [vydacha, setVydacha] = useState<OperPosition[]>(op ? vydachaPositions : []);
   const [vozvrat, setVozvrat] = useState<OperPosition[]>(op ? vozvratPositions : []);
   const [stages, setStages] = useState<WeighStage[]>(() => (op?.vid === "Производство ГП" ? seedGpStages : [newStage()]));
+  const [spisanieDocs, setSpisanieDocs] = useState<SpisanieDoc[]>(() => (op?.vid === "Производство ГП" ? seedDocs : []));
   const [showSpisanie, setShowSpisanie] = useState(false);
   const [showAddDM, setShowAddDM] = useState(false);
   const [showVozvratPick, setShowVozvratPick] = useState(false);
@@ -757,6 +868,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <SpisanieTab
           stages={stages}
           setStages={setStages}
+          docs={spisanieDocs}
+          setDocs={setSpisanieDocs}
+          onDownload={d => show(`Загрузка файла «${d.name}»...`)}
           isGP={vid === "Производство ГП"}
           vesStart={vesVydacha}
           readOnly={readOnly}
@@ -820,7 +934,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                 <div className="text-xs font-semibold text-gray-500 uppercase mt-4 mb-2">Списание потерь</div>
                 {stages.flatMap(st => st.losses.filter(l => !l.toVozvrat && num(l.ves) > 0).map(l => ({ st, l }))).map(({ st, l }) => (
                   <div key={l.id} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-                    <div className="text-sm text-gray-900">{l.name || "Без наименования"} {st.etap && <span className="text-gray-400 text-xs">{st.etap}</span>}</div>
+                    <div className="text-sm text-gray-900">{l.name || "Без наименования"} <span className="text-gray-400 text-xs">{[isoToRu(l.date), st.etap].filter(Boolean).join(" · ")}</span></div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-gray-600">{l.ves} г</span>
                       <Badge label={l.kind} />
