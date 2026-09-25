@@ -61,10 +61,12 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   ];
 
   const save = () => {
+    // Сохранение исправленной карты «На редактировании» возвращает её в «Новая» — снова доступна для плавки.
     const k: ShihtovayaKarta = karta ? {
       ...karta,
       name: name || karta.name,
       plavkaNo: plavkaNo || karta.plavkaNo,
+      ...(karta.status === "На редактировании" ? { status: "Новая" as const, vydannyePozicii: undefined } : {}),
     } : {
       id: `sk-${Date.now()}`,
       date: new Date().toLocaleDateString("ru-RU"),
@@ -87,6 +89,14 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
         <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={save}>Сохранить карту</Btn></>
       )}
     >
+      {karta?.status === "На редактировании" && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 mb-5 text-sm text-orange-800">
+          <div className="font-medium mb-0.5">⚠ Карта на редактировании — недоступна для плавки</div>
+          Зарезервированные позиции выданы в другой операции: {(karta.vydannyePozicii ?? []).join(", ") || "—"}.
+          {!ro && " Замените их и сохраните карту — она вернётся в статус «Новая»."}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 mb-5">
         <Field label="Наименование" full><Input value={name} onChange={setName} placeholder="Наименование шихты" disabled={ro} /></Field>
         <Field label="Номер плавки"><Input value={plavkaNo} onChange={setPlavkaNo} placeholder="П-2026-XXXX" disabled={ro} /></Field>

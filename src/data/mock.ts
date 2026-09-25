@@ -5,7 +5,7 @@ export type OpType = "Выдача" | "Возврат" | "Выдача-Возв�
 export type OpVid = "Отбор пробы" | "Анализ в ЛКИ" | "Плавка" | "Гальванопокрытие" | "Производство ГП";
 export type UserStatus = "Активен" | "Заблокирован";
 export type LogType = "Создание" | "Изменение" | "Удаление" | "Закрытие";
-export type ShihtaStatus = "Новая" | "Выполнена";
+export type ShihtaStatus = "Новая" | "На редактировании" | "Выполнена";
 
 export interface GPItem {
   id: string;
@@ -86,6 +86,8 @@ export interface ShihtovayaKarta {
   name: string;
   plavkaNo: string;
   status: ShihtaStatus;
+  // Позиции ДМ из резерва карты, выданные в другой операции (причина статуса «На редактировании»).
+  vydannyePozicii?: string[];
   materials: ShihtaMaterial[];
   createdAt: string;
   createdBy: string;
@@ -224,9 +226,9 @@ export const initialGPItems: GPItem[] = [
 
 // --- DM Items ---
 export const initialDMItems: DMItem[] = [
-  { id: "dm1", name: "Слиток золота ЗлА-1", nomenkl: "5015371", klass: "Слиток", metal: "Au чистое-1000", qty: 1, proba: 999, ligWeight: 500.25, netWeight: 498.12, location: "Сейф №1, Полка 1", status: "На складе", au: "498.12", ag: "-", pd: "-", rh: "-", pt: "-" },
+  { id: "dm1", name: "Слиток золота ЗлА-1", nomenkl: "5015371", klass: "Слиток", metal: "Au чистое-1000", qty: 1, proba: 999, ligWeight: 500.25, netWeight: 498.12, location: "Сейф №1, Полка 1", status: "Резерв", au: "498.12", ag: "-", pd: "-", rh: "-", pt: "-" },
   { id: "dm2", name: "Слиток серебра СрА-2", nomenkl: "5015372", klass: "Слиток", metal: "Ag чистое-2000", qty: 1, proba: 999, ligWeight: 1000.50, netWeight: 998.30, location: "Сейф №1, Полка 2", status: "На складе", au: "-", ag: "998.30", pd: "-", rh: "-", pt: "-" },
-  { id: "dm3", name: "Стружка золотая", nomenkl: "5015373", klass: "Стружка", metal: "Au чистое-1000", qty: 1, proba: 585, ligWeight: 45.80, netWeight: 26.79, location: "Сейф №2, Полка 1", status: "На складе", au: "26.79", ag: "-", pd: "-", rh: "-", pt: "-" },
+  { id: "dm3", name: "Стружка золотая", nomenkl: "5015373", klass: "Стружка", metal: "Au чистое-1000", qty: 1, proba: 585, ligWeight: 45.80, netWeight: 26.79, location: "Сейф №2, Полка 1", status: "Резерв", au: "26.79", ag: "-", pd: "-", rh: "-", pt: "-" },
   { id: "dm4", name: "Проба золота Au-750", nomenkl: "5015374", klass: "Проба", metal: "Au чистое-1000", qty: 1, proba: 750, ligWeight: 12.30, netWeight: 9.22, location: "Сейф №2, Полка 3", status: "Резерв", au: "9.22", ag: "-", pd: "-", rh: "-", pt: "-" },
   { id: "dm5", name: "Раствор серебра AgNO3", nomenkl: "5015375", klass: "Раствор", metal: "Ag чистое-2000", qty: 1, proba: 999, ligWeight: 250.00, netWeight: 249.10, location: "Сейф №3, Полка 1", status: "В подотчёте", au: "-", ag: "249.10", pd: "-", rh: "-", pt: "-" },
   { id: "dm6", name: "Слиток платины ПлА-1", nomenkl: "5015376", klass: "Слиток", metal: "Pt чистое-4000", qty: 1, proba: 999, ligWeight: 300.00, netWeight: 299.50, location: "Сейф №1, Полка 3", status: "На складе", au: "-", ag: "-", pd: "-", rh: "-", pt: "299.50" },
@@ -264,15 +266,16 @@ export const initialShihtovyeKarty: ShihtovayaKarta[] = [
   {
     id: "sk1", date: "19.08.2026", name: "Шихта для плавки Au-585 (партия А)", plavkaNo: "П-2026-0089", status: "Новая",
     materials: [
-      { name: "Слиток золота ЗлА-1", nomenkl: "5015371", klass: "Слиток", proba: 999, ves: 500.25, loc: "Сейф №1, Полка А" },
-      { name: "Стружка золотая", nomenkl: "5015373", klass: "Стружка", proba: 585, ves: 45.80, loc: "Сейф №2, Полка А" },
+      { name: "Слиток золота ЗлА-1", nomenkl: "5015371", klass: "Слиток", proba: 999, ves: 500.25, loc: "Сейф №1, Полка 1" },
+      { name: "Стружка золотая", nomenkl: "5015373", klass: "Стружка", proba: 585, ves: 45.80, loc: "Сейф №2, Полка 1" },
     ],
     createdAt: "2026-08-19T09:12:00", createdBy: "Ковалева Елена",
   },
   {
     id: "sk2", date: "15.08.2026", name: "Шихта золото 750 пробы", plavkaNo: "П-2026-0088", status: "Новая",
     materials: [
-      { name: "Слиток золота 750", nomenkl: "DM-010", klass: "Слиток", proba: 750, ves: 320.00, loc: "Сейф №1, Полка Б" },
+      { name: "Проба золота Au-750", nomenkl: "5015374", klass: "Проба", proba: 750, ves: 12.30, loc: "Сейф №2, Полка 3" },
+      { name: "Золотой порошок Au", nomenkl: "5015378", klass: "Порошок", proba: 999, ves: 25.00, loc: "Сейф №3, Полка 3" },
     ],
     createdAt: "2026-08-15T14:45:00", createdBy: "Нурланов Асхат Бекович",
   },

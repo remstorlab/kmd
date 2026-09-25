@@ -60,9 +60,14 @@ function SpisanieModal({ delta, onClose, onConfirm }: { delta: number; onClose: 
 type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string; posType: "ГП" | "ДМ" };
 
 function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
-  const { dmItems } = useApp();
+  const { dmItems, shihtovyeKarty } = useApp();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const availableItems = dmItems.filter(i => i.status === "На складе");
+  // Позиции в резерве тоже можно выдать — тогда шихтовая карта, которая их резервирует, уйдёт «На редактировании».
+  const availableItems = dmItems.filter(i => i.status === "На складе" || i.status === "Резерв");
+  const reservedBy = (nomenkl: string) => shihtovyeKarty.find(k => k.status === "Новая" && k.materials.some(m => m.nomenkl === nomenkl));
+  const affectedKarty = [...new Set(
+    availableItems.filter(i => selected.has(i.id) && i.status === "Резерв").map(i => reservedBy(i.nomenkl)?.name).filter(Boolean),
+  )];
 
   const { sorted, sort, toggleSort } = useSort(availableItems, {
     name: i => i.name,
@@ -112,10 +117,12 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
               <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый вес г</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
+              <th className="px-3 py-2 text-left">Статус</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {sorted.map(i => {
                 const checked = selected.has(i.id);
+                const karta = i.status === "Резерв" ? reservedBy(i.nomenkl) : undefined;
                 return (
                   <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
                     <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(i.id)} className="w-4 h-4 accent-blue-600" /></td>
@@ -125,11 +132,20 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
                     <td className="px-3 py-2">{i.proba}</td>
                     <td className="px-3 py-2">{i.netWeight}</td>
                     <td className="px-3 py-2 text-gray-500">{i.location}</td>
+                    <td className="px-3 py-2">
+                      <Badge label={i.status} />
+                      {karta && <div className="text-xs text-gray-400 mt-0.5" title={karta.name}>ШК {karta.plavkaNo}</div>}
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      )}
+      {affectedKarty.length > 0 && (
+        <div className="mt-3 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm text-orange-800">
+          ⚠ Выбраны позиции из резерва. После выдачи шихтовая карта {affectedKarty.map(n => `«${n}»`).join(", ")} перейдёт в статус «На редактировании» и станет недоступна для плавки.
         </div>
       )}
     </Modal>
@@ -638,6 +654,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [showAddDM, setShowAddDM] = useState(false);
   const [showVozvratPick, setShowVozvratPick] = useState(false);
   const [showShihtaPick, setShowShihtaPick] = useState(false);
+  const [pickedShihtaId, setPickedShihtaId] = useState<string | null>(null);
+  const { dmItems, setDmItems, setShihtovyeKarty } = useApp();
   const { toast, show, clear } = useToast();
 
   const appendPositions = (target: "vydacha" | "vozvrat", rows: Omit<OperPosition, "n">[]) => {
@@ -702,7 +720,27 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     : !inNorm && !raznicaSpisana ? `Дельта ${deltaSign}${fmt(Math.abs(delta))} г превышает допуск ±5 г — спишите разницу во вкладке «Итого»`
     : null;
 
+  // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
+  // эта карта переходит «На редактировании» и пропадает из выбора ШК для плавки.
+  const applyVydacha = () => {
+    const vydanoNomenkl = new Set(vydacha.filter(p => p.posType === "ДМ").map(p => p.nomenkl));
+    const izRezerva = dmItems.filter(i => i.status === "Резерв" && vydanoNomenkl.has(i.nomenkl));
+    setDmItems(prev => prev.map(i => (vydanoNomenkl.has(i.nomenkl) && i.status !== "В подотчёте" ? { ...i, status: "В подотчёте" } : i)));
+    if (izRezerva.length === 0) return;
+    const rezNomenkl = new Set(izRezerva.map(i => i.nomenkl));
+    const zatronuty: string[] = [];
+    setShihtovyeKarty(prev => prev.map(k => {
+      if (k.id === pickedShihtaId || k.status === "Выполнена") return k;
+      const hit = k.materials.filter(m => rezNomenkl.has(m.nomenkl)).map(m => m.name);
+      if (hit.length === 0) return k;
+      zatronuty.push(k.name);
+      return { ...k, status: "На редактировании", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
+    }));
+    if (zatronuty.length) show(`Шихтовая карта ${zatronuty.map(n => `«${n}»`).join(", ")} переведена «На редактировании»`);
+  };
+
   const save = (oformit = false) => {
+    applyVydacha();
     const o: Operation = {
       id: op?.id || `op-${Date.now()}`,
       date: head.date,
@@ -770,10 +808,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           {!readOnly && (
             <div className="flex gap-2 mb-3">
               {vid === "Плавка" ? (
-                <>
-                  <Btn size="sm" onClick={() => setShowShihtaPick(true)}><Plus className="w-4 h-4" />Выдать по ШК</Btn>
-                  <Btn size="sm" variant="secondary" onClick={() => setShowAddDM(true)}><Plus className="w-4 h-4" />Добавить</Btn>
-                </>
+                // Для плавки состав выдачи определяет только шихтовая карта.
+                <Btn size="sm" onClick={() => setShowShihtaPick(true)}><Plus className="w-4 h-4" />Выдать по ШК</Btn>
               ) : (
                 <Btn size="sm" onClick={() => setShowAddDM(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               )}
@@ -979,6 +1015,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           onPick={k => {
             appendPositions("vydacha", k.materials.map(m => ({ ...m, ag: "-", cu: "-", posType: "ДМ" as const })));
             setHead(h => ({ ...h, plavkaNo: k.plavkaNo }));
+            setPickedShihtaId(k.id);
             setShowShihtaPick(false);
             show(`Позиции шихтовой карты «${k.name}» добавлены`);
           }}
