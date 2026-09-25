@@ -44,6 +44,12 @@ const badgePalette: Record<string, string> = {
   "Не закрыто": "bg-gray-100 text-gray-600 border-gray-200",
   "Закрытие": "bg-gray-100 text-gray-600 border-gray-200",
 
+  "Возвращено в обработку": "bg-blue-100 text-blue-700 border-blue-200",
+  "Безвозвратные": "bg-red-100 text-red-700 border-red-200",
+  "Возвратные": "bg-amber-100 text-amber-700 border-amber-200",
+  "Разница списана": "bg-gray-100 text-gray-600 border-gray-200",
+  "Передано в возврат":"bg-purple-100 text-purple-700 border-purple-200",
+
   "Преобразован": "bg-purple-100 text-purple-700 border-purple-200",
   "Преобразована": "bg-purple-100 text-purple-700 border-purple-200",
   "Объединена": "bg-purple-100 text-purple-700 border-purple-200",

@@ -10,7 +10,7 @@ import { Eye, Plus, Paperclip } from "lucide-react";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
 
-function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
+function SpisanieModal({ delta, onClose, onConfirm }: { delta: number; onClose: () => void; onConfirm: () => void }) {
   const [reason, setReason] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,7 +30,7 @@ function SpisanieModal({ onClose, onConfirm }: { onClose: () => void; onConfirm:
     }>
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex items-center gap-2 mb-4 text-sm">
         <span className="text-yellow-600">⚠</span>
-        <span className="text-yellow-800 font-medium">Превышение допустимой дельты: +2.35 г</span>
+        <span className="text-yellow-800 font-medium">Превышение допустимой дельты: {delta >= 0 ? "+" : "−"}{Math.abs(delta).toFixed(2)} г</span>
       </div>
       <div className="mb-4">
         <label className="block text-xs font-medium text-gray-500 mb-1">Причина списания</label>
@@ -307,9 +307,204 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
   );
 }
 
+// ── Списание потерь (с промежуточными взвешиваниями для Производства ГП) ─────
+
+type LossKind = "Безвозвратные" | "Возвратные";
+type LossRow = { id: string; name: string; kind: LossKind; ves: string; toVozvrat?: boolean };
+// Промежуточное взвешивание: позицию приносят на весы, фиксируют вес и потери,
+// но на склад не сдают — она уходит на следующий этап в рамках той же выдачи.
+type WeighStage = { id: string; etap: string; datetime: string; vesOut: string; losses: LossRow[] };
+
+const lossNames = ["Угар", "Обрезь", "Высечка", "Опилки", "Стружка", "Шлиф-пыль", "Смывы (травление)", "Безвозвратные потери"];
+const gpEtapy = ["Прокатка", "Отжиг", "Вырубка кружков", "Гуртовка", "Травление", "Гальтовка", "Чеканка", "Полировка", "Другое"];
+
+const num = (s: string) => parseFloat(String(s).replace(",", ".")) || 0;
+const fmt = (v: number) => v.toFixed(2);
+const nowStr = () => new Date().toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const uid = () => Math.random().toString(36).slice(2, 9);
+const newLoss = (): LossRow => ({ id: uid(), name: "", kind: "Безвозвратные", ves: "" });
+const newStage = (etap = ""): WeighStage => ({ id: uid(), etap, datetime: nowStr(), vesOut: "", losses: [newLoss()] });
+
+const seedGpStages: WeighStage[] = [
+  { id: "s1", etap: "Прокатка", datetime: "18.08.2026, 10:40", vesOut: "544.90", losses: [
+    { id: "l1", name: "Угар", kind: "Безвозвратные", ves: "0.35" },
+    { id: "l2", name: "Обрезь", kind: "Возвратные", ves: "0.80" },
+  ] },
+  { id: "s2", etap: "Вырубка кружков", datetime: "18.08.2026, 15:10", vesOut: "544.10", losses: [
+    { id: "l3", name: "Опилки", kind: "Возвратные", ves: "0.60" },
+    { id: "l4", name: "Шлиф-пыль", kind: "Безвозвратные", ves: "0.15" },
+  ] },
+];
+
+const sumLosses = (stages: WeighStage[], pred: (l: LossRow) => boolean = () => true) =>
+  stages.reduce((s, st) => s + st.losses.filter(pred).reduce((a, l) => a + num(l.ves), 0), 0);
+
+function LossTable({ losses, readOnly, onChange }: { losses: LossRow[]; readOnly: boolean; onChange: (rows: LossRow[]) => void }) {
+  const upd = (id: string, patch: Partial<LossRow>) => onChange(losses.map(l => (l.id === id ? { ...l, ...patch } : l)));
+  return (
+    <>
+      <datalist id="loss-names">{lossNames.map(n => <option key={n} value={n} />)}</datalist>
+      <table className="w-full text-sm">
+        <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+          <th className="px-3 py-2 text-left w-10">№</th>
+          <th className="px-3 py-2 text-left">Наименование потерь</th>
+          <th className="px-3 py-2 text-left w-48">Вид потерь</th>
+          <th className="px-3 py-2 text-left w-36">Вес потерь, г</th>
+          {!readOnly && <th className="w-10"></th>}
+        </tr></thead>
+        <tbody className="divide-y divide-gray-100">
+          {losses.map((l, i) => (
+            <tr key={l.id} className="hover:bg-gray-50">
+              <td className="px-3 py-2 text-gray-400">{i + 1}</td>
+              <td className="px-3 py-1.5">
+                <input
+                  list="loss-names"
+                  value={l.name}
+                  onChange={e => upd(l.id, { name: e.target.value })}
+                  disabled={readOnly || l.toVozvrat}
+                  placeholder="Выберите или введите"
+                  className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                />
+              </td>
+              <td className="px-3 py-1.5">
+                {l.toVozvrat
+                  ? <Badge label="Передано в возврат" />
+                  : <Select value={l.kind} options={["Безвозвратные", "Возвратные"]} onChange={v => upd(l.id, { kind: v as LossKind })} disabled={readOnly} />}
+              </td>
+              <td className="px-3 py-1.5"><Input value={l.ves} onChange={v => upd(l.id, { ves: v })} placeholder="0.00" disabled={readOnly || l.toVozvrat} /></td>
+              {!readOnly && <td className="px-2 py-1.5">{!l.toVozvrat && <DeleteIcon onClick={() => onChange(losses.filter(x => x.id !== l.id))} />}</td>}
+            </tr>
+          ))}
+          {losses.length === 0 && (
+            <tr><td colSpan={5} className="px-3 py-3 text-center text-xs text-gray-400">Потери не указаны</td></tr>
+          )}
+        </tbody>
+      </table>
+      {!readOnly && (
+        <button
+          onClick={() => onChange([...losses, newLoss()])}
+          className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <Plus className="w-4 h-4" />Добавить потерю
+        </button>
+      )}
+    </>
+  );
+}
+
+function SpisanieTab({ stages, setStages, isGP, vesStart, readOnly, onTransferVozvrat }: {
+  stages: WeighStage[];
+  setStages: React.Dispatch<React.SetStateAction<WeighStage[]>>;
+  isGP: boolean;
+  vesStart: number;
+  readOnly: boolean;
+  onTransferVozvrat: (rows: LossRow[]) => void;
+}) {
+  const updStage = (id: string, patch: Partial<WeighStage>) => setStages(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
+
+  const total = sumLosses(stages);
+  const bezv = sumLosses(stages, l => l.kind === "Безвозвратные");
+  const vozv = total - bezv;
+  const pendingVozv = stages.flatMap(s => s.losses).filter(l => l.kind === "Возвратные" && !l.toVozvrat && num(l.ves) > 0);
+  const lastWeighed = [...stages].reverse().find(s => s.vesOut);
+  const vesInWork = isGP && lastWeighed ? num(lastWeighed.vesOut) : vesStart - total;
+
+  const transfer = () => {
+    const ids = new Set(pendingVozv.map(l => l.id));
+    onTransferVozvrat(pendingVozv);
+    setStages(prev => prev.map(s => ({ ...s, losses: s.losses.map(l => (ids.has(l.id) ? { ...l, toVozvrat: true } : l)) })));
+  };
+
+  return (
+    <>
+      {/* Сводка */}
+      <div className="grid grid-cols-4 gap-3 mb-4">
+        {[
+          { label: "Выдано в работу", value: vesStart },
+          { label: "Списано всего", value: total },
+          { label: "в т.ч. безвозвратные / возвратные", value: null, text: `${fmt(bezv)} / ${fmt(vozv)} г` },
+          { label: isGP ? "Вес в работе (посл. взвешивание)" : "Остаток в работе", value: vesInWork },
+        ].map(c => (
+          <div key={c.label} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+            <div className="text-xs text-gray-500">{c.label}</div>
+            <div className="text-base font-semibold text-gray-900">{c.text ?? `${fmt(c.value!)} г`}</div>
+          </div>
+        ))}
+      </div>
+
+      {!readOnly && pendingVozv.length > 0 && (
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mb-4 text-sm">
+          <span className="text-amber-800">Возвратные отходы ({fmt(pendingVozv.reduce((a, l) => a + num(l.ves), 0))} г) можно оприходовать на склад ДМ через вкладку «Возврат»</span>
+          <Btn size="sm" variant="secondary" onClick={transfer}>Передать в возврат</Btn>
+        </div>
+      )}
+
+      {!isGP ? (
+        <LossTable losses={stages[0]?.losses ?? []} readOnly={readOnly} onChange={rows => stages[0] && updStage(stages[0].id, { losses: rows })} />
+      ) : (
+        <>
+          <div className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-4">
+            Промежуточное взвешивание фиксирует вес и потери после этапа обработки <b>без сдачи на склад</b>: позиция остаётся в подотчёте и уходит на следующий этап.
+            Вес на входе этапа = вес предыдущего взвешивания (для первого — вес выдачи).
+          </div>
+          <div className="space-y-4">
+            {stages.map((st, i) => {
+              const vesIn = i === 0 ? vesStart : num(stages[i - 1].vesOut);
+              const hasOut = st.vesOut.trim() !== "";
+              const ubyl = hasOut ? vesIn - num(st.vesOut) : null;
+              const uchteno = st.losses.reduce((a, l) => a + num(l.ves), 0);
+              const neuchteno = ubyl !== null ? ubyl - uchteno : null;
+              const ok = neuchteno !== null && Math.abs(neuchteno) < 0.005;
+              const isLast = i === stages.length - 1;
+              return (
+                <div key={st.id} className="border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Взвешивание №{i + 1}{st.etap && <span className="normal-case font-medium text-gray-900">— {st.etap}</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge label={isLast ? "В работе" : "Возвращено в обработку"} />
+                      {!readOnly && stages.length > 1 && <DeleteIcon onClick={() => setStages(prev => prev.filter(s => s.id !== st.id))} />}
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-4 gap-3 mb-4">
+                      <Field label="Этап обработки"><Select value={st.etap} options={["", ...gpEtapy]} onChange={v => updStage(st.id, { etap: v })} disabled={readOnly} /></Field>
+                      <Field label="Дата и время"><Input value={st.datetime} onChange={v => updStage(st.id, { datetime: v })} disabled={readOnly} /></Field>
+                      <Field label="Вес на входе, г"><Input value={fmt(vesIn)} disabled /></Field>
+                      <Field label="Вес при взвешивании, г"><Input value={st.vesOut} onChange={v => updStage(st.id, { vesOut: v })} placeholder="0.00" disabled={readOnly} /></Field>
+                    </div>
+                    <LossTable losses={st.losses} readOnly={readOnly} onChange={rows => updStage(st.id, { losses: rows })} />
+                    <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm border-t border-gray-100 pt-3">
+                      <span className="text-gray-500">Убыль по весам: <b className="text-gray-900">{ubyl !== null ? `${fmt(ubyl)} г` : "—"}</b></span>
+                      <span className="text-gray-500">Учтено потерь: <b className="text-gray-900">{fmt(uchteno)} г</b></span>
+                      {neuchteno !== null && (
+                        <span className={ok ? "text-green-700" : "text-yellow-700"}>
+                          {ok ? "✓ Потери сходятся с весом" : `⚠ Неучтённая разница: ${neuchteno >= 0 ? "+" : "−"}${fmt(Math.abs(neuchteno))} г`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {!readOnly && (
+            <div className="mt-4">
+              <Btn size="sm" variant="secondary" onClick={() => setStages(prev => [...prev, newStage()])}>
+                <Plus className="w-4 h-4" />Промежуточное взвешивание
+              </Btn>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
 // ── Operation modal ───────────────────────────────────────────────────────────
 
-type TabName = "Выдача" | "Возврат" | "Итого";
+type TabName = "Выдача" | "Возврат" | "Списание" | "Итого";
 
 const vydachaPositions: OperPosition[] = [
   { n: 1, name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, ves: 500.25, ag: "-", cu: "-", loc: "Сейф №1, Полка А", posType: "ДМ" },
@@ -327,6 +522,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [type, setType] = useState<"Выдача" | "Возврат" | "Выдача-Возврат">(op?.type || "Выдача");
   const [vydacha, setVydacha] = useState<OperPosition[]>(op ? vydachaPositions : []);
   const [vozvrat, setVozvrat] = useState<OperPosition[]>(op ? vozvratPositions : []);
+  const [stages, setStages] = useState<WeighStage[]>(() => (op?.vid === "Производство ГП" ? seedGpStages : [newStage()]));
   const [showSpisanie, setShowSpisanie] = useState(false);
   const [showAddDM, setShowAddDM] = useState(false);
   const [showVozvratPick, setShowVozvratPick] = useState(false);
@@ -378,11 +574,24 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   // Blank options list for a brand-new operation so pickers start unselected.
   const withBlank = (opts: string[]) => (op ? opts : ["", ...opts]);
 
-  const delta = -10.35;
-  const deltaSign = delta >= 0 ? "+" : "";
+  const vesVydacha = vydacha.reduce((a, p) => a + p.ves, 0);
+  const vesVozvrat = vozvrat.reduce((a, p) => a + p.ves, 0);
+  // Возвратные отходы, уже переданные во вкладку «Возврат», учтены там — не считаем дважды.
+  const vesSpisano = sumLosses(stages, l => !l.toVozvrat);
+  const delta = +(vesVozvrat + vesSpisano - vesVydacha).toFixed(2);
+  const deltaSign = delta >= 0 ? "+" : "−";
   const inNorm = Math.abs(delta) <= 5;
 
-  const save = () => {
+  // Дельта, на которую оформлен акт «Списать разницу». Действует, только пока дельта не изменилась.
+  const [spisanaRaznica, setSpisanaRaznica] = useState<number | null>(() => (op?.statusClose === "Закрыто: списано" ? delta : null));
+  const raznicaSpisana = spisanaRaznica !== null && spisanaRaznica === delta;
+
+  const oformitBlock =
+    vozvrat.length === 0 ? "Добавьте позиции во вкладке «Возврат»"
+    : !inNorm && !raznicaSpisana ? `Дельта ${deltaSign}${fmt(Math.abs(delta))} г превышает допуск ±5 г — спишите разницу во вкладке «Итого»`
+    : null;
+
+  const save = (oformit = false) => {
     const o: Operation = {
       id: op?.id || `op-${Date.now()}`,
       date: head.date,
@@ -392,8 +601,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       document: head.document,
       responsible: head.responsible,
       statusVydacha: "Выдано",
-      statusVozvrat: "Не начат",
-      statusClose: "Не закрыто",
+      statusVozvrat: oformit ? "Полностью" : vozvrat.length > 0 ? "Частично" : "Не начат",
+      statusClose: !oformit ? "Не закрыто" : !inNorm ? "Закрыто: списано" : "Закрыто",
     };
     onSave(o);
   };
@@ -405,9 +614,10 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       extraWide
       footer={readOnly ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
         <>
+          {oformitBlock && <span className="mr-auto self-center text-xs text-yellow-700">⚠ Оформление недоступно: {oformitBlock}</span>}
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn onClick={save}>Оформить</Btn>
-          <Btn variant="secondary" onClick={save}>Сохранить</Btn>
+          <Btn onClick={() => save(true)} disabled={!!oformitBlock}>Оформить</Btn>
+          <Btn variant="secondary" onClick={() => save()}>Сохранить</Btn>
         </>
       )}
     >
@@ -442,7 +652,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       </div>
 
       {/* Tabs */}
-      <Tabs tabs={["Выдача", "Возврат", "Итого"]} active={tab} onChange={t => setTab(t as TabName)} />
+      <Tabs tabs={["Выдача", "Возврат", "Списание", "Итого"]} active={tab} onChange={t => setTab(t as TabName)} />
 
       {tab === "Выдача" && (
         <>
@@ -543,16 +753,34 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         </>
       )}
 
+      {tab === "Списание" && (
+        <SpisanieTab
+          stages={stages}
+          setStages={setStages}
+          isGP={vid === "Производство ГП"}
+          vesStart={vesVydacha}
+          readOnly={readOnly}
+          onTransferVozvrat={rows => {
+            appendPositions("vozvrat", rows.map(l => ({
+              name: `${l.name || "Отходы"} (возвратные)`, nomenkl: "—", klass: "Отходы", proba: vydacha[0]?.proba ?? 0,
+              ves: num(l.ves), ag: "-", cu: "-", loc: "—", posType: "ДМ" as const,
+            })));
+            show("Возвратные отходы добавлены во вкладку «Возврат»");
+          }}
+        />
+      )}
+
       {tab === "Итого" && (
         <>
           <div className={`flex items-center justify-between rounded-lg px-4 py-3 mb-5 border ${inNorm ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}>
             <div className="flex items-center gap-2">
               <span className={inNorm ? "text-green-600" : "text-yellow-600"}>{inNorm ? "✓" : "⚠"}</span>
               <span className={`font-medium text-sm ${inNorm ? "text-green-800" : "text-yellow-800"}`}>
-                Дельта: {deltaSign}{Math.abs(delta)} г (допуск: ±5 г) {inNorm ? "— В норме!" : "— Превышение!"}
+                Дельта: {deltaSign}{fmt(Math.abs(delta))} г (допуск: ±5 г) {inNorm ? "— В норме!" : "— Превышение!"}
               </span>
             </div>
-            {!inNorm && (
+            {!inNorm && raznicaSpisana && <Badge label="Разница списана" />}
+            {!inNorm && !raznicaSpisana && !readOnly && (
               <button
                 onClick={() => setShowSpisanie(true)}
                 className="px-3 py-1.5 border border-red-500 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
@@ -588,6 +816,24 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   </div>
                 </div>
               ))}
+              {vesSpisano > 0 && <>
+                <div className="text-xs font-semibold text-gray-500 uppercase mt-4 mb-2">Списание потерь</div>
+                {stages.flatMap(st => st.losses.filter(l => !l.toVozvrat && num(l.ves) > 0).map(l => ({ st, l }))).map(({ st, l }) => (
+                  <div key={l.id} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
+                    <div className="text-sm text-gray-900">{l.name || "Без наименования"} {st.etap && <span className="text-gray-400 text-xs">{st.etap}</span>}</div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-600">{l.ves} г</span>
+                      <Badge label={l.kind} />
+                    </div>
+                  </div>
+                ))}
+              </>}
+              <div className="mt-4 pt-3 border-t border-gray-200 grid grid-cols-4 gap-3 text-sm">
+                <div><span className="text-gray-500">Выдано:</span> <b>{fmt(vesVydacha)} г</b></div>
+                <div><span className="text-gray-500">Возврат:</span> <b>{fmt(vesVozvrat)} г</b></div>
+                <div><span className="text-gray-500">Списано:</span> <b>{fmt(vesSpisano)} г</b></div>
+                <div><span className="text-gray-500">Дельта:</span> <b>{deltaSign}{fmt(Math.abs(delta))} г</b></div>
+              </div>
             </div>
           </div>
         </>
@@ -595,8 +841,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
       {showSpisanie && (
         <SpisanieModal
+          delta={delta}
           onClose={() => setShowSpisanie(false)}
-          onConfirm={() => { setShowSpisanie(false); show("Разница списана"); onSave({ ...op!, statusClose: "Закрыто: списано" }); }}
+          onConfirm={() => { setShowSpisanie(false); setSpisanaRaznica(delta); show("Разница списана — операцию можно оформить"); }}
         />
       )}
       {showAddDM && (
