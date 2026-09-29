@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Plus } from "lucide-react";
-import { initialMaterialClasses } from "../data/mock";
+import { initialMaterialClasses, initialMaterialCodes } from "../data/mock";
 
 // ── Badge ────────────────────────────────────────────────────────────────────
 
@@ -379,6 +379,13 @@ export function Select({ value, onChange, options, disabled = false }: { value: 
 // Выпадающий список «Класс материала» для форм ввода: полные наименования из справочника.
 export function KlassSelect({ value, onChange, disabled = false, allLabel }: { value: string; onChange?: (v: string) => void; disabled?: boolean; allLabel?: string }) {
   const names = initialMaterialClasses.map(c => c.name);
+  const options = [...(allLabel ? [allLabel] : []), ...(value && value !== allLabel && !names.includes(value) ? [value] : []), ...names];
+  return <Select value={value} onChange={onChange} options={options} disabled={disabled} />;
+}
+
+// Выпадающий список «Код материала»: краткие наименования из справочника «Коды материалов».
+export function MaterialCodeSelect({ value, onChange, disabled = false, allLabel }: { value: string; onChange?: (v: string) => void; disabled?: boolean; allLabel?: string }) {
+  const names = initialMaterialCodes.map(c => c.shortName);
   const options = [...(allLabel ? [allLabel] : []), ...(value && value !== allLabel && !names.includes(value) ? [value] : []), ...names];
   return <Select value={value} onChange={onChange} options={options} disabled={disabled} />;
 }

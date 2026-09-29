@@ -3,10 +3,14 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, KlassCode, FileChip, Toggle, SortTh, useSort,
+  Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, FileChip, Toggle, SortTh, useSort,
 } from "../components/ui";
-import { GPItem, DMItem } from "../data/mock";
+import { GPItem, DMItem, isGPKlass } from "../data/mock";
 import { Gem, Coins, Plus } from "lucide-react";
+
+// Приведение позиций между учётами ГП и ДМ — для разделения складов по классу материала.
+const dmToGp = (i: DMItem): GPItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, qty: i.qty, unit: "шт", klass: i.klass, code: i.metal, location: i.location, status: i.status });
+const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: 0, ligWeight: 0, netWeight: 0, location: i.location, status: i.status });
 
 // ── Склады ХАБ ───────────────────────────────────────────────────────────────
 
@@ -57,9 +61,9 @@ function GPViewModal({ item, onClose }: { item: GPItem; onClose: () => void }) {
 // ── Принять на склад GP modal ─────────────────────────────────────────────────
 
 function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [items, setItems] = useState<{ name: string; qty: string; klass: string; code: string; posType: "ГП" | "ДМ" }[]>([]);
+  const [items, setItems] = useState<{ name: string; qty: string; klass: string; code: string }[]>([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ posType: "ГП" as "ГП" | "ДМ", name: "", nomenkl: "", klass: "Готовая продукция", code: "AU-585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+  const [form, setForm] = useState({ name: "", nomenkl: "", klass: "Готовая продукция", code: "ЗлМ 585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
   const [head, setHead] = useState(() => ({
     number: `НП-${Math.floor(Math.random() * 900 + 100)}`,
     date: new Date().toLocaleDateString("ru-RU"),
@@ -70,14 +74,13 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
   }));
 
   const addItem = () => {
-    setItems(prev => [...prev, { name: form.name || "Позиция ГП", qty: form.qty, klass: form.klass, code: form.code, posType: form.posType }]);
+    setItems(prev => [...prev, { name: form.name || "Позиция ГП", qty: form.qty, klass: form.klass, code: form.code }]);
     setShowAdd(false);
-    setForm({ posType: "ГП", name: "", nomenkl: "", klass: "Готовая продукция", code: "AU-585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+    setForm({ name: "", nomenkl: "", klass: "Готовая продукция", code: "ЗлМ 585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
   };
 
   const { sorted: sortedItems, sort: itemsSort, toggleSort: toggleItemsSort } = useSort(items, {
     name: it => it.name,
-    posType: it => it.posType,
     qty: it => parseFloat(it.qty) || 0,
     klass: it => it.klass,
     code: it => it.code,
@@ -119,7 +122,6 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs">
               <SortTh sortKey="name" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="posType" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Позиция</SortTh>
               <SortTh sortKey="qty" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Кол-во</SortTh>
               <SortTh sortKey="klass" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Код</SortTh>
@@ -127,7 +129,6 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
             <tbody>{sortedItems.map((it, i) => (
               <tr key={i} className="border-t border-gray-100">
                 <td className="px-3 py-2">{it.name}</td>
-                <td className="px-3 py-2"><Badge label={it.posType} /></td>
                 <td className="px-3 py-2">{it.qty} шт</td>
                 <td className="px-3 py-2"><KlassCode value={it.klass} /></td>
                 <td className="px-3 py-2 text-blue-600">{it.code}</td>
@@ -145,10 +146,9 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
           </>
         }>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Позиция"><Select value={form.posType} options={["ГП", "ДМ"]} onChange={v => setForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
             <Field label="Номенкл. номер"><Select value={form.nomenkl || "GP-KOL-585-01"} options={["GP-KOL-585-01", "GP-CEP-750-03", "GP-SER-585-07"]} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} /></Field>
             <Field label="Класс"><KlassSelect value={form.klass} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
-            <Field label="Код материала"><Select value={form.code} options={["AU-585", "AU-750", "AU-999", "AG-925", "PT-950"]} onChange={v => setForm(f => ({ ...f, code: v }))} /></Field>
+            <Field label="Код материала"><MaterialCodeSelect value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} /></Field>
             <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Введите наименование" /></Field>
             <Field label="Количество"><Input value={form.qty} onChange={v => setForm(f => ({ ...f, qty: v }))} placeholder="0" /></Field>
             <Field label="Ед. изм."><Select value={form.unit} options={["шт", "г", "кг"]} onChange={v => setForm(f => ({ ...f, unit: v }))} /></Field>
@@ -260,7 +260,9 @@ function VydachaGPModal({ gpItems, onClose, onSave }: { gpItems: GPItem[]; onClo
 // ── Остатки на складе ГП ──────────────────────────────────────────────────────
 
 export function OstatokGP() {
-  const { gpItems, setGpItems, navigate } = useApp();
+  const { gpItems, setGpItems, dmItems, navigate } = useApp();
+  // Склад ГП: все позиции с классом «Готовая продукция», в том числе из учёта ДМ.
+  const skladItems = [...gpItems, ...dmItems.map(dmToGp)].filter(it => isGPKlass(it.klass));
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
 
@@ -276,10 +278,10 @@ export function OstatokGP() {
 
   const perPage = 8;
 
-  const filtered = gpItems.filter(it => {
+  const filtered = skladItems.filter(it => {
     const matchSearch = !search || it.name.toLowerCase().includes(search.toLowerCase());
     const matchSklad = filterSklad === "Все склады" || filterSklad === "Склад ГП";
-    const matchCode = filterCode === "Все коды" || it.code.startsWith(filterCode.replace(" (все)", ""));
+    const matchCode = filterCode === "Все коды" || it.code === filterCode;
     const matchStatus = filterStatus === "Все статусы" || it.status === filterStatus;
     return matchSearch && matchSklad && matchCode && matchStatus;
   });
@@ -340,9 +342,7 @@ export function OstatokGP() {
         </div>
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Код материала</label>
-          <select value={filterCode} onChange={e => setFilterCode(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {["Все коды", "AU", "AG", "PT", "PD"].map(o => <option key={o}>{o}</option>)}
-          </select>
+          <MaterialCodeSelect value={filterCode} onChange={setFilterCode} allLabel="Все коды" />
         </div>
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
@@ -398,7 +398,7 @@ export function OstatokGP() {
       {showPrihod && <PrihodGPModal onClose={() => setShowPrihod(false)} onSave={() => { setShowPrihod(false); show("Накладная сохранена"); }} />}
       {showVydacha && (
         <VydachaGPModal
-          gpItems={gpItems}
+          gpItems={skladItems}
           onClose={() => setShowVydacha(false)}
           onSave={() => { setShowVydacha(false); show("Выдача оформлена"); }}
         />
@@ -486,22 +486,21 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
   // Приходный ордер state
   const [ownProperty, setOwnProperty] = useState(true);
   const [orderPositions, setOrderPositions] = useState([
-    { nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au", kol: "1", proba: "999.9", lig: "1000.0", net: "999.9", loc: "Сейф 1/Полка 1", posType: "ДМ" as "ГП" | "ДМ" },
-    { nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag", kol: "1", proba: "925.0", lig: "318.6", net: "294.7", loc: "Сейф 2/Полка 3", posType: "ДМ" as "ГП" | "ДМ" },
+    { nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au чистое", kol: "1", proba: "999.9", lig: "1000.0", net: "999.9", loc: "Сейф 1/Полка 1" },
+    { nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag чистое", kol: "1", proba: "925.0", lig: "318.6", net: "294.7", loc: "Сейф 2/Полка 3" },
   ]);
   const [showAddOrder, setShowAddOrder] = useState(false);
-  const [orderForm, setOrderForm] = useState({ posType: "ДМ" as "ГП" | "ДМ", nomenkl: "НН-72103", klass: "Слиток", code: "Au", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
+  const [orderForm, setOrderForm] = useState({ nomenkl: "НН-72103", klass: "Слиток", code: "Au чистое", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
 
   const addOrderPos = () => {
-    setOrderPositions(p => [...p, { nomenkl: orderForm.nomenkl, name: orderForm.name || "Позиция ДМ", klass: orderForm.klass, code: orderForm.code, kol: orderForm.kol || "1", proba: orderForm.proba, lig: orderForm.lig, net: orderForm.net, loc: `${orderForm.sey}, ${orderForm.polka}`, posType: orderForm.posType }]);
+    setOrderPositions(p => [...p, { nomenkl: orderForm.nomenkl, name: orderForm.name || "Позиция ДМ", klass: orderForm.klass, code: orderForm.code, kol: orderForm.kol || "1", proba: orderForm.proba, lig: orderForm.lig, net: orderForm.net, loc: `${orderForm.sey}, ${orderForm.polka}` }]);
     setShowAddOrder(false);
-    setOrderForm({ posType: "ДМ", nomenkl: "НН-72103", klass: "Слиток", code: "Au", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
+    setOrderForm({ nomenkl: "НН-72103", klass: "Слиток", code: "Au чистое", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
   };
 
   const { sorted: sortedOrderPositions, sort: orderPosSort, toggleSort: toggleOrderPosSort } = useSort(orderPositions, {
     nomenkl: p => p.nomenkl,
     name: p => p.name,
-    posType: p => p.posType,
     klass: p => p.klass,
     code: p => p.code,
     kol: p => parseFloat(p.kol) || 0,
@@ -513,22 +512,21 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
 
   // Накладная state
   const [nakladPositions, setNakladPositions] = useState([
-    { nomenkl: "AU-SL-12000", name: "Монета Атамекен", kol: "2000", klass: "Готовая продукция", code: "200", loc: "Сейф №1, Полка 5", posType: "ГП" as "ГП" | "ДМ" },
-    { nomenkl: "AU-SL-01000", name: "Орден Алтын алка", kol: "300", klass: "Готовая продукция", code: "200", loc: "Сейф №1, Полка 7", posType: "ГП" as "ГП" | "ДМ" },
+    { nomenkl: "AU-SL-12000", name: "Монета Атамекен", kol: "2000", klass: "Готовая продукция", code: "Ag чистое", loc: "Сейф №1, Полка 5" },
+    { nomenkl: "AU-SL-01000", name: "Орден Алтын алка", kol: "300", klass: "Готовая продукция", code: "Ag чистое", loc: "Сейф №1, Полка 7" },
   ]);
   const [showAddNaklad, setShowAddNaklad] = useState(false);
-  const [nakladForm, setNakladForm] = useState({ posType: "ГП" as "ГП" | "ДМ", nomenkl: "", klass: "Готовая продукция", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+  const [nakladForm, setNakladForm] = useState({ nomenkl: "", klass: "Готовая продукция", code: "ЗлМ 585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
 
   const addNakladPos = () => {
-    setNakladPositions(p => [...p, { nomenkl: nakladForm.nomenkl || `AU-SL-${Math.floor(Math.random() * 90000 + 10000)}`, name: nakladForm.name || "Позиция ДМ", kol: nakladForm.kol || "0", klass: nakladForm.klass, code: nakladForm.code, loc: `${nakladForm.sey}, ${nakladForm.polka}`, posType: nakladForm.posType }]);
+    setNakladPositions(p => [...p, { nomenkl: nakladForm.nomenkl || `AU-SL-${Math.floor(Math.random() * 90000 + 10000)}`, name: nakladForm.name || "Позиция ДМ", kol: nakladForm.kol || "0", klass: nakladForm.klass, code: nakladForm.code, loc: `${nakladForm.sey}, ${nakladForm.polka}` }]);
     setShowAddNaklad(false);
-    setNakladForm({ posType: "ГП", nomenkl: "", klass: "Готовая продукция", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+    setNakladForm({ nomenkl: "", klass: "Готовая продукция", code: "ЗлМ 585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
   };
 
   const { sorted: sortedNakladPositions, sort: nakladPosSort, toggleSort: toggleNakladPosSort } = useSort(nakladPositions, {
     nomenkl: p => p.nomenkl,
     name: p => p.name,
-    posType: p => p.posType,
     kol: p => parseFloat(p.kol) || 0,
     klass: p => p.klass,
     code: p => p.code,
@@ -614,7 +612,6 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <SortTh sortKey="nomenkl" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Номенкл. №</SortTh>
               <SortTh sortKey="name" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="posType" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Позиция</SortTh>
               <SortTh sortKey="klass" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Код материала</SortTh>
               <SortTh sortKey="kol" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Кол-во</SortTh>
@@ -629,7 +626,6 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
-                  <td className="px-3 py-2"><Badge label={p.posType} /></td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{p.code}</td>
                   <td className="px-3 py-2">{p.kol}</td>
@@ -662,7 +658,6 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <SortTh sortKey="nomenkl" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Номенкл. №</SortTh>
               <SortTh sortKey="name" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="posType" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Позиция</SortTh>
               <SortTh sortKey="kol" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Кол-во</SortTh>
               <SortTh sortKey="klass" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Код материала</SortTh>
@@ -674,7 +669,6 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
-                  <td className="px-3 py-2"><Badge label={p.posType} /></td>
                   <td className="px-3 py-2">{p.kol}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 font-medium">{p.code}</td>
@@ -701,10 +695,9 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
           </>
         }>
           <div className="grid grid-cols-3 gap-4">
-            <Field label="Позиция"><Select value={orderForm.posType} options={["ГП", "ДМ"]} onChange={v => setOrderForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
             <Field label="Номенкл. номер"><Input value={orderForm.nomenkl} onChange={v => setOrderForm(f => ({ ...f, nomenkl: v }))} /></Field>
             <Field label="Класс"><KlassSelect value={orderForm.klass} onChange={v => setOrderForm(f => ({ ...f, klass: v }))} /></Field>
-            <Field label="Код материала"><Select value={orderForm.code} options={["Au", "Ag", "Pt", "Pd"]} onChange={v => setOrderForm(f => ({ ...f, code: v }))} /></Field>
+            <Field label="Код материала"><MaterialCodeSelect value={orderForm.code} onChange={v => setOrderForm(f => ({ ...f, code: v }))} /></Field>
             <Field label="Наименование" full><Input value={orderForm.name} onChange={v => setOrderForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
             <Field label="Количество"><Input value={orderForm.kol} onChange={v => setOrderForm(f => ({ ...f, kol: v }))} placeholder="1" /></Field>
             <Field label="Проба"><Input value={orderForm.proba} onChange={v => setOrderForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
@@ -724,10 +717,9 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
           </>
         }>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Позиция"><Select value={nakladForm.posType} options={["ГП", "ДМ"]} onChange={v => setNakladForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
             <Field label="Номенкл. номер"><Input value={nakladForm.nomenkl} onChange={v => setNakladForm(f => ({ ...f, nomenkl: v }))} placeholder="AU-SL-XXXXX" /></Field>
             <Field label="Класс"><KlassSelect value={nakladForm.klass} onChange={v => setNakladForm(f => ({ ...f, klass: v }))} /></Field>
-            <Field label="Код материала"><Select value={nakladForm.code} options={["AU-585", "AU-750", "AU-999", "AG-925", "PT-950"]} onChange={v => setNakladForm(f => ({ ...f, code: v }))} /></Field>
+            <Field label="Код материала"><MaterialCodeSelect value={nakladForm.code} onChange={v => setNakladForm(f => ({ ...f, code: v }))} /></Field>
             <Field label="Наименование" full><Input value={nakladForm.name} onChange={v => setNakladForm(f => ({ ...f, name: v }))} placeholder="Введите наименование" /></Field>
             <Field label="Количество"><Input value={nakladForm.kol} onChange={v => setNakladForm(f => ({ ...f, kol: v }))} placeholder="0" /></Field>
             <Field label="Ед. изм."><Select value={nakladForm.unit} options={["шт", "г", "кг"]} onChange={v => setNakladForm(f => ({ ...f, unit: v }))} /></Field>
@@ -841,7 +833,9 @@ function VydachaDMModal({ dmItems, onClose, onSave }: { dmItems: DMItem[]; onClo
 // ── Остатки на складе ДМ ──────────────────────────────────────────────────────
 
 export function OstatokDM() {
-  const { dmItems, setDmItems } = useApp();
+  const { dmItems, setDmItems, gpItems, setGpItems } = useApp();
+  // Склад ДМ: все позиции, класс которых не «Готовая продукция», в том числе из учёта ГП.
+  const skladItems = [...dmItems, ...gpItems.map(gpToDm)].filter(it => !isGPKlass(it.klass));
   const { toast, show, clear } = useToast();
   const [search, setSearch] = useState("");
   const [filterKlass, setFilterKlass] = useState("Все классы");
@@ -854,7 +848,7 @@ export function OstatokDM() {
   const [showVydacha, setShowVydacha] = useState(false);
 
   const perPage = 8;
-  const filtered = dmItems.filter(it => {
+  const filtered = skladItems.filter(it => {
     const matchSearch = !search || it.name.toLowerCase().includes(search.toLowerCase());
     const matchKlass = filterKlass === "Все классы" || it.klass === filterKlass;
     const matchStatus = filterStatus === "Все статусы" || it.status === filterStatus;
@@ -882,7 +876,7 @@ export function OstatokDM() {
     });
   };
 
-  const selectedItems = dmItems.filter(it => selected.has(it.id));
+  const selectedItems = skladItems.filter(it => selected.has(it.id));
 
   const doMerge = () => {
     const totalLig = selectedItems.reduce((s, i) => s + i.ligWeight, 0);
@@ -903,6 +897,7 @@ export function OstatokDM() {
       status: "На складе",
     };
     setDmItems(prev => [...prev.filter(it => !selected.has(it.id)), merged]);
+    setGpItems(prev => prev.filter(it => !selected.has(it.id)));
     setSelected(new Set());
     setShowMerge(false);
     show("Позиции объединены");
@@ -1020,7 +1015,7 @@ export function OstatokDM() {
       )}
       {showVydacha && (
         <VydachaDMModal
-          dmItems={dmItems}
+          dmItems={skladItems}
           onClose={() => setShowVydacha(false)}
           onSave={() => { setShowVydacha(false); show("Выдача оформлена"); }}
         />

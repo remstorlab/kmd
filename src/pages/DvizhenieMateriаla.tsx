@@ -5,7 +5,7 @@ import {
   ExportBtn, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, KlassSelect, KlassCode, Tabs, Textarea, FileChip, MultiFileUpload, SortTh, useSort, parseRuDate,
 } from "../components/ui";
-import { Operation, ShihtovayaKarta } from "../data/mock";
+import { Operation, ShihtovayaKarta, isGPKlass } from "../data/mock";
 import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
@@ -57,13 +57,13 @@ function SpisanieModal({ delta, onClose, onConfirm }: { delta: number; onClose: 
 
 // ── Добавить позицию ДМ со склада ─────────────────────────────────────────────
 
-type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string; posType: "ГП" | "ДМ" };
+type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string };
 
 function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
   const { dmItems, shihtovyeKarty } = useApp();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Позиции в резерве тоже можно выдать — тогда шихтовая карта, которая их резервирует, уйдёт «На редактировании».
-  const availableItems = dmItems.filter(i => i.status === "На складе" || i.status === "Резерв");
+  const availableItems = dmItems.filter(i => !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв"));
   const reservedBy = (nomenkl: string) => shihtovyeKarty.find(k => k.status === "Новая" && k.materials.some(m => m.nomenkl === nomenkl));
   const affectedKarty = [...new Set(
     availableItems.filter(i => selected.has(i.id) && i.status === "Резерв").map(i => reservedBy(i.nomenkl)?.name).filter(Boolean),
@@ -89,7 +89,7 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
   const add = () => {
     const chosen = availableItems.filter(i => selected.has(i.id));
     if (chosen.length === 0) return;
-    onAdd(chosen.map(i => ({ name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.netWeight, ag: "-", cu: "-", au: "-", pd: "-", rh: "-", pt: "-", loc: i.location, posType: "ДМ" as const })));
+    onAdd(chosen.map(i => ({ name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.netWeight, ag: "-", cu: "-", au: "-", pd: "-", rh: "-", pt: "-", loc: i.location, })));
   };
 
   return (
@@ -155,7 +155,7 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
 // ── Добавить позицию ДМ (новая, вручную) ──────────────────────────────────────
 
 function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
-  const [form, setForm] = useState({ posType: "ДМ" as "ГП" | "ДМ", nomenkl: "", klass: "Слиток", name: "", proba: "999", ves: "", au: "-", ag: "-", pd: "-", rh: "-", pt: "-", sey: "Сейф №1", polka: "Полка А" });
+  const [form, setForm] = useState({ nomenkl: "", klass: "Слиток", name: "", proba: "999", ves: "", au: "-", ag: "-", pd: "-", rh: "-", pt: "-", sey: "Сейф №1", polka: "Полка А" });
 
   const add = () => {
     if (!form.name || !form.nomenkl) return;
@@ -172,7 +172,6 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
       rh: form.rh || "-",
       pt: form.pt || "-",
       loc: `${form.sey}, ${form.polka}`,
-      posType: form.posType,
     }]);
   };
 
@@ -186,7 +185,6 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
       </>}
     >
       <div className="grid grid-cols-3 gap-4 mb-4">
-        <Field label="Позиция"><Select value={form.posType} options={["ГП", "ДМ"]} onChange={v => setForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
         <Field label="Номенкл. номер"><Input value={form.nomenkl} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} placeholder="DM-XXX" /></Field>
         <Field label="Класс"><KlassSelect value={form.klass} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
         <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
@@ -561,13 +559,13 @@ function SpisanieTab({ losses, setLosses, doc, setDoc, vesStart, readOnly, onDow
 type TabName = "Выдача" | "Возврат" | "Списание" | "Итого";
 
 const vydachaPositions: OperPosition[] = [
-  { n: 1, name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, ves: 500.25, ag: "-", cu: "-", loc: "Сейф №1, Полка А", posType: "ДМ" },
-  { n: 2, name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", proba: 585, ves: 45.80, ag: "0.12", cu: "1.20", loc: "Сейф №2, Полка А", posType: "ДМ" },
+  { n: 1, name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, ves: 500.25, ag: "-", cu: "-", loc: "Сейф №1, Полка А" },
+  { n: 2, name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", proba: 585, ves: 45.80, ag: "0.12", cu: "1.20", loc: "Сейф №2, Полка А" },
 ];
 const vozvratPositions: OperPosition[] = [
-  { n: 1, name: "Подкат 30х20", nomenkl: "DM-R01", klass: "Подкат", proba: 999, ves: 480.10, ag: "-", cu: "-", loc: "Сейф №1, Полка Б", posType: "ДМ" },
-  { n: 2, name: "Королёк №1", nomenkl: "DM-R02", klass: "Королёк", proba: 999, ves: 55.60, ag: "-", cu: "-", loc: "Сейф №2, Полка Б", posType: "ДМ" },
-  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Отходы", proba: 500, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка А", posType: "ДМ" },
+  { n: 1, name: "Подкат 30х20", nomenkl: "DM-R01", klass: "Подкат", proba: 999, ves: 480.10, ag: "-", cu: "-", loc: "Сейф №1, Полка Б" },
+  { n: 2, name: "Королёк №1", nomenkl: "DM-R02", klass: "Королёк", proba: 999, ves: 55.60, ag: "-", cu: "-", loc: "Сейф №2, Полка Б" },
+  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Отходы", proba: 500, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка А" },
 ];
 
 function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation | null; onClose: () => void; onSave: (o: Operation) => void; readOnly?: boolean }) {
@@ -597,7 +595,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const { sorted: sortedVydacha, sort: vydachaSort, toggleSort: toggleVydachaSort } = useSort(vydacha, {
     name: p => p.name,
     nomenkl: p => p.nomenkl,
-    posType: p => p.posType,
     klass: p => p.klass,
     proba: p => p.proba,
     ves: p => p.ves,
@@ -608,7 +605,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const { sorted: sortedVozvrat, sort: vozvratSort, toggleSort: toggleVozvratSort } = useSort(vozvrat, {
     name: p => p.name,
     nomenkl: p => p.nomenkl,
-    posType: p => p.posType,
     klass: p => p.klass,
     proba: p => p.proba,
     ves: p => p.ves,
@@ -650,7 +646,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
   // эта карта переходит «На редактировании» и пропадает из выбора ШК для плавки.
   const applyVydacha = () => {
-    const vydanoNomenkl = new Set(vydacha.filter(p => p.posType === "ДМ").map(p => p.nomenkl));
+    const vydanoNomenkl = new Set(vydacha.filter(p => !isGPKlass(p.klass)).map(p => p.nomenkl));
     const izRezerva = dmItems.filter(i => i.status === "Резерв" && vydanoNomenkl.has(i.nomenkl));
     setDmItems(prev => prev.map(i => (vydanoNomenkl.has(i.nomenkl) && i.status !== "В подотчёте" ? { ...i, status: "В подотчёте" } : i)));
     if (izRezerva.length === 0) return;
@@ -748,7 +744,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               <th className="px-3 py-2 text-left">№</th>
               <SortTh sortKey="name" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="nomenkl" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Номенкл.№</SortTh>
-              <SortTh sortKey="posType" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Позиция</SortTh>
               <SortTh sortKey="klass" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="proba" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Проба</SortTh>
               <SortTh sortKey="ves" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Вес г</SortTh>
@@ -763,7 +758,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 text-gray-400">{p.n}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
-                  <td className="px-3 py-2"><Badge label={p.posType} /></td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2">{p.proba}</td>
                   <td className="px-3 py-2 font-medium">{p.ves}</td>
@@ -796,7 +790,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               <th className="px-3 py-2 text-left">№</th>
               <SortTh sortKey="name" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="nomenkl" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Номенкл.№</SortTh>
-              <SortTh sortKey="posType" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Позиция</SortTh>
               <SortTh sortKey="klass" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="proba" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Проба</SortTh>
               <SortTh sortKey="ves" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Вес г</SortTh>
@@ -810,7 +803,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 text-gray-400">{p.n}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
-                  <td className="px-3 py-2"><Badge label={p.posType} /></td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2">{p.proba}</td>
                   <td className="px-3 py-2 font-medium">{p.ves}</td>
@@ -932,7 +924,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <ShihtaPickModal
           onClose={() => setShowShihtaPick(false)}
           onPick={k => {
-            appendPositions("vydacha", k.materials.map(m => ({ ...m, ag: "-", cu: "-", posType: "ДМ" as const })));
+            appendPositions("vydacha", k.materials.map(m => ({ ...m, ag: "-", cu: "-", })));
             setHead(h => ({ ...h, plavkaNo: k.plavkaNo }));
             setPickedShihtaId(k.id);
             setShowShihtaPick(false);
