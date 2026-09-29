@@ -6,7 +6,7 @@ import {
   Field, Input, Select, Tabs, Textarea, FileChip, MultiFileUpload, SortTh, useSort, parseRuDate,
 } from "../components/ui";
 import { Operation, ShihtovayaKarta } from "../data/mock";
-import { Eye, Plus, Paperclip, Upload, Download } from "lucide-react";
+import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
 
@@ -323,17 +323,15 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
   );
 }
 
-// ── Списание потерь (с промежуточными взвешиваниями для Производства ГП) ─────
+// ── Списание потерь ───────────────────────────────────────────────────────────
 
 type LossKind = "Безвозвратные" | "Возвратные";
-type LossRow = { id: string; date: string; name: string; kind: LossKind; ves: string; toVozvrat?: boolean };
 type SpisanieDoc = { id: string; name: string; size: number; docType: string; uploaded: string };
-// Промежуточное взвешивание: позицию приносят на весы, фиксируют вес и потери,
-// но на склад не сдают — она уходит на следующий этап в рамках той же выдачи.
-type WeighStage = { id: string; etap: string; datetime: string; vesOut: string; losses: LossRow[] };
+// doc — документ-основание, прикреплённый к конкретной строке потерь (акт, скан взвешивания и т.п.).
+type LossRow = { id: string; date: string; name: string; kind: LossKind; ves: string; toVozvrat?: boolean; doc?: SpisanieDoc };
 
 const lossNames = ["Угар", "Обрезь", "Высечка", "Опилки", "Стружка", "Шлиф-пыль", "Смывы (травление)", "Безвозвратные потери"];
-const gpEtapy = ["Прокатка", "Отжиг", "Вырубка кружков", "Гуртовка", "Травление", "Гальтовка", "Чеканка", "Полировка", "Другое"];
+const docAccept = ".pdf,.doc,.docx,.jpg,.jpeg,.png,.tif,.tiff";
 
 const num = (s: string) => parseFloat(String(s).replace(",", ".")) || 0;
 const fmt = (v: number) => v.toFixed(2);
@@ -350,26 +348,69 @@ const newLoss = (): LossRow => ({ id: uid(), date: todayIso(), name: "", kind: "
 const docTypes = ["Акт списания", "Акт взвешивания", "Служебная записка", "Протокол", "Прочее"];
 const fmtSize = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
 const seedDocs: SpisanieDoc[] = [
-  { id: "d1", name: "Акт_списания_угар_18082026.pdf", size: 412_000, docType: "Акт списания", uploaded: "18.08.2026, 16:05" },
-  { id: "d2", name: "Скан_взвешивание_этап1.jpg", size: 1_850_000, docType: "Акт взвешивания", uploaded: "18.08.2026, 10:52" },
+  { id: "d1", name: "Служебная_записка_потери_18082026.pdf", size: 236_000, docType: "Служебная записка", uploaded: "18.08.2026, 16:20" },
 ];
-const newStage = (etap = ""): WeighStage => ({ id: uid(), etap, datetime: nowStr(), vesOut: "", losses: [newLoss()] });
-
-const seedGpStages: WeighStage[] = [
-  { id: "s1", etap: "Прокатка", datetime: "18.08.2026, 10:40", vesOut: "544.90", losses: [
-    { id: "l1", date: "2026-08-18", name: "Угар", kind: "Безвозвратные", ves: "0.35" },
-    { id: "l2", date: "2026-08-18", name: "Обрезь", kind: "Возвратные", ves: "0.80" },
-  ] },
-  { id: "s2", etap: "Вырубка кружков", datetime: "18.08.2026, 15:10", vesOut: "544.10", losses: [
-    { id: "l3", date: "2026-08-18", name: "Опилки", kind: "Возвратные", ves: "0.60" },
-    { id: "l4", date: "2026-08-18", name: "Шлиф-пыль", kind: "Безвозвратные", ves: "0.15" },
-  ] },
+const seedGpLosses: LossRow[] = [
+  { id: "l1", date: "2026-08-18", name: "Угар", kind: "Безвозвратные", ves: "0.35",
+    doc: { id: "ld1", name: "Акт_списания_угар_18082026.pdf", size: 412_000, docType: "Акт списания", uploaded: "18.08.2026, 16:05" } },
+  { id: "l2", date: "2026-08-18", name: "Обрезь", kind: "Возвратные", ves: "0.80" },
+  { id: "l3", date: "2026-08-18", name: "Опилки", kind: "Возвратные", ves: "0.60" },
+  { id: "l4", date: "2026-08-18", name: "Шлиф-пыль", kind: "Безвозвратные", ves: "0.15",
+    doc: { id: "ld2", name: "Скан_взвешивание_шлиф.jpg", size: 1_850_000, docType: "Акт взвешивания", uploaded: "18.08.2026, 10:52" } },
 ];
 
-const sumLosses = (stages: WeighStage[], pred: (l: LossRow) => boolean = () => true) =>
-  stages.reduce((s, st) => s + st.losses.filter(pred).reduce((a, l) => a + num(l.ves), 0), 0);
+const sumLosses = (losses: LossRow[], pred: (l: LossRow) => boolean = () => true) =>
+  losses.filter(pred).reduce((a, l) => a + num(l.ves), 0);
 
-function LossTable({ losses, readOnly, onChange }: { losses: LossRow[]; readOnly: boolean; onChange: (rows: LossRow[]) => void }) {
+function LossDocCell({ doc, readOnly, onChange, onDownload }: {
+  doc?: SpisanieDoc;
+  readOnly: boolean;
+  onChange: (d: SpisanieDoc | undefined) => void;
+  onDownload: (d: SpisanieDoc) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pick = (list: FileList | null) => {
+    const f = list?.[0];
+    if (!f) return;
+    onChange({ id: uid(), name: f.name, size: f.size, uploaded: nowStr(), docType: /акт/i.test(f.name) ? "Акт списания" : "Прочее" });
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  if (doc) {
+    return (
+      <div className="flex items-center gap-1 min-w-0 px-2 py-1 border border-gray-200 rounded-lg bg-gray-50">
+        <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+        <button onClick={() => onDownload(doc)} className="truncate text-xs text-blue-600 hover:underline text-left" title={`${doc.name} · ${fmtSize(doc.size)}`}>
+          {doc.name}
+        </button>
+        {!readOnly && (
+          <button onClick={() => onChange(undefined)} className="ml-auto text-gray-400 hover:text-red-600 shrink-0 p-0.5" title="Открепить">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    );
+  }
+  if (readOnly) return <span className="text-xs text-gray-400">—</span>;
+  return (
+    <>
+      <input ref={inputRef} type="file" accept={docAccept} className="hidden" onChange={e => pick(e.target.files)} />
+      <button
+        onClick={() => inputRef.current?.click()}
+        className="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 border border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+      >
+        <Paperclip className="w-3.5 h-3.5" />Прикрепить
+      </button>
+    </>
+  );
+}
+
+function LossTable({ losses, readOnly, onChange, onDownload }: {
+  losses: LossRow[];
+  readOnly: boolean;
+  onChange: (rows: LossRow[]) => void;
+  onDownload: (d: SpisanieDoc) => void;
+}) {
   const upd = (id: string, patch: Partial<LossRow>) => onChange(losses.map(l => (l.id === id ? { ...l, ...patch } : l)));
   return (
     <>
@@ -380,7 +421,8 @@ function LossTable({ losses, readOnly, onChange }: { losses: LossRow[]; readOnly
           <th className="px-3 py-2 text-left w-44">Дата</th>
           <th className="px-3 py-2 text-left">Наименование потерь</th>
           <th className="px-3 py-2 text-left w-48">Вид потерь</th>
-          <th className="px-3 py-2 text-left w-36">Вес потерь, г</th>
+          <th className="px-3 py-2 text-left w-32">Вес потерь, г</th>
+          <th className="px-3 py-2 text-left w-48">Документ</th>
           {!readOnly && <th className="w-10"></th>}
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
@@ -412,11 +454,14 @@ function LossTable({ losses, readOnly, onChange }: { losses: LossRow[]; readOnly
                   : <Select value={l.kind} options={["Безвозвратные", "Возвратные"]} onChange={v => upd(l.id, { kind: v as LossKind })} disabled={readOnly} />}
               </td>
               <td className="px-3 py-1.5"><Input value={l.ves} onChange={v => upd(l.id, { ves: v })} placeholder="0.00" disabled={readOnly || l.toVozvrat} /></td>
+              <td className="px-3 py-1.5 max-w-48">
+                <LossDocCell doc={l.doc} readOnly={readOnly} onChange={d => upd(l.id, { doc: d })} onDownload={onDownload} />
+              </td>
               {!readOnly && <td className="px-2 py-1.5">{!l.toVozvrat && <DeleteIcon onClick={() => onChange(losses.filter(x => x.id !== l.id))} />}</td>}
             </tr>
           ))}
           {losses.length === 0 && (
-            <tr><td colSpan={6} className="px-3 py-3 text-center text-xs text-gray-400">Потери не указаны</td></tr>
+            <tr><td colSpan={7} className="px-3 py-3 text-center text-xs text-gray-400">Потери не указаны</td></tr>
           )}
         </tbody>
       </table>
@@ -502,7 +547,7 @@ function SpisanieDocs({ docs, setDocs, readOnly, onDownload }: {
             onDrop={e => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
             className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${drag ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"}`}
           >
-            <input ref={inputRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.tif,.tiff" className="hidden" onChange={e => addFiles(e.target.files)} />
+            <input ref={inputRef} type="file" multiple accept={docAccept} className="hidden" onChange={e => addFiles(e.target.files)} />
             <Upload className="w-6 h-6 mx-auto mb-2 text-gray-400" />
             <p className="text-sm text-gray-600">Перетащите файлы сюда или <span className="text-blue-600 font-medium">выберите на компьютере</span></p>
             <p className="text-xs text-gray-400 mt-1">Можно несколько файлов · PDF, DOC/DOCX, JPG, PNG, TIFF — до 10 МБ каждый</p>
@@ -513,30 +558,26 @@ function SpisanieDocs({ docs, setDocs, readOnly, onDownload }: {
   );
 }
 
-function SpisanieTab({ stages, setStages, docs, setDocs, isGP, vesStart, readOnly, onTransferVozvrat, onDownload }: {
-  stages: WeighStage[];
-  setStages: React.Dispatch<React.SetStateAction<WeighStage[]>>;
+function SpisanieTab({ losses, setLosses, docs, setDocs, vesStart, readOnly, onTransferVozvrat, onDownload }: {
+  losses: LossRow[];
+  setLosses: React.Dispatch<React.SetStateAction<LossRow[]>>;
   docs: SpisanieDoc[];
   setDocs: React.Dispatch<React.SetStateAction<SpisanieDoc[]>>;
   onDownload: (d: SpisanieDoc) => void;
-  isGP: boolean;
   vesStart: number;
   readOnly: boolean;
   onTransferVozvrat: (rows: LossRow[]) => void;
 }) {
-  const updStage = (id: string, patch: Partial<WeighStage>) => setStages(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)));
-
-  const total = sumLosses(stages);
-  const bezv = sumLosses(stages, l => l.kind === "Безвозвратные");
+  const total = sumLosses(losses);
+  const bezv = sumLosses(losses, l => l.kind === "Безвозвратные");
   const vozv = total - bezv;
-  const pendingVozv = stages.flatMap(s => s.losses).filter(l => l.kind === "Возвратные" && !l.toVozvrat && num(l.ves) > 0);
-  const lastWeighed = [...stages].reverse().find(s => s.vesOut);
-  const vesInWork = isGP && lastWeighed ? num(lastWeighed.vesOut) : vesStart - total;
+  const pendingVozv = losses.filter(l => l.kind === "Возвратные" && !l.toVozvrat && num(l.ves) > 0);
+  const vesInWork = vesStart - total;
 
   const transfer = () => {
     const ids = new Set(pendingVozv.map(l => l.id));
     onTransferVozvrat(pendingVozv);
-    setStages(prev => prev.map(s => ({ ...s, losses: s.losses.map(l => (ids.has(l.id) ? { ...l, toVozvrat: true } : l)) })));
+    setLosses(prev => prev.map(l => (ids.has(l.id) ? { ...l, toVozvrat: true } : l)));
   };
 
   return (
@@ -547,7 +588,7 @@ function SpisanieTab({ stages, setStages, docs, setDocs, isGP, vesStart, readOnl
           { label: "Выдано в работу", value: vesStart },
           { label: "Списано всего", value: total },
           { label: "в т.ч. безвозвратные / возвратные", value: null, text: `${fmt(bezv)} / ${fmt(vozv)} г` },
-          { label: isGP ? "Вес в работе (посл. взвешивание)" : "Остаток в работе", value: vesInWork },
+          { label: "Остаток в работе", value: vesInWork },
         ].map(c => (
           <div key={c.label} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
             <div className="text-xs text-gray-500">{c.label}</div>
@@ -563,65 +604,7 @@ function SpisanieTab({ stages, setStages, docs, setDocs, isGP, vesStart, readOnl
         </div>
       )}
 
-      {!isGP ? (
-        <LossTable losses={stages[0]?.losses ?? []} readOnly={readOnly} onChange={rows => stages[0] && updStage(stages[0].id, { losses: rows })} />
-      ) : (
-        <>
-          <div className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-4">
-            Промежуточное взвешивание фиксирует вес и потери после этапа обработки <b>без сдачи на склад</b>: позиция остаётся в подотчёте и уходит на следующий этап.
-            Вес на входе этапа = вес предыдущего взвешивания (для первого — вес выдачи).
-          </div>
-          <div className="space-y-4">
-            {stages.map((st, i) => {
-              const vesIn = i === 0 ? vesStart : num(stages[i - 1].vesOut);
-              const hasOut = st.vesOut.trim() !== "";
-              const ubyl = hasOut ? vesIn - num(st.vesOut) : null;
-              const uchteno = st.losses.reduce((a, l) => a + num(l.ves), 0);
-              const neuchteno = ubyl !== null ? ubyl - uchteno : null;
-              const ok = neuchteno !== null && Math.abs(neuchteno) < 0.005;
-              const isLast = i === stages.length - 1;
-              return (
-                <div key={st.id} className="border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                      Взвешивание №{i + 1}{st.etap && <span className="normal-case font-medium text-gray-900">— {st.etap}</span>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge label={isLast ? "В работе" : "Возвращено в обработку"} />
-                      {!readOnly && stages.length > 1 && <DeleteIcon onClick={() => setStages(prev => prev.filter(s => s.id !== st.id))} />}
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <div className="grid grid-cols-4 gap-3 mb-4">
-                      <Field label="Этап обработки"><Select value={st.etap} options={["", ...gpEtapy]} onChange={v => updStage(st.id, { etap: v })} disabled={readOnly} /></Field>
-                      <Field label="Дата и время"><Input value={st.datetime} onChange={v => updStage(st.id, { datetime: v })} disabled={readOnly} /></Field>
-                      <Field label="Вес на входе, г"><Input value={fmt(vesIn)} disabled /></Field>
-                      <Field label="Вес при взвешивании, г"><Input value={st.vesOut} onChange={v => updStage(st.id, { vesOut: v })} placeholder="0.00" disabled={readOnly} /></Field>
-                    </div>
-                    <LossTable losses={st.losses} readOnly={readOnly} onChange={rows => updStage(st.id, { losses: rows })} />
-                    <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm border-t border-gray-100 pt-3">
-                      <span className="text-gray-500">Убыль по весам: <b className="text-gray-900">{ubyl !== null ? `${fmt(ubyl)} г` : "—"}</b></span>
-                      <span className="text-gray-500">Учтено потерь: <b className="text-gray-900">{fmt(uchteno)} г</b></span>
-                      {neuchteno !== null && (
-                        <span className={ok ? "text-green-700" : "text-yellow-700"}>
-                          {ok ? "✓ Потери сходятся с весом" : `⚠ Неучтённая разница: ${neuchteno >= 0 ? "+" : "−"}${fmt(Math.abs(neuchteno))} г`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {!readOnly && (
-            <div className="mt-4">
-              <Btn size="sm" variant="secondary" onClick={() => setStages(prev => [...prev, newStage()])}>
-                <Plus className="w-4 h-4" />Промежуточное взвешивание
-              </Btn>
-            </div>
-          )}
-        </>
-      )}
+      <LossTable losses={losses} readOnly={readOnly} onChange={rows => setLosses(rows)} onDownload={onDownload} />
 
       <SpisanieDocs docs={docs} setDocs={setDocs} readOnly={readOnly} onDownload={onDownload} />
     </>
@@ -648,7 +631,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [type, setType] = useState<"Выдача" | "Возврат" | "Выдача-Возврат">(op?.type || "Выдача");
   const [vydacha, setVydacha] = useState<OperPosition[]>(op ? vydachaPositions : []);
   const [vozvrat, setVozvrat] = useState<OperPosition[]>(op ? vozvratPositions : []);
-  const [stages, setStages] = useState<WeighStage[]>(() => (op?.vid === "Производство ГП" ? seedGpStages : [newStage()]));
+  const [losses, setLosses] = useState<LossRow[]>(() => (op?.vid === "Производство ГП" ? seedGpLosses : [newLoss()]));
   const [spisanieDocs, setSpisanieDocs] = useState<SpisanieDoc[]>(() => (op?.vid === "Производство ГП" ? seedDocs : []));
   const [showSpisanie, setShowSpisanie] = useState(false);
   const [showAddDM, setShowAddDM] = useState(false);
@@ -706,7 +689,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const vesVydacha = vydacha.reduce((a, p) => a + p.ves, 0);
   const vesVozvrat = vozvrat.reduce((a, p) => a + p.ves, 0);
   // Возвратные отходы, уже переданные во вкладку «Возврат», учтены там — не считаем дважды.
-  const vesSpisano = sumLosses(stages, l => !l.toVozvrat);
+  const vesSpisano = sumLosses(losses, l => !l.toVozvrat);
   const delta = +(vesVozvrat + vesSpisano - vesVydacha).toFixed(2);
   const deltaSign = delta >= 0 ? "+" : "−";
   const inNorm = Math.abs(delta) <= 5;
@@ -902,12 +885,11 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
       {tab === "Списание" && (
         <SpisanieTab
-          stages={stages}
-          setStages={setStages}
+          losses={losses}
+          setLosses={setLosses}
           docs={spisanieDocs}
           setDocs={setSpisanieDocs}
           onDownload={d => show(`Загрузка файла «${d.name}»...`)}
-          isGP={vid === "Производство ГП"}
           vesStart={vesVydacha}
           readOnly={readOnly}
           onTransferVozvrat={rows => {
@@ -968,9 +950,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               ))}
               {vesSpisano > 0 && <>
                 <div className="text-xs font-semibold text-gray-500 uppercase mt-4 mb-2">Списание потерь</div>
-                {stages.flatMap(st => st.losses.filter(l => !l.toVozvrat && num(l.ves) > 0).map(l => ({ st, l }))).map(({ st, l }) => (
+                {losses.filter(l => !l.toVozvrat && num(l.ves) > 0).map(l => (
                   <div key={l.id} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-                    <div className="text-sm text-gray-900">{l.name || "Без наименования"} <span className="text-gray-400 text-xs">{[isoToRu(l.date), st.etap].filter(Boolean).join(" · ")}</span></div>
+                    <div className="text-sm text-gray-900">{l.name || "Без наименования"} <span className="text-gray-400 text-xs">{isoToRu(l.date)}{l.doc && <Paperclip className="inline w-3 h-3 ml-1 -mt-0.5" />}</span></div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-gray-600">{l.ves} г</span>
                       <Badge label={l.kind} />
