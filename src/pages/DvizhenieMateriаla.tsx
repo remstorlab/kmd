@@ -325,10 +325,9 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
 
 // ── Списание потерь ───────────────────────────────────────────────────────────
 
-type LossKind = "Безвозвратные" | "Возвратные";
 type SpisanieDoc = { id: string; name: string; size: number; uploaded: string };
 // doc — документ-основание, прикреплённый к конкретной строке потерь (акт, скан взвешивания и т.п.).
-type LossRow = { id: string; date: string; name: string; kind: LossKind; ves: string; doc?: SpisanieDoc };
+type LossRow = { id: string; date: string; name: string; ves: string; doc?: SpisanieDoc };
 
 const lossNames = ["Угар", "Обрезь", "Высечка", "Опилки", "Стружка", "Шлиф-пыль", "Смывы (травление)", "Безвозвратные потери"];
 const docAccept = ".pdf,.doc,.docx,.jpg,.jpeg,.png,.tif,.tiff";
@@ -343,16 +342,16 @@ const todayIso = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const isoToRu = (iso: string) => (iso ? iso.split("-").reverse().join(".") : "");
-const newLoss = (): LossRow => ({ id: uid(), date: todayIso(), name: "", kind: "Безвозвратные", ves: "" });
+const newLoss = (): LossRow => ({ id: uid(), date: todayIso(), name: "", ves: "" });
 
 const fmtSize = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
 const seedDoc: SpisanieDoc = { id: "d1", name: "Служебная_записка_потери_18082026.pdf", size: 236_000, uploaded: "18.08.2026, 16:20" };
 const seedGpLosses: LossRow[] = [
-  { id: "l1", date: "2026-08-18", name: "Угар", kind: "Безвозвратные", ves: "0.35",
+  { id: "l1", date: "2026-08-18", name: "Угар", ves: "0.35",
     doc: { id: "ld1", name: "Акт_списания_угар_18082026.pdf", size: 412_000, uploaded: "18.08.2026, 16:05" } },
-  { id: "l2", date: "2026-08-18", name: "Обрезь", kind: "Возвратные", ves: "0.80" },
-  { id: "l3", date: "2026-08-18", name: "Опилки", kind: "Возвратные", ves: "0.60" },
-  { id: "l4", date: "2026-08-18", name: "Шлиф-пыль", kind: "Безвозвратные", ves: "0.15",
+  { id: "l2", date: "2026-08-18", name: "Обрезь", ves: "0.80" },
+  { id: "l3", date: "2026-08-18", name: "Опилки", ves: "0.60" },
+  { id: "l4", date: "2026-08-18", name: "Шлиф-пыль", ves: "0.15",
     doc: { id: "ld2", name: "Скан_взвешивание_шлиф.jpg", size: 1_850_000, uploaded: "18.08.2026, 10:52" } },
 ];
 
@@ -417,7 +416,6 @@ function LossTable({ losses, readOnly, onChange, onDownload }: {
           <th className="px-3 py-2 text-left w-10">№</th>
           <th className="px-3 py-2 text-left w-44">Дата</th>
           <th className="px-3 py-2 text-left">Наименование потерь</th>
-          <th className="px-3 py-2 text-left w-48">Вид потерь</th>
           <th className="px-3 py-2 text-left w-32">Вес потерь, г</th>
           <th className="px-3 py-2 text-left w-48">Документ</th>
           {!readOnly && <th className="w-10"></th>}
@@ -445,9 +443,6 @@ function LossTable({ losses, readOnly, onChange, onDownload }: {
                   className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
                 />
               </td>
-              <td className="px-3 py-1.5">
-                <Select value={l.kind} options={["Безвозвратные", "Возвратные"]} onChange={v => upd(l.id, { kind: v as LossKind })} disabled={readOnly} />
-              </td>
               <td className="px-3 py-1.5"><Input value={l.ves} onChange={v => upd(l.id, { ves: v })} placeholder="0.00" disabled={readOnly} /></td>
               <td className="px-3 py-1.5 max-w-48">
                 <LossDocCell doc={l.doc} readOnly={readOnly} onChange={d => upd(l.id, { doc: d })} onDownload={onDownload} />
@@ -456,7 +451,7 @@ function LossTable({ losses, readOnly, onChange, onDownload }: {
             </tr>
           ))}
           {losses.length === 0 && (
-            <tr><td colSpan={7} className="px-3 py-3 text-center text-xs text-gray-400">Потери не указаны</td></tr>
+            <tr><td colSpan={6} className="px-3 py-3 text-center text-xs text-gray-400">Потери не указаны</td></tr>
           )}
         </tbody>
       </table>
@@ -536,23 +531,20 @@ function SpisanieTab({ losses, setLosses, doc, setDoc, vesStart, readOnly, onDow
   readOnly: boolean;
 }) {
   const total = sumLosses(losses);
-  const bezv = sumLosses(losses, l => l.kind === "Безвозвратные");
-  const vozv = total - bezv;
   const vesInWork = vesStart - total;
 
   return (
     <>
       {/* Сводка */}
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-3 gap-3 mb-4">
         {[
           { label: "Выдано в работу", value: vesStart },
           { label: "Списано всего", value: total },
-          { label: "в т.ч. безвозвратные / возвратные", value: null, text: `${fmt(bezv)} / ${fmt(vozv)} г` },
           { label: "Остаток в работе", value: vesInWork },
         ].map(c => (
           <div key={c.label} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
             <div className="text-xs text-gray-500">{c.label}</div>
-            <div className="text-base font-semibold text-gray-900">{c.text ?? `${fmt(c.value!)} г`}</div>
+            <div className="text-base font-semibold text-gray-900">{fmt(c.value)} г</div>
           </div>
         ))}
       </div>
@@ -900,7 +892,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                     <div className="text-sm text-gray-900">{l.name || "Без наименования"} <span className="text-gray-400 text-xs">{isoToRu(l.date)}{l.doc && <Paperclip className="inline w-3 h-3 ml-1 -mt-0.5" />}</span></div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-gray-600">{l.ves} г</span>
-                      <Badge label={l.kind} />
+                      <Badge label="Списано" />
                     </div>
                   </div>
                 ))}
