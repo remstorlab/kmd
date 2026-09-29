@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, FileChip, Toggle, SortTh, useSort,
+  Field, Input, Select, KlassSelect, FileChip, Toggle, SortTh, useSort,
 } from "../components/ui";
 import { GPItem, DMItem } from "../data/mock";
 import { Gem, Coins, Plus } from "lucide-react";
@@ -59,7 +59,7 @@ function GPViewModal({ item, onClose }: { item: GPItem; onClose: () => void }) {
 function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
   const [items, setItems] = useState<{ name: string; qty: string; klass: string; code: string; posType: "ГП" | "ДМ" }[]>([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ posType: "ГП" as "ГП" | "ДМ", name: "", nomenkl: "", klass: "Монета", code: "AU-585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+  const [form, setForm] = useState({ posType: "ГП" as "ГП" | "ДМ", name: "", nomenkl: "", klass: "Готовая продукция", code: "AU-585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
   const [head, setHead] = useState(() => ({
     number: `НП-${Math.floor(Math.random() * 900 + 100)}`,
     date: new Date().toLocaleDateString("ru-RU"),
@@ -72,7 +72,7 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
   const addItem = () => {
     setItems(prev => [...prev, { name: form.name || "Позиция ГП", qty: form.qty, klass: form.klass, code: form.code, posType: form.posType }]);
     setShowAdd(false);
-    setForm({ posType: "ГП", name: "", nomenkl: "", klass: "Монета", code: "AU-585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+    setForm({ posType: "ГП", name: "", nomenkl: "", klass: "Готовая продукция", code: "AU-585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
   };
 
   const { sorted: sortedItems, sort: itemsSort, toggleSort: toggleItemsSort } = useSort(items, {
@@ -147,7 +147,7 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Позиция"><Select value={form.posType} options={["ГП", "ДМ"]} onChange={v => setForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
             <Field label="Номенкл. номер"><Select value={form.nomenkl || "GP-KOL-585-01"} options={["GP-KOL-585-01", "GP-CEP-750-03", "GP-SER-585-07"]} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} /></Field>
-            <Field label="Класс"><Select value={form.klass} options={["Монета", "Кольцо", "Браслет", "Цепочка"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
+            <Field label="Класс"><KlassSelect value={form.klass} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Код материала"><Select value={form.code} options={["AU-585", "AU-750", "AU-999", "AG-925", "PT-950"]} onChange={v => setForm(f => ({ ...f, code: v }))} /></Field>
             <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Введите наименование" /></Field>
             <Field label="Количество"><Input value={form.qty} onChange={v => setForm(f => ({ ...f, qty: v }))} placeholder="0" /></Field>
@@ -513,16 +513,16 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
 
   // Накладная state
   const [nakladPositions, setNakladPositions] = useState([
-    { nomenkl: "AU-SL-12000", name: "Монета Атамекен", kol: "2000", klass: "Монета", code: "200", loc: "Сейф №1, Полка 5", posType: "ГП" as "ГП" | "ДМ" },
+    { nomenkl: "AU-SL-12000", name: "Монета Атамекен", kol: "2000", klass: "Готовая продукция", code: "200", loc: "Сейф №1, Полка 5", posType: "ГП" as "ГП" | "ДМ" },
     { nomenkl: "AU-SL-01000", name: "Орден Алтын алка", kol: "300", klass: "Орден", code: "200", loc: "Сейф №1, Полка 7", posType: "ГП" as "ГП" | "ДМ" },
   ]);
   const [showAddNaklad, setShowAddNaklad] = useState(false);
-  const [nakladForm, setNakladForm] = useState({ posType: "ГП" as "ГП" | "ДМ", nomenkl: "", klass: "Монета", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+  const [nakladForm, setNakladForm] = useState({ posType: "ГП" as "ГП" | "ДМ", nomenkl: "", klass: "Готовая продукция", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
 
   const addNakladPos = () => {
     setNakladPositions(p => [...p, { nomenkl: nakladForm.nomenkl || `AU-SL-${Math.floor(Math.random() * 90000 + 10000)}`, name: nakladForm.name || "Позиция ДМ", kol: nakladForm.kol || "0", klass: nakladForm.klass, code: nakladForm.code, loc: `${nakladForm.sey}, ${nakladForm.polka}`, posType: nakladForm.posType }]);
     setShowAddNaklad(false);
-    setNakladForm({ posType: "ГП", nomenkl: "", klass: "Монета", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
+    setNakladForm({ posType: "ГП", nomenkl: "", klass: "Готовая продукция", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
   };
 
   const { sorted: sortedNakladPositions, sort: nakladPosSort, toggleSort: toggleNakladPosSort } = useSort(nakladPositions, {
@@ -703,7 +703,7 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
           <div className="grid grid-cols-3 gap-4">
             <Field label="Позиция"><Select value={orderForm.posType} options={["ГП", "ДМ"]} onChange={v => setOrderForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
             <Field label="Номенкл. номер"><Input value={orderForm.nomenkl} onChange={v => setOrderForm(f => ({ ...f, nomenkl: v }))} /></Field>
-            <Field label="Класс"><Select value={orderForm.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setOrderForm(f => ({ ...f, klass: v }))} /></Field>
+            <Field label="Класс"><KlassSelect value={orderForm.klass} onChange={v => setOrderForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Код материала"><Select value={orderForm.code} options={["Au", "Ag", "Pt", "Pd"]} onChange={v => setOrderForm(f => ({ ...f, code: v }))} /></Field>
             <Field label="Наименование" full><Input value={orderForm.name} onChange={v => setOrderForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
             <Field label="Количество"><Input value={orderForm.kol} onChange={v => setOrderForm(f => ({ ...f, kol: v }))} placeholder="1" /></Field>
@@ -726,7 +726,7 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Позиция"><Select value={nakladForm.posType} options={["ГП", "ДМ"]} onChange={v => setNakladForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
             <Field label="Номенкл. номер"><Input value={nakladForm.nomenkl} onChange={v => setNakladForm(f => ({ ...f, nomenkl: v }))} placeholder="AU-SL-XXXXX" /></Field>
-            <Field label="Класс"><Select value={nakladForm.klass} options={["Монета", "Слиток", "Орден", "Медаль"]} onChange={v => setNakladForm(f => ({ ...f, klass: v }))} /></Field>
+            <Field label="Класс"><KlassSelect value={nakladForm.klass} onChange={v => setNakladForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Код материала"><Select value={nakladForm.code} options={["AU-585", "AU-750", "AU-999", "AG-925", "PT-950"]} onChange={v => setNakladForm(f => ({ ...f, code: v }))} /></Field>
             <Field label="Наименование" full><Input value={nakladForm.name} onChange={v => setNakladForm(f => ({ ...f, name: v }))} placeholder="Введите наименование" /></Field>
             <Field label="Количество"><Input value={nakladForm.kol} onChange={v => setNakladForm(f => ({ ...f, kol: v }))} placeholder="0" /></Field>
@@ -932,9 +932,7 @@ export function OstatokDM() {
         </div>
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Класс материала</label>
-          <select value={filterKlass} onChange={e => setFilterKlass(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {["Все классы", "Слиток", "Стружка", "Проба", "Раствор"].map(o => <option key={o}>{o}</option>)}
-          </select>
+          <KlassSelect value={filterKlass} onChange={setFilterKlass} allLabel="Все классы" />
         </div>
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>

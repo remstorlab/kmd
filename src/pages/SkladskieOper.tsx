@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
-  ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
+  ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, KlassSelect, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, Badge,
 } from "../components/ui";
 import { SkladDoc, GPItem, DocStatus } from "../data/mock";
@@ -281,7 +281,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
           <div className="grid grid-cols-3 gap-4 mb-4">
             <Field label="Позиция"><Select value={form.posType} options={["ГП", "ДМ"]} onChange={v => setForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
             <Field label="Номенкл. номер"><Select value={form.nomenkl} options={["DM-001", "DM-002", "DM-003", "DM-004"]} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} /></Field>
-            <Field label="Класс"><Select value={form.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
+            <Field label="Класс"><KlassSelect value={form.klass} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Код материала"><Select value={form.code} options={["AU", "AG", "PT", "PD"]} onChange={v => setForm(f => ({ ...f, code: v }))} /></Field>
             <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
             <Field label="Количество"><Input value={form.kol} onChange={v => setForm(f => ({ ...f, kol: v }))} placeholder="1" /></Field>
@@ -309,7 +309,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
           <div className="grid grid-cols-2 gap-4">
             <Field label="Позиция"><Select value={nakladForm.posType} options={["ГП", "ДМ"]} onChange={v => setNakladForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
             <Field label="Номенкл. номер"><Input value={nakladForm.nomenkl} onChange={v => setNakladForm(f => ({ ...f, nomenkl: v }))} placeholder="DM-XXX" /></Field>
-            <Field label="Класс"><Select value={nakladForm.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setNakladForm(f => ({ ...f, klass: v }))} /></Field>
+            <Field label="Класс"><KlassSelect value={nakladForm.klass} onChange={v => setNakladForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Код материала"><Select value={nakladForm.code} options={["AU-585", "AU-750", "AU-999", "AG-925", "PT-950"]} onChange={v => setNakladForm(f => ({ ...f, code: v }))} /></Field>
             <Field label="Наименование" full><Input value={nakladForm.name} onChange={v => setNakladForm(f => ({ ...f, name: v }))} placeholder="Введите наименование" /></Field>
             <Field label="Количество"><Input value={nakladForm.kol} onChange={v => setNakladForm(f => ({ ...f, kol: v }))} placeholder="0" /></Field>

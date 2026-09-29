@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
-  ExportBtn, useToast, Toast, Field, Input, Select, useConfirm, ConfirmDialog,
+  ExportBtn, useToast, Toast, Field, Input, Select, KlassSelect, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, formatDateTime,
 } from "../components/ui";
 import { ShihtovayaKarta } from "../data/mock";
@@ -24,7 +24,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const [materials, setMaterials] = useState(shihtaMaterials);
   const [showFromSklad, setShowFromSklad] = useState(false);
   const [showAddDop, setShowAddDop] = useState(false);
-  const [dopForm, setDopForm] = useState({ name: "", code: "", klass: "Лигатура", proba: "", unit: "г", ves: "" });
+  const [dopForm, setDopForm] = useState({ name: "", code: "", klass: "Комплектующие", proba: "", unit: "г", ves: "" });
   const [showResult, setShowResult] = useState(false);
   const { toast, show, clear } = useToast();
   const ro = readOnly;
@@ -216,14 +216,14 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           <Btn onClick={() => {
             setMaterials(prev => [...prev, { mat: dopForm.name || "Доп. материал", klass: dopForm.klass, fe: "0.01", sb: "0.001", bi: "0.001", pb: "0.001", p: "0.001", ves: parseFloat(dopForm.ves) || 0, dola: 0 }]);
             setShowAddDop(false);
-            setDopForm({ name: "", code: "", klass: "Лигатура", proba: "", unit: "г", ves: "" });
+            setDopForm({ name: "", code: "", klass: "Комплектующие", proba: "", unit: "г", ves: "" });
             show("Материал добавлен");
           }}>Добавить</Btn></>
         }>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Наименование материала" full><Input value={dopForm.name} onChange={v => setDopForm(f => ({ ...f, name: v }))} placeholder="Название" /></Field>
             <Field label="Код материала"><Input value={dopForm.code} onChange={v => setDopForm(f => ({ ...f, code: v }))} placeholder="AU, AG..." /></Field>
-            <Field label="Класс"><Select value={dopForm.klass} options={["Лигатура", "Флюс", "Добавка"]} onChange={v => setDopForm(f => ({ ...f, klass: v }))} /></Field>
+            <Field label="Класс"><KlassSelect value={dopForm.klass} onChange={v => setDopForm(f => ({ ...f, klass: v }))} /></Field>
             <Field label="Проба"><Input value={dopForm.proba} onChange={v => setDopForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
             <Field label="Ед. измерения"><Select value={dopForm.unit} options={["г", "кг", "шт"]} onChange={v => setDopForm(f => ({ ...f, unit: v }))} /></Field>
             <Field label="Вес г"><Input value={dopForm.ves} onChange={v => setDopForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>

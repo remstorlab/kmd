@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, Tabs, Textarea, FileChip, MultiFileUpload, SortTh, useSort, parseRuDate,
+  Field, Input, Select, KlassSelect, Tabs, Textarea, FileChip, MultiFileUpload, SortTh, useSort, parseRuDate,
 } from "../components/ui";
 import { Operation, ShihtovayaKarta } from "../data/mock";
 import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
@@ -188,7 +188,7 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
       <div className="grid grid-cols-3 gap-4 mb-4">
         <Field label="Позиция"><Select value={form.posType} options={["ГП", "ДМ"]} onChange={v => setForm(f => ({ ...f, posType: v as "ГП" | "ДМ" }))} /></Field>
         <Field label="Номенкл. номер"><Input value={form.nomenkl} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} placeholder="DM-XXX" /></Field>
-        <Field label="Класс"><Select value={form.klass} options={["Слиток", "Стружка", "Проба", "Раствор"]} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
+        <Field label="Класс"><KlassSelect value={form.klass} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
         <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
         <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
         <Field label="Вес г"><Input value={form.ves} onChange={v => setForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>
