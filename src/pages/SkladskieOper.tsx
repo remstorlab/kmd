@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
-  ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, KlassSelect, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
+  ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, KlassSelect, KlassCode, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, Badge,
 } from "../components/ui";
 import { SkladDoc, GPItem, DocStatus } from "../data/mock";
@@ -221,7 +221,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><Badge label={p.posType} /></td>
-                  <td className="px-3 py-2">{p.klass}</td>
+                  <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{p.code}</td>
                   <td className="px-3 py-2">{p.kol}</td>
                   <td className="px-3 py-2">{p.proba}</td>
@@ -263,7 +263,7 @@ function PrihodnyOrdModal({ onClose, onSave, doc, readOnly = false }: { onClose:
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><Badge label={p.posType} /></td>
                   <td className="px-3 py-2">{p.kol}</td>
-                  <td className="px-3 py-2">{p.klass}</td>
+                  <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 font-medium">{p.code}</td>
                   <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                   <td className="px-3 py-2">
@@ -623,7 +623,7 @@ function PrintLabelsModal({ docs, onClose, onPrint }: { docs: SkladDoc[]; onClos
                 <input type="checkbox" checked={effectiveSelected.has(p.id)} onChange={() => togglePos(p.id)} className="w-4 h-4 accent-blue-600 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 truncate">{p.name}</div>
-                  <div className="text-xs text-gray-500">{p.nomenkl} · {p.klass} · {p.weight} г · Ag {p.ag} · Cu {p.cu} · Fe {p.fe}</div>
+                  <div className="text-xs text-gray-500">{p.nomenkl} · <KlassCode value={p.klass} /> · {p.weight} г · Ag {p.ag} · Cu {p.cu} · Fe {p.fe}</div>
                 </div>
               </label>
             ))}

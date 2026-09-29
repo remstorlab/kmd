@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Plus, ChevronDown } from "lucide-react";
+import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Plus } from "lucide-react";
 import { initialMaterialClasses } from "../data/mock";
 
 // ── Badge ────────────────────────────────────────────────────────────────────
@@ -376,83 +376,17 @@ export function Select({ value, onChange, options, disabled = false }: { value: 
   );
 }
 
-// Выпадающий список «Класс материала»: показывает код, полное наименование — во всплывающей подсказке.
-// Значение (value) — полное наименование класса.
+// Выпадающий список «Класс материала» для форм ввода: полные наименования из справочника.
 export function KlassSelect({ value, onChange, disabled = false, allLabel }: { value: string; onChange?: (v: string) => void; disabled?: boolean; allLabel?: string }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const names = initialMaterialClasses.map(c => c.name);
+  const options = [...(allLabel ? [allLabel] : []), ...(value && value !== allLabel && !names.includes(value) ? [value] : []), ...names];
+  return <Select value={value} onChange={onChange} options={options} disabled={disabled} />;
+}
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (btnRef.current?.contains(t) || listRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    const closeOnScroll = (e: Event) => { if (!listRef.current?.contains(e.target as Node)) setOpen(false); };
-    const closeOnResize = () => setOpen(false);
-    document.addEventListener("mousedown", close);
-    window.addEventListener("scroll", closeOnScroll, true);
-    window.addEventListener("resize", closeOnResize);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      window.removeEventListener("scroll", closeOnScroll, true);
-      window.removeEventListener("resize", closeOnResize);
-    };
-  }, [open]);
-
-  const toggle = () => {
-    if (disabled) return;
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ left: r.left, top: r.bottom + 4, width: Math.max(r.width, 96) });
-    }
-    setOpen(o => !o);
-  };
-
-  const pick = (v: string) => { onChange?.(v); setOpen(false); };
-  const current = initialMaterialClasses.find(c => c.name === value);
-  const label = allLabel && value === allLabel ? allLabel : current ? current.code : value;
-  const tip = current ? current.name : value;
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        title={tip}
-        disabled={disabled}
-        onClick={toggle}
-        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500 bg-white flex items-center justify-between gap-2"
-      >
-        <span className="truncate">{label}</span>
-        <ChevronDown size={14} className="text-gray-400 shrink-0" />
-      </button>
-      {open && pos && (
-        <div
-          ref={listRef}
-          style={{ position: "fixed", left: pos.left, top: pos.top, minWidth: pos.width, zIndex: 1000 }}
-          className="max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-sm"
-        >
-          {allLabel && (
-            <div onClick={() => pick(allLabel)} className={`px-3 py-1.5 cursor-pointer hover:bg-blue-50 ${value === allLabel ? "bg-blue-50 text-blue-700 font-medium" : ""}`}>{allLabel}</div>
-          )}
-          {initialMaterialClasses.map(c => (
-            <div
-              key={c.code}
-              title={c.name}
-              onClick={() => pick(c.name)}
-              className={`px-3 py-1.5 cursor-pointer hover:bg-blue-50 ${value === c.name ? "bg-blue-50 text-blue-700 font-medium" : ""}`}
-            >
-              {c.code}
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  );
+// Класс материала в ячейке таблицы: код, полное наименование — во всплывающей подсказке.
+export function KlassCode({ value }: { value: string }) {
+  const c = initialMaterialClasses.find(x => x.name === value);
+  return <span title={c ? c.name : value} className="cursor-help">{c ? c.code : value}</span>;
 }
 
 export function Textarea({ value, onChange, placeholder = "", rows = 3, disabled = false }: { value: string; onChange?: (v: string) => void; placeholder?: string; rows?: number; disabled?: boolean }) {

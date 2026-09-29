@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
-import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort } from "../components/ui";
+import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode } from "../components/ui";
 import { Podotchetnik, PodotchetProcess } from "../data/mock";
 import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, LucideIcon } from "lucide-react";
 
@@ -48,7 +48,7 @@ function ProcessCard({ process, showCompletedDate }: { process: PodotchetProcess
               <tr key={i} className="hover:bg-gray-50">
                 <td className="px-4 py-2 font-medium text-gray-900">{pos.name}</td>
                 <td className="px-4 py-2 text-gray-500">{pos.nomenkl}</td>
-                <td className="px-4 py-2">{pos.klass}</td>
+                <td className="px-4 py-2"><KlassCode value={pos.klass} /></td>
                 <td className="px-4 py-2">{pos.metal}</td>
                 <td className="px-4 py-2 text-right">{pos.qty}</td>
                 <td className="px-4 py-2 text-right">{pos.proba}</td>

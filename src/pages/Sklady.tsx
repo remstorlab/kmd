@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, FileChip, Toggle, SortTh, useSort,
+  Field, Input, Select, KlassSelect, KlassCode, FileChip, Toggle, SortTh, useSort,
 } from "../components/ui";
 import { GPItem, DMItem } from "../data/mock";
 import { Gem, Coins, Plus } from "lucide-react";
@@ -129,7 +129,7 @@ function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
                 <td className="px-3 py-2">{it.name}</td>
                 <td className="px-3 py-2"><Badge label={it.posType} /></td>
                 <td className="px-3 py-2">{it.qty} шт</td>
-                <td className="px-3 py-2">{it.klass}</td>
+                <td className="px-3 py-2"><KlassCode value={it.klass} /></td>
                 <td className="px-3 py-2 text-blue-600">{it.code}</td>
               </tr>
             ))}</tbody>
@@ -230,7 +230,7 @@ function VydachaGPModal({ gpItems, onClose, onSave }: { gpItems: GPItem[]; onClo
               <tr key={i} className="border-t border-gray-100">
                 <td className="px-3 py-2">{it.name}</td>
                 <td className="px-3 py-2">{it.qty} шт</td>
-                <td className="px-3 py-2">{it.klass}</td>
+                <td className="px-3 py-2"><KlassCode value={it.klass} /></td>
                 <td className="px-3 py-2 text-blue-600">{it.code}</td>
               </tr>
             ))}</tbody>
@@ -380,7 +380,7 @@ export function OstatokGP() {
                 <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
                 <td className="px-4 py-3">{item.qty} {item.unit}</td>
-                <td className="px-4 py-3 text-gray-700">{item.klass}</td>
+                <td className="px-4 py-3 text-gray-700"><KlassCode value={item.klass} /></td>
                 <td className="px-4 py-3 text-blue-600 font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><Badge label={item.status} /></td>
@@ -630,7 +630,7 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><Badge label={p.posType} /></td>
-                  <td className="px-3 py-2">{p.klass}</td>
+                  <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{p.code}</td>
                   <td className="px-3 py-2">{p.kol}</td>
                   <td className="px-3 py-2">{p.proba}</td>
@@ -676,7 +676,7 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><Badge label={p.posType} /></td>
                   <td className="px-3 py-2">{p.kol}</td>
-                  <td className="px-3 py-2">{p.klass}</td>
+                  <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 font-medium">{p.code}</td>
                   <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                   <td className="px-3 py-2">
@@ -811,7 +811,7 @@ function VydachaDMModal({ dmItems, onClose, onSave }: { dmItems: DMItem[]; onClo
               <tr key={i} className="border-t border-gray-100">
                 <td className="px-3 py-2">{it.name}</td>
                 <td className="px-3 py-2">{it.qty} шт</td>
-                <td className="px-3 py-2">{it.klass}</td>
+                <td className="px-3 py-2"><KlassCode value={it.klass} /></td>
                 <td className="px-3 py-2 text-blue-600">{it.metal}</td>
               </tr>
             ))}</tbody>
@@ -969,7 +969,7 @@ export function OstatokDM() {
                 <td className="px-4 py-3"><input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} /></td>
                 <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
-                <td className="px-4 py-3">{item.klass}</td>
+                <td className="px-4 py-3"><KlassCode value={item.klass} /></td>
                 <td className="px-4 py-3 text-blue-600 font-medium">{item.metal}</td>
                 <td className="px-4 py-3">{item.qty}</td>
                 <td className="px-4 py-3">{item.proba}</td>

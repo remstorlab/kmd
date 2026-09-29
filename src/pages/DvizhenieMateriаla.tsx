@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, Tabs, Textarea, FileChip, MultiFileUpload, SortTh, useSort, parseRuDate,
+  Field, Input, Select, KlassSelect, KlassCode, Tabs, Textarea, FileChip, MultiFileUpload, SortTh, useSort, parseRuDate,
 } from "../components/ui";
 import { Operation, ShihtovayaKarta } from "../data/mock";
 import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
@@ -128,7 +128,7 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
                     <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(i.id)} className="w-4 h-4 accent-blue-600" /></td>
                     <td className="px-3 py-2 font-medium">{i.name}</td>
                     <td className="px-3 py-2 text-gray-500">{i.nomenkl}</td>
-                    <td className="px-3 py-2">{i.klass}</td>
+                    <td className="px-3 py-2"><KlassCode value={i.klass} /></td>
                     <td className="px-3 py-2">{i.proba}</td>
                     <td className="px-3 py-2">{i.netWeight}</td>
                     <td className="px-3 py-2 text-gray-500">{i.location}</td>
@@ -268,7 +268,7 @@ function VozvratPickModal({ vydacha, onClose, onAdd }: { vydacha: OperPosition[]
                     <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(p.n)} className="w-4 h-4 accent-blue-600" /></td>
                     <td className="px-3 py-2 font-medium">{p.name}</td>
                     <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
-                    <td className="px-3 py-2">{p.klass}</td>
+                    <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                     <td className="px-3 py-2">{p.proba}</td>
                     <td className="px-3 py-2">{p.ves}</td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
@@ -764,7 +764,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2"><Badge label={p.posType} /></td>
-                  <td className="px-3 py-2">{p.klass}</td>
+                  <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2">{p.proba}</td>
                   <td className="px-3 py-2 font-medium">{p.ves}</td>
                   <td className="px-3 py-2 text-gray-400">{p.ag}</td>
@@ -811,7 +811,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2"><Badge label={p.posType} /></td>
-                  <td className="px-3 py-2">{p.klass}</td>
+                  <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2">{p.proba}</td>
                   <td className="px-3 py-2 font-medium">{p.ves}</td>
                   <td className="px-3 py-2 text-gray-400">{p.ag}</td>

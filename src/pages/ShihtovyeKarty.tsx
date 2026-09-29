@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
-  ExportBtn, useToast, Toast, Field, Input, Select, KlassSelect, useConfirm, ConfirmDialog,
+  ExportBtn, useToast, Toast, Field, Input, Select, KlassSelect, KlassCode, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, formatDateTime,
 } from "../components/ui";
 import { ShihtovayaKarta } from "../data/mock";
@@ -133,7 +133,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
             {sortedMaterials.map((m, i) => (
               <tr key={i} className="hover:bg-gray-50">
                 <td className="px-3 py-2 font-medium">{m.mat}</td>
-                <td className="px-3 py-2">{m.klass}</td>
+                <td className="px-3 py-2"><KlassCode value={m.klass} /></td>
                 <td className="px-3 py-2 text-right text-gray-600">{m.fe}</td>
                 <td className="px-3 py-2 text-right text-gray-600">{m.sb}</td>
                 <td className="px-3 py-2 text-right text-gray-600">{m.bi}</td>
@@ -200,7 +200,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
               {sortedSkladPicker.map((r, i) => (
                 <tr key={i} className="hover:bg-gray-50"><td className="px-3 py-2"><input type="checkbox" /></td>
                   <td className="px-3 py-2 font-medium">{r.name}</td><td className="px-3 py-2 text-gray-500">{r.nom}</td>
-                  <td className="px-3 py-2">{r.klass}</td><td className="px-3 py-2 text-right">{r.lig}</td>
+                  <td className="px-3 py-2"><KlassCode value={r.klass} /></td><td className="px-3 py-2 text-right">{r.lig}</td>
                   <td className="px-3 py-2 text-right">{r.net}</td><td className="px-3 py-2 text-gray-500">{r.loc}</td>
                 </tr>
               ))}
