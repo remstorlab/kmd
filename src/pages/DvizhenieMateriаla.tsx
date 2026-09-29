@@ -567,7 +567,7 @@ const vydachaPositions: OperPosition[] = [
 const vozvratPositions: OperPosition[] = [
   { n: 1, name: "Подкат 30х20", nomenkl: "DM-R01", klass: "Подкат", proba: 999, ves: 480.10, ag: "-", cu: "-", loc: "Сейф №1, Полка Б", posType: "ДМ" },
   { n: 2, name: "Королёк №1", nomenkl: "DM-R02", klass: "Королёк", proba: 999, ves: 55.60, ag: "-", cu: "-", loc: "Сейф №2, Полка Б", posType: "ДМ" },
-  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Шлак", proba: 500, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка А", posType: "ДМ" },
+  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Отходы", proba: 500, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка А", posType: "ДМ" },
 ];
 
 function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation | null; onClose: () => void; onSave: (o: Operation) => void; readOnly?: boolean }) {

@@ -11,7 +11,7 @@ import { Plus, X, Calculator } from "lucide-react";
 const shihtaMaterials = [
   { mat: "Слиток золота ЗлА-1", klass: "Слиток", fe: "0.001", sb: "0.001", bi: "0.0005", pb: "0.001", p: "0.0005", ves: 500.25, dola: 89.2 },
   { mat: "Стружка золотая", klass: "Стружка", fe: "0.002", sb: "0.001", bi: "0.001", pb: "0.001", p: "0.001", ves: 45.80, dola: 8.2 },
-  { mat: "Лом золота 585", klass: "Лом", fe: "0.005", sb: "0.003", bi: "0.002", pb: "0.003", p: "0.001", ves: 14.20, dola: 2.6 },
+  { mat: "Лом золота 585", klass: "Скрап", fe: "0.005", sb: "0.003", bi: "0.002", pb: "0.003", p: "0.001", ves: 14.20, dola: 2.6 },
 ];
 
 function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta?: ShihtovayaKarta | null; onClose: () => void; onSave: (k: ShihtovayaKarta) => void; readOnly?: boolean }) {
@@ -31,7 +31,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
   const skladPickerItems = [
     { name: "Слиток золота ЗлА-1", nom: "DM-001", klass: "Слиток", lig: 500.25, net: 498.12, loc: "Сейф №1, Полка А" },
-    { name: "Золотой порошок Au", nom: "DM-008", klass: "Порошок", lig: 25.00, net: 24.95, loc: "Сейф №3, Полка В" },
+    { name: "Золотой порошок Au", nom: "DM-008", klass: "Гранулы", lig: 25.00, net: 24.95, loc: "Сейф №3, Полка В" },
   ];
   const { sorted: sortedSkladPicker, sort: skladPickerSort, toggleSort: toggleSkladPickerSort } = useSort(skladPickerItems, {
     name: r => r.name,
@@ -181,7 +181,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
         <Modal title="Добавить материал со склада" onClose={() => setShowFromSklad(false)} wide footer={
           <><Btn variant="secondary" onClick={() => setShowFromSklad(false)}>Отмена</Btn>
           <Btn onClick={() => {
-            setMaterials(prev => [...prev, { mat: "Золотой порошок Au", klass: "Порошок", fe: "0.001", sb: "0.0005", bi: "0.0003", pb: "0.001", p: "0.0002", ves: 25.00, dola: 0 }]);
+            setMaterials(prev => [...prev, { mat: "Золотой порошок Au", klass: "Гранулы", fe: "0.001", sb: "0.0005", bi: "0.0003", pb: "0.001", p: "0.0002", ves: 25.00, dola: 0 }]);
             setShowFromSklad(false);
             show("Материал добавлен");
           }}>Добавить выбранные</Btn></>

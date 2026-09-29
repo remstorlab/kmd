@@ -536,7 +536,7 @@ const LABEL_TEMPLATES = [
   { nomenkl: "DM-001", name: "Слиток золота ЗлА-1", klass: "Слиток", weight: "500.25", ag: "0.05", cu: "0.02", fe: "–" },
   { nomenkl: "DM-002", name: "Слиток серебра СрА-2", klass: "Слиток", weight: "300.10", ag: "92.50", cu: "0.10", fe: "–" },
   { nomenkl: "DM-003", name: "Стружка золотая", klass: "Стружка", weight: "120.40", ag: "0.03", cu: "0.01", fe: "0.01" },
-  { nomenkl: "DM-004", name: "Проба на анализ", klass: "Проба", weight: "12.40", ag: "0.02", cu: "–", fe: "–" },
+  { nomenkl: "DM-004", name: "Проба на анализ", klass: "Основная проба", weight: "12.40", ag: "0.02", cu: "–", fe: "–" },
   { nomenkl: "DM-005", name: "Слиток золота ЗлБ-2", klass: "Слиток", weight: "300.00", ag: "0.04", cu: "0.02", fe: "–" },
 ];
 

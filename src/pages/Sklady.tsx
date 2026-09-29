@@ -514,7 +514,7 @@ function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
   // Накладная state
   const [nakladPositions, setNakladPositions] = useState([
     { nomenkl: "AU-SL-12000", name: "Монета Атамекен", kol: "2000", klass: "Готовая продукция", code: "200", loc: "Сейф №1, Полка 5", posType: "ГП" as "ГП" | "ДМ" },
-    { nomenkl: "AU-SL-01000", name: "Орден Алтын алка", kol: "300", klass: "Орден", code: "200", loc: "Сейф №1, Полка 7", posType: "ГП" as "ГП" | "ДМ" },
+    { nomenkl: "AU-SL-01000", name: "Орден Алтын алка", kol: "300", klass: "Готовая продукция", code: "200", loc: "Сейф №1, Полка 7", posType: "ГП" as "ГП" | "ДМ" },
   ]);
   const [showAddNaklad, setShowAddNaklad] = useState(false);
   const [nakladForm, setNakladForm] = useState({ posType: "ГП" as "ГП" | "ДМ", nomenkl: "", klass: "Готовая продукция", code: "AU-585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
