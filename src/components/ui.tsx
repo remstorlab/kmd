@@ -13,7 +13,10 @@ const badgePalette: Record<string, string> = {
   "Без изменений": "bg-green-100 text-green-700 border-green-200",
   "Активен": "bg-green-100 text-green-700 border-green-200",
   "Активно": "bg-green-100 text-green-700 border-green-200",
-  "Выдано": "bg-green-100 text-green-700 border-green-200",
+  "Выдано": "bg-blue-100 text-blue-700 border-blue-200",
+  "Выдача: На редактировании": "bg-blue-100 text-blue-700 border-blue-200",
+  "Возврат: На редактировании": "bg-yellow-100 text-yellow-700 border-yellow-200",
+  "Завершено": "bg-green-100 text-green-700 border-green-200",
   "Создание": "bg-green-100 text-green-700 border-green-200",
   "Доступно": "bg-green-100 text-green-700 border-green-200",
   "Оформлено": "bg-green-100 text-green-700 border-green-200",
@@ -555,14 +558,15 @@ export function MultiFileUpload({
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
-export function Tabs({ tabs, active, onChange }: { tabs: string[]; active: string; onChange: (t: string) => void }) {
+export function Tabs({ tabs, active, onChange, disabled = [] }: { tabs: string[]; active: string; onChange: (t: string) => void; disabled?: string[] }) {
   return (
     <div className="flex border-b border-gray-200 mb-4">
       {tabs.map(t => (
         <button
           key={t}
           onClick={() => onChange(t)}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${active === t ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+          disabled={disabled.includes(t)}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors disabled:text-gray-300 disabled:cursor-not-allowed disabled:hover:text-gray-300 ${active === t ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
         >
           {t}
         </button>

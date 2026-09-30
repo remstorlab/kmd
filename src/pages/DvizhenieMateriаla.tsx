@@ -5,7 +5,7 @@ import {
   ExportBtn, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, KlassSelect, KlassCode, Tabs, Textarea, FileChip, MultiFileUpload, SortTh, useSort, parseRuDate,
 } from "../components/ui";
-import { Operation, ShihtovayaKarta, isGPKlass } from "../data/mock";
+import { Operation, OperPosition, OperStage, ShihtovayaKarta, isGPKlass } from "../data/mock";
 import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ function SpisanieModal({ delta, onClose, onConfirm }: { delta: number; onClose: 
 
 // ── Добавить позицию ДМ со склада ─────────────────────────────────────────────
 
-type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string };
+
 
 function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
   const { dmItems, shihtovyeKarty } = useApp();
@@ -569,11 +569,21 @@ const vozvratPositions: OperPosition[] = [
 ];
 
 function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation | null; onClose: () => void; onSave: (o: Operation) => void; readOnly?: boolean }) {
-  const [tab, setTab] = useState<TabName>("Выдача");
+  // Этап операции определяет, какие вкладки доступны и что редактируется:
+  // выдача — только вкладка «Выдача»; возврат — «Возврат»/«Списание»/«Итого», «Выдача» только просмотр; завершено — всё только просмотр.
+  const stage: OperStage = op?.stage ?? "Выдача: На редактировании";
+  const phase: "vydacha" | "vozvrat" | "done" = stage === "Выдача: На редактировании" ? "vydacha" : stage === "Завершено" ? "done" : "vozvrat";
+  const ro = readOnly || phase === "done";
+  const vydachaRo = ro || phase !== "vydacha";
+  const vozvratRo = ro || phase !== "vozvrat";
+  const headRo = vydachaRo;
+  const disabledTabs: TabName[] = phase === "vydacha" ? ["Возврат", "Списание", "Итого"] : [];
+
+  const [tab, setTab] = useState<TabName>(phase === "vozvrat" && !readOnly ? "Возврат" : "Выдача");
   const [vid, setVid] = useState<"Отбор пробы" | "Анализ в ЛКИ" | "Плавка" | "Гальванопокрытие" | "Производство ГП">(op?.vid || "Плавка");
   const [type, setType] = useState<"Выдача" | "Возврат" | "Выдача-Возврат">(op?.type || "Выдача");
-  const [vydacha, setVydacha] = useState<OperPosition[]>(op ? vydachaPositions : []);
-  const [vozvrat, setVozvrat] = useState<OperPosition[]>(op ? vozvratPositions : []);
+  const [vydacha, setVydacha] = useState<OperPosition[]>(() => op?.vydachaPos ?? (op ? vydachaPositions : []));
+  const [vozvrat, setVozvrat] = useState<OperPosition[]>(() => op?.vozvratPos ?? (op && phase !== "vydacha" && stage !== "Выдано" ? vozvratPositions : []));
   const [losses, setLosses] = useState<LossRow[]>(() => (op?.vid === "Производство ГП" ? seedGpLosses : [newLoss()]));
   const [spisanieDoc, setSpisanieDoc] = useState<SpisanieDoc | null>(() => (op?.vid === "Производство ГП" ? seedDoc : null));
   const [showSpisanie, setShowSpisanie] = useState(false);
@@ -639,9 +649,11 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const raznicaSpisana = spisanaRaznica !== null && spisanaRaznica === delta;
 
   const oformitBlock =
-    vozvrat.length === 0 ? "Добавьте позиции во вкладке «Возврат»"
-    : !inNorm && !raznicaSpisana ? `Дельта ${deltaSign}${fmt(Math.abs(delta))} г превышает допуск ±5 г — спишите разницу во вкладке «Итого»`
-    : null;
+    phase === "vydacha"
+      ? (vydacha.length === 0 ? "Добавьте хотя бы одну позицию во вкладке «Выдача»" : null)
+      : vozvrat.length === 0 ? "Добавьте позиции во вкладке «Возврат»"
+      : !inNorm && !raznicaSpisana ? `Дельта ${deltaSign}${fmt(Math.abs(delta))} г превышает допуск ±5 г — спишите разницу во вкладке «Итого»`
+      : null;
 
   // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
   // эта карта переходит «На редактировании» и пропадает из выбора ШК для плавки.
@@ -663,7 +675,11 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   };
 
   const save = (oformit = false) => {
-    applyVydacha();
+    const next: OperStage = phase === "vydacha"
+      ? (oformit ? "Выдано" : "Выдача: На редактировании")
+      : (oformit ? "Завершено" : "Возврат: На редактировании");
+    // Позиции уходят в подотчёт только при оформлении выдачи
+    if (phase === "vydacha" && oformit) applyVydacha();
     const o: Operation = {
       id: op?.id || `op-${Date.now()}`,
       date: head.date,
@@ -672,9 +688,12 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       positions: vydacha.length,
       document: head.document,
       responsible: head.responsible,
-      statusVydacha: "Выдано",
-      statusVozvrat: oformit ? "Полностью" : vozvrat.length > 0 ? "Частично" : "Не начат",
-      statusClose: !oformit ? "Не закрыто" : !inNorm ? "Закрыто: списано" : "Закрыто",
+      stage: next,
+      statusVydacha: next === "Выдача: На редактировании" ? "Не выдано" : "Выдано",
+      statusVozvrat: next === "Завершено" ? "Полностью" : vozvrat.length > 0 ? "Частично" : "Не начат",
+      statusClose: next !== "Завершено" ? "Не закрыто" : !inNorm ? "Закрыто: списано" : "Закрыто",
+      vydachaPos: vydacha,
+      vozvratPos: vozvrat,
     };
     onSave(o);
   };
@@ -684,7 +703,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       title={`Движение материала${op ? ` — ${op.vid}` : vid ? ` — ${vid}` : ""}`}
       onClose={onClose}
       extraWide
-      footer={readOnly ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
+      footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
         <>
           {oformitBlock && <span className="mr-auto self-center text-xs text-yellow-700">⚠ Оформление недоступно: {oformitBlock}</span>}
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
@@ -693,42 +712,43 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         </>
       )}
     >
-      {/* Status badges for saved ops */}
+      {/* Статус операции */}
       {op && (
-        <div className="flex gap-2 mb-4">
-          <Badge label={op.statusVydacha} />
-          <Badge label={op.statusVozvrat === "Не начат" ? "Не начат" : `Возврат: ${op.statusVozvrat}`} />
-          <Badge label={op.statusClose} />
+        <div className="flex items-center gap-2 mb-4">
+          <Badge label={op.stage} />
+          {!readOnly && phase === "vozvrat" && <span className="text-xs text-gray-500">Оформление возврата: вкладка «Выдача» доступна только для просмотра</span>}
+          {!readOnly && phase === "done" && <span className="text-xs text-gray-500">Операция завершена — доступна только для просмотра</span>}
         </div>
       )}
+      {!op && <div className="mb-4 text-xs text-gray-500">Новая операция: заполните вкладку «Выдача». Возврат оформляется после выдачи.</div>}
 
       {/* Fields */}
       <div className="grid grid-cols-2 gap-4 mb-5">
         <Field label="Тип операции">
-          <Select value={type} options={["Выдача", "Возврат", "Выдача-Возврат"]} onChange={v => setType(v as any)} disabled={readOnly || !!op} />
+          <Select value={type} options={["Выдача", "Возврат", "Выдача-Возврат"]} onChange={v => setType(v as any)} disabled={headRo || !!op} />
         </Field>
         <Field label="Вид">
-          <Select value={vid} options={["Отбор пробы", "Анализ в ЛКИ", "Плавка", "Гальванопокрытие", "Производство ГП"]} onChange={v => setVid(v as any)} disabled={readOnly || !!op} />
+          <Select value={vid} options={["Отбор пробы", "Анализ в ЛКИ", "Плавка", "Гальванопокрытие", "Производство ГП"]} onChange={v => setVid(v as any)} disabled={headRo || !!op} />
         </Field>
-        <Field label="Тип документа"><Select value={head.docType} options={withBlank(["Приказ", "Заказ-наряд"])} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={readOnly} /></Field>
-        <Field label="Номер документа"><Input value={head.document} onChange={v => setHead(h => ({ ...h, document: v }))} disabled={readOnly || !!op} /></Field>
-        <Field label="Дата операции"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={readOnly} /></Field>
-        <Field label="Заказчик"><Select value={head.zakazchik} options={withBlank(["Монетный двор"])} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={readOnly} /></Field>
-        <Field label="Подотчётное лицо" full><Select value={head.responsible} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"])} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={readOnly} /></Field>
+        <Field label="Тип документа"><Select value={head.docType} options={withBlank(["Приказ", "Заказ-наряд"])} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={headRo} /></Field>
+        <Field label="Номер документа"><Input value={head.document} onChange={v => setHead(h => ({ ...h, document: v }))} disabled={headRo || !!op} /></Field>
+        <Field label="Дата операции"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
+        <Field label="Заказчик"><Select value={head.zakazchik} options={withBlank(["Монетный двор"])} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={headRo} /></Field>
+        <Field label="Подотчётное лицо" full><Select value={head.responsible} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"])} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={headRo} /></Field>
         {vid === "Плавка" && <>
-          <Field label="Материал"><Select value={head.material} options={withBlank(["Золото (Au)", "Серебро (Ag)", "Платина (Pt)"])} onChange={v => setHead(h => ({ ...h, material: v }))} disabled={readOnly} /></Field>
-          <Field label="Номер плавки"><Input value={head.plavkaNo} onChange={v => setHead(h => ({ ...h, plavkaNo: v }))} disabled={readOnly} /></Field>
+          <Field label="Материал"><Select value={head.material} options={withBlank(["Золото (Au)", "Серебро (Ag)", "Платина (Pt)"])} onChange={v => setHead(h => ({ ...h, material: v }))} disabled={headRo} /></Field>
+          <Field label="Номер плавки"><Input value={head.plavkaNo} onChange={v => setHead(h => ({ ...h, plavkaNo: v }))} disabled={headRo} /></Field>
         </>}
-        <Field label="Выдал"><Select value={head.vydal} options={withBlank(["Ким Александр Юрьевич", "Жумабаев Даурен"])} onChange={v => setHead(h => ({ ...h, vydal: v }))} disabled={readOnly} /></Field>
-        <Field label="Получил"><Select value={head.poluchil} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович"])} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={readOnly} /></Field>
+        <Field label="Выдал"><Select value={head.vydal} options={withBlank(["Ким Александр Юрьевич", "Жумабаев Даурен"])} onChange={v => setHead(h => ({ ...h, vydal: v }))} disabled={headRo} /></Field>
+        <Field label="Получил"><Select value={head.poluchil} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович"])} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={headRo} /></Field>
       </div>
 
       {/* Tabs */}
-      <Tabs tabs={["Выдача", "Возврат", "Списание", "Итого"]} active={tab} onChange={t => setTab(t as TabName)} />
+      <Tabs tabs={["Выдача", "Возврат", "Списание", "Итого"]} active={tab} onChange={t => setTab(t as TabName)} disabled={disabledTabs} />
 
       {tab === "Выдача" && (
         <>
-          {!readOnly && (
+          {!vydachaRo && (
             <div className="flex gap-2 mb-3">
               {vid === "Плавка" ? (
                 // Для плавки состав выдачи определяет только шихтовая карта.
@@ -750,7 +770,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               <SortTh sortKey="ag" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Ag</SortTh>
               <SortTh sortKey="cu" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Cu</SortTh>
               <SortTh sortKey="loc" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Размещение</SortTh>
-              {!readOnly && <th className="w-16"></th>}
+              {!vydachaRo && <th className="w-16"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {sortedVydacha.map(p => (
@@ -764,7 +784,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 text-gray-400">{p.ag}</td>
                   <td className="px-3 py-2 text-gray-400">{p.cu}</td>
                   <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                  {!readOnly && <td className="px-3 py-2"><DeleteIcon onClick={() => setVydacha(prev => prev.filter(x => x.n !== p.n))} /></td>}
+                  {!vydachaRo && <td className="px-3 py-2"><DeleteIcon onClick={() => setVydacha(prev => prev.filter(x => x.n !== p.n))} /></td>}
                 </tr>
               ))}
             </tbody>
@@ -779,7 +799,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
       {tab === "Возврат" && (
         <>
-          {!readOnly && (
+          {!vozvratRo && (
             <div className="flex gap-2 mb-3">
               <Btn size="sm" onClick={() => setShowVozvratPick(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               <ExportBtn onToast={show} />
@@ -795,7 +815,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               <SortTh sortKey="ves" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Вес г</SortTh>
               <SortTh sortKey="ag" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Ag</SortTh>
               <SortTh sortKey="cu" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Cu</SortTh>
-              {!readOnly && <th className="w-16"></th>}
+              {!vozvratRo && <th className="w-16"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {sortedVozvrat.map(p => (
@@ -808,7 +828,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 font-medium">{p.ves}</td>
                   <td className="px-3 py-2 text-gray-400">{p.ag}</td>
                   <td className="px-3 py-2 text-gray-400">{p.cu}</td>
-                  {!readOnly && <td className="px-3 py-2"><DeleteIcon onClick={() => setVozvrat(prev => prev.filter(x => x.n !== p.n))} /></td>}
+                  {!vozvratRo && <td className="px-3 py-2"><DeleteIcon onClick={() => setVozvrat(prev => prev.filter(x => x.n !== p.n))} /></td>}
                 </tr>
               ))}
             </tbody>
@@ -827,7 +847,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           setDoc={setSpisanieDoc}
           onDownload={d => show(`Загрузка файла «${d.name}»...`)}
           vesStart={vesVydacha}
-          readOnly={readOnly}
+          readOnly={vozvratRo}
         />
       )}
 
@@ -841,7 +861,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               </span>
             </div>
             {!inNorm && raznicaSpisana && <Badge label="Разница списана" />}
-            {!inNorm && !raznicaSpisana && !readOnly && (
+            {!inNorm && !raznicaSpisana && !vozvratRo && (
               <button
                 onClick={() => setShowSpisanie(true)}
                 className="px-3 py-1.5 border border-red-500 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
@@ -973,8 +993,12 @@ export function DvizhenieMateriаla() {
     positions: o => o.positions,
     document: o => o.document,
     responsible: o => o.responsible,
-    statusVydacha: o => o.statusVydacha,
+    stage: o => o.stage,
   });
+
+  // Возврат оформляется по выданной операции (или продолжается по черновику возврата)
+  const selectedOp = operations.find(o => o.id === selected) ?? null;
+  const canVozvrat = !!selectedOp && (selectedOp.stage === "Выдано" || selectedOp.stage === "Возврат: На редактировании");
 
   const typeColor: Record<string, string> = {
     "Выдача": "text-green-600",
@@ -990,7 +1014,7 @@ export function DvizhenieMateriаla() {
         breadcrumb={["Движение материала", "Реестр операций"]}
         actions={
           <>
-            <Btn variant="secondary" disabled={!selected} onClick={() => setShowNew(true)}>Оформить возврат</Btn>
+            <Btn variant="secondary" disabled={!canVozvrat} onClick={() => selectedOp && setEditOp(selectedOp)}>Оформить возврат</Btn>
             <Btn onClick={() => setShowNew(true)}>Новая операция</Btn>
           </>
         }
@@ -1021,7 +1045,7 @@ export function DvizhenieMateriаla() {
               <SortTh sortKey="positions" sort={sort} onSort={toggleSort}>Позиции</SortTh>
               <SortTh sortKey="document" sort={sort} onSort={toggleSort}>Документ</SortTh>
               <SortTh sortKey="responsible" sort={sort} onSort={toggleSort}>Подотчётник</SortTh>
-              <SortTh sortKey="statusVydacha" sort={sort} onSort={toggleSort}>Статус выдачи</SortTh>
+              <SortTh sortKey="stage" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <th className="w-24"></th>
             </tr>
           </thead>
@@ -1044,7 +1068,7 @@ export function DvizhenieMateriаla() {
                 </td>
                 <td className="px-4 py-3 text-blue-600">{op.document}</td>
                 <td className="px-4 py-3 text-gray-700">{op.responsible}</td>
-                <td className="px-4 py-3"><Badge label={op.statusVydacha} /></td>
+                <td className="px-4 py-3 whitespace-nowrap"><Badge label={op.stage} /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewOp(op)} />
                   <EditIcon onClick={() => setEditOp(op)} />
@@ -1065,7 +1089,8 @@ export function DvizhenieMateriаla() {
           onSave={updated => {
             setOperations(prev => prev.map(o => o.id === updated.id ? updated : o));
             setEditOp(null);
-            show("Операция сохранена");
+            setSelected(null);
+            show(`Операция ${updated.document || ""} — ${updated.stage}`);
           }}
         />
       )}
@@ -1075,7 +1100,7 @@ export function DvizhenieMateriаla() {
           onSave={o => {
             setOperations(prev => [o, ...prev]);
             setShowNew(false);
-            show("Операция создана");
+            show(`Операция создана — ${o.stage}`);
           }}
         />
       )}

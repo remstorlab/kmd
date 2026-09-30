@@ -78,6 +78,12 @@ export interface VydachaDocPosition {
   issue: number;
 }
 
+// Этап операции движения материала:
+// «Выдача: На редактировании» → (Оформить) «Выдано» → (Оформить возврат, Сохранить) «Возврат: На редактировании» → (Оформить) «Завершено»
+export type OperStage = "Выдача: На редактировании" | "Выдано" | "Возврат: На редактировании" | "Завершено";
+
+export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string };
+
 export interface Operation {
   id: string;
   date: string;
@@ -86,9 +92,13 @@ export interface Operation {
   positions: number;
   document: string;
   responsible: string;
+  stage: OperStage;
   statusVydacha: "Выдано" | "Не выдано";
   statusVozvrat: "Не начат" | "Частично" | "Полностью";
   statusClose: "Не закрыто" | "Закрыто: списано" | "Закрыто";
+  // Позиции вкладок «Выдача» / «Возврат» (сохраняются с операцией)
+  vydachaPos?: OperPosition[];
+  vozvratPos?: OperPosition[];
 }
 
 export interface ShihtaMaterial {
@@ -278,11 +288,11 @@ export const initialVydachaDocs: SkladDoc[] = [
 
 // --- Операции движения ---
 export const initialOperations: Operation[] = [
-  { id: "op1", date: "19.08.2026", type: "Выдача", vid: "Плавка", positions: 3, document: "ДВ-001234", responsible: "Нурланов А.Б.", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
-  { id: "op2", date: "18.08.2026", type: "Выдача-Возврат", vid: "Производство ГП", positions: 5, document: "ДВ-001233", responsible: "Петров С.В.", statusVydacha: "Выдано", statusVozvrat: "Частично", statusClose: "Не закрыто" },
-  { id: "op3", date: "17.08.2026", type: "Выдача-Возврат", vid: "Отбор пробы", positions: 2, document: "ДВ-001232", responsible: "Смирнов К.Д.", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто" },
-  { id: "op4", date: "16.08.2026", type: "Возврат", vid: "Анализ в ЛКИ", positions: 4, document: "ДВ-001231", responsible: "Нурланов А.Б.", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто: списано" },
-  { id: "op5", date: "15.08.2026", type: "Выдача", vid: "Гальванопокрытие", positions: 6, document: "ДВ-001230", responsible: "Иванова М.С.", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
+  { id: "op1", date: "19.08.2026", type: "Выдача", vid: "Плавка", positions: 3, document: "ДВ-001234", responsible: "Нурланов А.Б.", stage: "Выдано", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
+  { id: "op2", date: "18.08.2026", type: "Выдача-Возврат", vid: "Производство ГП", positions: 5, document: "ДВ-001233", responsible: "Петров С.В.", stage: "Возврат: На редактировании", statusVydacha: "Выдано", statusVozvrat: "Частично", statusClose: "Не закрыто" },
+  { id: "op3", date: "17.08.2026", type: "Выдача-Возврат", vid: "Отбор пробы", positions: 2, document: "ДВ-001232", responsible: "Смирнов К.Д.", stage: "Завершено", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто" },
+  { id: "op4", date: "16.08.2026", type: "Возврат", vid: "Анализ в ЛКИ", positions: 4, document: "ДВ-001231", responsible: "Нурланов А.Б.", stage: "Завершено", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто: списано" },
+  { id: "op5", date: "15.08.2026", type: "Выдача", vid: "Гальванопокрытие", positions: 6, document: "ДВ-001230", responsible: "Иванова М.С.", stage: "Выдано", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
 ];
 
 // --- Шихтовые карты ---
