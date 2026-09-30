@@ -6,6 +6,7 @@ import { initialMaterialClasses, initialMaterialCodes } from "../data/mock";
 
 const badgePalette: Record<string, string> = {
   "На складе": "bg-green-100 text-green-700 border-green-200",
+  "Закрыта": "bg-gray-100 text-gray-600 border-gray-200",
   "Выполнено": "bg-green-100 text-green-700 border-green-200",
   "Выполнена": "bg-green-100 text-green-700 border-green-200",
   "Соответствует": "bg-green-100 text-green-700 border-green-200",

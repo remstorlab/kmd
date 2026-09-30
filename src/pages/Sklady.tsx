@@ -8,6 +8,7 @@ import {
 import { GPItem, DMItem, isGPKlass } from "../data/mock";
 import { Gem, Coins, Plus } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
+import VydachaDocModal from "../components/VydachaDocModal";
 
 // Приведение позиций между учётами ГП и ДМ — для разделения складов по классу материала.
 const dmToGp = (i: DMItem): GPItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, qty: i.qty, unit: "шт", klass: i.klass, code: i.metal, location: i.location, status: i.status });
@@ -59,106 +60,10 @@ function GPViewModal({ item, onClose }: { item: GPItem; onClose: () => void }) {
   );
 }
 
-// ── Выдача со склада GP modal ─────────────────────────────────────────────────
-
-function VydachaGPModal({ gpItems, onClose, onSave }: { gpItems: GPItem[]; onClose: () => void; onSave: () => void }) {
-  const [items, setItems] = useState<{ name: string; nomenkl: string; qty: string; klass: string; code: string }[]>([]);
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ nomenkl: gpItems[0]?.nomenkl || "", qty: "" });
-  const [head, setHead] = useState(() => ({
-    number: `НО-${Math.floor(Math.random() * 900 + 100)}`,
-    date: new Date().toLocaleDateString("ru-RU"),
-    poluchatel: "ТД «Золото Казахстана»",
-    schetFaktura: "",
-  }));
-
-  const addItem = () => {
-    const src = gpItems.find(i => i.nomenkl === form.nomenkl);
-    if (!src) return;
-    setItems(prev => [...prev, { name: src.name, nomenkl: src.nomenkl, qty: form.qty || "1", klass: src.klass, code: src.code }]);
-    setShowAdd(false);
-    setForm({ nomenkl: gpItems[0]?.nomenkl || "", qty: "" });
-  };
-
-  const { sorted: sortedItems, sort: itemsSort, toggleSort: toggleItemsSort } = useSort(items, {
-    name: it => it.name,
-    qty: it => parseFloat(it.qty) || 0,
-    klass: it => it.klass,
-    code: it => it.code,
-  });
-
-  return (
-    <Modal
-      title="Накладная на отгрузку ГП"
-      onClose={onClose}
-      wide
-      footer={
-        <>
-          <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn onClick={onSave}>Оформить выдачу</Btn>
-        </>
-      }
-    >
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <Field label="Тип документа"><Select value="Накладная на отгрузку ГП" options={["Накладная на отгрузку ГП"]} /></Field>
-        <Field label="Номер"><Input value={head.number} onChange={v => setHead(h => ({ ...h, number: v }))} /></Field>
-        <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} /></Field>
-        <Field label="Получатель"><Select value={head.poluchatel} options={["ТД «Золото Казахстана»", "ИП Сейткали А.М."]} onChange={v => setHead(h => ({ ...h, poluchatel: v }))} /></Field>
-        <Field label="Счёт-фактура" full><Input value={head.schetFaktura} onChange={v => setHead(h => ({ ...h, schetFaktura: v }))} placeholder="Номер счёт-фактуры" /></Field>
-      </div>
-
-      <div className="border-t border-gray-200 pt-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции выдачи</h3>
-          <div className="flex gap-2">
-            <Btn size="sm" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
-          </div>
-        </div>
-        {items.length === 0 ? (
-          <div className="text-center py-6 text-gray-400 text-sm">Нет позиций. Нажмите «+ Добавить позицию»</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs">
-              <SortTh sortKey="name" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="qty" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Кол-во</SortTh>
-              <SortTh sortKey="klass" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="code" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Код</SortTh>
-            </tr></thead>
-            <tbody>{sortedItems.map((it, i) => (
-              <tr key={i} className="border-t border-gray-100">
-                <td className="px-3 py-2">{it.name}</td>
-                <td className="px-3 py-2">{it.qty} шт</td>
-                <td className="px-3 py-2"><KlassCode value={it.klass} /></td>
-                <td className="px-3 py-2 text-blue-600">{it.code}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        )}
-      </div>
-
-      {showAdd && (
-        <Modal title="Добавить позицию для выдачи" onClose={() => setShowAdd(false)} footer={
-          <>
-            <Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn>
-            <Btn onClick={addItem}>Добавить</Btn>
-          </>
-        }>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Номенкл. номер" full>
-              <Select value={form.nomenkl} options={gpItems.map(i => i.nomenkl)} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} />
-            </Field>
-            <Field label="Количество"><Input value={form.qty} onChange={v => setForm(f => ({ ...f, qty: v }))} placeholder="0" /></Field>
-          </div>
-        </Modal>
-      )}
-    </Modal>
-  );
-}
-
 // ── Остатки на складе ГП ──────────────────────────────────────────────────────
 
 export function OstatokGP() {
-  const { gpItems, setGpItems, dmItems, navigate, setSkladDocs } = useApp();
+  const { gpItems, setGpItems, dmItems, navigate, setSkladDocs, setVydachaDocs } = useApp();
   // Склад ГП: все позиции с классом «Готовая продукция», в том числе из учёта ДМ.
   const skladItems = [...gpItems, ...dmItems.map(dmToGp)].filter(it => isGPKlass(it.klass));
   const { toast, show, clear } = useToast();
@@ -245,7 +150,7 @@ export function OstatokGP() {
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {["Все статусы", "На складе", "Резерв", "В подотчёте"].map(o => <option key={o}>{o}</option>)}
+            {["Все статусы", "На складе", "Резерв", "В подотчёте", "Закрыта"].map(o => <option key={o}>{o}</option>)}
           </select>
         </div>
         <button onClick={() => { setSearch(""); setFilterSklad("Все склады"); setFilterCode("Все коды"); setFilterStatus("Все статусы"); }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
@@ -302,10 +207,10 @@ export function OstatokGP() {
         />
       )}
       {showVydacha && (
-        <VydachaGPModal
-          gpItems={skladItems}
+        <VydachaDocModal
+          kind="ГП"
           onClose={() => setShowVydacha(false)}
-          onSave={() => { setShowVydacha(false); show("Выдача оформлена"); }}
+          onSave={d => { setVydachaDocs(prev => [d, ...prev]); setShowVydacha(false); show(`Накладная ${d.number} сохранена`); }}
         />
       )}
       {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
@@ -352,107 +257,10 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
   );
 }
 
-// ── Выдача со склада ДМ modal ─────────────────────────────────────────────────
-
-function VydachaDMModal({ dmItems, onClose, onSave }: { dmItems: DMItem[]; onClose: () => void; onSave: () => void }) {
-  const availableItems = dmItems.filter(i => i.status === "На складе");
-  const [items, setItems] = useState<{ name: string; nomenkl: string; qty: string; klass: string; metal: string }[]>([]);
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ nomenkl: availableItems[0]?.nomenkl || "", qty: "" });
-  const [head, setHead] = useState(() => ({
-    number: `НО-${Math.floor(Math.random() * 900 + 100)}`,
-    date: new Date().toLocaleDateString("ru-RU"),
-    poluchatel: "ТД «Золото Казахстана»",
-    schetFaktura: "",
-  }));
-
-  const addItem = () => {
-    const src = availableItems.find(i => i.nomenkl === form.nomenkl);
-    if (!src) return;
-    setItems(prev => [...prev, { name: src.name, nomenkl: src.nomenkl, qty: form.qty || "1", klass: src.klass, metal: src.metal }]);
-    setShowAdd(false);
-    setForm({ nomenkl: availableItems[0]?.nomenkl || "", qty: "" });
-  };
-
-  const { sorted: sortedItems, sort: itemsSort, toggleSort: toggleItemsSort } = useSort(items, {
-    name: it => it.name,
-    qty: it => parseFloat(it.qty) || 0,
-    klass: it => it.klass,
-    metal: it => it.metal,
-  });
-
-  return (
-    <Modal
-      title="Накладная на отгрузку"
-      onClose={onClose}
-      wide
-      footer={
-        <>
-          <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn onClick={onSave}>Оформить выдачу</Btn>
-        </>
-      }
-    >
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <Field label="Тип документа"><Select value="Накладная на отгрузку" options={["Накладная на отгрузку"]} /></Field>
-        <Field label="Номер"><Input value={head.number} onChange={v => setHead(h => ({ ...h, number: v }))} /></Field>
-        <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} /></Field>
-        <Field label="Получатель"><Select value={head.poluchatel} options={["ТД «Золото Казахстана»", "АО «Металл Инвест»"]} onChange={v => setHead(h => ({ ...h, poluchatel: v }))} /></Field>
-        <Field label="Счёт-фактура" full><Input value={head.schetFaktura} onChange={v => setHead(h => ({ ...h, schetFaktura: v }))} placeholder="Номер счёт-фактуры" /></Field>
-      </div>
-
-      <div className="border-t border-gray-200 pt-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции выдачи</h3>
-          <div className="flex gap-2">
-            <Btn size="sm" onClick={() => setShowAdd(true)} disabled={availableItems.length === 0}><Plus className="w-4 h-4" />Добавить позицию</Btn>
-          </div>
-        </div>
-        {items.length === 0 ? (
-          <div className="text-center py-6 text-gray-400 text-sm">Нет позиций. Нажмите «+ Добавить позицию»</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs">
-              <SortTh sortKey="name" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="qty" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Кол-во</SortTh>
-              <SortTh sortKey="klass" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="metal" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Металл</SortTh>
-            </tr></thead>
-            <tbody>{sortedItems.map((it, i) => (
-              <tr key={i} className="border-t border-gray-100">
-                <td className="px-3 py-2">{it.name}</td>
-                <td className="px-3 py-2">{it.qty} шт</td>
-                <td className="px-3 py-2"><KlassCode value={it.klass} /></td>
-                <td className="px-3 py-2 text-blue-600">{it.metal}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        )}
-      </div>
-
-      {showAdd && (
-        <Modal title="Добавить позицию для выдачи" onClose={() => setShowAdd(false)} footer={
-          <>
-            <Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn>
-            <Btn onClick={addItem}>Добавить</Btn>
-          </>
-        }>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Номенкл. номер" full>
-              <Select value={form.nomenkl} options={availableItems.map(i => i.nomenkl)} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} />
-            </Field>
-            <Field label="Количество"><Input value={form.qty} onChange={v => setForm(f => ({ ...f, qty: v }))} placeholder="0" /></Field>
-          </div>
-        </Modal>
-      )}
-    </Modal>
-  );
-}
-
 // ── Остатки на складе ДМ ──────────────────────────────────────────────────────
 
 export function OstatokDM() {
-  const { dmItems, setDmItems, gpItems, setGpItems, setSkladDocs } = useApp();
+  const { dmItems, setDmItems, gpItems, setGpItems, setSkladDocs, setVydachaDocs } = useApp();
   // Склад ДМ: все позиции, класс которых не «Готовая продукция», в том числе из учёта ГП.
   const skladItems = [...dmItems, ...gpItems.map(gpToDm)].filter(it => !isGPKlass(it.klass));
   const { toast, show, clear } = useToast();
@@ -495,7 +303,8 @@ export function OstatokDM() {
     });
   };
 
-  const selectedItems = skladItems.filter(it => selected.has(it.id));
+  // Закрытые (выданные) позиции в объединении не участвуют
+  const selectedItems = skladItems.filter(it => selected.has(it.id) && it.status !== "Закрыта");
 
   const doMerge = () => {
     const totalLig = selectedItems.reduce((s, i) => s + i.ligWeight, 0);
@@ -532,7 +341,7 @@ export function OstatokDM() {
           <>
             <Btn onClick={() => setShowPrihod(true)}>Принять на склад</Btn>
             <Btn variant="secondary" onClick={() => setShowVydacha(true)}>Выдать со склада</Btn>
-            <Btn variant="secondary" disabled={selected.size < 2} onClick={() => setShowMerge(true)}>Объединить позиции</Btn>
+            <Btn variant="secondary" disabled={selectedItems.length < 2} onClick={() => setShowMerge(true)}>Объединить позиции</Btn>
             <ExportBtn onToast={show} />
           </>
         }
@@ -551,7 +360,7 @@ export function OstatokDM() {
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {["Все статусы", "На складе", "Резерв", "В подотчёте"].map(o => <option key={o}>{o}</option>)}
+            {["Все статусы", "На складе", "Резерв", "В подотчёте", "Закрыта"].map(o => <option key={o}>{o}</option>)}
           </select>
         </div>
         <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus("Все статусы"); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
@@ -563,7 +372,7 @@ export function OstatokDM() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="w-10 px-4 py-3"><input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(filtered.map(i => i.id)) : new Set())} /></th>
+              <th className="w-10 px-4 py-3"><input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(filtered.filter(i => i.status !== "Закрыта").map(i => i.id)) : new Set())} /></th>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort}>Номенкл. №</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort}>Класс</SortTh>
@@ -580,7 +389,7 @@ export function OstatokDM() {
           <tbody className="divide-y divide-gray-100">
             {pageItems.map(item => (
               <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3"><input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} /></td>
+                <td className="px-4 py-3"><input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} disabled={item.status === "Закрыта"} title={item.status === "Закрыта" ? "Позиция закрыта — объединение недоступно" : undefined} /></td>
                 <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
                 <td className="px-4 py-3"><KlassCode value={item.klass} /></td>
@@ -633,10 +442,10 @@ export function OstatokDM() {
         />
       )}
       {showVydacha && (
-        <VydachaDMModal
-          dmItems={skladItems}
+        <VydachaDocModal
+          kind="ДМ"
           onClose={() => setShowVydacha(false)}
-          onSave={() => { setShowVydacha(false); show("Выдача оформлена"); }}
+          onSave={d => { setVydachaDocs(prev => [d, ...prev]); setShowVydacha(false); show(`Накладная ${d.number} сохранена`); }}
         />
       )}
       {toast && <Toast message={toast} onDone={clear} />}

@@ -8,6 +8,7 @@ import {
 import { SkladDoc, GPItem, DocStatus } from "../data/mock";
 import { Inbox, Send, Repeat, Plus, X, LucideIcon } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
+import VydachaDocModal from "../components/VydachaDocModal";
 
 // ── Hub ───────────────────────────────────────────────────────────────────────
 
@@ -33,212 +34,6 @@ export function SkladskieOperHub() {
         ))}
       </div>
     </div>
-  );
-}
-
-// ── Выдача ГП modal ───────────────────────────────────────────────────────────
-
-function VydachaGPModal({ onClose, onSave, doc, readOnly = false }: { onClose: () => void; onSave: (d: SkladDoc) => void; doc?: SkladDoc | null; readOnly?: boolean }) {
-  const { gpItems } = useApp();
-  const { toast, show, clear } = useToast();
-  const [head, setHead] = useState(() => ({
-    number: doc?.number || "НО-0205",
-    date: doc?.date || new Date().toLocaleDateString("ru-RU"),
-    poluchatel: doc?.receiver || "ТД «Золото Казахстана»",
-    schetFaktura: "СФ-2026-0199",
-  }));
-
-  const [files, setFiles] = useState<File[]>([]);
-
-  const [positions, setPositions] = useState<{ nomenkl: string; name: string; code: string; location: string; qty: number }[]>([]);
-  const [showAdd, setShowAdd] = useState(false);
-  const [selectedQty, setSelectedQty] = useState<Record<string, string>>({});
-
-  const availableItems = gpItems.filter(i => i.status === "На складе" && i.qty > 0);
-  const selectedCount = Object.keys(selectedQty).length;
-
-  const { sorted: sortedPositions, sort: posSort, toggleSort: togglePosSort } = useSort(positions, {
-    nomenkl: p => p.nomenkl,
-    name: p => p.name,
-    code: p => p.code,
-    qty: p => p.qty,
-    location: p => p.location,
-  });
-
-  const { sorted: sortedAvailable, sort: availSort, toggleSort: toggleAvailSort } = useSort(availableItems, {
-    nomenkl: i => i.nomenkl,
-    name: i => i.name,
-    code: i => i.code,
-    qty: i => i.qty,
-  });
-
-  const openAdd = () => {
-    setSelectedQty({});
-    setShowAdd(true);
-  };
-
-  const toggleItem = (id: string) => {
-    setSelectedQty(prev => {
-      const next = { ...prev };
-      if (id in next) delete next[id];
-      else next[id] = "1";
-      return next;
-    });
-  };
-
-  const setItemQty = (id: string, v: string) => {
-    setSelectedQty(prev => (id in prev ? { ...prev, [id]: v } : prev));
-  };
-
-  const addPositions = () => {
-    const additions = availableItems
-      .filter(i => i.id in selectedQty)
-      .map((i): { nomenkl: string; name: string; code: string; location: string; qty: number } => {
-        const raw = parseInt(selectedQty[i.id], 10) || 1;
-        return { nomenkl: i.nomenkl, name: i.name, code: i.code, location: i.location, qty: Math.max(1, Math.min(raw, i.qty)) };
-      });
-    if (additions.length === 0) return;
-    setPositions(prev => [...prev, ...additions]);
-    setShowAdd(false);
-  };
-
-  const save = (targetStatus: DocStatus) => {
-    const d: SkladDoc = doc ? {
-      ...doc,
-      number: head.number,
-      date: head.date,
-      receiver: head.poluchatel,
-      status: targetStatus,
-    } : {
-      id: `vd-${Date.now()}`,
-      date: head.date,
-      type: "Накладная на отгрузку ГП",
-      number: head.number,
-      status: targetStatus,
-      sender: "Склад ГП",
-      receiver: head.poluchatel,
-    };
-    onSave(d);
-  };
-
-  return (
-    <Modal title="Накладная на отгрузку ГП" onClose={onClose} wide footer={
-      readOnly
-        ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn>
-        : (
-          <>
-            <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-            <Btn onClick={() => save("Оформлено")}>Оформить</Btn>
-            <Btn variant="secondary" onClick={() => save("Редактирование")}>Сохранить</Btn>
-          </>
-        )
-    }>
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <Field label="Тип документа"><Select value="Накладная на отгрузку ГП" options={["Накладная на отгрузку ГП"]} disabled={readOnly} /></Field>
-        <Field label="Номер"><Input value={head.number} onChange={v => setHead(h => ({ ...h, number: v }))} disabled={readOnly} /></Field>
-        <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={readOnly} /></Field>
-        <Field label="Получатель"><Select value={head.poluchatel} options={["ТД «Золото Казахстана»", "ИП Сейткали А.М."]} onChange={v => setHead(h => ({ ...h, poluchatel: v }))} disabled={readOnly} /></Field>
-        <Field label="Счёт-фактура" full><Input value={head.schetFaktura} onChange={v => setHead(h => ({ ...h, schetFaktura: v }))} disabled={readOnly} /></Field>
-      </div>
-
-      <div className="mb-4">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
-        {readOnly && files.length === 0 ? (
-          doc ? <FileChip name={`Накладная_${doc.number}.pdf`} onDownload={() => show("Загрузка файла...")} /> : <span className="text-sm text-gray-400">Файлы не прикреплены</span>
-        ) : (
-          <MultiFileUpload files={files} onChange={setFiles} disabled={readOnly} />
-        )}
-      </div>
-
-      <div className="border-t border-gray-200 pt-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции для выдачи</h3>
-          {!readOnly && (
-            <Btn size="sm" onClick={openAdd} disabled={availableItems.length === 0}><Plus className="w-4 h-4" />Добавить позицию</Btn>
-          )}
-        </div>
-        {positions.length === 0 ? (
-          <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-            Список позиций для выдачи пуст
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <SortTh sortKey="nomenkl" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Номенкл.№</SortTh>
-              <SortTh sortKey="name" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="code" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Код</SortTh>
-              <SortTh sortKey="qty" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Кол-во</SortTh>
-              <SortTh sortKey="location" sort={posSort} onSort={togglePosSort} className="px-3 py-2">Размещение</SortTh>
-              {!readOnly && <th className="w-16"></th>}
-            </tr></thead>
-            <tbody className="divide-y divide-gray-100">
-              {sortedPositions.map((p, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
-                  <td className="px-3 py-2 font-medium">{p.name}</td>
-                  <td className="px-3 py-2 text-blue-600">{p.code}</td>
-                  <td className="px-3 py-2">{p.qty}</td>
-                  <td className="px-3 py-2 text-gray-500">{p.location}</td>
-                  {!readOnly && <td className="px-3 py-2">
-                    <button onClick={() => setPositions(prev => prev.filter(x => x !== p))} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
-                  </td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {showAdd && (
-        <Modal
-          title="Добавить позиции со склада ГП"
-          onClose={() => setShowAdd(false)}
-          footer={<>
-            <Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn>
-            <Btn onClick={addPositions} disabled={selectedCount === 0}>Добавить{selectedCount > 0 ? ` (${selectedCount})` : ""}</Btn>
-          </>}
-        >
-          {availableItems.length === 0 ? (
-            <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-              Нет доступных позиций на складе ГП
-            </div>
-          ) : (
-            <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0"><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-                  <th className="w-10 px-3 py-2"></th>
-                  <SortTh sortKey="nomenkl" sort={availSort} onSort={toggleAvailSort} className="px-3 py-2">Номенкл.№</SortTh>
-                  <SortTh sortKey="name" sort={availSort} onSort={toggleAvailSort} className="px-3 py-2">Наименование</SortTh>
-                  <SortTh sortKey="code" sort={availSort} onSort={toggleAvailSort} className="px-3 py-2">Код</SortTh>
-                  <SortTh sortKey="qty" sort={availSort} onSort={toggleAvailSort} className="px-3 py-2">Доступно</SortTh>
-                  <th className="px-3 py-2 text-left w-32">Кол-во к выдаче</th>
-                </tr></thead>
-                <tbody className="divide-y divide-gray-100">
-                  {sortedAvailable.map(i => {
-                    const checked = i.id in selectedQty;
-                    return (
-                      <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
-                        <td className="px-3 py-2">
-                          <input type="checkbox" checked={checked} onChange={() => toggleItem(i.id)} className="w-4 h-4 accent-blue-600" />
-                        </td>
-                        <td className="px-3 py-2 text-gray-500">{i.nomenkl}</td>
-                        <td className="px-3 py-2 font-medium">{i.name}</td>
-                        <td className="px-3 py-2 text-blue-600">{i.code}</td>
-                        <td className="px-3 py-2 text-gray-500">{i.qty} {i.unit}</td>
-                        <td className="px-3 py-2">
-                          <Input value={selectedQty[i.id] ?? ""} onChange={v => setItemQty(i.id, v)} placeholder="1" disabled={!checked} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Modal>
-      )}
-      {toast && <Toast message={toast} onDone={clear} />}
-    </Modal>
   );
 }
 
@@ -526,7 +321,7 @@ export function VydachaList() {
     <div>
       <PageHeader
         title="Выдача со склада"
-        subtitle="Документы отгрузки готовой продукции"
+        subtitle="Документы отгрузки ГП и ДМ сторонним получателям"
         breadcrumb={["Складские операции", "Выдача со склада"]}
         actions={
           <>
@@ -570,9 +365,9 @@ export function VydachaList() {
         <Pagination page={page} total={vydachaDocs.length} perPage={perPage} onPage={setPage} />
       </div>
 
-      {viewDoc && <VydachaGPModal doc={viewDoc} onClose={() => setViewDoc(null)} onSave={() => setViewDoc(null)} readOnly />}
+      {viewDoc && <VydachaDocModal doc={viewDoc} onClose={() => setViewDoc(null)} onSave={() => setViewDoc(null)} readOnly />}
       {editDoc && (
-        <VydachaGPModal
+        <VydachaDocModal
           doc={editDoc}
           onClose={() => setEditDoc(null)}
           onSave={d => {
@@ -583,7 +378,7 @@ export function VydachaList() {
         />
       )}
       {showNew && (
-        <VydachaGPModal
+        <VydachaDocModal
           onClose={() => setShowNew(false)}
           onSave={d => {
             setVydachaDocs(prev => [d, ...prev]);

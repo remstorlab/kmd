@@ -71,7 +71,7 @@ export function Dashboard() {
   const { dmItems, vydachaDocs, podotchetniki, operations, logs, currentUser, navigate } = useApp();
 
   // ── Часть 1: всего на складе (ДМ), по видам металла ──────────────────────
-  const dmByMetal = dmItems.reduce((acc, i) => {
+  const dmByMetal = dmItems.filter(i => i.status !== "Закрыта").reduce((acc, i) => {
     const m = baseMetal(i.metal);
     acc[m] = (acc[m] || 0) + i.netWeight;
     return acc;

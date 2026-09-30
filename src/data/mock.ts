@@ -1,5 +1,6 @@
-export type StatusGP = "На складе" | "Резерв" | "В подотчёте";
-export type StatusDM = "На складе" | "Резерв" | "В подотчёте";
+// «Закрыта» — позиция выдана со склада наружу по оформленной накладной на отгрузку.
+export type StatusGP = "На складе" | "Резерв" | "В подотчёте" | "Закрыта";
+export type StatusDM = "На складе" | "Резерв" | "В подотчёте" | "Закрыта";
 export type DocStatus = "Оформлено" | "Редактирование";
 export type OpType = "Выдача" | "Возврат" | "Выдача-Возврат";
 export type OpVid = "Отбор пробы" | "Анализ в ЛКИ" | "Плавка" | "Гальванопокрытие" | "Производство ГП";
@@ -51,11 +52,30 @@ export interface DMItem {
 export interface SkladDoc {
   id: string;
   date: string;
-  type: "Приходный ордер" | "Накладная на приём ГП" | "Накладная на приём ДМ" | "Накладная на отгрузку ГП" | "Накладная на отгрузку";
+  type: "Приходный ордер" | "Накладная на приём ГП" | "Накладная на приём ДМ" | "Накладная на отгрузку ГП" | "Накладная на отгрузку ДМ" | "Накладная на отгрузку";
   number: string;
   status: DocStatus;
   sender: string;
   receiver: string;
+  // Позиции накладной на отгрузку (выдача со склада)
+  positions?: VydachaDocPosition[];
+}
+
+// Позиция выдачи: ссылка на позицию склада (id + учёт ГП/ДМ) и количество к выдаче.
+export interface VydachaDocPosition {
+  id: string;
+  src: "gp" | "dm";
+  nomenkl: string;
+  name: string;
+  klass: string;
+  code: string;
+  qty: number;
+  unit: string;
+  proba: number | null;
+  lig: number | null;
+  net: number | null;
+  location: string;
+  issue: number;
 }
 
 export interface Operation {
