@@ -98,6 +98,8 @@ export interface ShihtaMaterial {
   proba: number;
   ves: number;
   loc: string;
+  // Количество, шт (для позиций, зарезервированных со склада ДМ)
+  qty?: number;
 }
 
 export interface ShihtovayaKarta {
@@ -109,6 +111,8 @@ export interface ShihtovayaKarta {
   // Позиции ДМ из резерва карты, выданные в другой операции (причина статуса «На редактировании»).
   vydannyePozicii?: string[];
   materials: ShihtaMaterial[];
+  // Прикреплённые документы (несколько файлов)
+  files?: File[];
   createdAt: string;
   createdBy: string;
 }
