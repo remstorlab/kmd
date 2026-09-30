@@ -985,7 +985,7 @@ export function DvizhenieMateriаla() {
   return (
     <div>
       <PageHeader
-        title="Движение материала"
+        title="Движение материала (операции)"
         subtitle="Выдача и возврат материалов подотчётным лицам"
         breadcrumb={["Движение материала", "Реестр операций"]}
         actions={

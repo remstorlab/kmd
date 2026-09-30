@@ -15,7 +15,7 @@ export function SkladskieOperHub() {
   const cards: { title: string; sub: string; icon: LucideIcon; page: "prihod-list" | "vydacha-list" | "dvizhenie-mat" }[] = [
     { title: "Приход на склад", sub: "Приходные ордера и накладные", icon: Inbox, page: "prihod-list" },
     { title: "Выдача со склада", sub: "Документы отгрузки", icon: Send, page: "vydacha-list" },
-    { title: "Движение материала (операции)", sub: "Журнал операций", icon: Repeat, page: "dvizhenie-mat" },
+    { title: "Движение материала (операции)", sub: "Журнал внутреннихопераций", icon: Repeat, page: "dvizhenie-mat" },
   ];
   return (
     <div>

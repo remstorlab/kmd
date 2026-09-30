@@ -906,7 +906,7 @@ export function OstatokDM() {
   return (
     <div>
       <PageHeader
-        title="Остатки материалов на складе"
+        title="Остатки материалов на складе ДМ"
         subtitle="Актуальные позиции по всем складам, сейфам и полкам"
         breadcrumb={["Склады", "Остатки на складе ДМ"]}
         actions={
