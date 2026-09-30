@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import {
   GPItem, DMItem, SkladDoc, Operation, ShihtovayaKarta,
-  Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy,
+  Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy, StorageLocation,
   initialGPItems, initialDMItems, initialSkladDocs, initialVydachaDocs,
   initialOperations, initialShihtovyeKarty, initialPodotchetniki,
-  initialUsers, initialRoles, initialLogs, initialSecurityPolicy,
+  initialUsers, initialRoles, initialLogs, initialSecurityPolicy, initialStorageLocations,
 } from "../data/mock";
 
 export type Page =
@@ -194,6 +194,8 @@ interface AppCtx {
   setRoles: React.Dispatch<React.SetStateAction<Role[]>>;
   logs: LogEntry[];
   setLogs: React.Dispatch<React.SetStateAction<LogEntry[]>>;
+  storageLocations: StorageLocation[];
+  setStorageLocations: React.Dispatch<React.SetStateAction<StorageLocation[]>>;
 }
 
 const Ctx = createContext<AppCtx>(null!);
@@ -293,6 +295,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState(initialUsers);
   const [roles, setRoles] = useState(initialRoles);
   const [logs, setLogs] = useState(initialLogs);
+  const [storageLocations, setStorageLocations] = useState(initialStorageLocations);
 
   return (
     <Ctx.Provider value={{
@@ -312,6 +315,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       users, setUsers,
       roles, setRoles,
       logs, setLogs,
+      storageLocations, setStorageLocations,
     }}>
       {children}
     </Ctx.Provider>

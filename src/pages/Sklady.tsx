@@ -7,6 +7,7 @@ import {
 } from "../components/ui";
 import { GPItem, DMItem, isGPKlass } from "../data/mock";
 import { Gem, Coins, Plus } from "lucide-react";
+import PrihodDocModal from "../components/PrihodDocModal";
 
 // Приведение позиций между учётами ГП и ДМ — для разделения складов по классу материала.
 const dmToGp = (i: DMItem): GPItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, qty: i.qty, unit: "шт", klass: i.klass, code: i.metal, location: i.location, status: i.status });
@@ -447,292 +448,6 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
   );
 }
 
-// ── Приём на склад ДМ modal (Приходный ордер / Накладная) ────────────────────
-
-type PrihodDocType = "Приходный ордер" | "Накладная";
-
-function PrihodDMModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [docType, setDocType] = useState<PrihodDocType>("Приходный ордер");
-  const { toast, show, clear } = useToast();
-  const today = new Date().toLocaleDateString("ru-RU");
-
-  const [head, setHead] = useState(() => ({
-    number: "ПО-0342",
-    date: today,
-    otpravitel: "ООО «Аффинаж-Сервис»",
-    poluchatel: "Склад №1",
-    schetFaktura: "СФ-0091",
-    schetFakturaData: today,
-    dogovor: "ДОГ-2026-045",
-    dogovorData: today,
-    pasport: "ПМ-000456",
-    platDoc: "ПД-001234",
-    platDocData: today,
-    ligByDoc: "1 000.00 г",
-    massByDoc: "999.90 г",
-    ligAccepted: "999.50 г",
-    netAccepted: "998.80 г",
-    price: "32 500.00",
-    sum: "32 467 500.00",
-    planPos: "План-2026/Q3-AU",
-    nakladNumber: "НП-001234",
-    nakladDate: today,
-    zakazchik: "Национальный банк",
-    skladOtpr: "СДМ",
-    skladPoluch: "Склад ДМ №1",
-    sotrudnik: "Петров А.Н.",
-  }));
-
-  // Приходный ордер state
-  const [ownProperty, setOwnProperty] = useState(true);
-  const [orderPositions, setOrderPositions] = useState([
-    { nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au чистое", kol: "1", proba: "999.9", lig: "1000.0", net: "999.9", loc: "Сейф 1/Полка 1" },
-    { nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag чистое", kol: "1", proba: "925.0", lig: "318.6", net: "294.7", loc: "Сейф 2/Полка 3" },
-  ]);
-  const [showAddOrder, setShowAddOrder] = useState(false);
-  const [orderForm, setOrderForm] = useState({ nomenkl: "НН-72103", klass: "Слиток", code: "Au чистое", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
-
-  const addOrderPos = () => {
-    setOrderPositions(p => [...p, { nomenkl: orderForm.nomenkl, name: orderForm.name || "Позиция ДМ", klass: orderForm.klass, code: orderForm.code, kol: orderForm.kol || "1", proba: orderForm.proba, lig: orderForm.lig, net: orderForm.net, loc: `${orderForm.sey}, ${orderForm.polka}` }]);
-    setShowAddOrder(false);
-    setOrderForm({ nomenkl: "НН-72103", klass: "Слиток", code: "Au чистое", name: "", kol: "", proba: "999", lig: "", net: "", sey: "Сейф №1", polka: "Полка А" });
-  };
-
-  const { sorted: sortedOrderPositions, sort: orderPosSort, toggleSort: toggleOrderPosSort } = useSort(orderPositions, {
-    nomenkl: p => p.nomenkl,
-    name: p => p.name,
-    klass: p => p.klass,
-    code: p => p.code,
-    kol: p => parseFloat(p.kol) || 0,
-    proba: p => parseFloat(p.proba) || 0,
-    lig: p => parseFloat(p.lig) || 0,
-    net: p => parseFloat(p.net) || 0,
-    loc: p => p.loc,
-  });
-
-  // Накладная state
-  const [nakladPositions, setNakladPositions] = useState([
-    { nomenkl: "AU-SL-12000", name: "Монета Атамекен", kol: "2000", klass: "Готовая продукция", code: "Ag чистое", loc: "Сейф №1, Полка 5" },
-    { nomenkl: "AU-SL-01000", name: "Орден Алтын алка", kol: "300", klass: "Готовая продукция", code: "Ag чистое", loc: "Сейф №1, Полка 7" },
-  ]);
-  const [showAddNaklad, setShowAddNaklad] = useState(false);
-  const [nakladForm, setNakladForm] = useState({ nomenkl: "", klass: "Готовая продукция", code: "ЗлМ 585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
-
-  const addNakladPos = () => {
-    setNakladPositions(p => [...p, { nomenkl: nakladForm.nomenkl || `AU-SL-${Math.floor(Math.random() * 90000 + 10000)}`, name: nakladForm.name || "Позиция ДМ", kol: nakladForm.kol || "0", klass: nakladForm.klass, code: nakladForm.code, loc: `${nakladForm.sey}, ${nakladForm.polka}` }]);
-    setShowAddNaklad(false);
-    setNakladForm({ nomenkl: "", klass: "Готовая продукция", code: "ЗлМ 585", name: "", kol: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
-  };
-
-  const { sorted: sortedNakladPositions, sort: nakladPosSort, toggleSort: toggleNakladPosSort } = useSort(nakladPositions, {
-    nomenkl: p => p.nomenkl,
-    name: p => p.name,
-    kol: p => parseFloat(p.kol) || 0,
-    klass: p => p.klass,
-    code: p => p.code,
-    loc: p => p.loc,
-  });
-
-  const isOrder = docType === "Приходный ордер";
-
-  return (
-    <Modal
-      title={isOrder ? "Приходный ордер" : "Накладная на приём ДМ"}
-      onClose={onClose}
-      extraWide
-      footer={
-        <>
-          <Btn variant="secondary" onClick={() => show("Ярлыки отправлены на печать")}>Печать ярлыков ДМ</Btn>
-          <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn onClick={onSave}>Оформить</Btn>
-          <Btn variant="secondary" onClick={onSave}>Сохранить</Btn>
-        </>
-      }
-    >
-      {isOrder ? (
-        <div className="grid grid-cols-3 gap-4 mb-5">
-          <Field label="Тип документа"><Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} /></Field>
-          <Field label="Номер"><Input value={head.number} onChange={v => setHead(h => ({ ...h, number: v }))} /></Field>
-          <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} /></Field>
-          <Field label="Отправитель"><Select value={head.otpravitel} options={["ООО «Аффинаж-Сервис»", "АО «Металл Инвест»"]} onChange={v => setHead(h => ({ ...h, otpravitel: v }))} /></Field>
-          <Field label="Получатель"><Select value={head.poluchatel} options={["Склад №1", "Склад №2"]} onChange={v => setHead(h => ({ ...h, poluchatel: v }))} /></Field>
-          <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={v => setHead(h => ({ ...h, schetFaktura: v }))} /></Field>
-          <Field label="Дата счёт-фактуры"><Input value={head.schetFakturaData} onChange={v => setHead(h => ({ ...h, schetFakturaData: v }))} /></Field>
-          <Field label="Номер договора"><Input value={head.dogovor} onChange={v => setHead(h => ({ ...h, dogovor: v }))} /></Field>
-          <Field label="Дата договора"><Input value={head.dogovorData} onChange={v => setHead(h => ({ ...h, dogovorData: v }))} /></Field>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
-            <Toggle checked={ownProperty} onChange={setOwnProperty} label={ownProperty ? "Да" : "Нет"} />
-          </div>
-          <Field label="Номер паспорта"><Input value={head.pasport} onChange={v => setHead(h => ({ ...h, pasport: v }))} /></Field>
-          <Field label="Номер платёжного документа"><Input value={head.platDoc} onChange={v => setHead(h => ({ ...h, platDoc: v }))} /></Field>
-          <Field label="Дата платёжного документа"><Input value={head.platDocData} onChange={v => setHead(h => ({ ...h, platDocData: v }))} /></Field>
-          <Field label="Лигатурный вес по документу"><Input value={head.ligByDoc} onChange={v => setHead(h => ({ ...h, ligByDoc: v }))} /></Field>
-          <Field label="Масса по документу"><Input value={head.massByDoc} onChange={v => setHead(h => ({ ...h, massByDoc: v }))} /></Field>
-          <Field label="Принято лигатурный вес"><Input value={head.ligAccepted} onChange={v => setHead(h => ({ ...h, ligAccepted: v }))} /></Field>
-          <Field label="Принято чистый вес"><Input value={head.netAccepted} onChange={v => setHead(h => ({ ...h, netAccepted: v }))} /></Field>
-          <Field label="Цена за единицу, тг"><Input value={head.price} onChange={v => setHead(h => ({ ...h, price: v }))} /></Field>
-          <Field label="Сумма в тенге"><Input value={head.sum} onChange={v => setHead(h => ({ ...h, sum: v }))} /></Field>
-          <Field label="Позиция годового плана"><Input value={head.planPos} onChange={v => setHead(h => ({ ...h, planPos: v }))} /></Field>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 mb-5">
-          <Field label="Тип документа"><Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} /></Field>
-          <Field label="Номер"><Input value={head.nakladNumber} onChange={v => setHead(h => ({ ...h, nakladNumber: v }))} /></Field>
-          <Field label="Дата"><Input value={head.nakladDate} onChange={v => setHead(h => ({ ...h, nakladDate: v }))} /></Field>
-          <Field label="Заказчик"><Select value={head.zakazchik} options={["Национальный банк", "Монетный двор"]} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} /></Field>
-          <Field label="Склад-отправитель"><Select value={head.skladOtpr} options={["СДМ", "Производственный цех"]} onChange={v => setHead(h => ({ ...h, skladOtpr: v }))} /></Field>
-          <Field label="Склад-получатель"><Select value={head.skladPoluch} options={["Склад ДМ №1", "Склад ДМ №2"]} onChange={v => setHead(h => ({ ...h, skladPoluch: v }))} /></Field>
-          <Field label="Сотрудник склада-получателя" full><Select value={head.sotrudnik} options={["Петров А.Н.", "Ким Александр Юрьевич"]} onChange={v => setHead(h => ({ ...h, sotrudnik: v }))} /></Field>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
-            <Toggle checked={ownProperty} onChange={setOwnProperty} label={ownProperty ? "Да" : "Нет"} />
-          </div>
-        </div>
-      )}
-
-      <div className="mb-4">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
-        <FileChip
-          name={isOrder ? "Приходный ордер ПО-0342.pdf" : "Накладная_НП-001234.pdf"}
-          onDownload={() => show("Загрузка файла...")}
-        />
-      </div>
-
-      {isOrder ? (
-        <div className="border-t border-gray-200 pt-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции прихода</h3>
-            <div className="flex gap-2">
-              <Btn size="sm" onClick={() => setShowAddOrder(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
-              <ExportBtn onToast={show} />
-            </div>
-          </div>
-          <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <SortTh sortKey="nomenkl" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Номенкл. №</SortTh>
-              <SortTh sortKey="name" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="klass" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="code" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Код материала</SortTh>
-              <SortTh sortKey="kol" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Кол-во</SortTh>
-              <SortTh sortKey="proba" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Проба</SortTh>
-              <SortTh sortKey="lig" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Лигат.</SortTh>
-              <SortTh sortKey="net" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Чистый</SortTh>
-              <SortTh sortKey="loc" sort={orderPosSort} onSort={toggleOrderPosSort} className="px-3 py-2">Размещение</SortTh>
-              <th className="w-24"></th>
-            </tr></thead>
-            <tbody className="divide-y divide-gray-100">
-              {sortedOrderPositions.map((p, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
-                  <td className="px-3 py-2 font-medium">{p.name}</td>
-                  <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
-                  <td className="px-3 py-2 text-blue-600">{p.code}</td>
-                  <td className="px-3 py-2">{p.kol}</td>
-                  <td className="px-3 py-2">{p.proba}</td>
-                  <td className="px-3 py-2 font-medium">{p.lig}</td>
-                  <td className="px-3 py-2 text-blue-600">{p.net}</td>
-                  <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1">
-                      <EyeIcon onClick={() => show(`Позиция: ${p.name}`)} />
-                      <EditIcon onClick={() => show(`Редактирование: ${p.name}`)} />
-                      <DeleteIcon onClick={() => setOrderPositions(prev => prev.filter(x => x !== p))} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="border-t border-gray-200 pt-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции приёма</h3>
-            <div className="flex gap-2">
-              <Btn size="sm" onClick={() => setShowAddNaklad(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
-              <ExportBtn onToast={show} />
-            </div>
-          </div>
-          <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <SortTh sortKey="nomenkl" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Номенкл. №</SortTh>
-              <SortTh sortKey="name" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="kol" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Кол-во</SortTh>
-              <SortTh sortKey="klass" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="code" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Код материала</SortTh>
-              <SortTh sortKey="loc" sort={nakladPosSort} onSort={toggleNakladPosSort} className="px-3 py-2">Размещение</SortTh>
-              <th className="w-24"></th>
-            </tr></thead>
-            <tbody className="divide-y divide-gray-100">
-              {sortedNakladPositions.map((p, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
-                  <td className="px-3 py-2 font-medium">{p.name}</td>
-                  <td className="px-3 py-2">{p.kol}</td>
-                  <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
-                  <td className="px-3 py-2 font-medium">{p.code}</td>
-                  <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1">
-                      <EyeIcon onClick={() => show(`Позиция: ${p.name}`)} />
-                      <EditIcon onClick={() => show(`Редактирование: ${p.name}`)} />
-                      <DeleteIcon onClick={() => setNakladPositions(prev => prev.filter(x => x !== p))} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {showAddOrder && (
-        <Modal title="Добавить позицию ДМ" onClose={() => setShowAddOrder(false)} footer={
-          <>
-            <Btn variant="secondary" onClick={() => setShowAddOrder(false)}>Отмена</Btn>
-            <Btn onClick={addOrderPos}>Добавить</Btn>
-          </>
-        }>
-          <div className="grid grid-cols-3 gap-4">
-            <Field label="Номенкл. номер"><Input value={orderForm.nomenkl} onChange={v => setOrderForm(f => ({ ...f, nomenkl: v }))} /></Field>
-            <Field label="Класс"><KlassSelect value={orderForm.klass} onChange={v => setOrderForm(f => ({ ...f, klass: v }))} /></Field>
-            <Field label="Код материала"><MaterialCodeSelect value={orderForm.code} onChange={v => setOrderForm(f => ({ ...f, code: v }))} /></Field>
-            <Field label="Наименование" full><Input value={orderForm.name} onChange={v => setOrderForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
-            <Field label="Количество"><Input value={orderForm.kol} onChange={v => setOrderForm(f => ({ ...f, kol: v }))} placeholder="1" /></Field>
-            <Field label="Проба"><Input value={orderForm.proba} onChange={v => setOrderForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
-            <Field label="Масса лигатурная"><Input value={orderForm.lig} onChange={v => setOrderForm(f => ({ ...f, lig: v }))} placeholder="0.00" /></Field>
-            <Field label="Масса чистая"><Input value={orderForm.net} onChange={v => setOrderForm(f => ({ ...f, net: v }))} placeholder="0.00" /></Field>
-            <Field label="Сейф"><Select value={orderForm.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setOrderForm(f => ({ ...f, sey: v }))} /></Field>
-            <Field label="Полка"><Select value={orderForm.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setOrderForm(f => ({ ...f, polka: v }))} /></Field>
-          </div>
-        </Modal>
-      )}
-
-      {showAddNaklad && (
-        <Modal title="Добавить позицию ДМ" onClose={() => setShowAddNaklad(false)} footer={
-          <>
-            <Btn variant="secondary" onClick={() => setShowAddNaklad(false)}>Отмена</Btn>
-            <Btn onClick={addNakladPos}>Добавить</Btn>
-          </>
-        }>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Номенкл. номер"><Input value={nakladForm.nomenkl} onChange={v => setNakladForm(f => ({ ...f, nomenkl: v }))} placeholder="AU-SL-XXXXX" /></Field>
-            <Field label="Класс"><KlassSelect value={nakladForm.klass} onChange={v => setNakladForm(f => ({ ...f, klass: v }))} /></Field>
-            <Field label="Код материала"><MaterialCodeSelect value={nakladForm.code} onChange={v => setNakladForm(f => ({ ...f, code: v }))} /></Field>
-            <Field label="Наименование" full><Input value={nakladForm.name} onChange={v => setNakladForm(f => ({ ...f, name: v }))} placeholder="Введите наименование" /></Field>
-            <Field label="Количество"><Input value={nakladForm.kol} onChange={v => setNakladForm(f => ({ ...f, kol: v }))} placeholder="0" /></Field>
-            <Field label="Ед. изм."><Select value={nakladForm.unit} options={["шт", "г", "кг"]} onChange={v => setNakladForm(f => ({ ...f, unit: v }))} /></Field>
-            <Field label="Сейф"><Select value={nakladForm.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setNakladForm(f => ({ ...f, sey: v }))} /></Field>
-            <Field label="Полка"><Select value={nakladForm.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setNakladForm(f => ({ ...f, polka: v }))} /></Field>
-          </div>
-        </Modal>
-      )}
-      {toast && <Toast message={toast} onDone={clear} />}
-    </Modal>
-  );
-}
-
 // ── Выдача со склада ДМ modal ─────────────────────────────────────────────────
 
 function VydachaDMModal({ dmItems, onClose, onSave }: { dmItems: DMItem[]; onClose: () => void; onSave: () => void }) {
@@ -833,7 +548,7 @@ function VydachaDMModal({ dmItems, onClose, onSave }: { dmItems: DMItem[]; onClo
 // ── Остатки на складе ДМ ──────────────────────────────────────────────────────
 
 export function OstatokDM() {
-  const { dmItems, setDmItems, gpItems, setGpItems } = useApp();
+  const { dmItems, setDmItems, gpItems, setGpItems, setSkladDocs } = useApp();
   // Склад ДМ: все позиции, класс которых не «Готовая продукция», в том числе из учёта ГП.
   const skladItems = [...dmItems, ...gpItems.map(gpToDm)].filter(it => !isGPKlass(it.klass));
   const { toast, show, clear } = useToast();
@@ -1008,9 +723,9 @@ export function OstatokDM() {
       )}
       {showMerge && <MergeModal items={selectedItems} onClose={() => setShowMerge(false)} onConfirm={doMerge} />}
       {showPrihod && (
-        <PrihodDMModal
+        <PrihodDocModal
           onClose={() => setShowPrihod(false)}
-          onSave={() => { setShowPrihod(false); show("Документ создан"); }}
+          onSave={d => { setSkladDocs(prev => [d, ...prev]); setShowPrihod(false); show(`Документ ${d.number} сохранён`); }}
         />
       )}
       {showVydacha && (

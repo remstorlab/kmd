@@ -4,7 +4,8 @@ import {
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination,
 } from "../components/ui";
-import { spravochniki, initialMaterialCodes, MaterialCode, initialMaterialClasses, MaterialClass, initialStorageLocations, StorageLocation } from "../data/mock";
+import { spravochniki, initialMaterialCodes, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation } from "../data/mock";
+import { useApp } from "../store/AppContext";
 import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
@@ -363,7 +364,7 @@ function placeOf(loc: StorageLocation): string {
 }
 
 function StorageLocationsPage({ onBack }: { onBack: () => void }) {
-  const [items, setItems] = useState(initialStorageLocations);
+  const { storageLocations: items, setStorageLocations: setItems } = useApp();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
@@ -534,6 +535,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
 }
 
 export function Spravochniki() {
+  const { storageLocations } = useApp();
   const [selected, setSelected] = useState<SpravKey | null>(null);
   const [showMaterialCodes, setShowMaterialCodes] = useState(false);
   const [showMaterialClasses, setShowMaterialClasses] = useState(false);
@@ -605,7 +607,7 @@ export function Spravochniki() {
             <MapPin className="w-5 h-5" />
           </div>
           <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Места хранения</h3>
-          <p className="text-sm text-gray-400">{initialStorageLocations.length} значений</p>
+          <p className="text-sm text-gray-400">{storageLocations.length} значений</p>
         </button>
       </div>
     </div>
