@@ -59,109 +59,6 @@ function GPViewModal({ item, onClose }: { item: GPItem; onClose: () => void }) {
   );
 }
 
-// ── Принять на склад GP modal ─────────────────────────────────────────────────
-
-function PrihodGPModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [items, setItems] = useState<{ name: string; qty: string; klass: string; code: string }[]>([]);
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", nomenkl: "", klass: "Готовая продукция", code: "ЗлМ 585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
-  const [head, setHead] = useState(() => ({
-    number: `НП-${Math.floor(Math.random() * 900 + 100)}`,
-    date: new Date().toLocaleDateString("ru-RU"),
-    zakazchik: "Монетный двор",
-    skladOtpr: "Производственный цех",
-    skladPoluch: "Склад ГП",
-    sotrudnik: "Ким Александр Юрьевич",
-  }));
-
-  const addItem = () => {
-    setItems(prev => [...prev, { name: form.name || "Позиция ГП", qty: form.qty, klass: form.klass, code: form.code }]);
-    setShowAdd(false);
-    setForm({ name: "", nomenkl: "", klass: "Готовая продукция", code: "ЗлМ 585", qty: "", unit: "шт", sey: "Сейф №1", polka: "Полка А" });
-  };
-
-  const { sorted: sortedItems, sort: itemsSort, toggleSort: toggleItemsSort } = useSort(items, {
-    name: it => it.name,
-    qty: it => parseFloat(it.qty) || 0,
-    klass: it => it.klass,
-    code: it => it.code,
-  });
-
-  return (
-    <Modal
-      title="Накладная на приём ГП"
-      onClose={onClose}
-      wide
-      footer={
-        <>
-          <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn variant="secondary" onClick={onSave}>Сохранить и печать</Btn>
-          <Btn onClick={onSave}>Сохранить</Btn>
-        </>
-      }
-    >
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <Field label="Тип документа"><Input value="Накладная на приём ГП" disabled /></Field>
-        <Field label="Номер"><Input value={head.number} onChange={v => setHead(h => ({ ...h, number: v }))} /></Field>
-        <Field label="Дата"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} /></Field>
-        <Field label="Заказчик"><Select value={head.zakazchik} options={["Монетный двор", "ОО «АурумПоставка»"]} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} /></Field>
-        <Field label="Склад-отправитель"><Select value={head.skladOtpr} options={["Производственный цех", "Ювелирный цех"]} onChange={v => setHead(h => ({ ...h, skladOtpr: v }))} /></Field>
-        <Field label="Склад-получатель"><Select value={head.skladPoluch} options={["Склад ГП", "Склад ДМ №1"]} onChange={v => setHead(h => ({ ...h, skladPoluch: v }))} /></Field>
-        <Field label="Сотрудник склада-получателя" full><Select value={head.sotrudnik} options={["Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} onChange={v => setHead(h => ({ ...h, sotrudnik: v }))} /></Field>
-      </div>
-
-      <div className="border-t border-gray-200 pt-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции приёма</h3>
-          <div className="flex gap-2">
-            <Btn size="sm" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
-          </div>
-        </div>
-        {items.length === 0 ? (
-          <div className="text-center py-6 text-gray-400 text-sm">Нет позиций. Нажмите «+ Добавить позицию»</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs">
-              <SortTh sortKey="name" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="qty" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Кол-во</SortTh>
-              <SortTh sortKey="klass" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="code" sort={itemsSort} onSort={toggleItemsSort} className="px-3 py-2">Код</SortTh>
-            </tr></thead>
-            <tbody>{sortedItems.map((it, i) => (
-              <tr key={i} className="border-t border-gray-100">
-                <td className="px-3 py-2">{it.name}</td>
-                <td className="px-3 py-2">{it.qty} шт</td>
-                <td className="px-3 py-2"><KlassCode value={it.klass} /></td>
-                <td className="px-3 py-2 text-blue-600">{it.code}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        )}
-      </div>
-
-      {showAdd && (
-        <Modal title="Добавить позицию ГП" onClose={() => setShowAdd(false)} footer={
-          <>
-            <Btn variant="secondary" onClick={() => setShowAdd(false)}>Отмена</Btn>
-            <Btn onClick={addItem}>Добавить</Btn>
-          </>
-        }>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Номенкл. номер"><Select value={form.nomenkl || "GP-KOL-585-01"} options={["GP-KOL-585-01", "GP-CEP-750-03", "GP-SER-585-07"]} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} /></Field>
-            <Field label="Класс"><KlassSelect value={form.klass} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
-            <Field label="Код материала"><MaterialCodeSelect value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} /></Field>
-            <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Введите наименование" /></Field>
-            <Field label="Количество"><Input value={form.qty} onChange={v => setForm(f => ({ ...f, qty: v }))} placeholder="0" /></Field>
-            <Field label="Ед. изм."><Select value={form.unit} options={["шт", "г", "кг"]} onChange={v => setForm(f => ({ ...f, unit: v }))} /></Field>
-            <Field label="Сейф"><Select value={form.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setForm(f => ({ ...f, sey: v }))} /></Field>
-            <Field label="Полка"><Select value={form.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setForm(f => ({ ...f, polka: v }))} /></Field>
-          </div>
-        </Modal>
-      )}
-    </Modal>
-  );
-}
-
 // ── Выдача со склада GP modal ─────────────────────────────────────────────────
 
 function VydachaGPModal({ gpItems, onClose, onSave }: { gpItems: GPItem[]; onClose: () => void; onSave: () => void }) {
@@ -261,7 +158,7 @@ function VydachaGPModal({ gpItems, onClose, onSave }: { gpItems: GPItem[]; onClo
 // ── Остатки на складе ГП ──────────────────────────────────────────────────────
 
 export function OstatokGP() {
-  const { gpItems, setGpItems, dmItems, navigate } = useApp();
+  const { gpItems, setGpItems, dmItems, navigate, setSkladDocs } = useApp();
   // Склад ГП: все позиции с классом «Готовая продукция», в том числе из учёта ДМ.
   const skladItems = [...gpItems, ...dmItems.map(dmToGp)].filter(it => isGPKlass(it.klass));
   const { toast, show, clear } = useToast();
@@ -396,7 +293,14 @@ export function OstatokGP() {
       </div>
 
       {viewItem && <GPViewModal item={viewItem} onClose={() => setViewItem(null)} />}
-      {showPrihod && <PrihodGPModal onClose={() => setShowPrihod(false)} onSave={() => { setShowPrihod(false); show("Накладная сохранена"); }} />}
+      {showPrihod && (
+        <PrihodDocModal
+          onlyNaklad
+          nakladType="Накладная на приём ГП"
+          onClose={() => setShowPrihod(false)}
+          onSave={d => { setSkladDocs(prev => [d, ...prev]); setShowPrihod(false); show(`Накладная ${d.number} сохранена`); }}
+        />
+      )}
       {showVydacha && (
         <VydachaGPModal
           gpItems={skladItems}

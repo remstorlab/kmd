@@ -121,15 +121,18 @@ function PositionModal({ mode, sklad, initial, onClose, onSave }: {
 
 // ── Документ прихода ─────────────────────────────────────────────────────────
 
-export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false }: {
+export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false, onlyNaklad = false, nakladType = "Накладная на приём ДМ" }: {
   onClose: () => void;
   onSave: (d: SkladDoc) => void;
   doc?: SkladDoc | null;
   readOnly?: boolean;
+  // Жёстко зафиксировать тип документа = «Накладная» (например, приём на склад ГП)
+  onlyNaklad?: boolean;
+  nakladType?: "Накладная на приём ДМ" | "Накладная на приём ГП";
 }) {
   const ro = readOnly;
   const { storageLocations } = useApp();
-  const [docType, setDocType] = useState<PrihodDocType>(doc && doc.type !== "Приходный ордер" ? "Накладная" : "Приходный ордер");
+  const [docType, setDocType] = useState<PrihodDocType>(onlyNaklad || (doc && doc.type !== "Приходный ордер") ? "Накладная" : "Приходный ордер");
   const isOrder = docType === "Приходный ордер";
   const { toast, show, clear } = useToast();
   const today = new Date().toLocaleDateString("ru-RU");
@@ -206,17 +209,17 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
   const save = (status: DocStatus) => {
     const d: SkladDoc = isOrder
       ? { id: doc?.id ?? `sd-${Date.now()}`, date: head.date, type: "Приходный ордер", number: head.number, status, sender: head.otpravitel, receiver: head.poluchatel }
-      : { id: doc?.id ?? `sd-${Date.now()}`, date: head.nakladDate, type: "Накладная на приём ДМ", number: head.nakladNumber, status, sender: head.skladOtpr, receiver: head.skladPoluch };
+      : { id: doc?.id ?? `sd-${Date.now()}`, date: head.nakladDate, type: nakladType, number: head.nakladNumber, status, sender: head.skladOtpr, receiver: head.skladPoluch };
     onSave(d);
   };
 
   const title = doc
-    ? `${isOrder ? "Приходный ордер" : "Накладная на приём ДМ"} ${doc.number}`
-    : isOrder ? "Приходный ордер" : "Накладная на приём ДМ";
+    ? `${isOrder ? "Приходный ордер" : nakladType} ${doc.number}`
+    : isOrder ? "Приходный ордер" : nakladType;
 
   const typeSelect = (
     <Field label="Тип документа">
-      <Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} disabled={ro || !!doc} />
+      <Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} disabled={ro || !!doc || onlyNaklad} />
     </Field>
   );
 
