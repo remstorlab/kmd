@@ -52,6 +52,8 @@ interface AuthUser {
   username: string;
   password: string;
   name: string;
+  // Полное ФИО — для документов (например, «Выдал» в операциях движения материала)
+  fullName: string;
   email: string;
   initials: string;
   passwordChangedAt: string;
@@ -59,8 +61,8 @@ interface AuthUser {
 }
 
 const initialAuthUsers: AuthUser[] = [
-  { username: "admin", password: "admin", name: "Е. Ковалева", email: "e.kovaleva@kmd.kz", initials: "ЕК", passwordChangedAt: "2026-05-01", passwordHistory: [] },
-  { username: "nurlanov", password: "1234", name: "А.Б. Нурланов", email: "a.nurlanov@kmd.kz", initials: "АН", passwordChangedAt: "2026-09-01", passwordHistory: [] },
+  { username: "admin", password: "admin", name: "Е. Ковалева", fullName: "Ковалева Елена Викторовна", email: "e.kovaleva@kmd.kz", initials: "ЕК", passwordChangedAt: "2026-05-01", passwordHistory: [] },
+  { username: "nurlanov", password: "1234", name: "А.Б. Нурланов", fullName: "Нурланов Асхат Бекович", email: "a.nurlanov@kmd.kz", initials: "АН", passwordChangedAt: "2026-09-01", passwordHistory: [] },
 ];
 
 export type Theme = "light" | "dark";
@@ -148,7 +150,7 @@ export const t: Record<Lang, Record<string, string>> = {
 interface AppCtx {
   // Auth
   isLoggedIn: boolean;
-  currentUser: { name: string; email: string; initials: string; username: string; passwordChangedAt: string } | null;
+  currentUser: { name: string; fullName: string; email: string; initials: string; username: string; passwordChangedAt: string } | null;
   login: (username: string, password: string) => boolean;
   logout: (reason?: string) => void;
   sessionEndedReason: string | null;
@@ -240,7 +242,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const user = authUsers.find(u => u.username === username && u.password === password);
     if (user) {
       setIsLoggedIn(true);
-      setCurrentUser({ name: user.name, email: user.email, initials: user.initials, username: user.username, passwordChangedAt: user.passwordChangedAt });
+      setCurrentUser({ name: user.name, fullName: user.fullName, email: user.email, initials: user.initials, username: user.username, passwordChangedAt: user.passwordChangedAt });
       return true;
     }
     return false;

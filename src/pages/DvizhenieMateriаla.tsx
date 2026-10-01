@@ -811,7 +811,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     responsible: op?.responsible || "",
     plavkaNo: op ? (op.plavkaNo ?? "П-2026-0089") : "",
     // «Выдал» — авторизованный пользователь; у сохранённой операции остаётся тот, кто её оформлял.
-    vydal: op ? (op.vydal ?? "Ким Александр Юрьевич") : (currentUser?.name ?? ""),
+    vydal: op ? (op.vydal ?? "Ким Александр Юрьевич") : (currentUser?.fullName ?? ""),
     poluchil: op ? (op.poluchil ?? op.responsible) : "",
   }));
 
