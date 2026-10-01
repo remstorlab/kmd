@@ -6,7 +6,7 @@ import {
 } from "../components/ui";
 import { spravochniki, initialMaterialCodes, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation } from "../data/mock";
 import { useApp } from "../store/AppContext";
-import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, LucideIcon } from "lucide-react";
+import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 
@@ -17,6 +17,7 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Организации": Building2,
   "Подотчётные сотрудники": UserRound,
   "Типы операций": Settings2,
+  "Виды операций": Layers,
   "Склады": Warehouse,
 };
 
@@ -43,11 +44,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   };
 
   const save = () => {
-    if (editItem) {
-      setItems(prev => prev.map(i => i.code === editItem.code ? form : i));
-    } else {
-      setItems(prev => [...prev, form]);
-    }
+    const next = editItem ? items.map(i => i.code === editItem.code ? form : i) : [...items, form];
+    setItems(next);
+    // Справочник — общий источник вариантов для полей форм, поэтому изменения пишем в него.
+    if (!editItem) dict.count += 1;
+    dict.items = next;
     setShowAdd(false);
     setEditItem(null);
     show("Запись сохранена");

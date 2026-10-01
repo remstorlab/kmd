@@ -174,9 +174,9 @@ export function DeleteIcon({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function PrintIcon({ onClick }: { onClick: () => void }) {
+export function PrintIcon({ onClick, disabled = false, title = "Печать" }: { onClick: () => void; disabled?: boolean; title?: string }) {
   return (
-    <button onClick={onClick} className="text-gray-400 hover:text-gray-600 transition-colors p-1" title="Печать">
+    <button onClick={onClick} disabled={disabled} className="text-gray-400 hover:text-gray-600 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400" title={title}>
       <Printer className="w-4 h-4" />
     </button>
   );

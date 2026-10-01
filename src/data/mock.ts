@@ -99,6 +99,15 @@ export interface Operation {
   // Позиции вкладок «Выдача» / «Возврат» (сохраняются с операцией)
   vydachaPos?: OperPosition[];
   vozvratPos?: OperPosition[];
+  // Документы, прикреплённые во вкладках «Выдача» / «Возврат»
+  vydachaFiles?: File[];
+  vozvratFiles?: File[];
+  // Реквизиты шапки (для печатной формы)
+  docType?: string;
+  zakazchik?: string;
+  plavkaNo?: string;
+  vydal?: string;
+  poluchil?: string;
 }
 
 export interface ShihtaMaterial {
@@ -288,11 +297,11 @@ export const initialVydachaDocs: SkladDoc[] = [
 
 // --- Операции движения ---
 export const initialOperations: Operation[] = [
-  { id: "op1", date: "19.08.2026", type: "Выдача", vid: "Плавка", positions: 3, document: "ДВ-001234", responsible: "Нурланов А.Б.", stage: "Выдано", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
-  { id: "op2", date: "18.08.2026", type: "Выдача-Возврат", vid: "Производство ГП", positions: 5, document: "ДВ-001233", responsible: "Петров С.В.", stage: "Возврат: На редактировании", statusVydacha: "Выдано", statusVozvrat: "Частично", statusClose: "Не закрыто" },
-  { id: "op3", date: "17.08.2026", type: "Выдача-Возврат", vid: "Отбор пробы", positions: 2, document: "ДВ-001232", responsible: "Смирнов К.Д.", stage: "Завершено", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто" },
-  { id: "op4", date: "16.08.2026", type: "Возврат", vid: "Анализ в ЛКИ", positions: 4, document: "ДВ-001231", responsible: "Нурланов А.Б.", stage: "Завершено", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто: списано" },
-  { id: "op5", date: "15.08.2026", type: "Выдача", vid: "Гальванопокрытие", positions: 6, document: "ДВ-001230", responsible: "Иванова М.С.", stage: "Выдано", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
+  { id: "op1", date: "19.08.2026", type: "Выдача", vid: "Плавка", positions: 3, document: "1234", responsible: "Нурланов А.Б.", stage: "Выдано", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
+  { id: "op2", date: "18.08.2026", type: "Выдача-Возврат", vid: "Производство ГП", positions: 5, document: "1233", responsible: "Петров С.В.", stage: "Возврат: На редактировании", statusVydacha: "Выдано", statusVozvrat: "Частично", statusClose: "Не закрыто" },
+  { id: "op3", date: "17.08.2026", type: "Выдача-Возврат", vid: "Отбор пробы", positions: 2, document: "1232", responsible: "Смирнов К.Д.", stage: "Завершено", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто" },
+  { id: "op4", date: "16.08.2026", type: "Возврат", vid: "Анализ в ЛКИ", positions: 4, document: "1231", responsible: "Нурланов А.Б.", stage: "Завершено", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто: списано" },
+  { id: "op5", date: "15.08.2026", type: "Выдача", vid: "Гальванопокрытие", positions: 6, document: "1230", responsible: "Иванова М.С.", stage: "Выдано", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
 ];
 
 // --- Шихтовые карты ---
@@ -602,7 +611,7 @@ export const spravochniki = {
     ]
   },
   "Типы документов": {
-    count: 9,
+    count: 11,
     items: [
       { code: "ПО", value: "Приходный ордер", status: "Активно" },
       { code: "НП", value: "Накладная на приём", status: "Активно" },
@@ -613,6 +622,8 @@ export const spravochniki = {
       { code: "МСЛ", value: "Маршрутный лист", status: "Активно" },
       { code: "ИНВ", value: "Инвентаризационная опись", status: "Активно" },
       { code: "ШК", value: "Шихтовая карта", status: "Активно" },
+      { code: "ПР", value: "Приказ", status: "Активно" },
+      { code: "НЛКИ", value: "Накладная в ЛКИ", status: "Активно" },
     ]
   },
   "Организации": {
@@ -636,15 +647,21 @@ export const spravochniki = {
     ]
   },
   "Типы операций": {
-    count: 7,
+    count: 3,
     items: [
-      { code: "ОП-01", value: "Выдача", status: "Активно" },
-      { code: "ОП-02", value: "Возврат", status: "Активно" },
-      { code: "ОП-03", value: "Выдача-Возврат", status: "Активно" },
-      { code: "ОП-04", value: "Отбор пробы", status: "Активно" },
-      { code: "ОП-05", value: "Анализ в ЛКИ", status: "Активно" },
-      { code: "ОП-06", value: "Плавка", status: "Активно" },
-      { code: "ОП-07", value: "Гальванопокрытие", status: "Активно" },
+      { code: "ТО-01", value: "Выдача", status: "Активно" },
+      { code: "ТО-02", value: "Возврат", status: "Активно" },
+      { code: "ТО-03", value: "Выдача-Возврат", status: "Активно" },
+    ]
+  },
+  "Виды операций": {
+    count: 5,
+    items: [
+      { code: "ВО-01", value: "Отбор пробы", status: "Активно" },
+      { code: "ВО-02", value: "Анализ в ЛКИ", status: "Активно" },
+      { code: "ВО-03", value: "Плавка", status: "Активно" },
+      { code: "ВО-04", value: "Гальванопокрытие", status: "Активно" },
+      { code: "ВО-05", value: "Производство ГП", status: "Активно" },
     ]
   },
   "Склады": {
@@ -655,6 +672,14 @@ export const spravochniki = {
     ]
   },
 };
+
+// Активные значения справочника — источник вариантов для полей выбора на формах.
+export function spravValues(name: keyof typeof spravochniki): string[] {
+  return spravochniki[name].items.filter(i => i.status === "Активно").map(i => i.value);
+}
+
+// Тип документа, единственно допустимый для вида операции «Анализ в ЛКИ».
+export const DOC_TYPE_LKI = "Накладная в ЛКИ";
 
 // --- Коды материалов ---
 export interface MaterialCode {
