@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, KlassCode, Tabs, Textarea, MultiFileUpload, SortTh, useSort, parseRuDate,
+  Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, parseRuDate,
 } from "../components/ui";
 import { Operation, OperPosition, OperStage, ShihtovayaKarta, isGPKlass, spravValues, DOC_TYPE_LKI } from "../data/mock";
 import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
@@ -59,58 +59,132 @@ function SpisanieModal({ delta, onClose, onConfirm }: { delta: number; onClose: 
 
 
 
-function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
+const ALL_KLASS = "Все классы";
+const ALL_METALS = "Все металлы";
+const ALL_LOCS = "Все места хранения";
+const ALL_STATUSES = "Все статусы";
+
+function AddDMPositionModal({ already = {}, onClose, onAdd }: {
+  // Сколько уже добавлено в выдачу по номенклатуре — вычитается из остатка на складе
+  already?: Record<string, number>;
+  onClose: () => void;
+  onAdd: (rows: Omit<OperPosition, "n">[]) => void;
+}) {
   const { dmItems, shihtovyeKarty } = useApp();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // id → введённое количество к выдаче; наличие ключа = позиция выбрана
+  const [selectedQty, setSelectedQty] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
+  const [klass, setKlass] = useState(ALL_KLASS);
+  const [metal, setMetal] = useState(ALL_METALS);
+  const [loc, setLoc] = useState(ALL_LOCS);
+  const [status, setStatus] = useState(ALL_STATUSES);
+  const [onlySelected, setOnlySelected] = useState(false);
+
+  type Item = (typeof dmItems)[number];
+  const left = (i: Item) => i.qty - (already[i.nomenkl] ?? 0);
   // Позиции в резерве тоже можно выдать — тогда шихтовая карта, которая их резервирует, уйдёт «На редактировании».
-  const availableItems = dmItems.filter(i => !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв"));
+  const availableItems = dmItems.filter(i => !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв") && left(i) > 0);
   const reservedBy = (nomenkl: string) => shihtovyeKarty.find(k => k.status === "Новая" && k.materials.some(m => m.nomenkl === nomenkl));
   const affectedKarty = [...new Set(
-    availableItems.filter(i => selected.has(i.id) && i.status === "Резерв").map(i => reservedBy(i.nomenkl)?.name).filter(Boolean),
+    availableItems.filter(i => i.id in selectedQty && i.status === "Резерв").map(i => reservedBy(i.nomenkl)?.name).filter(Boolean),
   )];
 
-  const { sorted, sort, toggleSort } = useSort(availableItems, {
+  const metals = [ALL_METALS, ...Array.from(new Set(availableItems.map(i => i.metal))).sort()];
+  const locations = [ALL_LOCS, ...Array.from(new Set(availableItems.map(i => i.location))).sort()];
+
+  const filtered = availableItems.filter(i => {
+    const q = search.trim().toLowerCase();
+    return (!q || i.name.toLowerCase().includes(q) || i.nomenkl.toLowerCase().includes(q))
+      && (klass === ALL_KLASS || i.klass === klass)
+      && (metal === ALL_METALS || i.metal === metal)
+      && (loc === ALL_LOCS || i.location === loc)
+      && (status === ALL_STATUSES || i.status === status)
+      && (!onlySelected || i.id in selectedQty);
+  });
+
+  const { sorted, sort, toggleSort } = useSort(filtered, {
     name: i => i.name,
     nomenkl: i => i.nomenkl,
     klass: i => i.klass,
     proba: i => i.proba,
     netWeight: i => i.netWeight,
     location: i => i.location,
+    qty: i => left(i),
   });
 
-  const toggle = (id: string) => {
-    setSelected(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
-  };
+  const selectedCount = Object.keys(selectedQty).length;
+  const allChecked = filtered.length > 0 && filtered.every(i => i.id in selectedQty);
+
+  const toggle = (id: string) => setSelectedQty(prev => {
+    const next = { ...prev };
+    if (id in next) delete next[id]; else next[id] = "1";
+    return next;
+  });
+  const toggleAll = () => setSelectedQty(prev => {
+    const next = { ...prev };
+    if (allChecked) filtered.forEach(i => delete next[i.id]);
+    else filtered.forEach(i => { if (!(i.id in next)) next[i.id] = "1"; });
+    return next;
+  });
+  const setQty = (id: string, v: string) => setSelectedQty(prev => (id in prev ? { ...prev, [id]: v.replace(/[^\d]/g, "") } : prev));
+  const qtyOf = (i: Item) => parseInt(selectedQty[i.id], 10) || 0;
+  const badQty = (i: Item) => i.id in selectedQty && (qtyOf(i) < 1 || qtyOf(i) > left(i));
+  const hasBadQty = availableItems.some(badQty);
+
+  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setStatus(ALL_STATUSES); setOnlySelected(false); };
 
   const add = () => {
-    const chosen = availableItems.filter(i => selected.has(i.id));
-    if (chosen.length === 0) return;
-    onAdd(chosen.map(i => ({ name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.netWeight, ag: "-", cu: "-", au: "-", pd: "-", rh: "-", pt: "-", loc: i.location, })));
+    const chosen = availableItems.filter(i => i.id in selectedQty);
+    if (chosen.length === 0 || hasBadQty) return;
+    onAdd(chosen.map(i => {
+      const qty = qtyOf(i);
+      // При частичной выдаче вес пропорционален количеству
+      const ves = i.qty > 0 ? +(i.netWeight * qty / i.qty).toFixed(2) : i.netWeight;
+      return { name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty, ves, ag: "-", cu: "-", au: "-", pd: "-", rh: "-", pt: "-", loc: i.location };
+    }));
   };
 
   return (
     <Modal
       title="Добавить позицию ДМ со склада"
       onClose={onClose}
-      wide
+      extraWide
       footer={<>
+        {hasBadQty && <span className="mr-auto self-center text-xs text-red-600">Количество к выдаче должно быть от 1 до остатка на складе</span>}
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={add} disabled={selected.size === 0}>Добавить{selected.size > 0 ? ` (${selected.size})` : ""}</Btn>
+        <Btn onClick={add} disabled={selectedCount === 0 || hasBadQty}>Добавить{selectedCount > 0 ? ` (${selectedCount})` : ""}</Btn>
       </>}
     >
-      {availableItems.length === 0 ? (
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 grid grid-cols-4 gap-3 items-end">
+        <div className="col-span-2">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Наименование / Номенкл. №</label>
+          <SearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
+        </div>
+        <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
+        <Field label="Металл"><Select value={metal} options={metals} onChange={setMetal} /></Field>
+        <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
+        <Field label="Статус"><Select value={status} options={[ALL_STATUSES, "На складе", "Резерв"]} onChange={setStatus} /></Field>
+        <label className="flex items-center gap-2 text-sm text-gray-700 h-9 cursor-pointer">
+          <input type="checkbox" checked={onlySelected} onChange={e => setOnlySelected(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+          Только выбранные
+        </label>
+        <button onClick={reset} className="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+        <span>Найдено: {filtered.length} из {availableItems.length}</span>
+        <span>Выбрано: {selectedCount}</span>
+      </div>
+
+      {filtered.length === 0 ? (
         <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-          Нет доступных позиций на складе ДМ
+          {availableItems.length === 0 ? "Нет доступных позиций на складе ДМ" : "Нет позиций по заданным фильтрам"}
         </div>
       ) : (
-        <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
+        <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
           <table className="w-full text-sm">
-            <thead className="sticky top-0"><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <th className="w-10 px-3 py-2"></th>
+            <thead className="sticky top-0 z-10"><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+              <th className="w-10 px-3 py-2"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 accent-blue-600" title="Выбрать все найденные" /></th>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл.№</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
@@ -118,10 +192,12 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
               <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый вес г</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <th className="px-3 py-2 text-left">Статус</th>
+              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">На складе</SortTh>
+              <th className="px-3 py-2 text-left w-28">Кол-во к выдаче</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {sorted.map(i => {
-                const checked = selected.has(i.id);
+                const checked = i.id in selectedQty;
                 const karta = i.status === "Резерв" ? reservedBy(i.nomenkl) : undefined;
                 return (
                   <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
@@ -135,6 +211,12 @@ function AddDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
                     <td className="px-3 py-2">
                       <Badge label={i.status} />
                       {karta && <div className="text-xs text-gray-400 mt-0.5" title={karta.name}>ШК {karta.plavkaNo}</div>}
+                    </td>
+                    <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{left(i)} шт</td>
+                    <td className="px-3 py-2">
+                      <div className={badQty(i) ? "rounded-lg ring-1 ring-red-400" : ""}>
+                        <Input value={selectedQty[i.id] ?? ""} onChange={v => setQty(i.id, v)} placeholder="1" disabled={!checked} />
+                      </div>
                     </td>
                   </tr>
                 );
@@ -683,7 +765,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [showVozvratPick, setShowVozvratPick] = useState(false);
   const [showShihtaPick, setShowShihtaPick] = useState(false);
   const [pickedShihtaId, setPickedShihtaId] = useState<string | null>(null);
-  const { dmItems, setDmItems, setShihtovyeKarty, operations } = useApp();
+  const { dmItems, setDmItems, setShihtovyeKarty, operations, currentUser } = useApp();
   // Документы вкладок «Выдача» / «Возврат»
   const [vydachaFiles, setVydachaFiles] = useState<File[]>(() =>
     op?.vydachaFiles ?? (op?.vid === "Плавка" ? [new File([], `Приказ-${op.document}.pdf`)] : []));
@@ -704,6 +786,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     nomenkl: p => p.nomenkl,
     klass: p => p.klass,
     proba: p => p.proba,
+    qty: p => p.qty ?? 0,
     ves: p => p.ves,
     ag: p => p.ag,
     cu: p => p.cu,
@@ -727,7 +810,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     zakazchik: op ? (op.zakazchik ?? "Монетный двор") : "",
     responsible: op?.responsible || "",
     plavkaNo: op ? (op.plavkaNo ?? "П-2026-0089") : "",
-    vydal: op ? (op.vydal ?? "Ким Александр Юрьевич") : "",
+    // «Выдал» — авторизованный пользователь; у сохранённой операции остаётся тот, кто её оформлял.
+    vydal: op ? (op.vydal ?? "Ким Александр Юрьевич") : (currentUser?.name ?? ""),
     poluchil: op ? (op.poluchil ?? op.responsible) : "",
   }));
 
@@ -866,7 +950,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         {vid === "Плавка" && (
           <Field label="Номер плавки"><Input value={head.plavkaNo} onChange={v => setHead(h => ({ ...h, plavkaNo: v }))} disabled={headRo} /></Field>
         )}
-        <Field label="Выдал"><Select value={head.vydal} options={withBlank(["Ким Александр Юрьевич", "Жумабаев Даурен"])} onChange={v => setHead(h => ({ ...h, vydal: v }))} disabled={headRo} /></Field>
+        <Field label="Выдал"><Input value={head.vydal} disabled /></Field>
         <Field label="Получил"><Select value={head.poluchil} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович"])} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={headRo} /></Field>
       </div>
 
@@ -893,6 +977,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               <SortTh sortKey="nomenkl" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Номенкл.№</SortTh>
               <SortTh sortKey="klass" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="proba" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Проба</SortTh>
+              <SortTh sortKey="qty" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Кол-во</SortTh>
               <SortTh sortKey="ves" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Вес г</SortTh>
               <SortTh sortKey="ag" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Ag</SortTh>
               <SortTh sortKey="cu" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Cu</SortTh>
@@ -907,6 +992,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2">{p.proba}</td>
+                  <td className="px-3 py-2">{p.qty ?? "—"}</td>
                   <td className="px-3 py-2 font-medium">{p.ves}</td>
                   <td className="px-3 py-2 text-gray-400">{p.ag}</td>
                   <td className="px-3 py-2 text-gray-400">{p.cu}</td>
@@ -1056,6 +1142,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       )}
       {showAddDM && (
         <AddDMPositionModal
+          already={vydacha.reduce<Record<string, number>>((m, p) => ({ ...m, [p.nomenkl]: (m[p.nomenkl] ?? 0) + (p.qty ?? 0) }), {})}
           onClose={() => setShowAddDM(false)}
           onAdd={rows => { appendPositions("vydacha", rows); setShowAddDM(false); show("Позиции добавлены"); }}
         />

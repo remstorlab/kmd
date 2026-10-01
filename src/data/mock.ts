@@ -82,7 +82,7 @@ export interface VydachaDocPosition {
 // «Выдача: На редактировании» → (Оформить) «Выдано» → (Оформить возврат, Сохранить) «Возврат: На редактировании» → (Оформить) «Завершено»
 export type OperStage = "Выдача: На редактировании" | "Выдано" | "Возврат: На редактировании" | "Завершено";
 
-export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string };
+export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string };
 
 export interface Operation {
   id: string;
