@@ -8,6 +8,7 @@ import {
 import { ShihtovayaKarta, ShihtaMaterial, DMItem, isGPKlass } from "../data/mock";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
 import { Plus, X, Calculator } from "lucide-react";
+import { useScreen } from "../router";
 
 // Строка шихтовых материалов в конструкторе
 interface MatRow {
@@ -65,10 +66,14 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const [osnovanie, setOsnovanie] = useState(`Приказ №234-П от ${new Date().toLocaleDateString("ru-RU")}`);
   const [files, setFiles] = useState<File[]>(() => karta?.files ?? []);
   const [materials, setMaterials] = useState<MatRow[]>(() => (karta?.materials ?? []).map(toRow));
-  const [showFromSklad, setShowFromSklad] = useState(false);
-  const [showAddDop, setShowAddDop] = useState(false);
+  // Вложенные экраны: …/from-sklad, …/dop-material, …/raschet (результат расчёта)
+  const screen = useScreen();
+  const nested = (name: string) => [screen.has(name), (open: boolean) => (open ? screen.open(name) : screen.close(name))] as const;
+  const [showFromSklad, setShowFromSklad] = nested("from-sklad");
+  const [showAddDop, setShowAddDop] = nested("dop-material");
   const [dopForm, setDopForm] = useState({ name: "", code: "Au чистое", klass: "Комплектующие", proba: "", unit: "г", ves: "" });
-  const [showResult, setShowResult] = useState(false);
+  const showResult = screen.has("raschet");
+  const setShowResult = (on: boolean) => screen.toggle("raschet", on);
   const { toast, show, clear } = useToast();
   const ro = readOnly;
 
@@ -339,9 +344,14 @@ export function ShihtovyeKarty() {
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
-  const [viewKarta, setViewKarta] = useState<ShihtovayaKarta | null>(null);
-  const [editKarta, setEditKarta] = useState<ShihtovayaKarta | null>(null);
-  const [showNew, setShowNew] = useState(false);
+  // Экраны: /shihtovye-karty/new, /view/:id, /edit/:id
+  const screen = useScreen();
+  const viewKarta = shihtovyeKarty.find(k => k.id === screen.after("view")) ?? null;
+  const editKarta = shihtovyeKarty.find(k => k.id === screen.after("edit")) ?? null;
+  const showNew = screen.has("new");
+  const setViewKarta = (k: ShihtovayaKarta | null) => (k ? screen.openTop("view", k.id) : screen.close("view"));
+  const setEditKarta = (k: ShihtovayaKarta | null) => (k ? screen.openTop("edit", k.id) : screen.close("edit"));
+  const setShowNew = (open: boolean) => (open ? screen.openTop("new") : screen.close("new"));
   const perPage = 8;
 
   // Удаление невыполненной карты снимает резерв с её позиций ДМ
@@ -403,9 +413,10 @@ export function ShihtovyeKarty() {
         <Pagination page={page} total={shihtovyeKarty.length} perPage={perPage} onPage={setPage} />
       </div>
 
-      {viewKarta && <ShihtaConstructor karta={viewKarta} onClose={() => setViewKarta(null)} onSave={() => setViewKarta(null)} readOnly />}
+      {viewKarta && <ShihtaConstructor key={viewKarta.id} karta={viewKarta} onClose={() => setViewKarta(null)} onSave={() => setViewKarta(null)} readOnly />}
       {editKarta && (
         <ShihtaConstructor
+          key={editKarta.id}
           karta={editKarta}
           onClose={() => setEditKarta(null)}
           onSave={k => { setShihtovyeKarty(prev => prev.map(s => s.id === k.id ? k : s)); setEditKarta(null); show("Карта обновлена"); }}

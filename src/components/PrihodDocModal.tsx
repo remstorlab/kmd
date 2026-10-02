@@ -6,6 +6,7 @@ import {
 import { SkladDoc, DocStatus, StorageLocation, spravochniki } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { Plus } from "lucide-react";
+import { useScreen } from "../router";
 
 // ── Приём на склад: Приходный ордер / Накладная ──────────────────────────────
 // Общая модалка для «Остатки на складе ДМ → Принять на склад» и «Приход на склад».
@@ -132,7 +133,10 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
 }) {
   const ro = readOnly;
   const { storageLocations } = useApp();
-  const [docType, setDocType] = useState<PrihodDocType>(onlyNaklad || (doc && doc.type !== "Приходный ордер") ? "Накладная" : "Приходный ордер");
+  // Вложенные экраны: …/nakladnaya (тип документа), …/position-new, …/position/:id, …/position-edit/:id
+  const screen = useScreen();
+  const docType: PrihodDocType = onlyNaklad || (doc ? doc.type !== "Приходный ордер" : screen.has("nakladnaya")) ? "Накладная" : "Приходный ордер";
+  const setDocType = (t: PrihodDocType) => screen.toggle("nakladnaya", t === "Накладная");
   const isOrder = docType === "Приходный ордер";
   const { toast, show, clear } = useToast();
   const today = new Date().toLocaleDateString("ru-RU");
@@ -172,26 +176,33 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
 
   // Позиции
   const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>([
-    { id: newPosId(), nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au чистое", kol: "1", unit: "шт", proba: "999.9", lig: "1000.0", net: "999.9", seyf: "1", polka: "1", au: "999.9", ag: "-", pd: "-", rh: "-", pt: "-" },
-    { id: newPosId(), nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag чистое", kol: "1", unit: "шт", proba: "925.0", lig: "318.6", net: "294.7", seyf: "2", polka: "1", au: "-", ag: "294.7", pd: "-", rh: "-", pt: "-" },
+    { id: "po-1", nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au чистое", kol: "1", unit: "шт", proba: "999.9", lig: "1000.0", net: "999.9", seyf: "1", polka: "1", au: "999.9", ag: "-", pd: "-", rh: "-", pt: "-" },
+    { id: "po-2", nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag чистое", kol: "1", unit: "шт", proba: "925.0", lig: "318.6", net: "294.7", seyf: "2", polka: "1", au: "-", ag: "294.7", pd: "-", rh: "-", pt: "-" },
   ]);
   const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>([
-    { id: newPosId(), nomenkl: "AU-SL-12000", name: "Монета Атамекен", klass: "Готовая продукция", code: "Ag чистое", kol: "2000", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "1", au: "-", ag: "-", pd: "-", rh: "-", pt: "-" },
-    { id: newPosId(), nomenkl: "AU-SL-01000", name: "Орден Алтын алка", klass: "Готовая продукция", code: "Ag чистое", kol: "300", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "2", au: "-", ag: "-", pd: "-", rh: "-", pt: "-" },
+    { id: "pn-1", nomenkl: "AU-SL-12000", name: "Монета Атамекен", klass: "Готовая продукция", code: "Ag чистое", kol: "2000", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "1", au: "-", ag: "-", pd: "-", rh: "-", pt: "-" },
+    { id: "pn-2", nomenkl: "AU-SL-01000", name: "Орден Алтын алка", klass: "Готовая продукция", code: "Ag чистое", kol: "300", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "2", au: "-", ag: "-", pd: "-", rh: "-", pt: "-" },
   ]);
 
   const positions = isOrder ? orderPositions : nakladPositions;
   const setPositions = isOrder ? setOrderPositions : setNakladPositions;
   const sklad = isOrder ? head.poluchatel : head.skladPoluch;
 
-  const [posModal, setPosModal] = useState<{ mode: "add" | "edit" | "view"; pos: PrihodPosition } | null>(null);
+  const posModal: { mode: "add" | "edit" | "view"; pos: PrihodPosition } | null = (() => {
+    if (screen.has("position-new")) return { mode: "add", pos: emptyPosition(storageLocations, sklad, isOrder ? "Слиток" : "Готовая продукция", "Au чистое") };
+    const view = positions.find(x => x.id === screen.after("position"));
+    if (view) return { mode: "view", pos: view };
+    const edit = positions.find(x => x.id === screen.after("position-edit"));
+    return edit ? { mode: "edit", pos: edit } : null;
+  })();
+  const closePos = () => screen.close(posModal?.mode === "add" ? "position-new" : posModal?.mode === "edit" ? "position-edit" : "position");
 
   const savePos = (p: PrihodPosition) => {
     if (!posModal) return;
     if (posModal.mode === "add") setPositions(prev => [...prev, p]);
     else setPositions(prev => prev.map(x => x.id === p.id ? p : x));
     show(posModal.mode === "add" ? "Позиция добавлена" : "Позиция обновлена");
-    setPosModal(null);
+    closePos();
   };
 
   const { sorted, sort, toggleSort } = useSort(positions, {
@@ -290,7 +301,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
           <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">{isOrder ? "Позиции прихода" : "Позиции приёма"}</h3>
           <div className="flex gap-2">
             {!ro && (
-              <Btn size="sm" onClick={() => setPosModal({ mode: "add", pos: emptyPosition(storageLocations, sklad, isOrder ? "Слиток" : "Готовая продукция", "Au чистое") })}>
+              <Btn size="sm" onClick={() => screen.open("position-new")}>
                 <Plus className="w-4 h-4" />Добавить позицию
               </Btn>
             )}
@@ -331,8 +342,8 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
                   <td className="px-3 py-2 text-gray-500">{locOf(p)}</td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
-                      <EyeIcon onClick={() => setPosModal({ mode: "view", pos: p })} />
-                      {!ro && <EditIcon onClick={() => setPosModal({ mode: "edit", pos: p })} />}
+                      <EyeIcon onClick={() => screen.open("position", p.id)} />
+                      {!ro && <EditIcon onClick={() => screen.open("position-edit", p.id)} />}
                       {!ro && <DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} />}
                     </div>
                   </td>
@@ -345,11 +356,11 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
 
       {posModal && (
         <PositionModal
-          key={posModal.pos.id + posModal.mode}
+          key={posModal.mode === "add" ? "add" : posModal.pos.id + posModal.mode}
           mode={posModal.mode}
           sklad={sklad}
           initial={posModal.pos}
-          onClose={() => setPosModal(null)}
+          onClose={closePos}
           onSave={savePos}
         />
       )}

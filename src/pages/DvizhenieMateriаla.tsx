@@ -7,6 +7,7 @@ import {
 } from "../components/ui";
 import { Operation, OperPosition, OperStage, ShihtovayaKarta, isGPKlass, spravValues, DOC_TYPE_LKI } from "../data/mock";
 import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
+import { useScreen, useTabParam } from "../router";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
 
@@ -293,7 +294,9 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
 
 function VozvratPickModal({ vydacha, onClose, onAdd }: { vydacha: OperPosition[]; onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [showAddNew, setShowAddNew] = useState(false);
+  const screen = useScreen();
+  const showAddNew = screen.has("new-position");
+  const setShowAddNew = (open: boolean) => (open ? screen.open("new-position") : screen.close("new-position"));
 
   const toggle = (n: number) => {
     setSelected(prev => {
@@ -753,17 +756,24 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const headRo = vydachaRo;
   const disabledTabs: TabName[] = phase === "vydacha" ? ["Возврат", "Списание", "Итого"] : [];
 
-  const [tab, setTab] = useState<TabName>(phase === "vozvrat" && !readOnly ? "Возврат" : "Выдача");
+  // Вкладка — ?tab=…; по умолчанию на этапе возврата открывается «Возврат»
+  const [tab, setTab] = useTabParam<TabName>(
+    { "Выдача": "vydacha", "Возврат": "vozvrat", "Списание": "spisanie", "Итого": "itogo" },
+    phase === "vozvrat" && !readOnly ? "Возврат" : "Выдача",
+  );
   const [vid, setVid] = useState<string>(op?.vid || "Плавка");
   const [type, setType] = useState<string>(op?.type || "Выдача");
   const [vydacha, setVydacha] = useState<OperPosition[]>(() => op?.vydachaPos ?? (op ? vydachaPositions : []));
   const [vozvrat, setVozvrat] = useState<OperPosition[]>(() => op?.vozvratPos ?? (op && phase !== "vydacha" && stage !== "Выдано" ? vozvratPositions : []));
   const [losses, setLosses] = useState<LossRow[]>(() => (op?.vid === "Производство ГП" ? seedGpLosses : [newLoss()]));
   const [spisanieDoc, setSpisanieDoc] = useState<SpisanieDoc | null>(() => (op?.vid === "Производство ГП" ? seedDoc : null));
-  const [showSpisanie, setShowSpisanie] = useState(false);
-  const [showAddDM, setShowAddDM] = useState(false);
-  const [showVozvratPick, setShowVozvratPick] = useState(false);
-  const [showShihtaPick, setShowShihtaPick] = useState(false);
+  // Вложенные экраны: …/spisanie-raznicy, …/add-position, …/vozvrat-pick, …/shihta-pick
+  const screen = useScreen();
+  const nested = (name: string) => [screen.has(name), (open: boolean) => (open ? screen.open(name) : screen.close(name))] as const;
+  const [showSpisanie, setShowSpisanie] = nested("spisanie-raznicy");
+  const [showAddDM, setShowAddDM] = nested("add-position");
+  const [showVozvratPick, setShowVozvratPick] = nested("vozvrat-pick");
+  const [showShihtaPick, setShowShihtaPick] = nested("shihta-pick");
   const [pickedShihtaId, setPickedShihtaId] = useState<string | null>(null);
   const { dmItems, setDmItems, setShihtovyeKarty, operations, currentUser } = useApp();
   // Документы вкладок «Выдача» / «Возврат»
@@ -1174,25 +1184,26 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 // ── Реестр операций ───────────────────────────────────────────────────────────
 
 export function DvizhenieMateriаla() {
-  const { operations, setOperations, pageParams } = useApp();
+  const { operations, setOperations } = useApp();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
   const [filterVid, setFilterVid] = useState("Все виды");
   const [search, setSearch] = useState("");
-  const [viewOp, setViewOp] = useState<Operation | null>(null);
-  const [editOp, setEditOp] = useState<Operation | null>(null);
-  const [showNew, setShowNew] = useState(false);
+  // Экраны: /dvizhenie-materiala/new, /view/:id, /edit/:id
+  const screen = useScreen();
+  const viewOp = operations.find(o => o.id === screen.after("view")) ?? null;
+  const editOp = operations.find(o => o.id === screen.after("edit")) ?? null;
+  const showNew = screen.has("new");
+  const setViewOp = (o: Operation | null) => (o ? screen.openTop("view", o.id) : screen.close("view"));
+  const setEditOp = (o: Operation | null) => (o ? screen.openTop("edit", o.id) : screen.close("edit"));
+  const setShowNew = (open: boolean) => (open ? screen.openTop("new") : screen.close("new"));
   const [selected, setSelected] = useState<string | null>(null);
   const perPage = 8;
 
   const toggleSelect = (id: string) => {
     setSelected(prev => (prev === id ? null : id));
   };
-
-  useEffect(() => {
-    if (pageParams.openNew) setShowNew(true);
-  }, [pageParams.openNew]);
 
   const filtered = operations.filter(o => {
     const matchSearch = !search || o.document.toLowerCase().includes(search.toLowerCase()) || o.responsible.toLowerCase().includes(search.toLowerCase());
@@ -1300,9 +1311,10 @@ export function DvizhenieMateriаla() {
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
       </div>
 
-      {viewOp && <OperModal op={viewOp} onClose={() => setViewOp(null)} onSave={() => setViewOp(null)} readOnly />}
+      {viewOp && <OperModal key={viewOp.id} op={viewOp} onClose={() => setViewOp(null)} onSave={() => setViewOp(null)} readOnly />}
       {editOp && (
         <OperModal
+          key={editOp.id}
           op={editOp}
           onClose={() => setEditOp(null)}
           onSave={updated => {

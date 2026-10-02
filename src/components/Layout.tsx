@@ -3,6 +3,7 @@ import { useApp, Page, Lang, daysSince, evaluatePasswordRules } from "../store/A
 import { Modal, Btn, Field, Input } from "./ui";
 import { Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, Languages, LogOut, KeyRound, ShieldAlert } from "lucide-react";
 import { KmdLogo } from "./KmdLogo";
+import { useSearchParams } from "react-router";
 
 const menuItems: { key: string; page: Page; icon: React.ReactNode }[] = [
   { key: "nav.sklady", page: "sklady-hub", icon: <Warehouse className="w-5 h-5" /> },
@@ -221,7 +222,14 @@ function useSessionTimeout(timeoutMinutes: number, onTimeout: () => void) {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { page, navigate, tr, theme, toggleTheme, currentUser, logout, securityPolicy } = useApp();
-  const [showChangePassword, setShowChangePassword] = useState(false);
+  // Смена пароля открывается поверх любого экрана: ?modal=smena-parolya
+  const [searchParams, setSearchParams] = useSearchParams();
+  const showChangePassword = searchParams.get("modal") === "smena-parolya";
+  const setShowChangePassword = (open: boolean) => setSearchParams(prev => {
+    const next = new URLSearchParams(prev);
+    if (open) next.set("modal", "smena-parolya"); else next.delete("modal");
+    return next;
+  });
 
   useSessionTimeout(securityPolicy.sessionTimeoutMinutes, () => {
     logout("Сессия завершена по истечении периода неактивности. Войдите снова.");

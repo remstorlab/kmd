@@ -6,6 +6,7 @@ import {
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravochniki, isGPKlass } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
+import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
 // ── Выдача со склада наружу (получателю) — единая для ГП и ДМ ─────────────────
@@ -71,7 +72,9 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const lockPos = ro || issued;
   const { gpItems, dmItems, setGpItems, setDmItems } = useApp();
   const { toast, show, clear } = useToast();
-  const [kind, setKind] = useState<VydachaKind>(fixedKind ?? (doc ? vydachaKindOf(doc) : "ГП"));
+  // Вложенные экраны: …/dm (склад ДМ при выборе в «Тип документа»), …/pick (подбор со склада)
+  const screen = useScreen();
+  const kind: VydachaKind = fixedKind ?? (doc ? vydachaKindOf(doc) : screen.has("dm") ? "ДМ" : "ГП");
   const isDM = kind === "ДМ";
   const today = new Date().toLocaleDateString("ru-RU");
 
@@ -89,7 +92,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
   const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Накладная_${doc.number}.pdf`)] : []));
   const [positions, setPositions] = useState<VydachaPosition[]>(() => doc?.positions ?? []);
-  const [showPick, setShowPick] = useState(false);
+  const showPick = screen.has("pick");
+  const setShowPick = (open: boolean) => (open ? screen.open("pick") : screen.close("pick"));
 
   // Остатки склада: ГП — класс «Готовая продукция», ДМ — все остальные (из обоих учётов)
   const stock = useMemo<StockRow[]>(() => {
@@ -123,7 +127,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
   const changeKind = (k: VydachaKind) => {
     if (k === kind) return;
-    setKind(k);
+    screen.toggle("dm", k === "ДМ");
     setPositions([]);
     setHead(x => ({ ...x, sender: SENDERS[k][0] }));
   };

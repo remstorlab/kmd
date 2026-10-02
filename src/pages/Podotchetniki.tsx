@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React from "react";
+import { useLocation } from "react-router";
 import { useApp } from "../store/AppContext";
 import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode } from "../components/ui";
 import { Podotchetnik, PodotchetProcess } from "../data/mock";
 import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, LucideIcon } from "lucide-react";
+import { matchPage, useTabParam } from "../router";
 
 const vidIcon: Record<string, LucideIcon> = {
   "Плавка": Flame,
@@ -69,7 +71,10 @@ function ProcessCard({ process, showCompletedDate }: { process: PodotchetProcess
 }
 
 function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: () => void }) {
-  const [tab, setTab] = useState("Текущие процессы");
+  const [tab, setTab] = useTabParam<"Текущие процессы" | "Завершённые процессы">(
+    { "Текущие процессы": "tekushie", "Завершённые процессы": "zavershennye" },
+    "Текущие процессы",
+  );
 
   const processes = tab === "Текущие процессы" ? person.currentProcesses : person.completedProcesses;
 
@@ -134,7 +139,7 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
 
       {/* Processes */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <Tabs tabs={["Текущие процессы", "Завершённые процессы"]} active={tab} onChange={setTab} />
+        <Tabs tabs={["Текущие процессы", "Завершённые процессы"]} active={tab} onChange={t => setTab(t as typeof tab)} />
         <div className="space-y-3">
           {processes.map(p => (
             <ProcessCard key={p.id} process={p} showCompletedDate={tab === "Завершённые процессы"} />
@@ -149,8 +154,12 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
 }
 
 export function Podotchetniki() {
-  const { podotchetniki } = useApp();
-  const [selected, setSelected] = useState<Podotchetnik | null>(null);
+  const { podotchetniki, navigate } = useApp();
+  // Карточка — /podotchetniki/:id
+  const { pathname } = useLocation();
+  const { page, segs } = matchPage(pathname);
+  const selected = page === "podotchetnik-card" ? podotchetniki.find(p => p.id === segs[1]) ?? null : null;
+  const setSelected = (p: Podotchetnik | null) => (p ? navigate("podotchetnik-card", { id: p.id }) : navigate("podotchetniki"));
 
   const { sorted, sort, toggleSort } = useSort(podotchetniki, {
     name: p => p.name,

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router";
 import {
   PageHeader, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Badge, Toggle,
   useToast, Toast, useConfirm, ConfirmDialog,
@@ -6,9 +7,44 @@ import {
 } from "../components/ui";
 import { spravochniki, initialMaterialCodes, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation } from "../data/mock";
 import { useApp } from "../store/AppContext";
+import { matchPage, useScreen } from "../router";
 import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
+
+// Адреса справочников: /spravochniki/<slug>
+const DICT_SLUG: Record<SpravKey, string> = {
+  "Номенклатуры": "nomenklatury",
+  "Единицы измерения": "edinicy-izmereniya",
+  "Типы документов": "tipy-dokumentov",
+  "Организации": "organizacii",
+  "Подотчётные сотрудники": "podotchetnye-sotrudniki",
+  "Типы операций": "tipy-operaciy",
+  "Виды операций": "vidy-operaciy",
+  "Склады": "sklady",
+};
+export const SPRAV_SLUGS = {
+  ...DICT_SLUG,
+  "Коды материалов": "kody-materialov",
+  "Классы материалов": "klassy-materialov",
+  "Места хранения": "mesta-hraneniya",
+} as const;
+
+// Экраны записей справочника: …/new, …/view/:key, …/edit/:key
+function useRecordScreens<T>(items: T[], keyOf: (t: T) => string) {
+  const screen = useScreen();
+  const editKey = screen.after("edit");
+  return {
+    showAdd: screen.has("new"),
+    viewItem: items.find(i => keyOf(i) === screen.after("view")) ?? null,
+    editItem: items.find(i => keyOf(i) === editKey) ?? null,
+    editKey,
+    goAdd: () => screen.openTop("new"),
+    goView: (i: T) => screen.openTop("view", keyOf(i)),
+    goEdit: (i: T) => screen.openTop("edit", keyOf(i)),
+    closeAll: () => screen.openTop(),
+  };
+}
 
 const dictIcon: Record<SpravKey, LucideIcon> = {
   "Номенклатуры": Package,
@@ -24,9 +60,13 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
 function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const dict = spravochniki[name];
   const [items, setItems] = useState(dict.items);
-  const [showAdd, setShowAdd] = useState(false);
-  const [editItem, setEditItem] = useState<{ code: string; value: string; status: string } | null>(null);
   const [form, setForm] = useState({ code: "", value: "", status: "Активно" });
+  const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.code);
+  // Форма заполняется при открытии экрана добавления / редактирования (в т.ч. по прямой ссылке)
+  useEffect(() => {
+    if (editItem) setForm(editItem);
+    else if (showAdd) setForm({ code: "", value: "", status: "Активно" });
+  }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { sorted, sort, toggleSort } = useSort(items, {
     code: i => i.code,
@@ -34,14 +74,8 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
     status: i => i.status,
   });
 
-  const openAdd = () => {
-    setForm({ code: "", value: "", status: "Активно" });
-    setShowAdd(true);
-  };
-  const openEdit = (item: { code: string; value: string; status: string }) => {
-    setForm(item);
-    setEditItem(item);
-  };
+  const openAdd = goAdd;
+  const openEdit = goEdit;
 
   const save = () => {
     const next = editItem ? items.map(i => i.code === editItem.code ? form : i) : [...items, form];
@@ -49,8 +83,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
     // Справочник — общий источник вариантов для полей форм, поэтому изменения пишем в него.
     if (!editItem) dict.count += 1;
     dict.items = next;
-    setShowAdd(false);
-    setEditItem(null);
+    closeAll();
     show("Запись сохранена");
   };
 
@@ -93,10 +126,10 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
       {(showAdd || editItem) && (
         <Modal
           title={editItem ? "Редактировать запись" : "Добавить запись"}
-          onClose={() => { setShowAdd(false); setEditItem(null); }}
+          onClose={() => { closeAll(); }}
           footer={
             <>
-              <Btn variant="secondary" onClick={() => { setShowAdd(false); setEditItem(null); }}>Отмена</Btn>
+              <Btn variant="secondary" onClick={() => { closeAll(); }}>Отмена</Btn>
               <Btn onClick={save}>Сохранить</Btn>
             </>
           }
@@ -119,9 +152,12 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
   const [items, setItems] = useState(initialMaterialCodes);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [showAdd, setShowAdd] = useState(false);
-  const [editItem, setEditItem] = useState<MaterialCode | null>(null);
   const [form, setForm] = useState<MaterialCode>({ code: "", name: "", shortName: "" });
+  const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.code);
+  useEffect(() => {
+    if (editItem) setForm(editItem);
+    else if (showAdd) setForm({ code: "", name: "", shortName: "" });
+  }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const perPage = 10;
 
@@ -137,14 +173,8 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
   });
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
 
-  const openAdd = () => {
-    setForm({ code: "", name: "", shortName: "" });
-    setShowAdd(true);
-  };
-  const openEdit = (item: MaterialCode) => {
-    setForm(item);
-    setEditItem(item);
-  };
+  const openAdd = goAdd;
+  const openEdit = goEdit;
 
   const save = () => {
     if (editItem) {
@@ -152,8 +182,7 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
     } else {
       setItems(prev => [...prev, form]);
     }
-    setShowAdd(false);
-    setEditItem(null);
+    closeAll();
     show("Запись сохранена");
   };
 
@@ -207,10 +236,10 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
       {(showAdd || editItem) && (
         <Modal
           title={editItem ? "Редактировать запись" : "Добавить запись"}
-          onClose={() => { setShowAdd(false); setEditItem(null); }}
+          onClose={() => { closeAll(); }}
           footer={
             <>
-              <Btn variant="secondary" onClick={() => { setShowAdd(false); setEditItem(null); }}>Отмена</Btn>
+              <Btn variant="secondary" onClick={() => { closeAll(); }}>Отмена</Btn>
               <Btn onClick={save}>Сохранить</Btn>
             </>
           }
@@ -233,10 +262,13 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
   const [items, setItems] = useState(initialMaterialClasses);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [showAdd, setShowAdd] = useState(false);
-  const [viewItem, setViewItem] = useState<MaterialClass | null>(null);
-  const [editItem, setEditItem] = useState<MaterialClass | null>(null);
   const [form, setForm] = useState<MaterialClass>({ code: "", name: "" });
+  const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, i => i.code);
+  const setViewItem = (i: MaterialClass | null) => (i ? goView(i) : closeAll());
+  useEffect(() => {
+    if (editItem) setForm(editItem);
+    else if (showAdd) setForm({ code: "", name: "" });
+  }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const perPage = 10;
@@ -252,14 +284,8 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
   });
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
 
-  const openAdd = () => {
-    setForm({ code: "", name: "" });
-    setShowAdd(true);
-  };
-  const openEdit = (item: MaterialClass) => {
-    setForm(item);
-    setEditItem(item);
-  };
+  const openAdd = goAdd;
+  const openEdit = goEdit;
 
   const save = () => {
     if (editItem) {
@@ -267,8 +293,7 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
     } else {
       setItems(prev => [...prev, form]);
     }
-    setShowAdd(false);
-    setEditItem(null);
+    closeAll();
     show("Запись сохранена");
   };
 
@@ -326,10 +351,10 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
       {(showAdd || editItem) && (
         <Modal
           title={editItem ? "Редактировать запись" : "Добавить запись"}
-          onClose={() => { setShowAdd(false); setEditItem(null); }}
+          onClose={() => { closeAll(); }}
           footer={
             <>
-              <Btn variant="secondary" onClick={() => { setShowAdd(false); setEditItem(null); }}>Отмена</Btn>
+              <Btn variant="secondary" onClick={() => { closeAll(); }}>Отмена</Btn>
               <Btn onClick={save}>Сохранить</Btn>
             </>
           }
@@ -368,11 +393,16 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
   const { storageLocations: items, setStorageLocations: setItems } = useApp();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [showAdd, setShowAdd] = useState(false);
-  const [viewItem, setViewItem] = useState<StorageLocation | null>(null);
-  const [editItem, setEditItem] = useState<StorageLocation | null>(null);
   const [editAvailable, setEditAvailable] = useState(true);
   const [form, setForm] = useState({ sklad: SKLAD_OPTIONS[0], seyfNum: "", polkaNum: "", available: true });
+  const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, l => l.id);
+  const setViewItem = (l: StorageLocation | null) => (l ? goView(l) : closeAll());
+  const setEditItem = (l: StorageLocation | null) => (l ? goEdit(l) : closeAll());
+  const setShowAdd = (open: boolean) => (open ? goAdd() : closeAll());
+  useEffect(() => {
+    if (editItem) setEditAvailable(editItem.available);
+    else if (showAdd) setForm({ sklad: SKLAD_OPTIONS[0], seyfNum: "", polkaNum: "", available: true });
+  }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const perPage = 10;
@@ -390,14 +420,8 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
   });
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
 
-  const openAdd = () => {
-    setForm({ sklad: SKLAD_OPTIONS[0], seyfNum: "", polkaNum: "", available: true });
-    setShowAdd(true);
-  };
-  const openEdit = (loc: StorageLocation) => {
-    setEditItem(loc);
-    setEditAvailable(loc.available);
-  };
+  const openAdd = goAdd;
+  const openEdit = goEdit;
 
   const saveEdit = () => {
     if (!editItem) return;
@@ -536,14 +560,23 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
 }
 
 export function Spravochniki() {
-  const { storageLocations } = useApp();
-  const [selected, setSelected] = useState<SpravKey | null>(null);
-  const [showMaterialCodes, setShowMaterialCodes] = useState(false);
-  const [showMaterialClasses, setShowMaterialClasses] = useState(false);
-  const [showStorageLocations, setShowStorageLocations] = useState(false);
+  const { storageLocations, navigate } = useApp();
+  // Справочник — /spravochniki/<slug>
+  const { pathname } = useLocation();
+  const { page, segs } = matchPage(pathname);
+  const slug = page === "spravochnik-detail" ? segs[1] : undefined;
+  const open = (s?: string) => (s ? navigate("spravochnik-detail", { dict: s }) : navigate("spravochniki"));
+  const selected = (Object.keys(DICT_SLUG) as SpravKey[]).find(k => DICT_SLUG[k] === slug) ?? null;
+  const showMaterialCodes = slug === SPRAV_SLUGS["Коды материалов"];
+  const showMaterialClasses = slug === SPRAV_SLUGS["Классы материалов"];
+  const showStorageLocations = slug === SPRAV_SLUGS["Места хранения"];
+  const setSelected = (k: SpravKey | null) => open(k ? DICT_SLUG[k] : undefined);
+  const setShowMaterialCodes = (on: boolean) => open(on ? SPRAV_SLUGS["Коды материалов"] : undefined);
+  const setShowMaterialClasses = (on: boolean) => open(on ? SPRAV_SLUGS["Классы материалов"] : undefined);
+  const setShowStorageLocations = (on: boolean) => open(on ? SPRAV_SLUGS["Места хранения"] : undefined);
 
   if (selected) {
-    return <DictPage name={selected} onBack={() => setSelected(null)} />;
+    return <DictPage key={selected} name={selected} onBack={() => setSelected(null)} />;
   }
   if (showMaterialCodes) {
     return <MaterialCodesPage onBack={() => setShowMaterialCodes(false)} />;

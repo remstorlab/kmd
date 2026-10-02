@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
       figmaMakeKitPlugin({ storiesGlob: '/src/**/*.stories.{ts,tsx,js,jsx}' }),
+      spaFallback404(),
     ],
     resolve: {
       alias: {
@@ -66,6 +67,26 @@ type FigmaSiteConfiguration = {
   }
   accessibility?: {
     addBypassLinks?: boolean
+  }
+}
+
+/**
+ * Every screen has its own URL (client-side routing), so a deep link such as
+ * /dvizhenie-materiala/new must still load the app on static hosting.
+ * Hosts that serve 404.html for unknown paths get a copy of index.html.
+ */
+function spaFallback404(): Plugin {
+  let outDir = 'dist'
+  return {
+    name: 'spa-fallback-404',
+    apply: 'build',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir)
+    },
+    async closeBundle() {
+      const fs = await import('node:fs/promises')
+      await fs.copyFile(path.join(outDir, 'index.html'), path.join(outDir, '404.html'))
+    },
   }
 }
 

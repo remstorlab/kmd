@@ -9,6 +9,7 @@ import { SkladDoc, GPItem, DocStatus } from "../data/mock";
 import { Inbox, Send, Repeat, Plus, X, LucideIcon } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
+import { useScreen } from "../router";
 
 // ── Hub ───────────────────────────────────────────────────────────────────────
 
@@ -166,10 +167,12 @@ function DocList({
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("Все статусы");
   const [page, setPage] = useState(1);
-  const [viewDoc, setViewDoc] = useState<SkladDoc | null>(null);
-  const [editDoc, setEditDoc] = useState<SkladDoc | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [showPrintLabels, setShowPrintLabels] = useState(false);
+  // Экраны: …/new, …/view/:id, …/edit/:id, …/labels
+  const screen = useScreen();
+  const viewDoc = docs.find(d => d.id === screen.after("view")) ?? null;
+  const editDoc = docs.find(d => d.id === screen.after("edit")) ?? null;
+  const showModal = screen.has("new");
+  const showPrintLabels = screen.has("labels");
 
   const filtered = docs.filter(d => {
     const matchSearch = !search || d.number.toLowerCase().includes(search.toLowerCase()) || d.type.toLowerCase().includes(search.toLowerCase());
@@ -195,11 +198,11 @@ function DocList({
         breadcrumb={["Складские операции", title]}
         actions={
           <>
-            <Btn onClick={() => setShowModal(true)}>
+            <Btn onClick={() => screen.openTop("new")}>
               <Plus className="w-4 h-4" />
               {addLabel}
             </Btn>
-            {showPrint && <Btn variant="secondary" onClick={() => setShowPrintLabels(true)}>Печать ярлыков ДМ</Btn>}
+            {showPrint && <Btn variant="secondary" onClick={() => screen.openTop("labels")}>Печать ярлыков ДМ</Btn>}
             <ExportBtn onToast={show} />
           </>
         }
@@ -242,8 +245,8 @@ function DocList({
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
                 <td className="px-4 py-3"><Badge label={doc.status} /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
-                  <EyeIcon onClick={() => setViewDoc(doc)} />
-                  <EditIcon onClick={() => setEditDoc(doc)} />
+                  <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
+                  <EditIcon onClick={() => screen.openTop("edit", doc.id)} />
                   <DeleteIcon onClick={() => confirm(`Удалить документ ${doc.number}?`, () => { onDelete(doc.id); show(`Документ ${doc.number} удалён`); })} />
                   <PrintIcon onClick={() => show(`Документ ${doc.number} отправлен на печать`)} />
                 </td>
@@ -254,25 +257,26 @@ function DocList({
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
       </div>
 
-      {viewDoc && <PrihodDocModal doc={viewDoc} onClose={() => setViewDoc(null)} onSave={() => setViewDoc(null)} readOnly />}
+      {viewDoc && <PrihodDocModal key={viewDoc.id} doc={viewDoc} onClose={() => screen.close("view")} onSave={() => screen.close("view")} readOnly />}
       {editDoc && (
         <PrihodDocModal
+          key={editDoc.id}
           doc={editDoc}
-          onClose={() => setEditDoc(null)}
-          onSave={d => { onUpdate(d); setEditDoc(null); show(`Документ ${d.number} обновлён`); }}
+          onClose={() => screen.close("edit")}
+          onSave={d => { onUpdate(d); screen.close("edit"); show(`Документ ${d.number} обновлён`); }}
         />
       )}
       {showModal && (
         <PrihodDocModal
-          onClose={() => setShowModal(false)}
-          onSave={d => { onSave(d); setShowModal(false); show(`Документ ${d.number} сохранён`); }}
+          onClose={() => screen.close("new")}
+          onSave={d => { onSave(d); screen.close("new"); show(`Документ ${d.number} сохранён`); }}
         />
       )}
       {showPrintLabels && (
         <PrintLabelsModal
           docs={docs}
-          onClose={() => setShowPrintLabels(false)}
-          onPrint={count => { setShowPrintLabels(false); show(`Печать ${count} ярлыков выполнена`); }}
+          onClose={() => screen.close("labels")}
+          onPrint={count => { screen.close("labels"); show(`Печать ${count} ярлыков выполнена`); }}
         />
       )}
       {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
@@ -303,9 +307,11 @@ export function VydachaList() {
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
-  const [viewDoc, setViewDoc] = useState<SkladDoc | null>(null);
-  const [editDoc, setEditDoc] = useState<SkladDoc | null>(null);
-  const [showNew, setShowNew] = useState(false);
+  // Экраны: …/new, …/view/:id, …/edit/:id
+  const screen = useScreen();
+  const viewDoc = vydachaDocs.find(d => d.id === screen.after("view")) ?? null;
+  const editDoc = vydachaDocs.find(d => d.id === screen.after("edit")) ?? null;
+  const showNew = screen.has("new");
   const perPage = 8;
 
   const { sorted, sort, toggleSort } = useSort(vydachaDocs, {
@@ -325,7 +331,7 @@ export function VydachaList() {
         breadcrumb={["Складские операции", "Выдача со склада"]}
         actions={
           <>
-            <Btn onClick={() => setShowNew(true)}>Выдать со склада</Btn>
+            <Btn onClick={() => screen.openTop("new")}>Выдать со склада</Btn>
             <ExportBtn onToast={show} />
           </>
         }
@@ -353,8 +359,8 @@ export function VydachaList() {
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
                 <td className="px-4 py-3"><Badge label={doc.status} /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
-                  <EyeIcon onClick={() => setViewDoc(doc)} />
-                  <EditIcon onClick={() => setEditDoc(doc)} />
+                  <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
+                  <EditIcon onClick={() => screen.openTop("edit", doc.id)} />
                   <DeleteIcon onClick={() => confirm(`Удалить документ ${doc.number}?`, () => setVydachaDocs(prev => prev.filter(d => d.id !== doc.id)))} />
                   <PrintIcon onClick={() => show(`Документ ${doc.number} отправлен на печать`)} />
                 </td>
@@ -365,24 +371,25 @@ export function VydachaList() {
         <Pagination page={page} total={vydachaDocs.length} perPage={perPage} onPage={setPage} />
       </div>
 
-      {viewDoc && <VydachaDocModal doc={viewDoc} onClose={() => setViewDoc(null)} onSave={() => setViewDoc(null)} readOnly />}
+      {viewDoc && <VydachaDocModal key={viewDoc.id} doc={viewDoc} onClose={() => screen.close("view")} onSave={() => screen.close("view")} readOnly />}
       {editDoc && (
         <VydachaDocModal
+          key={editDoc.id}
           doc={editDoc}
-          onClose={() => setEditDoc(null)}
+          onClose={() => screen.close("edit")}
           onSave={d => {
             setVydachaDocs(prev => prev.map(x => x.id === d.id ? d : x));
-            setEditDoc(null);
+            screen.close("edit");
             show(`Документ ${d.number} обновлён`);
           }}
         />
       )}
       {showNew && (
         <VydachaDocModal
-          onClose={() => setShowNew(false)}
+          onClose={() => screen.close("new")}
           onSave={d => {
             setVydachaDocs(prev => [d, ...prev]);
-            setShowNew(false);
+            screen.close("new");
             show("Выдача оформлена");
           }}
         />

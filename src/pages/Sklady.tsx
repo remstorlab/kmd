@@ -9,6 +9,7 @@ import { GPItem, DMItem, isGPKlass } from "../data/mock";
 import { Gem, Coins, Plus } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
+import { useScreen } from "../router";
 
 // Приведение позиций между учётами ГП и ДМ — для разделения складов по классу материала.
 const dmToGp = (i: DMItem): GPItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, qty: i.qty, unit: "шт", klass: i.klass, code: i.metal, location: i.location, status: i.status });
@@ -75,9 +76,11 @@ export function OstatokGP() {
   const [filterStatus, setFilterStatus] = useState("Все статусы");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [viewItem, setViewItem] = useState<GPItem | null>(null);
-  const [showPrihod, setShowPrihod] = useState(false);
-  const [showVydacha, setShowVydacha] = useState(false);
+  // Экраны: /sklady/gp/view/:id, /sklady/gp/prihod, /sklady/gp/vydacha
+  const screen = useScreen();
+  const viewItem = skladItems.find(it => it.id === screen.after("view")) ?? null;
+  const showPrihod = screen.has("prihod");
+  const showVydacha = screen.has("vydacha");
 
   const perPage = 8;
 
@@ -121,11 +124,11 @@ export function OstatokGP() {
         breadcrumb={["Склады", "Остатки на складе ГП"]}
         actions={
           <>
-            <Btn onClick={() => setShowPrihod(true)}>
+            <Btn onClick={() => screen.openTop("prihod")}>
               <Plus className="w-4 h-4" />
               Принять на склад
             </Btn>
-            <Btn variant="secondary" onClick={() => setShowVydacha(true)}>Выдать со склада</Btn>
+            <Btn variant="secondary" onClick={() => screen.openTop("vydacha")}>Выдать со склада</Btn>
             <ExportBtn onToast={show} />
           </>
         }
@@ -188,7 +191,7 @@ export function OstatokGP() {
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><Badge label={item.status} /></td>
                 <td className="px-4 py-3">
-                  <EyeIcon onClick={() => setViewItem(item)} />
+                  <EyeIcon onClick={() => screen.openTop("view", item.id)} />
                 </td>
               </tr>
             ))}
@@ -197,20 +200,20 @@ export function OstatokGP() {
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
       </div>
 
-      {viewItem && <GPViewModal item={viewItem} onClose={() => setViewItem(null)} />}
+      {viewItem && <GPViewModal item={viewItem} onClose={() => screen.close("view")} />}
       {showPrihod && (
         <PrihodDocModal
           onlyNaklad
           nakladType="Накладная на приём ГП"
-          onClose={() => setShowPrihod(false)}
-          onSave={d => { setSkladDocs(prev => [d, ...prev]); setShowPrihod(false); show(`Накладная ${d.number} сохранена`); }}
+          onClose={() => screen.close("prihod")}
+          onSave={d => { setSkladDocs(prev => [d, ...prev]); screen.close("prihod"); show(`Накладная ${d.number} сохранена`); }}
         />
       )}
       {showVydacha && (
         <VydachaDocModal
           kind="ГП"
-          onClose={() => setShowVydacha(false)}
-          onSave={d => { setVydachaDocs(prev => [d, ...prev]); setShowVydacha(false); show(`Накладная ${d.number} сохранена`); }}
+          onClose={() => screen.close("vydacha")}
+          onSave={d => { setVydachaDocs(prev => [d, ...prev]); screen.close("vydacha"); show(`Накладная ${d.number} сохранена`); }}
         />
       )}
       {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
@@ -269,10 +272,12 @@ export function OstatokDM() {
   const [filterStatus, setFilterStatus] = useState("Все статусы");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [viewItem, setViewItem] = useState<DMItem | null>(null);
-  const [showMerge, setShowMerge] = useState(false);
-  const [showPrihod, setShowPrihod] = useState(false);
-  const [showVydacha, setShowVydacha] = useState(false);
+  // Экраны: /sklady/dm/view/:id, /sklady/dm/merge, /sklady/dm/prihod, /sklady/dm/vydacha
+  const screen = useScreen();
+  const viewItem = skladItems.find(it => it.id === screen.after("view")) ?? null;
+  const showMerge = screen.has("merge");
+  const showPrihod = screen.has("prihod");
+  const showVydacha = screen.has("vydacha");
 
   const perPage = 8;
   const filtered = skladItems.filter(it => {
@@ -305,8 +310,12 @@ export function OstatokDM() {
 
   // Закрытые (выданные) позиции в объединении не участвуют
   const selectedItems = skladItems.filter(it => selected.has(it.id) && it.status !== "Закрыта");
+  // Экран объединения, открытый по прямой ссылке без выбора, показывает первые две доступные позиции
+  const mergeItems = selectedItems.length >= 2 ? selectedItems : skladItems.filter(it => it.status !== "Закрыта").slice(0, 2);
 
   const doMerge = () => {
+    const ids = new Set(mergeItems.map(it => it.id));
+    const selectedItems = mergeItems;
     const totalLig = selectedItems.reduce((s, i) => s + i.ligWeight, 0);
     const avgProba = Math.round(selectedItems.reduce((s, i) => s + i.proba * i.ligWeight, 0) / totalLig);
     const totalNet = selectedItems.reduce((s, i) => s + i.netWeight, 0);
@@ -324,10 +333,10 @@ export function OstatokDM() {
       location: selectedItems[0].location,
       status: "На складе",
     };
-    setDmItems(prev => [...prev.filter(it => !selected.has(it.id)), merged]);
-    setGpItems(prev => prev.filter(it => !selected.has(it.id)));
+    setDmItems(prev => [...prev.filter(it => !ids.has(it.id)), merged]);
+    setGpItems(prev => prev.filter(it => !ids.has(it.id)));
     setSelected(new Set());
-    setShowMerge(false);
+    screen.close("merge");
     show("Позиции объединены");
   };
 
@@ -339,9 +348,9 @@ export function OstatokDM() {
         breadcrumb={["Склады", "Остатки на складе ДМ"]}
         actions={
           <>
-            <Btn onClick={() => setShowPrihod(true)}>Принять на склад</Btn>
-            <Btn variant="secondary" onClick={() => setShowVydacha(true)}>Выдать со склада</Btn>
-            <Btn variant="secondary" disabled={selectedItems.length < 2} onClick={() => setShowMerge(true)}>Объединить позиции</Btn>
+            <Btn onClick={() => screen.openTop("prihod")}>Принять на склад</Btn>
+            <Btn variant="secondary" onClick={() => screen.openTop("vydacha")}>Выдать со склада</Btn>
+            <Btn variant="secondary" disabled={selectedItems.length < 2} onClick={() => screen.openTop("merge")}>Объединить позиции</Btn>
             <ExportBtn onToast={show} />
           </>
         }
@@ -400,7 +409,7 @@ export function OstatokDM() {
                 <td className="px-4 py-3">{item.netWeight}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><Badge label={item.status} /></td>
-                <td className="px-4 py-3"><EyeIcon onClick={() => setViewItem(item)} /></td>
+                <td className="px-4 py-3"><EyeIcon onClick={() => screen.openTop("view", item.id)} /></td>
               </tr>
             ))}
           </tbody>
@@ -409,7 +418,7 @@ export function OstatokDM() {
       </div>
 
       {viewItem && (
-        <Modal title="Просмотр позиции ДМ" onClose={() => setViewItem(null)} footer={<Btn variant="secondary" onClick={() => setViewItem(null)}>Закрыть</Btn>}>
+        <Modal title="Просмотр позиции ДМ" onClose={() => screen.close("view")} footer={<Btn variant="secondary" onClick={() => screen.close("view")}>Закрыть</Btn>}>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <Field label="Наименование" full><Input value={viewItem.name} disabled /></Field>
             <Field label="Номенкл. №"><Input value={viewItem.nomenkl} disabled /></Field>
@@ -434,18 +443,18 @@ export function OstatokDM() {
           </div>
         </Modal>
       )}
-      {showMerge && <MergeModal items={selectedItems} onClose={() => setShowMerge(false)} onConfirm={doMerge} />}
+      {showMerge && mergeItems.length >= 2 && <MergeModal items={mergeItems} onClose={() => screen.close("merge")} onConfirm={doMerge} />}
       {showPrihod && (
         <PrihodDocModal
-          onClose={() => setShowPrihod(false)}
-          onSave={d => { setSkladDocs(prev => [d, ...prev]); setShowPrihod(false); show(`Документ ${d.number} сохранён`); }}
+          onClose={() => screen.close("prihod")}
+          onSave={d => { setSkladDocs(prev => [d, ...prev]); screen.close("prihod"); show(`Документ ${d.number} сохранён`); }}
         />
       )}
       {showVydacha && (
         <VydachaDocModal
           kind="ДМ"
-          onClose={() => setShowVydacha(false)}
-          onSave={d => { setVydachaDocs(prev => [d, ...prev]); setShowVydacha(false); show(`Накладная ${d.number} сохранена`); }}
+          onClose={() => screen.close("vydacha")}
+          onSave={d => { setVydachaDocs(prev => [d, ...prev]); screen.close("vydacha"); show(`Накладная ${d.number} сохранена`); }}
         />
       )}
       {toast && <Toast message={toast} onDone={clear} />}

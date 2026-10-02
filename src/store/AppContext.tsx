@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { matchPage, pagePath, LOGIN_PATH } from "../router";
 import {
   GPItem, DMItem, SkladDoc, Operation, ShihtovayaKarta,
   Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy, StorageLocation,
@@ -203,8 +205,16 @@ interface AppCtx {
 const Ctx = createContext<AppCtx>(null!);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState<AppCtx["currentUser"]>(null);
+  const location = useLocation();
+  const routerNavigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Демо-режим: при открытии любого экрана по прямой ссылке (кроме /login) сразу входим под первым
+  // пользователем — так каждый экран доступен по URL без авторизации (например, для импорта в Figma).
+  const openedByLink = location.pathname !== LOGIN_PATH;
+  const toCurrentUser = (u: AuthUser): NonNullable<AppCtx["currentUser"]> =>
+    ({ name: u.name, fullName: u.fullName, email: u.email, initials: u.initials, username: u.username, passwordChangedAt: u.passwordChangedAt });
+  const [isLoggedIn, setIsLoggedIn] = useState(openedByLink);
+  const [currentUser, setCurrentUser] = useState<AppCtx["currentUser"]>(() => (openedByLink ? toCurrentUser(initialAuthUsers[0]) : null));
   const [authUsers, setAuthUsers] = useState<AuthUser[]>(initialAuthUsers);
   const [sessionEndedReason, setSessionEndedReason] = useState<string | null>(null);
   const [securityPolicy, setSecurityPolicy] = useState<SecurityPolicy>(initialSecurityPolicy);
@@ -216,8 +226,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return (localStorage.getItem("dm-lang") as Lang) || "ru";
   });
 
-  const [page, setPage] = useState<Page>("dashboard");
-  const [pageParams, setPageParams] = useState<Record<string, string>>({});
+  // Текущий раздел и параметры — из адреса
+  const page = matchPage(location.pathname).page;
+  const pageParams = Object.fromEntries(searchParams);
 
   // Apply dark class to <html>
   useEffect(() => {
@@ -242,7 +253,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const user = authUsers.find(u => u.username === username && u.password === password);
     if (user) {
       setIsLoggedIn(true);
-      setCurrentUser({ name: user.name, fullName: user.fullName, email: user.email, initials: user.initials, username: user.username, passwordChangedAt: user.passwordChangedAt });
+      setCurrentUser(toCurrentUser(user));
+      if (location.pathname === LOGIN_PATH) routerNavigate("/");
       return true;
     }
     return false;
@@ -251,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const logout = (reason?: string) => {
     setIsLoggedIn(false);
     setCurrentUser(null);
-    setPage("dashboard");
+    routerNavigate(LOGIN_PATH);
     if (reason) setSessionEndedReason(reason);
   };
 
@@ -282,10 +294,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return null;
   };
 
-  const navigate = (p: Page, params: Record<string, string> = {}) => {
-    setPage(p);
-    setPageParams(params);
-  };
+  const navigate = (p: Page, params: Record<string, string> = {}) => routerNavigate(pagePath(p, params));
 
   const [gpItems, setGpItems] = useState(initialGPItems);
   const [dmItems, setDmItems] = useState(initialDMItems);

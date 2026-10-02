@@ -3,6 +3,7 @@ import { useApp } from "../store/AppContext";
 import { PageHeader, Btn, Modal, Field, Input, Select, useToast, Toast, SortTh, useSort } from "../components/ui";
 import { Metal, baseMetal } from "../data/mock";
 import { ClipboardCheck, Coins, Gem, FileText, LucideIcon } from "lucide-react";
+import { useScreen } from "../router";
 
 const METAL_CODE: Record<Metal, string> = { Au: "1", Ag: "2", Pt: "3", Pd: "4" };
 
@@ -13,7 +14,10 @@ function InventarizationOpisModal({ onClose }: { onClose: () => void }) {
   const { toast, show, clear } = useToast();
   const [onDate, setOnDate] = useState(() => new Date().toLocaleDateString("ru-RU"));
   const [sklad, setSklad] = useState("Склад ДМ №1");
-  const [generated, setGenerated] = useState(false);
+  // Сформированная опись — …/inv-opis/sformirovana
+  const screen = useScreen();
+  const generated = screen.has("sformirovana");
+  const setGenerated = (on: boolean) => screen.toggle("sformirovana", on);
 
   const rows = dmItems.map(it => {
     const m = baseMetal(it.metal);
@@ -174,8 +178,9 @@ function InventarizationOpisModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-const reports: { title: string; desc: string; icon: LucideIcon; data: { nom: string; name: string; kol: string; ves: string; status: string }[] }[] = [
+const reports: { slug: string; title: string; desc: string; icon: LucideIcon; data: { nom: string; name: string; kol: string; ves: string; status: string }[] }[] = [
   {
+    slug: "akt-nzp",
     title: "Акт по итогам инвентаризации НЗП",
     desc: "Унифицированная форма ИНВ-3 — инвентаризационная опись незавершённого производства",
     icon: ClipboardCheck,
@@ -186,6 +191,7 @@ const reports: { title: string; desc: string; icon: LucideIcon; data: { nom: str
     ],
   },
   {
+    slug: "inv-opis",
     title: "Инвентаризационная опись ДМ",
     desc: "Опись фактических остатков драгоценных металлов на всех складах",
     icon: Coins,
@@ -196,6 +202,7 @@ const reports: { title: string; desc: string; icon: LucideIcon; data: { nom: str
     ],
   },
   {
+    slug: "opis-kamney",
     title: "Опись хранения драгоценных камней",
     desc: "Инвентаризация драгоценных камней в производстве и на хранении",
     icon: Gem,
@@ -205,6 +212,7 @@ const reports: { title: string; desc: string; icon: LucideIcon; data: { nom: str
     ],
   },
   {
+    slug: "nakladnye",
     title: "Накладные",
     desc: "Сводный журнал приходных и расходных документов за период",
     icon: FileText,
@@ -218,8 +226,12 @@ const reports: { title: string; desc: string; icon: LucideIcon; data: { nom: str
 
 export function Otchetnost() {
   const { toast, show, clear } = useToast();
-  const [viewReport, setViewReport] = useState<typeof reports[0] | null>(null);
-  const [showInvOpis, setShowInvOpis] = useState(false);
+  // Экраны: /otchetnost/report/:slug, /otchetnost/inv-opis
+  const screen = useScreen();
+  const viewReport = reports.find(r => r.slug === screen.after("report")) ?? null;
+  const showInvOpis = screen.has("inv-opis");
+  const setViewReport = (r: typeof reports[0] | null) => (r ? screen.openTop("report", r.slug) : screen.close("report"));
+  const setShowInvOpis = (open: boolean) => (open ? screen.openTop("inv-opis") : screen.close("inv-opis"));
 
   const { sorted: sortedReportRows, sort: reportSort, toggleSort: toggleReportSort } = useSort(viewReport?.data ?? [], {
     nom: r => r.nom,

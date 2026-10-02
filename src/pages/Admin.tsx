@@ -7,6 +7,7 @@ import {
 } from "../components/ui";
 import { AppUser, Role } from "../data/mock";
 import { ArrowLeft, Plus, ChevronRight } from "lucide-react";
+import { useScreen } from "../router";
 
 const permissions = ["Создать", "Редактировать", "Удалить", "Просмотр", "Экспорт", "Печать"];
 
@@ -313,9 +314,14 @@ function RolesPage({ onBack }: { onBack: () => void }) {
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [search, setSearch] = useState("");
-  const [showNew, setShowNew] = useState(false);
-  const [viewRole, setViewRole] = useState<Role | null>(null);
-  const [editRole, setEditRole] = useState<Role | null>(null);
+  // Экраны: /admin/roles/new, /view/:id, /edit/:id
+  const screen = useScreen();
+  const showNew = screen.has("new");
+  const viewRole = roles.find(r => r.id === screen.after("view")) ?? null;
+  const editRole = roles.find(r => r.id === screen.after("edit")) ?? null;
+  const setShowNew = (open: boolean) => (open ? screen.openTop("new") : screen.close("new"));
+  const setViewRole = (r: Role | null) => (r ? screen.openTop("view", r.id) : screen.close("view"));
+  const setEditRole = (r: Role | null) => (r ? screen.openTop("edit", r.id) : screen.close("edit"));
   const [page, setPage] = useState(1);
   const perPage = 20;
 
@@ -397,10 +403,11 @@ function RolesPage({ onBack }: { onBack: () => void }) {
         />
       )}
       {viewRole && (
-        <NewRoleModal role={viewRole} readOnly onClose={() => setViewRole(null)} onSave={() => {}} />
+        <NewRoleModal key={viewRole.id} role={viewRole} readOnly onClose={() => setViewRole(null)} onSave={() => {}} />
       )}
       {editRole && (
         <NewRoleModal
+          key={editRole.id}
           role={editRole}
           onClose={() => setEditRole(null)}
           onSave={r => { setRoles(prev => prev.map(x => x.id === r.id ? r : x)); setEditRole(null); show("Роль обновлена"); }}
@@ -501,13 +508,19 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
 }
 
 export function PanelAdmin() {
-  const { users, setUsers } = useApp();
+  const { users, setUsers, page: currentPage, navigate } = useApp();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
-  const [showRoles, setShowRoles] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showNewUser, setShowNewUser] = useState(false);
-  const [editUser, setEditUser] = useState<AppUser | null>(null);
+  // Разделы: /admin/users, /admin/roles, /admin/settings; модалки пользователей — /admin/users/new, /edit/:id
+  const showRoles = currentPage === "admin-roles";
+  const showSettings = currentPage === "admin-settings";
+  const setShowRoles = (open: boolean) => navigate(open ? "admin-roles" : "admin-users");
+  const setShowSettings = (open: boolean) => navigate(open ? "admin-settings" : "admin-users");
+  const screen = useScreen();
+  const showNewUser = screen.has("new");
+  const editUser = users.find(u => u.id === screen.after("edit")) ?? null;
+  const setShowNewUser = (open: boolean) => (open ? screen.openTop("new") : screen.close("new"));
+  const setEditUser = (u: AppUser | null) => (u ? screen.openTop("edit", u.id) : screen.close("edit"));
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const perPage = 20;
@@ -601,6 +614,7 @@ export function PanelAdmin() {
       )}
       {editUser && (
         <NewUserModal
+          key={editUser.id}
           user={editUser}
           onClose={() => setEditUser(null)}
           onSave={u => { setUsers(prev => prev.map(x => x.id === u.id ? u : x)); setEditUser(null); show("Пользователь обновлён"); }}

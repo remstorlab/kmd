@@ -3,10 +3,14 @@ import { useApp } from "../store/AppContext";
 import { Badge, PageHeader, Modal, useToast, Toast, SortTh, useSort, parseRuDate } from "../components/ui";
 import { LogEntry, LogSnapshotItem } from "../data/mock";
 import { Eye } from "lucide-react";
+import { useScreen } from "../router";
 
 export function Logirovanie() {
   const { logs } = useApp();
-  const [detailLog, setDetailLog] = useState<LogEntry | null>(null);
+  // Детали события — /logirovanie/view/:id
+  const screen = useScreen();
+  const detailLog = logs.find(l => l.id === screen.after("view")) ?? null;
+  const setDetailLog = (l: LogEntry | null) => (l ? screen.openTop("view", l.id) : screen.close("view"));
   const [filterType, setFilterType] = useState("Все типы");
   const [filterSection, setFilterSection] = useState("Все разделы");
   const [filterUser, setFilterUser] = useState("Все пользователи");
