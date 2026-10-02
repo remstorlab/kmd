@@ -301,7 +301,7 @@ export const initialOperations: Operation[] = [
   { id: "op2", date: "18.08.2026", type: "Выдача-Возврат", vid: "Производство ГП", positions: 5, document: "1233", responsible: "Петров С.В.", stage: "Возврат: На редактировании", statusVydacha: "Выдано", statusVozvrat: "Частично", statusClose: "Не закрыто" },
   { id: "op3", date: "17.08.2026", type: "Выдача-Возврат", vid: "Отбор пробы", positions: 2, document: "1232", responsible: "Смирнов К.Д.", stage: "Завершено", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто" },
   { id: "op4", date: "16.08.2026", type: "Возврат", vid: "Анализ в ЛКИ", positions: 4, document: "1231", responsible: "Нурланов А.Б.", stage: "Завершено", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто: списано" },
-  { id: "op5", date: "15.08.2026", type: "Выдача", vid: "Гальванопокрытие", positions: 6, document: "1230", responsible: "Иванова М.С.", stage: "Выдано", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
+  { id: "op5", date: "15.08.2026", type: "Выдача", vid: "Гальванопокрытие", positions: 6, document: "1230", docType: "Маршрутный лист", responsible: "Иванова М.С.", stage: "Выдано", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
 ];
 
 // --- Шихтовые карты ---

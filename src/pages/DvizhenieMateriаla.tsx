@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, parseRuDate,
 } from "../components/ui";
-import { Operation, OperPosition, OperStage, ShihtovayaKarta, isGPKlass, spravValues, DOC_TYPE_LKI } from "../data/mock";
+import { Operation, OperPosition, OperStage, ShihtovayaKarta, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
 import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 
@@ -685,7 +685,18 @@ function posTable(title: string, rows: OperPosition[]) {
     <tfoot><tr><td colspan="5">Итого</td><td class="r">${fmt(total)}</td><td></td></tr></tfoot></table>`;
 }
 
+// Печатная форма зависит от типа документа операции
 function printOperation(o: Operation, spisano = 0) {
+  const docType = o.docType ?? (o.vid === VID_LKI ? DOC_TYPE_LKI : undefined);
+  printHtml(
+    docType === DOC_TYPE_MSL ? mslHtml(o, spisano)
+      : docType === DOC_TYPE_LKI ? lkiNakladnayaHtml(o)
+      : operationHtml(o, spisano),
+  );
+}
+
+// Общая форма — для остальных типов документов
+function operationHtml(o: Operation, spisano: number) {
   const vyd = opVydacha(o);
   const voz = opVozvrat(o);
   const vesVyd = vyd.reduce((a, p) => a + p.ves, 0);
@@ -731,7 +742,184 @@ function printOperation(o: Operation, spisano = 0) {
     <div>Получил: ${esc(o.poluchil || o.responsible)}</div>
   </div>
   </body></html>`;
+  return html;
+}
 
+// ── Бланки по образцам бумажных форм ──────────────────────────────────────────
+
+const DOC_TYPE_MSL = "Маршрутный лист";
+const MONTHS_GEN = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+// «19.08.2026» → { d: "19", m: "августа", y: "2026" }
+const dateParts = (ru: string) => {
+  const [d, m, y] = ru.split(".");
+  return { d: String(parseInt(d, 10) || ""), m: MONTHS_GEN[parseInt(m, 10) - 1] ?? "", y: y ?? "" };
+};
+const metalOf = (name: string) =>
+  /золот/i.test(name) ? "Зл" : /серебр/i.test(name) ? "Ср" : /платин/i.test(name) ? "Пл" : /паллад/i.test(name) ? "Пд" : "";
+const klassCode = (klass: string) => initialMaterialClasses.find(c => c.name === klass)?.code ?? klass;
+const uniq = (xs: string[]) => [...new Set(xs.filter(Boolean))];
+const fmt3 = (v: number) => v.toFixed(3);
+// Подчёркнутое поле бланка с вписанным значением
+const fld = (value: unknown, cls = "") => `<span class="f ${cls}">${esc(value) || "&nbsp;"}</span>`;
+
+const blankCss = `
+  body { font-family: "Times New Roman", Times, serif; font-size: 12px; color: #000; margin: 0; }
+  .row { display: flex; align-items: flex-end; gap: 6px; margin: 7px 0; white-space: nowrap; }
+  .f { flex: 1; border-bottom: 1px solid #000; padding: 0 6px; text-align: center; min-height: 15px; font-family: Arial, sans-serif; font-size: 11px; color: #123; white-space: normal; }
+  .w0 { flex: 0 0 auto; min-width: 60px; }
+  .gap { flex: 0 0 24px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #000; padding: 3px 4px; vertical-align: middle; }
+  th { font-weight: normal; text-align: center; }
+  td { font-family: Arial, sans-serif; font-size: 10.5px; height: 22px; }
+  .c { text-align: center; } .r { text-align: right; }
+  .diag { position: relative; padding: 0; height: 64px; background: linear-gradient(to bottom right, transparent calc(50% - 0.5px), #000 50%, transparent calc(50% + 0.5px)); }
+  .diag .tl { position: absolute; top: 3px; left: 4px; text-align: left; font-size: 10px; }
+  .diag .br { position: absolute; bottom: 3px; right: 4px; text-align: right; font-size: 10px; }
+  .stamp { position: absolute; top: 0; right: 0; text-align: center; font-size: 12px; line-height: 1.25; }
+  .stamp .box { border: 1px solid #000; padding: 0 6px; }
+  .sign { display: flex; gap: 48px; margin-top: 28px; }
+  .sign .row { flex: 1; }
+`;
+
+// Маршрутно-сопроводительный лист (Форма М-1, СМК-4.16-27)
+function mslHtml(o: Operation, spisano: number) {
+  const vyd = opVydacha(o);
+  const voz = opVozvrat(o);
+  const { d, m, y } = dateParts(o.date);
+  const vesDo = vyd.reduce((a, p) => a + p.ves, 0);
+  const vesPosle = voz.reduce((a, p) => a + p.ves, 0);
+  const qtyDo = vyd.reduce((a, p) => a + (p.qty ?? 1), 0);
+  const qtyPosle = voz.reduce((a, p) => a + (p.qty ?? 1), 0);
+  const poteri = spisano || (voz.length ? vesDo - vesPosle : 0);
+  const probas = uniq(vyd.map(p => String(p.proba)));
+  const marka = uniq(vyd.map(p => `${metalOf(p.name)} ${p.proba}`.trim())).join(", ");
+  const slitki = vyd.filter(p => /слит/i.test(p.klass)).map(p => p.nomenkl).join(", ");
+  const izdelie = uniq(voz.filter(p => isGPKlass(p.klass)).map(p => p.name)).join(", ");
+  const zagotovki = uniq(vyd.map(p => p.klass.toLowerCase())).join(", ");
+  const litsevik = o.poluchil || o.responsible;
+  // Разбивка результата операции по классам: «Пдк 480.10», «Отх 8.00» …
+  const razbivka = voz.map(p => `${esc(klassCode(p.klass))} ${fmt(p.ves)}`).join("<br>");
+  // Пустые строки для следующих операций — заполняются вручную
+  const blankRows = Array.from({ length: 6 }, () => `<tr>${"<td></td>".repeat(11)}<td colspan="3"></td></tr>`).join("");
+
+  return `<!doctype html><html><head><meta charset="utf-8"><title>МСЛ_${esc(o.document)}</title>
+  <style>@page { size: A4 landscape; margin: 10mm; } ${blankCss}</style></head><body style="position: relative">
+  <div class="stamp">Форма М-1<br><span class="box">СМК-4.16-27</span><br>Лист №1</div>
+  <div class="row" style="margin-top: 34px; padding-right: 130px">
+    <b>Маршрутно-сопроводительный лист №</b>${fld(o.document)}
+    <span>от</span>${fld(`${d} ${m}`)}<span>${fld(y, "w0")} г</span>
+  </div>
+  <div class="row" style="padding-right: 130px">Наименование изделия${fld(izdelie)}<span class="gap"></span>Наименование заготовок изделия${fld(zagotovki)}</div>
+  <div class="row">Марка материала, проба${fld(marka)}<span class="gap"></span>Слиток №${fld(slitki)}</div>
+  <div class="row">№ пробы при пробоотборе${fld("")}<span class="gap"></span>фактическое содержание${fld(probas.map(p => `${(parseFloat(p) / 10).toFixed(2)}%`).join(", "))}<span class="gap"></span>Накладная №${fld("")}</div>
+  <div class="row">Ф.И.О. лицевика${fld(litsevik)}<span class="gap"></span>Журнал №${fld("")}<span class="gap"></span>Стр.№${fld("")}</div>
+  <div class="row">Ф.И.О. лицевика${fld("")}<span class="gap"></span>Журнал №${fld("")}<span class="gap"></span>Стр.№${fld("")}</div>
+  <div class="row">Примечание${fld(o.vid)}</div>
+
+  <table style="margin-top: 8px">
+    <tr><th style="width: 22%">Толщина полосы</th><th>Описание дефектов</th><th style="width: 15%">Заключение о соответствии НТД</th><th style="width: 12%">Штамп БТК</th></tr>
+    <tr><td style="height: 56px"></td><td></td><td></td><td></td></tr>
+  </table>
+  <div class="row">Решение технолога участка о материале (при наличии отклонений от требований НТД)${fld("")}</div>
+  <div class="row">${fld("")}</div>
+
+  <table style="margin-top: 6px">
+    <thead><tr>
+      <th style="width: 6%">Дата</th>
+      <th style="width: 11%">Наименование операции</th>
+      <th style="width: 8%">Вес до операции (кол-во)</th>
+      <th style="width: 8%">Вес после операции (кол-во)</th>
+      <th style="width: 9%">Пласт, стр, пфл, н/п, п/ф, отх., ост.</th>
+      <th style="width: 6%">Потери</th>
+      <th style="width: 10%">Исполнитель</th>
+      <th style="width: 9%">Примечание</th>
+      <th class="diag" style="width: 7%"><span class="tl">Кол-во изделий</span><span class="br">Кол-во предъявл.</span></th>
+      <th class="diag" style="width: 7%"><span class="tl">Кол-во годных</span><span class="br">Кол-во принятых</span></th>
+      <th style="width: 6%">Кол-во не-соотв.</th>
+      <th style="width: 7%" colspan="3">Штамп БТК, роспись</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td class="c">${esc(o.date)}</td>
+        <td>${esc(o.vid)}</td>
+        <td class="r">${fmt(vesDo)}<br>(${qtyDo} шт)</td>
+        <td class="r">${voz.length ? `${fmt(vesPosle)}<br>(${qtyPosle} шт)` : ""}</td>
+        <td>${razbivka}</td>
+        <td class="r">${poteri > 0 ? fmt(poteri) : "—"}</td>
+        <td>${esc(o.responsible)}</td>
+        <td>${esc(slitki)}</td>
+        <td class="c">${qtyDo}</td>
+        <td class="c">${voz.length ? qtyPosle : ""}</td>
+        <td></td>
+        <td colspan="3"></td>
+      </tr>
+      ${blankRows}
+    </tbody>
+  </table>
+  </body></html>`;
+}
+
+// Накладная (Форма №2) на передачу проб в ЛКИ
+function lkiNakladnayaHtml(o: Operation) {
+  const vyd = opVydacha(o);
+  const { d, m, y } = dateParts(o.date);
+  const rows = vyd.map(p => {
+    const vesMet = (p.ves * p.proba) / 1000;
+    return `<tr>
+      <td>${esc(p.name)}</td><td class="c">г</td><td class="c">${esc(p.nomenkl)}</td><td class="c">${p.qty ?? 1}</td><td class="c">—</td>
+      <td class="r">${fmt(p.ves)}</td><td class="r">${(p.proba / 10).toFixed(2)}</td><td class="r">${fmt3(vesMet)}</td>
+      <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+    </tr>`;
+  }).join("");
+  // Пустые строки — бланк заполняется в лаборатории
+  const blank = Array.from({ length: Math.max(4, 14 - vyd.length) }, () => `<tr>${"<td></td>".repeat(15)}</tr>`).join("");
+  const netto = vyd.reduce((a, p) => a + p.ves, 0);
+  const met = vyd.reduce((a, p) => a + (p.ves * p.proba) / 1000, 0);
+
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Накладная_ЛКИ_${esc(o.document)}</title>
+  <style>@page { size: A4 landscape; margin: 10mm; } ${blankCss}
+    .title { font-size: 16px; font-weight: bold; letter-spacing: 0.5px; }
+    .forma { position: absolute; right: 0; top: 0; font-size: 14px; }
+    .sub th { font-size: 10px; }
+  </style></head><body style="position: relative">
+  <div class="forma">Форма №2</div>
+  <div class="row" style="margin-top: 24px; max-width: 78%">
+    <span class="title">НАКЛАДНАЯ №</span>${fld(o.document)}
+    <span class="gap"></span>«${fld(d, "w0")}»${fld(m)}${fld(y, "w0")} г
+  </div>
+  <div class="row" style="max-width: 78%; padding-left: 18%">Склад №${fld("ДМ")}<span class="gap"></span>Цех №${fld("")}<span class="gap"></span>Заказ №${fld("")}</div>
+  <div class="title" style="margin: 18px 0 8px">В ЛКИ</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2" style="width: 20%">Шифр готовой продукции</th>
+        <th colspan="7">К сдаче на склад</th>
+        <th colspan="4">Принято на склад</th>
+        <th colspan="3">Тара</th>
+      </tr>
+      <tr class="sub">
+        <th>ед.изм.</th><th>№ пробы</th><th>кол-во мест</th><th>вес брутто</th><th>вес нетто</th><th>% содерж.</th><th>вес. мет.</th>
+        <th>кол-во мест</th><th>брутто</th><th>нетто</th><th>чист.</th>
+        <th>кол-во</th><th>цена</th><th>№ номенкл.</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+      ${blank}
+      <tr><td class="r"><b>Итого</b></td><td></td><td></td><td></td><td></td><td class="r"><b>${fmt(netto)}</b></td><td></td><td class="r"><b>${fmt3(met)}</b></td>${"<td></td>".repeat(7)}</tr>
+    </tbody>
+  </table>
+
+  <div class="sign">
+    <div class="row">Сдал${fld(o.vydal || "")}</div>
+    <div class="row">Принял (ЛКИ)${fld("")}</div>
+  </div>
+  </body></html>`;
+}
+
+function printHtml(html: string) {
   // Скрытый iframe вместо нового окна — не блокируется браузером; «Сохранить как PDF» в диалоге печати.
   const frame = document.createElement("iframe");
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
