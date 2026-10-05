@@ -8,7 +8,7 @@ const badgePalette: Record<string, string> = {
   "На складе": "bg-green-100 text-green-700 border-green-200",
   "Закрыта": "bg-gray-100 text-gray-600 border-gray-200",
   "Выполнено": "bg-green-100 text-green-700 border-green-200",
-  "Выполнена": "bg-green-100 text-green-700 border-green-200",
+  "Выполнена": "bg-gray-100 text-gray-600 border-gray-200",
   "Соответствует": "bg-green-100 text-green-700 border-green-200",
   "Без изменений": "bg-green-100 text-green-700 border-green-200",
   "Активен": "bg-green-100 text-green-700 border-green-200",
@@ -29,7 +29,7 @@ const badgePalette: Record<string, string> = {
 
   "В подотчёте": "bg-blue-100 text-blue-700 border-blue-200",
   "Изменена": "bg-blue-100 text-blue-700 border-blue-200",
-  "Новая": "bg-blue-100 text-blue-700 border-blue-200",
+  "Новая": "bg-green-100 text-green-700 border-green-200",
   "Изменение": "bg-blue-100 text-blue-700 border-blue-200",
   "В норме": "bg-blue-100 text-blue-700 border-blue-200",
   "Редактирование": "bg-blue-100 text-blue-700 border-blue-200",
@@ -158,9 +158,9 @@ export function EyeIcon({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function EditIcon({ onClick }: { onClick: () => void }) {
+export function EditIcon({ onClick, disabled = false, title = "Редактировать" }: { onClick: () => void; disabled?: boolean; title?: string }) {
   return (
-    <button onClick={onClick} className="text-gray-400 hover:text-gray-600 transition-colors p-1" title="Редактировать">
+    <button onClick={onClick} disabled={disabled} className="text-gray-400 hover:text-gray-600 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400" title={title}>
       <Pencil className="w-4 h-4" />
     </button>
   );

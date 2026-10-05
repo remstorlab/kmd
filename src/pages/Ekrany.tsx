@@ -21,8 +21,8 @@ export function useScreenGroups(): Group[] {
   const prihodNaklad = skladDocs.find(d => d.type !== "Приходный ордер") ?? skladDocs[0];
   const gp = gpItems[0];
   const dm = dmItems[0];
-  const karta = shihtovyeKarty[0];
-  const kartaRed = shihtovyeKarty.find(k => k.status === "На редактировании");
+  const karta = shihtovyeKarty.find(k => k.status === "Новая") ?? shihtovyeKarty[0];
+  const kartaRed = shihtovyeKarty.find(k => k.status === "Редактирование");
   const person = podotchetniki[0];
   const log = logs.find(l => (l.before?.length ?? 0) + (l.after?.length ?? 0) > 0) ?? logs[0];
   const S = SPRAV_SLUGS;
@@ -90,9 +90,8 @@ export function useScreenGroups(): Group[] {
       { title: "Новая карта — добавить со склада", path: `${P["shihtovye-karty"]}/new/from-sklad` },
       { title: "Новая карта — доп. материал", path: `${P["shihtovye-karty"]}/new/dop-material` },
       karta && { title: "Карта: просмотр", path: `${P["shihtovye-karty"]}/view/${karta.id}` },
-      karta && { title: "Карта: редактирование", path: `${P["shihtovye-karty"]}/edit/${karta.id}` },
-      karta && { title: "Карта: результат расчёта", path: `${P["shihtovye-karty"]}/edit/${karta.id}/raschet` },
-      kartaRed && { title: "Карта на редактировании", path: `${P["shihtovye-karty"]}/edit/${kartaRed.id}` },
+      kartaRed && { title: "Карта: редактирование (черновик)", path: `${P["shihtovye-karty"]}/edit/${kartaRed.id}` },
+      kartaRed && { title: "Карта: результат расчёта", path: `${P["shihtovye-karty"]}/edit/${kartaRed.id}/raschet` },
     ].filter(Boolean) as Screen[] },
     { title: "Подотчётники", screens: [
       { title: "Реестр подотчётников", path: P["podotchetniki"] },

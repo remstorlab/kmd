@@ -134,7 +134,12 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     { element: "Медь (Cu)", pct: "0.06%", norm: "≤0.10%", ok: true },
   ];
 
-  const save = () => {
+  // Сохранить — карта остаётся «Редактирование»; Оформить — «Новая»: доступна для плавки, редактирование закрыто
+  const save = (oformit = false) => {
+    if (oformit && materials.length === 0) {
+      show("Добавьте хотя бы один материал, чтобы оформить карту");
+      return;
+    }
     // Выбранные позиции склада должны быть всё ещё доступны в нужном количестве
     const reserve = new Map<string, number>();
     materials.forEach(m => { if (m.srcId) reserve.set(m.srcId, (reserve.get(m.srcId) ?? 0) + m.qty); });
@@ -152,20 +157,22 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     if (reserve.size || release.size) setDmItems(prev => reserveDm(prev, reserve, release, Date.now()));
 
     const mats: ShihtaMaterial[] = materials.map(m => ({ name: m.mat, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, ves: m.ves, loc: m.loc, qty: m.qty }));
-    // Сохранение исправленной карты «На редактировании» возвращает её в «Новая» — снова доступна для плавки.
+    // Оформление снимает пометку о выданных позициях — карта снова доступна для плавки.
+    const status = oformit ? "Новая" as const : "Редактирование" as const;
     const k: ShihtovayaKarta = karta ? {
       ...karta,
       name: name || karta.name,
       plavkaNo: plavkaNo || karta.plavkaNo,
       materials: mats,
       files,
-      ...(karta.status === "На редактировании" ? { status: "Новая" as const, vydannyePozicii: undefined } : {}),
+      status,
+      ...(oformit ? { vydannyePozicii: undefined } : {}),
     } : {
       id: `sk-${Date.now()}`,
       date: new Date().toLocaleDateString("ru-RU"),
       name: name || "Новая шихтовая карта",
       plavkaNo: plavkaNo || `П-2026-${Math.floor(Math.random() * 9000 + 1000)}`,
-      status: "Новая",
+      status,
       materials: mats,
       files,
       createdAt: new Date().toISOString(),
@@ -180,14 +187,25 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       onClose={onClose}
       extraWide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
-        <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={save}>Сохранить карту</Btn></>
+        <>
+          <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+          <Btn onClick={() => save(true)}>Оформить</Btn>
+          <Btn variant="secondary" onClick={() => save()}>Сохранить</Btn>
+        </>
       )}
     >
-      {karta?.status === "На редактировании" && (
+      {karta && (
+        <div className="flex items-center gap-2 mb-4">
+          <Badge label={karta.status} />
+          {karta.status === "Новая" && <span className="text-xs text-gray-500">Карта оформлена — доступна для выдачи на плавку, редактирование закрыто</span>}
+          {karta.status === "Редактирование" && !karta.vydannyePozicii?.length && <span className="text-xs text-gray-500">Черновик — недоступен для плавки до оформления</span>}
+        </div>
+      )}
+      {karta?.status === "Редактирование" && !!karta.vydannyePozicii?.length && (
         <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 mb-5 text-sm text-orange-800">
-          <div className="font-medium mb-0.5">⚠ Карта на редактировании — недоступна для плавки</div>
-          Зарезервированные позиции выданы в другой операции: {(karta.vydannyePozicii ?? []).join(", ") || "—"}.
-          {!ro && " Замените их и сохраните карту — она вернётся в статус «Новая»."}
+          <div className="font-medium mb-0.5">⚠ Карта возвращена в редактирование — недоступна для плавки</div>
+          Зарезервированные позиции выданы в другой операции: {karta.vydannyePozicii.join(", ")}.
+          {!ro && " Замените их и оформите карту — она перейдёт в статус «Новая»."}
         </div>
       )}
 
@@ -403,7 +421,11 @@ export function ShihtovyeKarty() {
                 <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(karta.createdAt)} - {karta.createdBy}</td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewKarta(karta)} />
-                  <EditIcon onClick={() => setEditKarta(karta)} />
+                  <EditIcon
+                    onClick={() => setEditKarta(karta)}
+                    disabled={karta.status !== "Редактирование"}
+                    title={karta.status === "Редактирование" ? "Редактировать" : "Карта оформлена — редактирование недоступно"}
+                  />
                   <DeleteIcon onClick={() => confirm(`Удалить шихтовую карту «${karta.name}»?`, () => removeKarta(karta))} />
                 </td>
               </tr>
@@ -418,14 +440,24 @@ export function ShihtovyeKarty() {
         <ShihtaConstructor
           key={editKarta.id}
           karta={editKarta}
+          // Оформленная карта не редактируется — даже если открыта по прямой ссылке /edit/:id
+          readOnly={editKarta.status !== "Редактирование"}
           onClose={() => setEditKarta(null)}
-          onSave={k => { setShihtovyeKarty(prev => prev.map(s => s.id === k.id ? k : s)); setEditKarta(null); show("Карта обновлена"); }}
+          onSave={k => {
+            setShihtovyeKarty(prev => prev.map(s => s.id === k.id ? k : s));
+            setEditKarta(null);
+            show(k.status === "Новая" ? "Карта оформлена — доступна для выдачи на плавку" : "Карта сохранена");
+          }}
         />
       )}
       {showNew && (
         <ShihtaConstructor
           onClose={() => setShowNew(false)}
-          onSave={k => { setShihtovyeKarty(prev => [k, ...prev]); setShowNew(false); show("Шихтовая карта создана, позиции зарезервированы"); }}
+          onSave={k => {
+            setShihtovyeKarty(prev => [k, ...prev]);
+            setShowNew(false);
+            show(k.status === "Новая" ? "Шихтовая карта оформлена, позиции зарезервированы" : "Шихтовая карта сохранена в статусе «Редактирование»");
+          }}
         />
       )}
       {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}

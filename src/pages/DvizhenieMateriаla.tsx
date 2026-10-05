@@ -83,9 +83,9 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
 
   type Item = (typeof dmItems)[number];
   const left = (i: Item) => i.qty - (already[i.nomenkl] ?? 0);
-  // Позиции в резерве тоже можно выдать — тогда шихтовая карта, которая их резервирует, уйдёт «На редактировании».
+  // Позиции в резерве тоже можно выдать — тогда шихтовая карта, которая их резервирует, вернётся в «Редактирование».
   const availableItems = dmItems.filter(i => !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв") && left(i) > 0);
-  const reservedBy = (nomenkl: string) => shihtovyeKarty.find(k => k.status === "Новая" && k.materials.some(m => m.nomenkl === nomenkl));
+  const reservedBy = (nomenkl: string) => shihtovyeKarty.find(k => k.status !== "Выполнена" && k.materials.some(m => m.nomenkl === nomenkl));
   const affectedKarty = [...new Set(
     availableItems.filter(i => i.id in selectedQty && i.status === "Резерв").map(i => reservedBy(i.nomenkl)?.name).filter(Boolean),
   )];
@@ -228,7 +228,7 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
       )}
       {affectedKarty.length > 0 && (
         <div className="mt-3 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm text-orange-800">
-          ⚠ Выбраны позиции из резерва. После выдачи шихтовая карта {affectedKarty.map(n => `«${n}»`).join(", ")} перейдёт в статус «На редактировании» и станет недоступна для плавки.
+          ⚠ Выбраны позиции из резерва. После выдачи шихтовая карта {affectedKarty.map(n => `«${n}»`).join(", ")} вернётся в статус «Редактирование» и станет недоступна для плавки.
         </div>
       )}
     </Modal>
@@ -1045,7 +1045,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       : null;
 
   // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
-  // эта карта переходит «На редактировании» и пропадает из выбора ШК для плавки.
+  // эта карта возвращается в «Редактирование» и пропадает из выбора ШК для плавки (там только «Новая»).
   const applyVydacha = () => {
     const vydanoNomenkl = new Set(vydacha.filter(p => !isGPKlass(p.klass)).map(p => p.nomenkl));
     const izRezerva = dmItems.filter(i => i.status === "Резерв" && vydanoNomenkl.has(i.nomenkl));
@@ -1058,9 +1058,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       const hit = k.materials.filter(m => rezNomenkl.has(m.nomenkl)).map(m => m.name);
       if (hit.length === 0) return k;
       zatronuty.push(k.name);
-      return { ...k, status: "На редактировании", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
+      return { ...k, status: "Редактирование", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
     }));
-    if (zatronuty.length) show(`Шихтовая карта ${zatronuty.map(n => `«${n}»`).join(", ")} переведена «На редактировании»`);
+    if (zatronuty.length) show(`Шихтовая карта ${zatronuty.map(n => `«${n}»`).join(", ")} переведена в «Редактирование»`);
   };
 
   const buildOp = (next: OperStage): Operation => ({
