@@ -9,7 +9,7 @@ import { GPItem, DMItem, isGPKlass } from "../data/mock";
 import { Gem, Coins, Plus } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
-import ChemCompositionBlock from "../components/ChemCompositionBlock";
+import DMPositionViewModal from "../components/DMPositionViewModal";
 import { useScreen } from "../router";
 
 // Приведение позиций между учётами ГП и ДМ — для разделения складов по классу материала.
@@ -431,21 +431,7 @@ export function OstatokDM() {
       </div>
 
       {viewItem && (
-        <Modal title="Просмотр позиции ДМ" onClose={() => screen.close("view")} footer={<Btn variant="secondary" onClick={() => screen.close("view")}>Закрыть</Btn>}>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <Field label="Наименование" full><Input value={viewItem.name} disabled /></Field>
-            <Field label="Номенкл. №"><Input value={viewItem.nomenkl} disabled /></Field>
-            <Field label="Класс"><Input value={viewItem.klass} disabled /></Field>
-            <Field label="Код материала"><Input value={codeLabel(viewItem.metal)} disabled /></Field>
-            <Field label="Количество"><Input value={String(viewItem.qty)} disabled /></Field>
-            <Field label="Проба"><Input value={String(viewItem.proba)} disabled /></Field>
-            <Field label="Лигатурный вес г"><Input value={String(viewItem.ligWeight)} disabled /></Field>
-            <Field label="Чистый вес г"><Input value={String(viewItem.netWeight)} disabled /></Field>
-            <Field label="Место хранения" full><Input value={viewItem.location} disabled /></Field>
-            <Field label="Статус"><Badge label={viewItem.status} /></Field>
-          </div>
-          <ChemCompositionBlock value={viewItem.chem} disabled />
-        </Modal>
+        <DMPositionViewModal item={viewItem} onClose={() => screen.close("view")} />
       )}
       {showMerge && mergeItems.length >= 2 && <MergeModal items={mergeItems} onClose={() => screen.close("merge")} onConfirm={doMerge} />}
       {showPrihod && (

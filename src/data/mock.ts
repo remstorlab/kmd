@@ -84,7 +84,8 @@ export interface VydachaDocPosition {
 // «Выдача: На редактировании» → (Оформить) «Выдано» → (Оформить возврат, Сохранить) «Возврат: На редактировании» → (Оформить) «Завершено»
 export type OperStage = "Выдача: На редактировании" | "Выдано" | "Возврат: На редактировании" | "Завершено";
 
-export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string };
+// ves — вес позиции для расчётов операции; metal (код материала), lig / net (лигатурный / чистый вес, г) — для отображения как на складе ДМ
+export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string; metal?: string; lig?: number; net?: number };
 
 export interface Operation {
   id: string;

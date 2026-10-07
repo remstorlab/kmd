@@ -3,12 +3,13 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, parseRuDate,
+  Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
 } from "../components/ui";
 import { Operation, OperPosition, OperStage, ShihtovayaKarta, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
 import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
+import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
 
@@ -142,8 +143,10 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
     onAdd(chosen.map(i => {
       const qty = qtyOf(i);
       // При частичной выдаче вес пропорционален количеству
-      const ves = i.qty > 0 ? +(i.netWeight * qty / i.qty).toFixed(2) : i.netWeight;
-      return { name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty, ves, ag: i.chem?.ag || "-", cu: i.chem?.cu || "-", chem: i.chem, loc: i.location };
+      const k = i.qty > 0 ? qty / i.qty : 1;
+      const ves = +(i.netWeight * k).toFixed(2);
+      const lig = +(i.ligWeight * k).toFixed(2);
+      return { name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty, ves, ag: i.chem?.ag || "-", cu: i.chem?.cu || "-", chem: i.chem, loc: i.location, metal: i.metal, lig, net: ves };
     }));
   };
 
@@ -240,7 +243,7 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
 // ── Добавить позицию ДМ (новая, вручную) ──────────────────────────────────────
 
 function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
-  const [form, setForm] = useState({ nomenkl: "", klass: "Слиток", name: "", proba: "999", ves: "", chem: {} as ChemComposition, sey: "Сейф №1", polka: "Полка А" });
+  const [form, setForm] = useState({ nomenkl: "", klass: "Слиток", metal: "1000", name: "", proba: "999", lig: "", net: "", chem: {} as ChemComposition, sey: "Сейф №1", polka: "Полка А" });
 
   const add = () => {
     if (!form.name || !form.nomenkl) return;
@@ -249,7 +252,11 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
       nomenkl: form.nomenkl,
       klass: form.klass,
       proba: parseFloat(form.proba) || 0,
-      ves: parseFloat(form.ves) || 0,
+      ves: num(form.net) || num(form.lig),
+      lig: num(form.lig),
+      net: num(form.net),
+      metal: form.metal,
+      qty: 1,
       ag: form.chem.ag || "-",
       cu: form.chem.cu || "-",
       chem: form.chem,
@@ -269,9 +276,11 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
       <div className="grid grid-cols-3 gap-4 mb-4">
         <Field label="Номенкл. номер"><Input value={form.nomenkl} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} placeholder="DM-XXX" /></Field>
         <Field label="Класс"><KlassSelect value={form.klass} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
-        <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
+        <Field label="Код материала"><MaterialCodeSelect value={form.metal} onChange={v => setForm(f => ({ ...f, metal: v }))} /></Field>
         <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
-        <Field label="Вес г"><Input value={form.ves} onChange={v => setForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>
+        <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
+        <Field label="Лигат. вес г"><Input value={form.lig} onChange={v => setForm(f => ({ ...f, lig: v }))} placeholder="0.00" /></Field>
+        <Field label="Чистый вес г"><Input value={form.net} onChange={v => setForm(f => ({ ...f, net: v }))} placeholder="0.00" /></Field>
         <Field label="Сейф"><Select value={form.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setForm(f => ({ ...f, sey: v }))} /></Field>
         <Field label="Полка"><Select value={form.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setForm(f => ({ ...f, polka: v }))} /></Field>
       </div>
@@ -629,18 +638,91 @@ function SpisanieTab({ losses, setLosses, doc, setDoc, vesStart, readOnly, onDow
   );
 }
 
+// ── Таблица позиций операции: те же столбцы и порядок, что на складе ДМ ───────
+
+function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
+  rows: OperPosition[];
+  view: (p: OperPosition) => DMPositionView;
+  readOnly: boolean;
+  onView: (p: OperPosition) => void;
+  onDelete: (p: OperPosition) => void;
+}) {
+  const codeLabel = useMaterialCodeLabel();
+  const { sorted, sort, toggleSort } = useSort(rows, {
+    nomenkl: p => p.nomenkl,
+    name: p => p.name,
+    qty: p => p.qty ?? 0,
+    klass: p => p.klass,
+    metal: p => codeLabel(view(p).metal),
+    proba: p => p.proba,
+    lig: p => view(p).ligWeight ?? 0,
+    net: p => view(p).netWeight ?? 0,
+    loc: p => p.loc,
+    status: p => view(p).status ?? "",
+  });
+  const th = "px-3 py-2";
+  const dash = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v);
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
+          <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className={th}>Номенкл. №</SortTh>
+          <SortTh sortKey="name" sort={sort} onSort={toggleSort} className={th}>Наименование</SortTh>
+          <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество</SortTh>
+          <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
+          <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
+          <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
+          <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Лигат. вес г</SortTh>
+          <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Чистый вес г</SortTh>
+          <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
+          <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
+          <th className={readOnly ? "w-10" : "w-20"}></th>
+        </tr></thead>
+        <tbody className="divide-y divide-gray-100">
+          {sorted.map(p => {
+            const v = view(p);
+            return (
+              <tr key={p.n} className="hover:bg-gray-50">
+                <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                <td className="px-3 py-2 font-medium">{p.name}</td>
+                <td className="px-3 py-2">{p.qty ?? "—"}</td>
+                <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
+                <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
+                <td className="px-3 py-2">{p.proba}</td>
+                <td className="px-3 py-2">{dash(v.ligWeight)}</td>
+                <td className="px-3 py-2">{dash(v.netWeight)}</td>
+                <td className="px-3 py-2 text-gray-500">{p.loc}</td>
+                <td className="px-3 py-2">{v.status ? <Badge label={v.status} /> : <span className="text-gray-400">—</span>}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => onView(p)} />
+                    {!readOnly && <DeleteIcon onClick={() => onDelete(p)} />}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+          {sorted.length === 0 && (
+            <tr><td colSpan={11} className="px-3 py-6 text-center text-sm text-gray-400">Позиции не добавлены</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Operation modal ───────────────────────────────────────────────────────────
 
 type TabName = "Выдача" | "Возврат" | "Списание" | "Итого";
 
 const vydachaPositions: OperPosition[] = [
-  { n: 1, name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, ves: 500.25, ag: "-", cu: "-", loc: "Сейф №1, Полка А" },
-  { n: 2, name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", proba: 585, ves: 45.80, ag: "0.12", cu: "1.20", loc: "Сейф №2, Полка А" },
+  { n: 1, name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, qty: 1, ves: 500.25, ag: "-", cu: "-", loc: "Сейф №1, Полка А", metal: "1000", lig: 500.25, net: 499.75, chem: { au: "499.75" } },
+  { n: 2, name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", proba: 585, qty: 1, ves: 45.80, ag: "0.12", cu: "1.20", loc: "Сейф №2, Полка А", metal: "1000", lig: 45.80, net: 26.79, chem: { au: "26.79", ag: "0.12", cu: "1.20" } },
 ];
 const vozvratPositions: OperPosition[] = [
-  { n: 1, name: "Подкат 30х20", nomenkl: "DM-R01", klass: "Подкат", proba: 999, ves: 480.10, ag: "-", cu: "-", loc: "Сейф №1, Полка Б" },
-  { n: 2, name: "Королёк №1", nomenkl: "DM-R02", klass: "Королёк", proba: 999, ves: 55.60, ag: "-", cu: "-", loc: "Сейф №2, Полка Б" },
-  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Отходы", proba: 500, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка А" },
+  { n: 1, name: "Подкат 30х20", nomenkl: "DM-R01", klass: "Подкат", proba: 999, qty: 1, ves: 480.10, ag: "-", cu: "-", loc: "Сейф №1, Полка Б", metal: "1000", lig: 480.10, net: 479.62, chem: { au: "479.62" } },
+  { n: 2, name: "Королёк №1", nomenkl: "DM-R02", klass: "Королёк", proba: 999, qty: 1, ves: 55.60, ag: "-", cu: "-", loc: "Сейф №2, Полка Б", metal: "1000", lig: 55.60, net: 55.54, chem: { au: "55.54" } },
+  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Отходы", proba: 500, qty: 1, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка А", metal: "1000", lig: 8.00, net: 4.00, chem: { au: "4.00", ag: "0.05", cu: "2.10" } },
 ];
 
 const VID_LKI = "Анализ в ЛКИ";
@@ -969,26 +1051,22 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     });
   };
 
-  const { sorted: sortedVydacha, sort: vydachaSort, toggleSort: toggleVydachaSort } = useSort(vydacha, {
-    name: p => p.name,
-    nomenkl: p => p.nomenkl,
-    klass: p => p.klass,
-    proba: p => p.proba,
-    qty: p => p.qty ?? 0,
-    ves: p => p.ves,
-    ag: p => p.ag,
-    cu: p => p.cu,
-    loc: p => p.loc,
-  });
-  const { sorted: sortedVozvrat, sort: vozvratSort, toggleSort: toggleVozvratSort } = useSort(vozvrat, {
-    name: p => p.name,
-    nomenkl: p => p.nomenkl,
-    klass: p => p.klass,
-    proba: p => p.proba,
-    ves: p => p.ves,
-    ag: p => p.ag,
-    cu: p => p.cu,
-  });
+  // Позиция операции в виде позиции склада ДМ: недостающие поля — из позиции склада с тем же номенклатурным №
+  const posView = (p: OperPosition): DMPositionView => {
+    const dm = dmItems.find(i => i.nomenkl === p.nomenkl);
+    return {
+      name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.metal ?? dm?.metal ?? "",
+      qty: p.qty ?? null, proba: p.proba, ligWeight: p.lig ?? null, netWeight: p.net ?? null,
+      location: p.loc, status: dm?.status, chem: p.chem ?? dm?.chem,
+    };
+  };
+  // Просмотр позиции: …/position/<вкладка>-<n>
+  const posKey = screen.after("position");
+  const viewPos = (() => {
+    if (!posKey) return null;
+    const [list, n] = posKey.split("-");
+    return (list === "vozvrat" ? vozvrat : vydacha).find(p => String(p.n) === n) ?? null;
+  })();
 
   const [head, setHead] = useState(() => ({
     docType: op ? (op.docType ?? (op.vid === VID_LKI ? DOC_TYPE_LKI : "Приказ")) : "",
@@ -1158,38 +1236,13 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               <ExportBtn onToast={show} />
             </div>
           )}
-          <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <th className="px-3 py-2 text-left">№</th>
-              <SortTh sortKey="name" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="nomenkl" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Номенкл.№</SortTh>
-              <SortTh sortKey="klass" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="proba" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Проба</SortTh>
-              <SortTh sortKey="qty" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Кол-во</SortTh>
-              <SortTh sortKey="ves" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Вес г</SortTh>
-              <SortTh sortKey="ag" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Ag</SortTh>
-              <SortTh sortKey="cu" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Cu</SortTh>
-              <SortTh sortKey="loc" sort={vydachaSort} onSort={toggleVydachaSort} className="px-3 py-2">Размещение</SortTh>
-              {!vydachaRo && <th className="w-16"></th>}
-            </tr></thead>
-            <tbody className="divide-y divide-gray-100">
-              {sortedVydacha.map(p => (
-                <tr key={p.n} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-400">{p.n}</td>
-                  <td className="px-3 py-2 font-medium">{p.name}</td>
-                  <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
-                  <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
-                  <td className="px-3 py-2">{p.proba}</td>
-                  <td className="px-3 py-2">{p.qty ?? "—"}</td>
-                  <td className="px-3 py-2 font-medium">{p.ves}</td>
-                  <td className="px-3 py-2 text-gray-400">{p.ag}</td>
-                  <td className="px-3 py-2 text-gray-400">{p.cu}</td>
-                  <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                  {!vydachaRo && <td className="px-3 py-2"><DeleteIcon onClick={() => setVydacha(prev => prev.filter(x => x.n !== p.n))} /></td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <OperPositionsTable
+            rows={vydacha}
+            view={posView}
+            readOnly={vydachaRo}
+            onView={p => screen.open("position", `vydacha-${p.n}`)}
+            onDelete={p => setVydacha(prev => prev.filter(x => x.n !== p.n))}
+          />
           <div className="mt-4">
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
             <MultiFileUpload files={vydachaFiles} onChange={setVydachaFiles} accept={docAccept} disabled={vydachaRo} />
@@ -1205,34 +1258,13 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               <ExportBtn onToast={show} />
             </div>
           )}
-          <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <th className="px-3 py-2 text-left">№</th>
-              <SortTh sortKey="name" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="nomenkl" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Номенкл.№</SortTh>
-              <SortTh sortKey="klass" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="proba" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Проба</SortTh>
-              <SortTh sortKey="ves" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Вес г</SortTh>
-              <SortTh sortKey="ag" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Ag</SortTh>
-              <SortTh sortKey="cu" sort={vozvratSort} onSort={toggleVozvratSort} className="px-3 py-2">Cu</SortTh>
-              {!vozvratRo && <th className="w-16"></th>}
-            </tr></thead>
-            <tbody className="divide-y divide-gray-100">
-              {sortedVozvrat.map(p => (
-                <tr key={p.n} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-400">{p.n}</td>
-                  <td className="px-3 py-2 font-medium">{p.name}</td>
-                  <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
-                  <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
-                  <td className="px-3 py-2">{p.proba}</td>
-                  <td className="px-3 py-2 font-medium">{p.ves}</td>
-                  <td className="px-3 py-2 text-gray-400">{p.ag}</td>
-                  <td className="px-3 py-2 text-gray-400">{p.cu}</td>
-                  {!vozvratRo && <td className="px-3 py-2"><DeleteIcon onClick={() => setVozvrat(prev => prev.filter(x => x.n !== p.n))} /></td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <OperPositionsTable
+            rows={vozvrat}
+            view={posView}
+            readOnly={vozvratRo}
+            onView={p => screen.open("position", `vozvrat-${p.n}`)}
+            onDelete={p => setVozvrat(prev => prev.filter(x => x.n !== p.n))}
+          />
           <div className="mt-4">
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
             <MultiFileUpload files={vozvratFiles} onChange={setVozvratFiles} accept={docAccept} disabled={vozvratRo} />
@@ -1342,11 +1374,16 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           onAdd={rows => { appendPositions("vozvrat", rows); setShowVozvratPick(false); show("Позиции возврата добавлены"); }}
         />
       )}
+      {viewPos && <DMPositionViewModal item={posView(viewPos)} onClose={() => screen.close("position")} />}
       {showShihtaPick && (
         <ShihtaPickModal
           onClose={() => setShowShihtaPick(false)}
           onPick={k => {
-            appendPositions("vydacha", k.materials.map(m => ({ ...m, ag: "-", cu: "-", })));
+            appendPositions("vydacha", k.materials.map(m => {
+              const dm = dmItems.find(i => i.nomenkl === m.nomenkl);
+              const part = dm && dm.qty > 0 ? (m.qty ?? 1) / dm.qty : 1;
+              return { ...m, ag: "-", cu: "-", metal: dm?.metal, lig: m.ves, net: dm ? +(dm.netWeight * part).toFixed(2) : undefined, chem: m.chem ?? dm?.chem };
+            }));
             setHead(h => ({ ...h, plavkaNo: k.plavkaNo }));
             setPickedShihtaId(k.id);
             setShowShihtaPick(false);
