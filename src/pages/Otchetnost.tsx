@@ -10,7 +10,7 @@ const METAL_CODE: Record<Metal, string> = { Au: "1", Ag: "2", Pt: "3", Pd: "4" }
 // ── Инвентаризационная опись ДМ ────────────────────────────────────────────────
 
 function InventarizationOpisModal({ onClose }: { onClose: () => void }) {
-  const { dmItems } = useApp();
+  const { dmItems, materialCodes } = useApp();
   const { toast, show, clear } = useToast();
   const [onDate, setOnDate] = useState(() => new Date().toLocaleDateString("ru-RU"));
   const [sklad, setSklad] = useState("Склад ДМ №1");
@@ -20,7 +20,7 @@ function InventarizationOpisModal({ onClose }: { onClose: () => void }) {
   const setGenerated = (on: boolean) => screen.toggle("sformirovana", on);
 
   const rows = dmItems.map(it => {
-    const m = baseMetal(it.metal);
+    const m = baseMetal(it.metal, materialCodes);
     return {
       kodDm: METAL_CODE[m] || "-",
       kodLig: String(it.proba),

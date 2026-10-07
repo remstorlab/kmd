@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, parseRuDate,
+  Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, parseRuDate,
 } from "../components/ui";
 import { Operation, OperPosition, OperStage, ShihtovayaKarta, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
 import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
@@ -91,6 +91,7 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
     availableItems.filter(i => i.id in selectedQty && i.status === "Резерв").map(i => reservedBy(i.nomenkl)?.name).filter(Boolean),
   )];
 
+  const codeLabel = useMaterialCodeLabel();
   const metals = [ALL_METALS, ...Array.from(new Set(availableItems.map(i => i.metal))).sort()];
   const locations = [ALL_LOCS, ...Array.from(new Set(availableItems.map(i => i.location))).sort()];
 
@@ -163,7 +164,7 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
           <SearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
         </div>
         <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
-        <Field label="Металл"><Select value={metal} options={metals} onChange={setMetal} /></Field>
+        <Field label="Код материала"><Select value={metal} options={metals} onChange={setMetal} optionLabel={v => (v === ALL_METALS ? v : codeLabel(v))} /></Field>
         <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
         <Field label="Статус"><Select value={status} options={[ALL_STATUSES, "На складе", "Резерв"]} onChange={setStatus} /></Field>
         <label className="flex items-center gap-2 text-sm text-gray-700 h-9 cursor-pointer">

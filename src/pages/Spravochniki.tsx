@@ -5,7 +5,7 @@ import {
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination,
 } from "../components/ui";
-import { spravochniki, initialMaterialCodes, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement } from "../data/mock";
+import { spravochniki, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
 import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, LucideIcon } from "lucide-react";
@@ -150,7 +150,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
 // ── Коды материалов ────────────────────────────────────────────────────────────
 
 function MaterialCodesPage({ onBack }: { onBack: () => void }) {
-  const [items, setItems] = useState(initialMaterialCodes);
+  const { materialCodes: items, setMaterialCodes: setItems } = useApp();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [form, setForm] = useState<MaterialCode>({ code: "", name: "", shortName: "" });
@@ -724,7 +724,7 @@ function ChemFlagCheckbox({ label, checked, onChange, disabled = false }: { labe
 }
 
 export function Spravochniki() {
-  const { storageLocations, chemElements, navigate } = useApp();
+  const { storageLocations, chemElements, materialCodes, navigate } = useApp();
   // Справочник — /spravochniki/<slug>
   const { pathname } = useLocation();
   const { page, segs } = matchPage(pathname);
@@ -790,7 +790,7 @@ export function Spravochniki() {
             <Tag className="w-5 h-5" />
           </div>
           <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Коды материалов</h3>
-          <p className="text-sm text-gray-400">{initialMaterialCodes.length} значений</p>
+          <p className="text-sm text-gray-400">{materialCodes.length} значений</p>
         </button>
         <button
           onClick={() => setShowMaterialClasses(true)}

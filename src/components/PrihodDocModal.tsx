@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
-  Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, MultiFileUpload, Toggle, SortTh, useSort,
+  Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort,
 } from "./ui";
 import { SkladDoc, DocStatus, StorageLocation, ChemComposition, spravochniki } from "../data/mock";
 import ChemCompositionBlock from "./ChemCompositionBlock";
@@ -164,12 +164,12 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
 
   // Позиции
   const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>([
-    { id: "po-1", nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au чистое", kol: "1", unit: "шт", proba: "999.9", lig: "1000.0", net: "999.9", seyf: "1", polka: "1", chem: { au: "999.9" } },
-    { id: "po-2", nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag чистое", kol: "1", unit: "шт", proba: "925.0", lig: "318.6", net: "294.7", seyf: "2", polka: "1", chem: { ag: "294.7" } },
+    { id: "po-1", nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "1000.0", net: "999.9", seyf: "1", polka: "1", chem: { au: "999.9" } },
+    { id: "po-2", nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "2000", kol: "1", unit: "шт", proba: "925.0", lig: "318.6", net: "294.7", seyf: "2", polka: "1", chem: { ag: "294.7" } },
   ]);
   const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>([
-    { id: "pn-1", nomenkl: "AU-SL-12000", name: "Монета Атамекен", klass: "Готовая продукция", code: "Ag чистое", kol: "2000", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "1", chem: {} },
-    { id: "pn-2", nomenkl: "AU-SL-01000", name: "Орден Алтын алка", klass: "Готовая продукция", code: "Ag чистое", kol: "300", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "2", chem: {} },
+    { id: "pn-1", nomenkl: "AU-SL-12000", name: "Монета Атамекен", klass: "Готовая продукция", code: "2000", kol: "2000", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "1", chem: {} },
+    { id: "pn-2", nomenkl: "AU-SL-01000", name: "Орден Алтын алка", klass: "Готовая продукция", code: "2000", kol: "300", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "2", chem: {} },
   ]);
 
   const positions = isOrder ? orderPositions : nakladPositions;
@@ -177,7 +177,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
   const sklad = isOrder ? head.poluchatel : head.skladPoluch;
 
   const posModal: { mode: "add" | "edit" | "view"; pos: PrihodPosition } | null = (() => {
-    if (screen.has("position-new")) return { mode: "add", pos: emptyPosition(storageLocations, sklad, isOrder ? "Слиток" : "Готовая продукция", "Au чистое") };
+    if (screen.has("position-new")) return { mode: "add", pos: emptyPosition(storageLocations, sklad, isOrder ? "Слиток" : "Готовая продукция", "1000") };
     const view = positions.find(x => x.id === screen.after("position"));
     if (view) return { mode: "view", pos: view };
     const edit = positions.find(x => x.id === screen.after("position-edit"));
@@ -193,11 +193,12 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
     closePos();
   };
 
+  const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(positions, {
     nomenkl: p => p.nomenkl,
     name: p => p.name,
     klass: p => p.klass,
-    code: p => p.code,
+    code: p => codeLabel(p.code),
     kol: p => parseFloat(p.kol) || 0,
     proba: p => parseFloat(p.proba) || 0,
     lig: p => parseFloat(p.lig) || 0,
@@ -320,7 +321,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
-                  <td className="px-3 py-2 text-blue-600">{p.code}</td>
+                  <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                   <td className="px-3 py-2">{isOrder ? p.kol : `${p.kol} ${p.unit}`}</td>
                   {isOrder && <>
                     <td className="px-3 py-2">{p.proba}</td>

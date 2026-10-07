@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   Badge, Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode,
-  MultiFileUpload, SortTh, useSort,
+  MultiFileUpload, SortTh, useSort, useMaterialCodeLabel,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravochniki, isGPKlass } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -132,11 +132,12 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     setHead(x => ({ ...x, sender: SENDERS[k][0] }));
   };
 
+  const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(positions, {
     nomenkl: p => p.nomenkl,
     name: p => p.name,
     klass: p => p.klass,
-    code: p => p.code,
+    code: p => codeLabel(p.code),
     issue: p => p.issue,
     lig: p => p.lig ?? 0,
     net: p => p.net ?? 0,
@@ -261,7 +262,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
-                  <td className="px-3 py-2 text-blue-600">{p.code}</td>
+                  <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                   <td className="px-3 py-2 w-32">
                     {lockPos ? `${p.issue} ${p.unit}` : (
                       <div className="flex items-center gap-1.5">

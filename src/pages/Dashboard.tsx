@@ -68,11 +68,11 @@ function BarRow({ label, value, max, unit, color }: { label: string; value: numb
 }
 
 export function Dashboard() {
-  const { dmItems, vydachaDocs, podotchetniki, operations, logs, currentUser, navigate } = useApp();
+  const { dmItems, materialCodes, vydachaDocs, podotchetniki, operations, logs, currentUser, navigate } = useApp();
 
   // ── Часть 1: всего на складе (ДМ), по видам металла ──────────────────────
   const dmByMetal = dmItems.filter(i => i.status !== "Закрыта").reduce((acc, i) => {
-    const m = baseMetal(i.metal);
+    const m = baseMetal(i.metal, materialCodes);
     acc[m] = (acc[m] || 0) + i.netWeight;
     return acc;
   }, {} as Record<Metal, number>);

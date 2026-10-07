@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, FileChip, Toggle, SortTh, useSort,
+  Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort,
 } from "../components/ui";
 import { GPItem, DMItem, isGPKlass } from "../data/mock";
 import { Gem, Coins, Plus } from "lucide-react";
@@ -13,8 +13,8 @@ import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { useScreen } from "../router";
 
 // Приведение позиций между учётами ГП и ДМ — для разделения складов по классу материала.
-const dmToGp = (i: DMItem): GPItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, qty: i.qty, unit: "шт", klass: i.klass, code: i.metal, location: i.location, status: i.status });
-const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: 0, ligWeight: 0, netWeight: 0, location: i.location, status: i.status });
+const dmToGp = (i: DMItem): GPItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, qty: i.qty, unit: "шт", klass: i.klass, code: i.metal, location: i.location, status: i.status, proba: i.proba, ligWeight: i.ligWeight, netWeight: i.netWeight });
+const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, status: i.status });
 
 // ── Склады ХАБ ───────────────────────────────────────────────────────────────
 
@@ -47,6 +47,7 @@ export function SkladyHub() {
 // ── GP Item view modal ────────────────────────────────────────────────────────
 
 function GPViewModal({ item, onClose }: { item: GPItem; onClose: () => void }) {
+  const codeLabel = useMaterialCodeLabel();
   return (
     <Modal title="Просмотр позиции ГП" onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Закрыть</Btn>}>
       <div className="grid grid-cols-2 gap-4">
@@ -54,7 +55,7 @@ function GPViewModal({ item, onClose }: { item: GPItem; onClose: () => void }) {
         <Field label="Номенклатурный №"><Input value={item.nomenkl} disabled /></Field>
         <Field label="Количество"><Input value={`${item.qty} ${item.unit}`} disabled /></Field>
         <Field label="Класс"><Input value={item.klass} disabled /></Field>
-        <Field label="Код материала"><Input value={item.code} disabled /></Field>
+        <Field label="Код материала"><Input value={codeLabel(item.code)} disabled /></Field>
         <Field label="Место хранения"><Input value={item.location} disabled /></Field>
         <Field label="Статус"><Badge label={item.status} /></Field>
       </div>
@@ -68,6 +69,7 @@ export function OstatokGP() {
   const { gpItems, setGpItems, dmItems, navigate, setSkladDocs, setVydachaDocs } = useApp();
   // Склад ГП: все позиции с классом «Готовая продукция», в том числе из учёта ДМ.
   const skladItems = [...gpItems, ...dmItems.map(dmToGp)].filter(it => isGPKlass(it.klass));
+  const codeLabel = useMaterialCodeLabel();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
 
@@ -98,7 +100,10 @@ export function OstatokGP() {
     nomenkl: it => it.nomenkl,
     qty: it => it.qty,
     klass: it => it.klass,
-    code: it => it.code,
+    code: it => codeLabel(it.code),
+    proba: it => it.proba ?? 0,
+    ligWeight: it => it.ligWeight ?? 0,
+    netWeight: it => it.netWeight ?? 0,
     location: it => it.location,
     status: it => it.status,
   });
@@ -168,11 +173,14 @@ export function OstatokGP() {
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="w-10 px-4 py-3"><input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(filtered.map(i => i.id)) : new Set())} /></th>
-              <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort}>Номенкл. №</SortTh>
+              <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort}>Количество</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort}>Класс</SortTh>
               <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код материала</SortTh>
+              <SortTh sortKey="proba" sort={sort} onSort={toggleSort}>Проба</SortTh>
+              <SortTh sortKey="ligWeight" sort={sort} onSort={toggleSort}>Лигат. вес г</SortTh>
+              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort}>Чистый вес г</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <th className="w-12"></th>
@@ -184,11 +192,14 @@ export function OstatokGP() {
                 <td className="px-4 py-3">
                   <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} />
                 </td>
-                <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
-                <td className="px-4 py-3">{item.qty} {item.unit}</td>
+                <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
+                <td className="px-4 py-3">{item.qty}</td>
                 <td className="px-4 py-3 text-gray-700"><KlassCode value={item.klass} /></td>
-                <td className="px-4 py-3 text-blue-600 font-medium">{item.code}</td>
+                <td className="px-4 py-3 text-blue-600 font-medium">{codeLabel(item.code)}</td>
+                <td className="px-4 py-3">{item.proba ?? "—"}</td>
+                <td className="px-4 py-3">{item.ligWeight ?? "—"}</td>
+                <td className="px-4 py-3">{item.netWeight ?? "—"}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><Badge label={item.status} /></td>
                 <td className="px-4 py-3">
@@ -267,6 +278,7 @@ export function OstatokDM() {
   const { dmItems, setDmItems, gpItems, setGpItems, setSkladDocs, setVydachaDocs } = useApp();
   // Склад ДМ: все позиции, класс которых не «Готовая продукция», в том числе из учёта ГП.
   const skladItems = [...dmItems, ...gpItems.map(gpToDm)].filter(it => !isGPKlass(it.klass));
+  const codeLabel = useMaterialCodeLabel();
   const { toast, show, clear } = useToast();
   const [search, setSearch] = useState("");
   const [filterKlass, setFilterKlass] = useState("Все классы");
@@ -291,7 +303,7 @@ export function OstatokDM() {
     name: it => it.name,
     nomenkl: it => it.nomenkl,
     klass: it => it.klass,
-    metal: it => it.metal,
+    metal: it => codeLabel(it.metal),
     qty: it => it.qty,
     proba: it => it.proba,
     ligWeight: it => it.ligWeight,
@@ -383,11 +395,11 @@ export function OstatokDM() {
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="w-10 px-4 py-3"><input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(filtered.filter(i => i.status !== "Закрыта").map(i => i.id)) : new Set())} /></th>
-              <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort}>Номенкл. №</SortTh>
-              <SortTh sortKey="klass" sort={sort} onSort={toggleSort}>Класс</SortTh>
-              <SortTh sortKey="metal" sort={sort} onSort={toggleSort}>Металл</SortTh>
+              <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort}>Количество</SortTh>
+              <SortTh sortKey="klass" sort={sort} onSort={toggleSort}>Класс</SortTh>
+              <SortTh sortKey="metal" sort={sort} onSort={toggleSort}>Код материала</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort}>Проба</SortTh>
               <SortTh sortKey="ligWeight" sort={sort} onSort={toggleSort}>Лигат. вес г</SortTh>
               <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort}>Чистый вес г</SortTh>
@@ -400,11 +412,11 @@ export function OstatokDM() {
             {pageItems.map(item => (
               <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3"><input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} disabled={item.status === "Закрыта"} title={item.status === "Закрыта" ? "Позиция закрыта — объединение недоступно" : undefined} /></td>
-                <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
-                <td className="px-4 py-3"><KlassCode value={item.klass} /></td>
-                <td className="px-4 py-3 text-blue-600 font-medium">{item.metal}</td>
+                <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                 <td className="px-4 py-3">{item.qty}</td>
+                <td className="px-4 py-3"><KlassCode value={item.klass} /></td>
+                <td className="px-4 py-3 text-blue-600 font-medium">{codeLabel(item.metal)}</td>
                 <td className="px-4 py-3">{item.proba}</td>
                 <td className="px-4 py-3">{item.ligWeight}</td>
                 <td className="px-4 py-3">{item.netWeight}</td>
@@ -424,7 +436,7 @@ export function OstatokDM() {
             <Field label="Наименование" full><Input value={viewItem.name} disabled /></Field>
             <Field label="Номенкл. №"><Input value={viewItem.nomenkl} disabled /></Field>
             <Field label="Класс"><Input value={viewItem.klass} disabled /></Field>
-            <Field label="Металл"><Input value={viewItem.metal} disabled /></Field>
+            <Field label="Код материала"><Input value={codeLabel(viewItem.metal)} disabled /></Field>
             <Field label="Количество"><Input value={String(viewItem.qty)} disabled /></Field>
             <Field label="Проба"><Input value={String(viewItem.proba)} disabled /></Field>
             <Field label="Лигатурный вес г"><Input value={String(viewItem.ligWeight)} disabled /></Field>

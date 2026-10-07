@@ -1,7 +1,7 @@
 import React from "react";
 import { useLocation } from "react-router";
 import { useApp } from "../store/AppContext";
-import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode } from "../components/ui";
+import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel } from "../components/ui";
 import { Podotchetnik, PodotchetProcess } from "../data/mock";
 import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, LucideIcon } from "lucide-react";
 import { matchPage, useTabParam } from "../router";
@@ -16,6 +16,7 @@ const vidIcon: Record<string, LucideIcon> = {
 
 function ProcessCard({ process, showCompletedDate }: { process: PodotchetProcess; showCompletedDate: boolean }) {
   const Icon = vidIcon[process.vid] ?? Flame;
+  const codeLabel = useMaterialCodeLabel();
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">
@@ -37,7 +38,7 @@ function ProcessCard({ process, showCompletedDate }: { process: PodotchetProcess
             <th className="px-4 py-2 text-left font-medium">Наименование</th>
             <th className="px-4 py-2 text-left font-medium">Номенкл.№</th>
             <th className="px-4 py-2 text-left font-medium">Класс</th>
-            <th className="px-4 py-2 text-left font-medium">Металл</th>
+            <th className="px-4 py-2 text-left font-medium">Код материала</th>
             <th className="px-4 py-2 text-right font-medium">Кол-во</th>
             <th className="px-4 py-2 text-right font-medium">Проба</th>
             <th className="px-4 py-2 text-right font-medium">Лигат. вес г</th>
@@ -51,7 +52,7 @@ function ProcessCard({ process, showCompletedDate }: { process: PodotchetProcess
                 <td className="px-4 py-2 font-medium text-gray-900">{pos.name}</td>
                 <td className="px-4 py-2 text-gray-500">{pos.nomenkl}</td>
                 <td className="px-4 py-2"><KlassCode value={pos.klass} /></td>
-                <td className="px-4 py-2">{pos.metal}</td>
+                <td className="px-4 py-2 text-blue-600">{codeLabel(pos.metal)}</td>
                 <td className="px-4 py-2 text-right">{pos.qty}</td>
                 <td className="px-4 py-2 text-right">{pos.proba}</td>
                 <td className="px-4 py-2 text-right">{pos.ligWeight.toFixed(2)}</td>

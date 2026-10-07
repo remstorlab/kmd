@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Plus } from "lucide-react";
-import { initialMaterialClasses, initialMaterialCodes } from "../data/mock";
+import { initialMaterialClasses, MaterialCode } from "../data/mock";
+import { useApp } from "../store/AppContext";
 
 // ── Badge ────────────────────────────────────────────────────────────────────
 
@@ -370,7 +371,7 @@ export function Input({ value, onChange, placeholder = "", disabled = false }: {
   );
 }
 
-export function Select({ value, onChange, options, disabled = false }: { value: string; onChange?: (v: string) => void; options: string[]; disabled?: boolean }) {
+export function Select({ value, onChange, options, disabled = false, optionLabel }: { value: string; onChange?: (v: string) => void; options: string[]; disabled?: boolean; optionLabel?: (v: string) => string }) {
   return (
     <select
       value={value}
@@ -378,7 +379,7 @@ export function Select({ value, onChange, options, disabled = false }: { value: 
       disabled={disabled}
       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500 bg-white"
     >
-      {options.map(o => <option key={o}>{o}</option>)}
+      {options.map(o => <option key={o} value={o}>{optionLabel ? optionLabel(o) : o}</option>)}
     </select>
   );
 }
@@ -390,11 +391,26 @@ export function KlassSelect({ value, onChange, disabled = false, allLabel }: { v
   return <Select value={value} onChange={onChange} options={options} disabled={disabled} />;
 }
 
-// Выпадающий список «Код материала»: краткие наименования из справочника «Коды материалов».
+// Код материала: поле хранит код из справочника «Коды материалов» (напр. «1000»),
+// везде выводится как «Код-Краткое наименование» (напр. «1000-Au чистое»).
+export function materialCodeLabel(value: string, codes: MaterialCode[]): string {
+  // Для старых значений поддерживаются краткое наименование и «Краткое наименование-Код»
+  const c = codes.find(x => x.code === value || x.shortName === value || `${x.shortName}-${x.code}` === value);
+  return c ? `${c.code}-${c.shortName}` : value;
+}
+
+// Функция подписи кода материала по текущему справочнику
+export function useMaterialCodeLabel() {
+  const { materialCodes } = useApp();
+  return (value: string) => materialCodeLabel(value, materialCodes);
+}
+
+// Выпадающий список «Код материала»: значения — коды справочника «Коды материалов», подписи — «Код-Краткое наименование».
 export function MaterialCodeSelect({ value, onChange, disabled = false, allLabel }: { value: string; onChange?: (v: string) => void; disabled?: boolean; allLabel?: string }) {
-  const names = initialMaterialCodes.map(c => c.shortName);
-  const options = [...(allLabel ? [allLabel] : []), ...(value && value !== allLabel && !names.includes(value) ? [value] : []), ...names];
-  return <Select value={value} onChange={onChange} options={options} disabled={disabled} />;
+  const { materialCodes } = useApp();
+  const codes = materialCodes.map(c => c.code);
+  const options = [...(allLabel ? [allLabel] : []), ...(value && value !== allLabel && !codes.includes(value) ? [value] : []), ...codes];
+  return <Select value={value} onChange={onChange} options={options} disabled={disabled} optionLabel={v => (v === allLabel ? v : materialCodeLabel(v, materialCodes))} />;
 }
 
 // Класс материала в ячейке таблицы: код, полное наименование — во всплывающей подсказке.

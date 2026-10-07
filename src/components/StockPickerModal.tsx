@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort } from "./ui";
+import { Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort, useMaterialCodeLabel } from "./ui";
 import { VydachaDocPosition } from "../data/mock";
 
 // ── Подбор позиций со склада (чекбокс + количество по каждой позиции) ─────────
@@ -44,6 +44,7 @@ export default function StockPickerModal({
 
   const left = (r: StockRow) => r.qty - (already[r.id] ?? 0);
   const available = rows.filter(r => left(r) > 0);
+  const codeLabel = useMaterialCodeLabel();
   const codes = [ALL_CODES, ...Array.from(new Set(available.map(r => r.code))).sort()];
   const locations = [ALL_LOCS, ...Array.from(new Set(available.map(r => r.location))).sort()];
 
@@ -60,7 +61,7 @@ export default function StockPickerModal({
     nomenkl: r => r.nomenkl,
     name: r => r.name,
     klass: r => r.klass,
-    code: r => r.code,
+    code: r => codeLabel(r.code),
     proba: r => r.proba ?? 0,
     lig: r => r.lig ?? 0,
     net: r => r.net ?? 0,
@@ -109,7 +110,7 @@ export default function StockPickerModal({
           <SearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
         </div>
         <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
-        <Field label="Код материала"><Select value={code} options={codes} onChange={setCode} /></Field>
+        <Field label="Код материала"><Select value={code} options={codes} onChange={setCode} optionLabel={v => (v === ALL_CODES ? v : codeLabel(v))} /></Field>
         <div className="col-span-2">
           <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
         </div>
@@ -156,7 +157,7 @@ export default function StockPickerModal({
                     <td className="px-3 py-2 text-gray-500">{r.nomenkl}</td>
                     <td className="px-3 py-2 font-medium">{r.name}</td>
                     <td className="px-3 py-2"><KlassCode value={r.klass} /></td>
-                    <td className="px-3 py-2 text-blue-600">{r.code}</td>
+                    <td className="px-3 py-2 text-blue-600">{codeLabel(r.code)}</td>
                     {showWeights && <>
                       <td className="px-3 py-2">{r.proba}</td>
                       <td className="px-3 py-2">{r.lig}</td>
