@@ -2,10 +2,11 @@ import React, { useMemo, useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
-  useToast, Toast, Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, MultiFileUpload, useConfirm, ConfirmDialog,
+  useToast, Toast, Field, Input, Select, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, formatDateTime,
 } from "../components/ui";
-import { ShihtovayaKarta, ShihtaMaterial, DMItem, isGPKlass } from "../data/mock";
+import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass } from "../data/mock";
+import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
 import { Plus, X, Calculator } from "lucide-react";
 import { useScreen } from "../router";
@@ -19,11 +20,9 @@ interface MatRow {
   proba: number;
   qty: number;
   loc: string;
-  fe: string;
-  sb: string;
-  bi: string;
-  pb: string;
-  p: string;
+  // Содержание в чистоте, г: id элемента справочника «Химический состав» → масса
+  chem: ChemComposition;
+  // Масса лигатурная, г
   ves: number;
   // id позиции склада ДМ, выбранной в этой сессии — резервируется при сохранении карты
   srcId?: string;
@@ -33,10 +32,25 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 let rowSeq = 0;
 const newKey = () => `mr-${Date.now()}-${rowSeq++}`;
 
-const toRow = (m: ShihtaMaterial): MatRow => ({
-  key: newKey(), mat: m.name, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, qty: m.qty ?? 1, loc: m.loc,
-  fe: "—", sb: "—", bi: "—", pb: "—", p: "—", ves: m.ves,
-});
+const num = (v: string | undefined) => parseFloat((v ?? "").replace(",", ".")) || 0;
+const fmt = (v: number) => String(round2(v));
+
+// Химсостав позиции склада на взятую часть (k = взято / всего)
+const scaleChem = (chem: ChemComposition | undefined, k: number): ChemComposition =>
+  Object.fromEntries(Object.entries(chem ?? {}).filter(([, v]) => num(v) > 0).map(([id, v]) => [id, fmt(num(v) * k)]));
+
+// Состав сплава по ГОСТ 6836-2002 (серебро 925), %: id элемента → норма
+const GOST_6836: Record<string, string> = {
+  ag: "92,20 – 92,80", cu: "Остальное", fe: "Менее 0,10", sb: "Менее 0,002", bi: "Менее 0,002", pb: "Менее 0,004",
+};
+
+const toRow = (m: ShihtaMaterial, dm: DMItem[]): MatRow => {
+  const src = m.nomenkl ? dm.find(i => i.nomenkl === m.nomenkl) : undefined;
+  return {
+    key: newKey(), mat: m.name, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, qty: m.qty ?? 1, loc: m.loc,
+    chem: m.chem ?? scaleChem(src?.chem, src && src.qty > 0 ? (m.qty ?? 1) / src.qty : 1), ves: m.ves,
+  };
+};
 
 // Резерв позиций ДМ под шихтовую карту: полностью взятая позиция переводится в «Резерв»,
 // при частичном выборе зарезервированная часть выделяется в отдельную позицию.
@@ -58,26 +72,30 @@ function reserveDm(items: DMItem[], reserve: Map<string, number>, release: Set<s
 }
 
 function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta?: ShihtovayaKarta | null; onClose: () => void; onSave: (k: ShihtovayaKarta) => void; readOnly?: boolean }) {
-  const { currentUser, dmItems, setDmItems } = useApp();
+  const { currentUser, dmItems, setDmItems, chemElements } = useApp();
+  // Колонки «Содержание в чистоте, г» — элементы справочника с признаком «Отображать в ШК»
+  const shkEls = chemElements.filter(e => e.showShk);
   const [name, setName] = useState(karta?.name || "");
   const [plavkaNo, setPlavkaNo] = useState(karta?.plavkaNo || "");
   const [oborotNo, setOborotNo] = useState("О-2026-001");
   const [naznachenie, setNaznachenie] = useState("Слитки для реализации");
   const [osnovanie, setOsnovanie] = useState(`Приказ №234-П от ${new Date().toLocaleDateString("ru-RU")}`);
   const [files, setFiles] = useState<File[]>(() => karta?.files ?? []);
-  const [materials, setMaterials] = useState<MatRow[]>(() => (karta?.materials ?? []).map(toRow));
+  const [materials, setMaterials] = useState<MatRow[]>(() => (karta?.materials ?? []).map(m => toRow(m, dmItems)));
   // Вложенные экраны: …/from-sklad, …/dop-material, …/raschet (результат расчёта)
   const screen = useScreen();
   const nested = (name: string) => [screen.has(name), (open: boolean) => (open ? screen.open(name) : screen.close(name))] as const;
   const [showFromSklad, setShowFromSklad] = nested("from-sklad");
   const [showAddDop, setShowAddDop] = nested("dop-material");
-  const [dopForm, setDopForm] = useState({ name: "", code: "Au чистое", klass: "Комплектующие", proba: "", unit: "г", ves: "" });
+  const emptyDop = () => ({ name: "", unit: "г", ves: "", chem: {} as ChemComposition });
+  const [dopForm, setDopForm] = useState(emptyDop);
   const showResult = screen.has("raschet");
   const setShowResult = (on: boolean) => screen.toggle("raschet", on);
   const { toast, show, clear } = useToast();
   const ro = readOnly;
 
   // Доступные позиции склада ДМ для шихты
+  const skladChem = (id: string) => dmItems.find(i => i.id === id)?.chem;
   const skladRows = useMemo<StockRow[]>(() => dmItems
     .filter(i => i.status === "На складе" && i.qty > 0 && !isGPKlass(i.klass))
     .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location })),
@@ -97,11 +115,11 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
         const idx = next.findIndex(m => m.srcId === row.id);
         if (idx >= 0) {
           const q = Math.min(next[idx].qty + qty, row.qty);
-          next[idx] = { ...next[idx], qty: q, ves: vesOf(q) };
+          next[idx] = { ...next[idx], qty: q, ves: vesOf(q), chem: scaleChem(skladChem(row.id), q / (row.qty || 1)) };
         } else {
           next.push({
             key: newKey(), mat: row.name, nomenkl: row.nomenkl, klass: row.klass, proba: row.proba ?? 0, qty, loc: row.location,
-            fe: "—", sb: "—", bi: "—", pb: "—", p: "—", ves: vesOf(qty), srcId: row.id,
+            chem: scaleChem(skladChem(row.id), qty / (row.qty || 1)), ves: vesOf(qty), srcId: row.id,
           });
         }
       }
@@ -113,17 +131,19 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
   const totalVes = materials.reduce((s, m) => s + m.ves, 0);
   const dola = (m: MatRow) => (totalVes > 0 ? round2((m.ves / totalVes) * 100) : 0);
-  const num = (v: string) => parseFloat(v) || 0;
+  // Итоговые строки по форме ГОСТ: содержание каждого элемента в шихте, г и %
+  const chemTotal = (id: string) => round2(materials.reduce((s, m) => s + num(m.chem[id]), 0));
+  const chemPct = (id: string) => {
+    if (GOST_6836[id] === "Остальное") return "Остальное";
+    const t = chemTotal(id);
+    return t > 0 && totalVes > 0 ? fmt((t / totalVes) * 100) : "—";
+  };
 
   const { sorted: sortedMaterials, sort: matSort, toggleSort: toggleMatSort } = useSort(materials, {
     mat: m => m.mat,
     klass: m => m.klass,
     qty: m => m.qty,
-    fe: m => num(m.fe),
-    sb: m => num(m.sb),
-    bi: m => num(m.bi),
-    pb: m => num(m.pb),
-    p: m => num(m.p),
+    ...Object.fromEntries(shkEls.map(e => [`el-${e.id}`, (m: MatRow) => num(m.chem[e.id])])),
     ves: m => m.ves,
     dola: m => dola(m),
   });
@@ -156,7 +176,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     const release = new Set((karta?.materials ?? []).map(m => m.nomenkl).filter(n => n && !kept.has(n)));
     if (reserve.size || release.size) setDmItems(prev => reserveDm(prev, reserve, release, Date.now()));
 
-    const mats: ShihtaMaterial[] = materials.map(m => ({ name: m.mat, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, ves: m.ves, loc: m.loc, qty: m.qty }));
+    const mats: ShihtaMaterial[] = materials.map(m => ({ name: m.mat, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, ves: m.ves, loc: m.loc, qty: m.qty, chem: m.chem }));
     // Оформление снимает пометку о выданных позициях — карта снова доступна для плавки.
     const status = oformit ? "Новая" as const : "Редактирование" as const;
     const k: ShihtovayaKarta = karta ? {
@@ -238,21 +258,29 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
             Нет материалов. Нажмите «+ Добавить со склада»
           </div>
         ) : (
-          <table className="w-full text-sm mb-4">
-            <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <SortTh sortKey="mat" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Материал</SortTh>
-              <SortTh sortKey="klass" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="qty" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Кол-во шт</SortTh>
-              <SortTh sortKey="fe" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Fe г</SortTh>
-              <SortTh sortKey="sb" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Sb г</SortTh>
-              <SortTh sortKey="bi" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Bi г</SortTh>
-              <SortTh sortKey="pb" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Pb г</SortTh>
-              <SortTh sortKey="p" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">P г</SortTh>
-              <SortTh sortKey="ves" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Вес г</SortTh>
-              <SortTh sortKey="dola" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Доля %</SortTh>
-              <th className="px-3 py-2 text-left">Статус</th>
-              {!ro && <th className="w-10"></th>}
-            </tr></thead>
+          <div className="overflow-x-auto mb-4">
+          <table className="w-full text-sm">
+            <thead>
+              {shkEls.length > 0 && (
+                <tr className="bg-gray-50 text-gray-500 text-xs">
+                  <th colSpan={4}></th>
+                  <th colSpan={shkEls.length} className="px-3 pt-2 pb-1 text-center font-medium uppercase tracking-wide border-b border-gray-200">Содержание в чистоте, г</th>
+                  <th colSpan={ro ? 2 : 3}></th>
+                </tr>
+              )}
+              <tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+                <SortTh sortKey="mat" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Материал</SortTh>
+                <SortTh sortKey="klass" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Класс</SortTh>
+                <SortTh sortKey="qty" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Кол-во, шт</SortTh>
+                <SortTh sortKey="ves" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Масса лигатурная, г</SortTh>
+                {shkEls.map(e => (
+                  <SortTh key={e.id} sortKey={`el-${e.id}`} sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">{e.shortName}</SortTh>
+                ))}
+                <SortTh sortKey="dola" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Доля, %</SortTh>
+                <th className="px-3 py-2 text-left">Статус</th>
+                {!ro && <th className="w-10"></th>}
+              </tr>
+            </thead>
             <tbody className="divide-y divide-gray-100">
               {sortedMaterials.map(m => (
                 <tr key={m.key} className="hover:bg-gray-50">
@@ -260,14 +288,12 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                     <div className="font-medium">{m.mat}</div>
                     {m.nomenkl && <div className="text-xs text-gray-400">{m.nomenkl}{m.loc ? ` · ${m.loc}` : ""}</div>}
                   </td>
-                  <td className="px-3 py-2"><KlassCode value={m.klass} /></td>
+                  <td className="px-3 py-2">{m.klass ? <KlassCode value={m.klass} /> : <span className="text-gray-400">—</span>}</td>
                   <td className="px-3 py-2 text-right">{m.qty}</td>
-                  <td className="px-3 py-2 text-right text-gray-600">{m.fe}</td>
-                  <td className="px-3 py-2 text-right text-gray-600">{m.sb}</td>
-                  <td className="px-3 py-2 text-right text-gray-600">{m.bi}</td>
-                  <td className="px-3 py-2 text-right text-gray-600">{m.pb}</td>
-                  <td className="px-3 py-2 text-right text-gray-600">{m.p}</td>
                   <td className="px-3 py-2 text-right font-medium">{m.ves}</td>
+                  {shkEls.map(e => (
+                    <td key={e.id} className="px-3 py-2 text-right text-gray-600">{num(m.chem[e.id]) > 0 ? m.chem[e.id] : "—"}</td>
+                  ))}
                   <td className="px-3 py-2 text-right text-blue-600">{dola(m)}%</td>
                   <td className="px-3 py-2">{m.nomenkl ? <Badge label="Резерв" /> : <span className="text-xs text-gray-400">Доп. материал</span>}</td>
                   {!ro && <td className="px-3 py-2 text-center">
@@ -276,15 +302,39 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                 </tr>
               ))}
             </tbody>
-            <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
-              <td className="px-3 py-2" colSpan={2}>Итого: {materials.length} поз.</td>
-              <td className="px-3 py-2 text-right">{materials.reduce((s, m) => s + m.qty, 0)}</td>
-              <td colSpan={5}></td>
-              <td className="px-3 py-2 text-right">{round2(totalVes)}</td>
-              <td className="px-3 py-2 text-right text-blue-600">100%</td>
-              <td colSpan={ro ? 1 : 2}></td>
-            </tr></tfoot>
+            <tfoot className="border-t-2 border-gray-200 bg-gray-50 text-sm divide-y divide-gray-200">
+              <tr className="font-medium">
+                <td className="px-3 py-2" colSpan={2}>Масса шихты, г <span className="text-xs font-normal text-gray-400">({materials.length} поз.)</span></td>
+                <td className="px-3 py-2 text-right">{materials.reduce((s, m) => s + m.qty, 0)}</td>
+                <td className="px-3 py-2 text-right font-semibold">{fmt(totalVes)}</td>
+                {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right text-gray-400">—</td>)}
+                <td className="px-3 py-2 text-right text-blue-600">100%</td>
+                <td colSpan={ro ? 1 : 2}></td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium" colSpan={3}>Содержание в шихте, г</td>
+                <td className="px-3 py-2 text-right text-gray-400">—</td>
+                {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right">{chemTotal(e.id) > 0 ? fmt(chemTotal(e.id)) : "—"}</td>)}
+                <td colSpan={ro ? 2 : 3}></td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium" colSpan={3}>Содержание в шихте, %</td>
+                <td className="px-3 py-2 text-right text-gray-400">—</td>
+                {shkEls.map(e => {
+                  const v = chemPct(e.id);
+                  return <td key={e.id} className={`px-3 py-2 text-right ${v === "Остальное" ? "text-xs text-gray-600" : v === "—" ? "text-gray-400" : "font-semibold"}`}>{v}</td>;
+                })}
+                <td colSpan={ro ? 2 : 3}></td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium" colSpan={3}>Состав сплава по ГОСТ 6836-2002, %</td>
+                <td className="px-3 py-2 text-right text-gray-400">—</td>
+                {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right text-xs text-gray-600 whitespace-nowrap">{GOST_6836[e.id] ?? "—"}</td>)}
+                <td colSpan={ro ? 2 : 3}></td>
+              </tr>
+            </tfoot>
           </table>
+          </div>
         )}
 
         {!ro && (
@@ -330,25 +380,25 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
       {/* Add dop material */}
       {showAddDop && (
-        <Modal title="Добавить дополнительный материал" onClose={() => setShowAddDop(false)} footer={
+        <Modal title="Добавить дополнительный материал" wide onClose={() => setShowAddDop(false)} footer={
           <><Btn variant="secondary" onClick={() => setShowAddDop(false)}>Отмена</Btn>
           <Btn onClick={() => {
             setMaterials(prev => [...prev, {
-              key: newKey(), mat: dopForm.name || "Доп. материал", nomenkl: "", klass: dopForm.klass, proba: parseFloat(dopForm.proba) || 0, qty: 1, loc: "",
-              fe: "0.01", sb: "0.001", bi: "0.001", pb: "0.001", p: "0.001", ves: parseFloat(dopForm.ves) || 0,
+              key: newKey(), mat: dopForm.name || "Доп. материал", nomenkl: "", klass: "", proba: 0, qty: 1, loc: "",
+              chem: scaleChem(dopForm.chem, 1), ves: num(dopForm.ves),
             }]);
             setShowAddDop(false);
-            setDopForm({ name: "", code: "Au чистое", klass: "Комплектующие", proba: "", unit: "г", ves: "" });
+            setDopForm(emptyDop());
             show("Материал добавлен");
           }}>Добавить</Btn></>
         }>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Наименование материала" full><Input value={dopForm.name} onChange={v => setDopForm(f => ({ ...f, name: v }))} placeholder="Название" /></Field>
-            <Field label="Код материала"><MaterialCodeSelect value={dopForm.code} onChange={v => setDopForm(f => ({ ...f, code: v }))} /></Field>
-            <Field label="Класс"><KlassSelect value={dopForm.klass} onChange={v => setDopForm(f => ({ ...f, klass: v }))} /></Field>
-            <Field label="Проба"><Input value={dopForm.proba} onChange={v => setDopForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
             <Field label="Ед. измерения"><Select value={dopForm.unit} options={["г", "кг", "шт"]} onChange={v => setDopForm(f => ({ ...f, unit: v }))} /></Field>
-            <Field label="Вес г"><Input value={dopForm.ves} onChange={v => setDopForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>
+            <Field label="Масса лигатурная, г"><Input value={dopForm.ves} onChange={v => setDopForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>
+          </div>
+          <div className="mt-4">
+            <ChemCompositionBlock scope="shk" value={dopForm.chem} onChange={chem => setDopForm(f => ({ ...f, chem }))} />
           </div>
         </Modal>
       )}

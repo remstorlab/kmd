@@ -118,6 +118,8 @@ export interface ShihtaMaterial {
   loc: string;
   // Количество, шт (для позиций, зарезервированных со склада ДМ)
   qty?: number;
+  // Содержание в чистоте, г (для доп. материалов — вводится вручную)
+  chem?: ChemComposition;
 }
 
 export interface ShihtovayaKarta {
@@ -774,41 +776,42 @@ export const GP_KLASS = "Готовая продукция";
 export const isGPKlass = (klass: string) => klass === GP_KLASS;
 
 // --- Химический состав (справочник элементов) ---
-// Блоки «Химический состав» во всех формах строятся по этому справочнику:
-// показываются только элементы с признаком «Отображать».
+// Блоки «Химический состав» строятся по этому справочнику: в формах позиций ДМ — элементы
+// с признаком «Отображать в ДМ», в шихтовых картах — с признаком «Отображать в ШК».
 export interface ChemElement {
   id: string;
   name: string;
   shortName: string;
-  visible: boolean;
+  showDm: boolean;
+  showShk: boolean;
 }
 
 // Значения химического состава позиции, г: id элемента → масса («-» или пусто — нет данных)
 export type ChemComposition = Record<string, string>;
 
 export const initialChemElements: ChemElement[] = [
-  { id: "au", name: "Золото", shortName: "Au", visible: true },
-  { id: "ag", name: "Серебро", shortName: "Ag", visible: true },
-  { id: "pd", name: "Палладий", shortName: "Pd", visible: true },
-  { id: "rh", name: "Родий", shortName: "Rh", visible: true },
-  { id: "pt", name: "Платина", shortName: "Pt", visible: true },
-  { id: "ir", name: "Иридий", shortName: "Ir", visible: false },
-  { id: "cu", name: "Медь", shortName: "Cu", visible: false },
-  { id: "p", name: "Фосфор", shortName: "P", visible: false },
-  { id: "fe", name: "Железо", shortName: "Fe", visible: false },
-  { id: "pb", name: "Свинец", shortName: "Pb", visible: false },
-  { id: "sb", name: "Сурьма", shortName: "Sb", visible: false },
-  { id: "bi", name: "Висмут", shortName: "Bi", visible: false },
-  { id: "te", name: "Теллур", shortName: "Te", visible: false },
-  { id: "zn", name: "Цинк", shortName: "Zn", visible: false },
-  { id: "cd", name: "Кадмий", shortName: "Cd", visible: false },
-  { id: "sn", name: "Олово", shortName: "Sn", visible: false },
-  { id: "ni", name: "Никель", shortName: "Ni", visible: false },
-  { id: "si", name: "Кремний", shortName: "Si", visible: false },
-  { id: "mg", name: "Магний", shortName: "Mg", visible: false },
-  { id: "mn", name: "Марганец", shortName: "Mn", visible: false },
-  { id: "cr", name: "Хром", shortName: "Cr", visible: false },
-  { id: "co", name: "Кобальт", shortName: "Co", visible: false },
-  { id: "as", name: "Мышьяк", shortName: "As", visible: false },
-  { id: "se", name: "Селен", shortName: "Se", visible: false },
+  { id: "au", name: "Золото", shortName: "Au", showDm: true, showShk: false },
+  { id: "ag", name: "Серебро", shortName: "Ag", showDm: true, showShk: true },
+  { id: "pd", name: "Палладий", shortName: "Pd", showDm: true, showShk: false },
+  { id: "rh", name: "Родий", shortName: "Rh", showDm: true, showShk: false },
+  { id: "pt", name: "Платина", shortName: "Pt", showDm: true, showShk: false },
+  { id: "ir", name: "Иридий", shortName: "Ir", showDm: false, showShk: false },
+  { id: "cu", name: "Медь", shortName: "Cu", showDm: false, showShk: true },
+  { id: "p", name: "Фосфор", shortName: "P", showDm: false, showShk: true },
+  { id: "fe", name: "Железо", shortName: "Fe", showDm: false, showShk: true },
+  { id: "pb", name: "Свинец", shortName: "Pb", showDm: false, showShk: true },
+  { id: "sb", name: "Сурьма", shortName: "Sb", showDm: false, showShk: true },
+  { id: "bi", name: "Висмут", shortName: "Bi", showDm: false, showShk: true },
+  { id: "te", name: "Теллур", shortName: "Te", showDm: false, showShk: false },
+  { id: "zn", name: "Цинк", shortName: "Zn", showDm: false, showShk: false },
+  { id: "cd", name: "Кадмий", shortName: "Cd", showDm: false, showShk: false },
+  { id: "sn", name: "Олово", shortName: "Sn", showDm: false, showShk: false },
+  { id: "ni", name: "Никель", shortName: "Ni", showDm: false, showShk: false },
+  { id: "si", name: "Кремний", shortName: "Si", showDm: false, showShk: false },
+  { id: "mg", name: "Магний", shortName: "Mg", showDm: false, showShk: false },
+  { id: "mn", name: "Марганец", shortName: "Mn", showDm: false, showShk: false },
+  { id: "cr", name: "Хром", shortName: "Cr", showDm: false, showShk: false },
+  { id: "co", name: "Кобальт", shortName: "Co", showDm: false, showShk: false },
+  { id: "as", name: "Мышьяк", shortName: "As", showDm: false, showShk: false },
+  { id: "se", name: "Селен", shortName: "Se", showDm: false, showShk: false },
 ];

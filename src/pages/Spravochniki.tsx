@@ -562,7 +562,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
 
 // ── Химический состав (элементы блока «Химический состав» в формах) ──────────
 
-const emptyChem = (): ChemElement => ({ id: "", name: "", shortName: "", visible: true });
+const emptyChem = (): ChemElement => ({ id: "", name: "", shortName: "", showDm: true, showShk: true });
 
 function ChemElementsPage({ onBack }: { onBack: () => void }) {
   const { chemElements: items, setChemElements: setItems } = useApp();
@@ -591,11 +591,13 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
     n: i => numOf(i),
     name: i => i.name,
     shortName: i => i.shortName,
-    visible: i => (i.visible ? 1 : 0),
+    showDm: i => (i.showDm ? 1 : 0),
+    showShk: i => (i.showShk ? 1 : 0),
   });
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
 
-  const setVisible = (id: string, visible: boolean) => setItems(prev => prev.map(i => i.id === id ? { ...i, visible } : i));
+  type Flag = "showDm" | "showShk";
+  const setFlag = (id: string, flag: Flag, v: boolean) => setItems(prev => prev.map(i => i.id === id ? { ...i, [flag]: v } : i));
 
   const canSave = !!form.name.trim() && !!form.shortName.trim();
   const save = () => {
@@ -625,7 +627,7 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
 
       <PageHeader
         title="Химический состав"
-        subtitle={`${items.length} значений · отображается в формах: ${items.filter(i => i.visible).length}`}
+        subtitle={`${items.length} значений · в ДМ: ${items.filter(i => i.showDm).length} · в ШК: ${items.filter(i => i.showShk).length}`}
         actions={<Btn onClick={goAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
       />
 
@@ -642,7 +644,8 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
             <SortTh sortKey="n" sort={sort} onSort={toggleSort}>№</SortTh>
             <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
             <SortTh sortKey="shortName" sort={sort} onSort={toggleSort}>Краткое наименование</SortTh>
-            <SortTh sortKey="visible" sort={sort} onSort={toggleSort}>Отображать</SortTh>
+            <SortTh sortKey="showDm" sort={sort} onSort={toggleSort}>Отображать в ДМ</SortTh>
+            <SortTh sortKey="showShk" sort={sort} onSort={toggleSort}>Отображать в ШК</SortTh>
             <th className="w-24"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
@@ -652,7 +655,10 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
                 <td className="px-4 py-3 text-gray-900">{item.name}</td>
                 <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.shortName}</td>
                 <td className="px-4 py-3">
-                  <input type="checkbox" checked={item.visible} onChange={e => setVisible(item.id, e.target.checked)} className="w-4 h-4 accent-blue-600 cursor-pointer" title="Отображать в формах" />
+                  <input type="checkbox" checked={item.showDm} onChange={e => setFlag(item.id, "showDm", e.target.checked)} className="w-4 h-4 accent-blue-600 cursor-pointer" title="Отображать в формах позиций ДМ" />
+                </td>
+                <td className="px-4 py-3">
+                  <input type="checkbox" checked={item.showShk} onChange={e => setFlag(item.id, "showShk", e.target.checked)} className="w-4 h-4 accent-blue-600 cursor-pointer" title="Отображать в шихтовых картах" />
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
@@ -664,7 +670,7 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
               </tr>
             ))}
             {pageItems.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
           </tbody>
         </table>
@@ -685,7 +691,8 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
           <div className="space-y-4">
             <Field label="Наименование"><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Золото" /></Field>
             <Field label="Краткое наименование (обозначение)"><Input value={form.shortName} onChange={v => setForm(f => ({ ...f, shortName: v }))} placeholder="Au" /></Field>
-            <ChemVisibleCheckbox checked={form.visible} onChange={v => setForm(f => ({ ...f, visible: v }))} />
+            <ChemFlagCheckbox label="Отображать в ДМ (поле выводится в блоке «Химический состав» форм позиций ДМ)" checked={form.showDm} onChange={v => setForm(f => ({ ...f, showDm: v }))} />
+            <ChemFlagCheckbox label="Отображать в ШК (колонка в таблице шихтовой карты и поле доп. материала)" checked={form.showShk} onChange={v => setForm(f => ({ ...f, showShk: v }))} />
           </div>
         </Modal>
       )}
@@ -696,7 +703,8 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
             <Field label="№"><Input value={String(numOf(viewItem))} disabled /></Field>
             <Field label="Наименование"><Input value={viewItem.name} disabled /></Field>
             <Field label="Краткое наименование (обозначение)"><Input value={viewItem.shortName} disabled /></Field>
-            <ChemVisibleCheckbox checked={viewItem.visible} disabled />
+            <ChemFlagCheckbox label="Отображать в ДМ" checked={viewItem.showDm} disabled />
+            <ChemFlagCheckbox label="Отображать в ШК" checked={viewItem.showShk} disabled />
           </div>
         </Modal>
       )}
@@ -706,11 +714,11 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-function ChemVisibleCheckbox({ checked, onChange, disabled = false }: { checked: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
+function ChemFlagCheckbox({ label, checked, onChange, disabled = false }: { label: string; checked: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
   return (
     <label className={`flex items-center gap-2 text-sm text-gray-700 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
       <input type="checkbox" checked={checked} onChange={e => onChange?.(e.target.checked)} disabled={disabled} className="w-4 h-4 accent-blue-600" />
-      Отображать (поле выводится в блоке «Химический состав» форм)
+      {label}
     </label>
   );
 }

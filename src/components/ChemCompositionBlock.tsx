@@ -4,14 +4,16 @@ import { ChemComposition } from "../data/mock";
 import { useApp } from "../store/AppContext";
 
 // Блок «Химический состав (в чистоте), г» — поля формируются по справочнику «Химический состав»:
-// выводятся только элементы с признаком «Отображать», подпись — «<Краткое наименование>, г.».
-export default function ChemCompositionBlock({ value, onChange, disabled = false }: {
+// выводятся только элементы с признаком «Отображать в ДМ» (scope="dm", формы позиций ДМ)
+// или «Отображать в ШК» (scope="shk", шихтовые карты); подпись — «<Краткое наименование>, г.».
+export default function ChemCompositionBlock({ value, onChange, disabled = false, scope = "dm" }: {
   value: ChemComposition | undefined;
   onChange?: (v: ChemComposition) => void;
   disabled?: boolean;
+  scope?: "dm" | "shk";
 }) {
   const { chemElements } = useApp();
-  const shown = chemElements.filter(e => e.visible);
+  const shown = chemElements.filter(e => (scope === "shk" ? e.showShk : e.showDm));
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -30,7 +32,7 @@ export default function ChemCompositionBlock({ value, onChange, disabled = false
           ))}
         </div>
       ) : (
-        <div className="text-sm text-gray-400">Нет элементов с признаком «Отображать» в справочнике «Химический состав»</div>
+        <div className="text-sm text-gray-400">Нет элементов с признаком «{scope === "shk" ? "Отображать в ШК" : "Отображать в ДМ"}» в справочнике «Химический состав»</div>
       )}
     </div>
   );
