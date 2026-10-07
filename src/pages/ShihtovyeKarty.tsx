@@ -39,10 +39,8 @@ const fmt = (v: number) => String(round2(v));
 const scaleChem = (chem: ChemComposition | undefined, k: number): ChemComposition =>
   Object.fromEntries(Object.entries(chem ?? {}).filter(([, v]) => num(v) > 0).map(([id, v]) => [id, fmt(num(v) * k)]));
 
-// Состав сплава по ГОСТ 6836-2002 (серебро 925), %: id элемента → норма
-const GOST_6836: Record<string, string> = {
-  ag: "92,20 – 92,80", cu: "Остальное", fe: "Менее 0,10", sb: "Менее 0,002", bi: "Менее 0,002", pb: "Менее 0,004",
-};
+// Основа сплава (лигатура): в строке «Содержание в шихте, %» выводится как «Остальное»
+const OSTALNOE = new Set(["cu"]);
 
 const toRow = (m: ShihtaMaterial, dm: DMItem[]): MatRow => {
   const src = m.nomenkl ? dm.find(i => i.nomenkl === m.nomenkl) : undefined;
@@ -134,7 +132,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   // Итоговые строки по форме ГОСТ: содержание каждого элемента в шихте, г и %
   const chemTotal = (id: string) => round2(materials.reduce((s, m) => s + num(m.chem[id]), 0));
   const chemPct = (id: string) => {
-    if (GOST_6836[id] === "Остальное") return "Остальное";
+    if (OSTALNOE.has(id) && chemTotal(id) > 0) return "Остальное";
     const t = chemTotal(id);
     return t > 0 && totalVes > 0 ? fmt((t / totalVes) * 100) : "—";
   };
@@ -205,7 +203,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     <Modal
       title="Конструктор шихтовой карты"
       onClose={onClose}
-      extraWide
+      fullWide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
         <>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
@@ -268,7 +266,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                   <th colSpan={ro ? 2 : 3}></th>
                 </tr>
               )}
-              <tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+              <tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
                 <SortTh sortKey="mat" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Материал</SortTh>
                 <SortTh sortKey="klass" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Класс</SortTh>
                 <SortTh sortKey="qty" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Кол-во, шт</SortTh>
@@ -324,12 +322,6 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                   const v = chemPct(e.id);
                   return <td key={e.id} className={`px-3 py-2 text-right ${v === "Остальное" ? "text-xs text-gray-600" : v === "—" ? "text-gray-400" : "font-semibold"}`}>{v}</td>;
                 })}
-                <td colSpan={ro ? 2 : 3}></td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 font-medium" colSpan={3}>Состав сплава по ГОСТ 6836-2002, %</td>
-                <td className="px-3 py-2 text-right text-gray-400">—</td>
-                {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right text-xs text-gray-600 whitespace-nowrap">{GOST_6836[e.id] ?? "—"}</td>)}
                 <td colSpan={ro ? 2 : 3}></td>
               </tr>
             </tfoot>

@@ -81,6 +81,7 @@ export function Modal({
   footer,
   wide = false,
   extraWide = false,
+  fullWide = false,
 }: {
   title: string;
   onClose: () => void;
@@ -88,6 +89,8 @@ export function Modal({
   footer?: React.ReactNode;
   wide?: boolean;
   extraWide?: boolean;
+  // Почти во всю ширину экрана — для широких таблиц (конструктор шихтовой карты)
+  fullWide?: boolean;
 }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -95,7 +98,7 @@ export function Modal({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const maxW = extraWide ? "max-w-5xl" : wide ? "max-w-3xl" : "max-w-xl";
+  const maxW = fullWide ? "max-w-[96vw]" : extraWide ? "max-w-5xl" : wide ? "max-w-3xl" : "max-w-xl";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
