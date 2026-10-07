@@ -45,11 +45,7 @@ export interface DMItem {
   netWeight: number;
   location: string;
   status: StatusDM;
-  au?: string;
-  ag?: string;
-  pd?: string;
-  rh?: string;
-  pt?: string;
+  chem?: ChemComposition;
 }
 
 export interface SkladDoc {
@@ -85,7 +81,7 @@ export interface VydachaDocPosition {
 // «Выдача: На редактировании» → (Оформить) «Выдано» → (Оформить возврат, Сохранить) «Возврат: На редактировании» → (Оформить) «Завершено»
 export type OperStage = "Выдача: На редактировании" | "Выдано" | "Возврат: На редактировании" | "Завершено";
 
-export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; au?: string; pd?: string; rh?: string; pt?: string; loc: string };
+export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string };
 
 export interface Operation {
   id: string;
@@ -272,14 +268,14 @@ export const initialGPItems: GPItem[] = [
 
 // --- DM Items ---
 export const initialDMItems: DMItem[] = [
-  { id: "dm1", name: "Слиток золота ЗлА-1", nomenkl: "5015371", klass: "Слиток", metal: "Au чистое", qty: 1, proba: 999, ligWeight: 500.25, netWeight: 498.12, location: "Сейф №1, Полка 1", status: "Резерв", au: "498.12", ag: "-", pd: "-", rh: "-", pt: "-" },
-  { id: "dm2", name: "Слиток серебра СрА-2", nomenkl: "5015372", klass: "Слиток", metal: "Ag чистое", qty: 1, proba: 999, ligWeight: 1000.50, netWeight: 998.30, location: "Сейф №1, Полка 2", status: "На складе", au: "-", ag: "998.30", pd: "-", rh: "-", pt: "-" },
-  { id: "dm3", name: "Стружка золотая", nomenkl: "5015373", klass: "Стружка", metal: "Au чистое", qty: 1, proba: 585, ligWeight: 45.80, netWeight: 26.79, location: "Сейф №2, Полка 1", status: "Резерв", au: "26.79", ag: "-", pd: "-", rh: "-", pt: "-" },
-  { id: "dm4", name: "Проба золота Au-750", nomenkl: "5015374", klass: "Основная проба", metal: "Au чистое", qty: 1, proba: 750, ligWeight: 12.30, netWeight: 9.22, location: "Сейф №2, Полка 3", status: "Резерв", au: "9.22", ag: "-", pd: "-", rh: "-", pt: "-" },
-  { id: "dm5", name: "Раствор серебра AgNO3", nomenkl: "5015375", klass: "Электролит", metal: "Ag чистое", qty: 1, proba: 999, ligWeight: 250.00, netWeight: 249.10, location: "Сейф №3, Полка 1", status: "В подотчёте", au: "-", ag: "249.10", pd: "-", rh: "-", pt: "-" },
-  { id: "dm6", name: "Слиток платины ПлА-1", nomenkl: "5015376", klass: "Слиток", metal: "Pt чистое", qty: 1, proba: 999, ligWeight: 300.00, netWeight: 299.50, location: "Сейф №1, Полка 3", status: "На складе", au: "-", ag: "-", pd: "-", rh: "-", pt: "299.50" },
-  { id: "dm7", name: "Лом золота 585", nomenkl: "5015377", klass: "Скрап", metal: "Au чистое", qty: 1, proba: 585, ligWeight: 88.40, netWeight: 51.71, location: "Сейф №2, Полка 2", status: "На складе", au: "51.71", ag: "-", pd: "-", rh: "-", pt: "-" },
-  { id: "dm8", name: "Золотой порошок Au", nomenkl: "5015378", klass: "Гранулы", metal: "Au чистое", qty: 1, proba: 999, ligWeight: 25.00, netWeight: 24.95, location: "Сейф №3, Полка 3", status: "Резерв", au: "24.95", ag: "-", pd: "-", rh: "-", pt: "-" },
+  { id: "dm1", name: "Слиток золота ЗлА-1", nomenkl: "5015371", klass: "Слиток", metal: "Au чистое", qty: 1, proba: 999, ligWeight: 500.25, netWeight: 498.12, location: "Сейф №1, Полка 1", status: "Резерв", chem: { au: "498.12" } },
+  { id: "dm2", name: "Слиток серебра СрА-2", nomenkl: "5015372", klass: "Слиток", metal: "Ag чистое", qty: 1, proba: 999, ligWeight: 1000.50, netWeight: 998.30, location: "Сейф №1, Полка 2", status: "На складе", chem: { ag: "998.30" } },
+  { id: "dm3", name: "Стружка золотая", nomenkl: "5015373", klass: "Стружка", metal: "Au чистое", qty: 1, proba: 585, ligWeight: 45.80, netWeight: 26.79, location: "Сейф №2, Полка 1", status: "Резерв", chem: { au: "26.79" } },
+  { id: "dm4", name: "Проба золота Au-750", nomenkl: "5015374", klass: "Основная проба", metal: "Au чистое", qty: 1, proba: 750, ligWeight: 12.30, netWeight: 9.22, location: "Сейф №2, Полка 3", status: "Резерв", chem: { au: "9.22" } },
+  { id: "dm5", name: "Раствор серебра AgNO3", nomenkl: "5015375", klass: "Электролит", metal: "Ag чистое", qty: 1, proba: 999, ligWeight: 250.00, netWeight: 249.10, location: "Сейф №3, Полка 1", status: "В подотчёте", chem: { ag: "249.10" } },
+  { id: "dm6", name: "Слиток платины ПлА-1", nomenkl: "5015376", klass: "Слиток", metal: "Pt чистое", qty: 1, proba: 999, ligWeight: 300.00, netWeight: 299.50, location: "Сейф №1, Полка 3", status: "На складе", chem: { pt: "299.50" } },
+  { id: "dm7", name: "Лом золота 585", nomenkl: "5015377", klass: "Скрап", metal: "Au чистое", qty: 1, proba: 585, ligWeight: 88.40, netWeight: 51.71, location: "Сейф №2, Полка 2", status: "На складе", chem: { au: "51.71" } },
+  { id: "dm8", name: "Золотой порошок Au", nomenkl: "5015378", klass: "Гранулы", metal: "Au чистое", qty: 1, proba: 999, ligWeight: 25.00, netWeight: 24.95, location: "Сейф №3, Полка 3", status: "Резерв", chem: { au: "24.95" } },
 ];
 
 // --- Складские документы ---
@@ -776,3 +772,43 @@ export const initialStorageLocations: StorageLocation[] = [
 // Класс, по которому позиция относится к складу ГП; все остальные классы — склад ДМ.
 export const GP_KLASS = "Готовая продукция";
 export const isGPKlass = (klass: string) => klass === GP_KLASS;
+
+// --- Химический состав (справочник элементов) ---
+// Блоки «Химический состав» во всех формах строятся по этому справочнику:
+// показываются только элементы с признаком «Отображать».
+export interface ChemElement {
+  id: string;
+  name: string;
+  shortName: string;
+  visible: boolean;
+}
+
+// Значения химического состава позиции, г: id элемента → масса («-» или пусто — нет данных)
+export type ChemComposition = Record<string, string>;
+
+export const initialChemElements: ChemElement[] = [
+  { id: "au", name: "Золото", shortName: "Au", visible: true },
+  { id: "ag", name: "Серебро", shortName: "Ag", visible: true },
+  { id: "pd", name: "Палладий", shortName: "Pd", visible: true },
+  { id: "rh", name: "Родий", shortName: "Rh", visible: true },
+  { id: "pt", name: "Платина", shortName: "Pt", visible: true },
+  { id: "ir", name: "Иридий", shortName: "Ir", visible: false },
+  { id: "cu", name: "Медь", shortName: "Cu", visible: false },
+  { id: "p", name: "Фосфор", shortName: "P", visible: false },
+  { id: "fe", name: "Железо", shortName: "Fe", visible: false },
+  { id: "pb", name: "Свинец", shortName: "Pb", visible: false },
+  { id: "sb", name: "Сурьма", shortName: "Sb", visible: false },
+  { id: "bi", name: "Висмут", shortName: "Bi", visible: false },
+  { id: "te", name: "Теллур", shortName: "Te", visible: false },
+  { id: "zn", name: "Цинк", shortName: "Zn", visible: false },
+  { id: "cd", name: "Кадмий", shortName: "Cd", visible: false },
+  { id: "sn", name: "Олово", shortName: "Sn", visible: false },
+  { id: "ni", name: "Никель", shortName: "Ni", visible: false },
+  { id: "si", name: "Кремний", shortName: "Si", visible: false },
+  { id: "mg", name: "Магний", shortName: "Mg", visible: false },
+  { id: "mn", name: "Марганец", shortName: "Mn", visible: false },
+  { id: "cr", name: "Хром", shortName: "Cr", visible: false },
+  { id: "co", name: "Кобальт", shortName: "Co", visible: false },
+  { id: "as", name: "Мышьяк", shortName: "As", visible: false },
+  { id: "se", name: "Селен", shortName: "Se", visible: false },
+];

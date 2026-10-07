@@ -3,7 +3,8 @@ import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
   Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, MultiFileUpload, Toggle, SortTh, useSort,
 } from "./ui";
-import { SkladDoc, DocStatus, StorageLocation, spravochniki } from "../data/mock";
+import { SkladDoc, DocStatus, StorageLocation, ChemComposition, spravochniki } from "../data/mock";
+import ChemCompositionBlock from "./ChemCompositionBlock";
 import { useApp } from "../store/AppContext";
 import { Plus } from "lucide-react";
 import { useScreen } from "../router";
@@ -28,11 +29,7 @@ export interface PrihodPosition {
   net: string;
   seyf: string;
   polka: string;
-  au: string;
-  ag: string;
-  pd: string;
-  rh: string;
-  pt: string;
+  chem: ChemComposition;
 }
 
 const locOf = (p: PrihodPosition) => (p.polka ? `Сейф ${p.seyf}/Полка ${p.polka}` : p.seyf ? `Сейф ${p.seyf}` : "—");
@@ -50,7 +47,7 @@ function emptyPosition(locs: StorageLocation[], sklad: string, klass: string, co
   const seyf = seyfsOf(locs, sklad)[0] ?? "";
   return {
     id: newPosId(), nomenkl: "", name: "", klass, code, kol: "1", unit: "шт", proba: "999", lig: "", net: "",
-    seyf, polka: polkasOf(locs, sklad, seyf)[0] ?? "", au: "-", ag: "-", pd: "-", rh: "-", pt: "-",
+    seyf, polka: polkasOf(locs, sklad, seyf)[0] ?? "", chem: {},
   };
 }
 
@@ -66,7 +63,7 @@ function PositionModal({ mode, sklad, initial, onClose, onSave }: {
   const ro = mode === "view";
   const { storageLocations: locs } = useApp();
   const [form, setForm] = useState(initial);
-  const set = (k: keyof PrihodPosition) => (v: string) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: Exclude<keyof PrihodPosition, "chem">) => (v: string) => setForm(f => ({ ...f, [k]: v }));
 
   const seyfs = seyfsOf(locs, sklad);
   const seyfOptions = form.seyf && !seyfs.includes(form.seyf) ? [form.seyf, ...seyfs] : seyfs;
@@ -106,16 +103,7 @@ function PositionModal({ mode, sklad, initial, onClose, onSave }: {
           {polkaOptions.length ? <Select value={form.polka} options={polkaOptions} onChange={set("polka")} disabled={ro} /> : <Input value="—" disabled />}
         </Field>
       </div>
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Химический состав (в чистоте), г</h4>
-        <div className="grid grid-cols-5 gap-3">
-          <Field label="Au, г"><Input value={form.au} onChange={set("au")} placeholder="-" disabled={ro} /></Field>
-          <Field label="Ag, г"><Input value={form.ag} onChange={set("ag")} placeholder="-" disabled={ro} /></Field>
-          <Field label="Pd, г"><Input value={form.pd} onChange={set("pd")} placeholder="-" disabled={ro} /></Field>
-          <Field label="Rh, г"><Input value={form.rh} onChange={set("rh")} placeholder="-" disabled={ro} /></Field>
-          <Field label="Pt, г"><Input value={form.pt} onChange={set("pt")} placeholder="-" disabled={ro} /></Field>
-        </div>
-      </div>
+      <ChemCompositionBlock value={form.chem} onChange={chem => setForm(f => ({ ...f, chem }))} disabled={ro} />
     </Modal>
   );
 }
@@ -176,12 +164,12 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
 
   // Позиции
   const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>([
-    { id: "po-1", nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au чистое", kol: "1", unit: "шт", proba: "999.9", lig: "1000.0", net: "999.9", seyf: "1", polka: "1", au: "999.9", ag: "-", pd: "-", rh: "-", pt: "-" },
-    { id: "po-2", nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag чистое", kol: "1", unit: "шт", proba: "925.0", lig: "318.6", net: "294.7", seyf: "2", polka: "1", au: "-", ag: "294.7", pd: "-", rh: "-", pt: "-" },
+    { id: "po-1", nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "Au чистое", kol: "1", unit: "шт", proba: "999.9", lig: "1000.0", net: "999.9", seyf: "1", polka: "1", chem: { au: "999.9" } },
+    { id: "po-2", nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "Ag чистое", kol: "1", unit: "шт", proba: "925.0", lig: "318.6", net: "294.7", seyf: "2", polka: "1", chem: { ag: "294.7" } },
   ]);
   const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>([
-    { id: "pn-1", nomenkl: "AU-SL-12000", name: "Монета Атамекен", klass: "Готовая продукция", code: "Ag чистое", kol: "2000", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "1", au: "-", ag: "-", pd: "-", rh: "-", pt: "-" },
-    { id: "pn-2", nomenkl: "AU-SL-01000", name: "Орден Алтын алка", klass: "Готовая продукция", code: "Ag чистое", kol: "300", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "2", au: "-", ag: "-", pd: "-", rh: "-", pt: "-" },
+    { id: "pn-1", nomenkl: "AU-SL-12000", name: "Монета Атамекен", klass: "Готовая продукция", code: "Ag чистое", kol: "2000", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "1", chem: {} },
+    { id: "pn-2", nomenkl: "AU-SL-01000", name: "Орден Алтын алка", klass: "Готовая продукция", code: "Ag чистое", kol: "300", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "2", chem: {} },
   ]);
 
   const positions = isOrder ? orderPositions : nakladPositions;

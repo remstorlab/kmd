@@ -9,6 +9,7 @@ import { GPItem, DMItem, isGPKlass } from "../data/mock";
 import { Gem, Coins, Plus } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
+import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { useScreen } from "../router";
 
 // Приведение позиций между учётами ГП и ДМ — для разделения складов по классу материала.
@@ -431,16 +432,7 @@ export function OstatokDM() {
             <Field label="Место хранения" full><Input value={viewItem.location} disabled /></Field>
             <Field label="Статус"><Badge label={viewItem.status} /></Field>
           </div>
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Химический состав (в чистоте), г</h4>
-            <div className="grid grid-cols-5 gap-3">
-              <Field label="Au, г"><Input value={viewItem.au ?? "-"} disabled /></Field>
-              <Field label="Ag, г"><Input value={viewItem.ag ?? "-"} disabled /></Field>
-              <Field label="Pd, г"><Input value={viewItem.pd ?? "-"} disabled /></Field>
-              <Field label="Rh, г"><Input value={viewItem.rh ?? "-"} disabled /></Field>
-              <Field label="Pt, г"><Input value={viewItem.pt ?? "-"} disabled /></Field>
-            </div>
-          </div>
+          <ChemCompositionBlock value={viewItem.chem} disabled />
         </Modal>
       )}
       {showMerge && mergeItems.length >= 2 && <MergeModal items={mergeItems} onClose={() => screen.close("merge")} onConfirm={doMerge} />}

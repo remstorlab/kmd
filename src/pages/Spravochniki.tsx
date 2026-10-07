@@ -5,10 +5,10 @@ import {
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination,
 } from "../components/ui";
-import { spravochniki, initialMaterialCodes, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation } from "../data/mock";
+import { spravochniki, initialMaterialCodes, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
-import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, LucideIcon } from "lucide-react";
+import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 
@@ -28,6 +28,7 @@ export const SPRAV_SLUGS = {
   "Коды материалов": "kody-materialov",
   "Классы материалов": "klassy-materialov",
   "Места хранения": "mesta-hraneniya",
+  "Химический состав": "himicheskiy-sostav",
 } as const;
 
 // Экраны записей справочника: …/new, …/view/:key, …/edit/:key
@@ -559,8 +560,163 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ── Химический состав (элементы блока «Химический состав» в формах) ──────────
+
+const emptyChem = (): ChemElement => ({ id: "", name: "", shortName: "", visible: true });
+
+function ChemElementsPage({ onBack }: { onBack: () => void }) {
+  const { chemElements: items, setChemElements: setItems } = useApp();
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [form, setForm] = useState<ChemElement>(emptyChem());
+  const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, i => i.id);
+  const setViewItem = (i: ChemElement | null) => (i ? goView(i) : closeAll());
+  useEffect(() => {
+    if (editItem) setForm(editItem);
+    else if (showAdd) setForm(emptyChem());
+  }, [editKey, showAdd]);
+  const { toast, show, clear } = useToast();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
+  const perPage = 10;
+
+  // № — порядковый номер в справочнике (в этом порядке поля выводятся в формах)
+  const numOf = (e: ChemElement) => items.indexOf(e) + 1;
+
+  const filtered = items.filter(i => {
+    const q = search.trim().toLowerCase();
+    return !q || i.name.toLowerCase().includes(q) || i.shortName.toLowerCase().includes(q);
+  });
+
+  const { sorted, sort, toggleSort } = useSort(filtered, {
+    n: i => numOf(i),
+    name: i => i.name,
+    shortName: i => i.shortName,
+    visible: i => (i.visible ? 1 : 0),
+  });
+  const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
+
+  const setVisible = (id: string, visible: boolean) => setItems(prev => prev.map(i => i.id === id ? { ...i, visible } : i));
+
+  const canSave = !!form.name.trim() && !!form.shortName.trim();
+  const save = () => {
+    const name = form.name.trim();
+    const shortName = form.shortName.trim();
+    if (items.some(i => i.id !== editItem?.id && i.shortName.toLowerCase() === shortName.toLowerCase())) {
+      show("Элемент с таким кратким наименованием уже существует");
+      return;
+    }
+    if (editItem) {
+      setItems(prev => prev.map(i => i.id === editItem.id ? { ...form, name, shortName } : i));
+    } else {
+      setItems(prev => [...prev, { ...form, id: `chem-${Date.now()}`, name, shortName }]);
+    }
+    closeAll();
+    show("Запись сохранена");
+  };
+
+  return (
+    <div>
+      <button onClick={onBack} className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium mb-4">
+        <ArrowLeft className="w-4 h-4" />
+        Назад к справочникам
+      </button>
+
+      <div className="text-xs text-gray-500 mb-4">Справочники / Химический состав</div>
+
+      <PageHeader
+        title="Химический состав"
+        subtitle={`${items.length} значений · отображается в формах: ${items.filter(i => i.visible).length}`}
+        actions={<Btn onClick={goAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
+      />
+
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+        <div className="max-w-xs">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
+          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Наименование, обозначение..." />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 border-b border-gray-200">
+            <SortTh sortKey="n" sort={sort} onSort={toggleSort}>№</SortTh>
+            <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
+            <SortTh sortKey="shortName" sort={sort} onSort={toggleSort}>Краткое наименование</SortTh>
+            <SortTh sortKey="visible" sort={sort} onSort={toggleSort}>Отображать</SortTh>
+            <th className="w-24"></th>
+          </tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {pageItems.map(item => (
+              <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 text-gray-500">{numOf(item)}</td>
+                <td className="px-4 py-3 text-gray-900">{item.name}</td>
+                <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.shortName}</td>
+                <td className="px-4 py-3">
+                  <input type="checkbox" checked={item.visible} onChange={e => setVisible(item.id, e.target.checked)} className="w-4 h-4 accent-blue-600 cursor-pointer" title="Отображать в формах" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => setViewItem(item)} />
+                    <EditIcon onClick={() => goEdit(item)} />
+                    <DeleteIcon onClick={() => confirm(`Удалить элемент «${item.name}»?`, () => { setItems(prev => prev.filter(x => x.id !== item.id)); show("Элемент удалён"); })} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {pageItems.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+            )}
+          </tbody>
+        </table>
+        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} />
+      </div>
+
+      {(showAdd || editItem) && (
+        <Modal
+          title={editItem ? "Редактировать запись" : "Добавить запись"}
+          onClose={closeAll}
+          footer={
+            <>
+              <Btn variant="secondary" onClick={closeAll}>Отмена</Btn>
+              <Btn onClick={save} disabled={!canSave}>Сохранить</Btn>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <Field label="Наименование"><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Золото" /></Field>
+            <Field label="Краткое наименование (обозначение)"><Input value={form.shortName} onChange={v => setForm(f => ({ ...f, shortName: v }))} placeholder="Au" /></Field>
+            <ChemVisibleCheckbox checked={form.visible} onChange={v => setForm(f => ({ ...f, visible: v }))} />
+          </div>
+        </Modal>
+      )}
+
+      {viewItem && (
+        <Modal title={`Химический элемент: ${viewItem.name}`} onClose={() => setViewItem(null)} footer={<Btn variant="secondary" onClick={() => setViewItem(null)}>Закрыть</Btn>}>
+          <div className="space-y-4">
+            <Field label="№"><Input value={String(numOf(viewItem))} disabled /></Field>
+            <Field label="Наименование"><Input value={viewItem.name} disabled /></Field>
+            <Field label="Краткое наименование (обозначение)"><Input value={viewItem.shortName} disabled /></Field>
+            <ChemVisibleCheckbox checked={viewItem.visible} disabled />
+          </div>
+        </Modal>
+      )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
+      {toast && <Toast message={toast} onDone={clear} />}
+    </div>
+  );
+}
+
+function ChemVisibleCheckbox({ checked, onChange, disabled = false }: { checked: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <label className={`flex items-center gap-2 text-sm text-gray-700 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+      <input type="checkbox" checked={checked} onChange={e => onChange?.(e.target.checked)} disabled={disabled} className="w-4 h-4 accent-blue-600" />
+      Отображать (поле выводится в блоке «Химический состав» форм)
+    </label>
+  );
+}
+
 export function Spravochniki() {
-  const { storageLocations, navigate } = useApp();
+  const { storageLocations, chemElements, navigate } = useApp();
   // Справочник — /spravochniki/<slug>
   const { pathname } = useLocation();
   const { page, segs } = matchPage(pathname);
@@ -570,10 +726,12 @@ export function Spravochniki() {
   const showMaterialCodes = slug === SPRAV_SLUGS["Коды материалов"];
   const showMaterialClasses = slug === SPRAV_SLUGS["Классы материалов"];
   const showStorageLocations = slug === SPRAV_SLUGS["Места хранения"];
+  const showChemElements = slug === SPRAV_SLUGS["Химический состав"];
   const setSelected = (k: SpravKey | null) => open(k ? DICT_SLUG[k] : undefined);
   const setShowMaterialCodes = (on: boolean) => open(on ? SPRAV_SLUGS["Коды материалов"] : undefined);
   const setShowMaterialClasses = (on: boolean) => open(on ? SPRAV_SLUGS["Классы материалов"] : undefined);
   const setShowStorageLocations = (on: boolean) => open(on ? SPRAV_SLUGS["Места хранения"] : undefined);
+  const setShowChemElements = (on: boolean) => open(on ? SPRAV_SLUGS["Химический состав"] : undefined);
 
   if (selected) {
     return <DictPage key={selected} name={selected} onBack={() => setSelected(null)} />;
@@ -586,6 +744,9 @@ export function Spravochniki() {
   }
   if (showStorageLocations) {
     return <StorageLocationsPage onBack={() => setShowStorageLocations(false)} />;
+  }
+  if (showChemElements) {
+    return <ChemElementsPage onBack={() => setShowChemElements(false)} />;
   }
 
   return (
@@ -642,6 +803,16 @@ export function Spravochniki() {
           </div>
           <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Места хранения</h3>
           <p className="text-sm text-gray-400">{storageLocations.length} значений</p>
+        </button>
+        <button
+          onClick={() => setShowChemElements(true)}
+          className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md transition-all hover:border-blue-300 group"
+        >
+          <div className="w-10 h-10 mb-3 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+            <FlaskConical className="w-5 h-5" />
+          </div>
+          <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Химический состав</h3>
+          <p className="text-sm text-gray-400">{chemElements.length} значений</p>
         </button>
       </div>
     </div>

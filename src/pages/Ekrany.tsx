@@ -116,6 +116,9 @@ export function useScreenGroups(): Group[] {
       { title: "Классы материалов — добавить запись", path: `${sprav(S["Классы материалов"])}/new` },
       { title: "Места хранения — добавить", path: `${sprav(S["Места хранения"])}/new` },
       storageLocations[0] && { title: "Места хранения — просмотр", path: `${sprav(S["Места хранения"])}/view/${storageLocations[0].id}` },
+      { title: "Химический состав — добавить запись", path: `${sprav(S["Химический состав"])}/new` },
+      { title: "Химический состав — просмотр", path: `${sprav(S["Химический состав"])}/view/au` },
+      { title: "Химический состав — редактирование", path: `${sprav(S["Химический состав"])}/edit/au` },
       storageLocations[0] && { title: "Места хранения — редактирование", path: `${sprav(S["Места хранения"])}/edit/${storageLocations[0].id}` },
     ].filter(Boolean) as Screen[] },
     { title: "Логирование", screens: [

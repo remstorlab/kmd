@@ -5,9 +5,10 @@ import {
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, parseRuDate,
 } from "../components/ui";
-import { Operation, OperPosition, OperStage, ShihtovayaKarta, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
+import { Operation, OperPosition, OperStage, ShihtovayaKarta, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
 import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
+import ChemCompositionBlock from "../components/ChemCompositionBlock";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
 
@@ -141,7 +142,7 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
       const qty = qtyOf(i);
       // При частичной выдаче вес пропорционален количеству
       const ves = i.qty > 0 ? +(i.netWeight * qty / i.qty).toFixed(2) : i.netWeight;
-      return { name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty, ves, ag: "-", cu: "-", au: "-", pd: "-", rh: "-", pt: "-", loc: i.location };
+      return { name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty, ves, ag: i.chem?.ag || "-", cu: i.chem?.cu || "-", chem: i.chem, loc: i.location };
     }));
   };
 
@@ -238,7 +239,7 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
 // ── Добавить позицию ДМ (новая, вручную) ──────────────────────────────────────
 
 function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
-  const [form, setForm] = useState({ nomenkl: "", klass: "Слиток", name: "", proba: "999", ves: "", au: "-", ag: "-", pd: "-", rh: "-", pt: "-", sey: "Сейф №1", polka: "Полка А" });
+  const [form, setForm] = useState({ nomenkl: "", klass: "Слиток", name: "", proba: "999", ves: "", chem: {} as ChemComposition, sey: "Сейф №1", polka: "Полка А" });
 
   const add = () => {
     if (!form.name || !form.nomenkl) return;
@@ -248,12 +249,9 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
       klass: form.klass,
       proba: parseFloat(form.proba) || 0,
       ves: parseFloat(form.ves) || 0,
-      ag: form.ag || "-",
-      cu: "-",
-      au: form.au || "-",
-      pd: form.pd || "-",
-      rh: form.rh || "-",
-      pt: form.pt || "-",
+      ag: form.chem.ag || "-",
+      cu: form.chem.cu || "-",
+      chem: form.chem,
       loc: `${form.sey}, ${form.polka}`,
     }]);
   };
@@ -276,16 +274,7 @@ function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r
         <Field label="Сейф"><Select value={form.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setForm(f => ({ ...f, sey: v }))} /></Field>
         <Field label="Полка"><Select value={form.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setForm(f => ({ ...f, polka: v }))} /></Field>
       </div>
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Химический состав (в чистоте), г</h4>
-        <div className="grid grid-cols-5 gap-3">
-          <Field label="Au, г"><Input value={form.au} onChange={v => setForm(f => ({ ...f, au: v }))} placeholder="-" /></Field>
-          <Field label="Ag, г"><Input value={form.ag} onChange={v => setForm(f => ({ ...f, ag: v }))} placeholder="-" /></Field>
-          <Field label="Pd, г"><Input value={form.pd} onChange={v => setForm(f => ({ ...f, pd: v }))} placeholder="-" /></Field>
-          <Field label="Rh, г"><Input value={form.rh} onChange={v => setForm(f => ({ ...f, rh: v }))} placeholder="-" /></Field>
-          <Field label="Pt, г"><Input value={form.pt} onChange={v => setForm(f => ({ ...f, pt: v }))} placeholder="-" /></Field>
-        </div>
-      </div>
+      <ChemCompositionBlock value={form.chem} onChange={chem => setForm(f => ({ ...f, chem }))} />
     </Modal>
   );
 }

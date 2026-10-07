@@ -3,10 +3,10 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { matchPage, pagePath, LOGIN_PATH } from "../router";
 import {
   GPItem, DMItem, SkladDoc, Operation, ShihtovayaKarta,
-  Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy, StorageLocation,
+  Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy, StorageLocation, ChemElement,
   initialGPItems, initialDMItems, initialSkladDocs, initialVydachaDocs,
   initialOperations, initialShihtovyeKarty, initialPodotchetniki,
-  initialUsers, initialRoles, initialLogs, initialSecurityPolicy, initialStorageLocations,
+  initialUsers, initialRoles, initialLogs, initialSecurityPolicy, initialStorageLocations, initialChemElements,
 } from "../data/mock";
 
 export type Page =
@@ -200,6 +200,8 @@ interface AppCtx {
   setLogs: React.Dispatch<React.SetStateAction<LogEntry[]>>;
   storageLocations: StorageLocation[];
   setStorageLocations: React.Dispatch<React.SetStateAction<StorageLocation[]>>;
+  chemElements: ChemElement[];
+  setChemElements: React.Dispatch<React.SetStateAction<ChemElement[]>>;
 }
 
 const Ctx = createContext<AppCtx>(null!);
@@ -307,6 +309,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState(initialRoles);
   const [logs, setLogs] = useState(initialLogs);
   const [storageLocations, setStorageLocations] = useState(initialStorageLocations);
+  const [chemElements, setChemElements] = useState(initialChemElements);
 
   return (
     <Ctx.Provider value={{
@@ -327,6 +330,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       roles, setRoles,
       logs, setLogs,
       storageLocations, setStorageLocations,
+      chemElements, setChemElements,
     }}>
       {children}
     </Ctx.Provider>
