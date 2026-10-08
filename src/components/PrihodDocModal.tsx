@@ -32,7 +32,7 @@ export interface PrihodPosition {
   chem: ChemComposition;
 }
 
-const locOf = (p: PrihodPosition) => (p.polka ? `Сейф ${p.seyf}/Полка ${p.polka}` : p.seyf ? `Сейф ${p.seyf}` : "—");
+export const locOf = (p: PrihodPosition) => (p.polka ? `Сейф ${p.seyf}/Полка ${p.polka}` : p.seyf ? `Сейф ${p.seyf}` : "—");
 
 // Места хранения склада из справочника «Места хранения»
 const seyfsOf = (locs: StorageLocation[], sklad: string) =>
@@ -43,7 +43,7 @@ const polkasOf = (locs: StorageLocation[], sklad: string, seyf: string) =>
 let posSeq = 0;
 const newPosId = () => `pp-${Date.now()}-${posSeq++}`;
 
-function emptyPosition(locs: StorageLocation[], sklad: string, klass: string, code: string): PrihodPosition {
+export function emptyPosition(locs: StorageLocation[], sklad: string, klass: string, code: string): PrihodPosition {
   const seyf = seyfsOf(locs, sklad)[0] ?? "";
   return {
     id: newPosId(), nomenkl: "", name: "", klass, code, kol: "1", unit: "шт", proba: "999", lig: "", net: "",
@@ -53,7 +53,7 @@ function emptyPosition(locs: StorageLocation[], sklad: string, klass: string, co
 
 // ── Позиция: добавление / просмотр / редактирование (с химическим составом) ──
 
-function PositionModal({ mode, sklad, initial, onClose, onSave }: {
+export function PositionModal({ mode, sklad, initial, onClose, onSave }: {
   mode: "add" | "edit" | "view";
   sklad: string;
   initial: PrihodPosition;

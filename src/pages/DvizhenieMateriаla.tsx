@@ -10,6 +10,7 @@ import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
+import { PositionModal, PrihodPosition, emptyPosition, locOf } from "../components/PrihodDocModal";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
 
@@ -240,70 +241,69 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
   );
 }
 
-// ── Добавить позицию ДМ (новая, вручную) ──────────────────────────────────────
-
-function NewDMPositionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
-  const [form, setForm] = useState({ nomenkl: "", klass: "Слиток", metal: "1000", name: "", proba: "999", lig: "", net: "", chem: {} as ChemComposition, sey: "Сейф №1", polka: "Полка А" });
-
-  const add = () => {
-    if (!form.name || !form.nomenkl) return;
-    onAdd([{
-      name: form.name,
-      nomenkl: form.nomenkl,
-      klass: form.klass,
-      proba: parseFloat(form.proba) || 0,
-      ves: num(form.net) || num(form.lig),
-      lig: num(form.lig),
-      net: num(form.net),
-      metal: form.metal,
-      qty: 1,
-      ag: form.chem.ag || "-",
-      cu: form.chem.cu || "-",
-      chem: form.chem,
-      loc: `${form.sey}, ${form.polka}`,
-    }]);
-  };
-
-  return (
-    <Modal
-      title="Добавить позицию ДМ"
-      onClose={onClose}
-      footer={<>
-        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={add} disabled={!form.name || !form.nomenkl}>Добавить</Btn>
-      </>}
-    >
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        <Field label="Номенкл. номер"><Input value={form.nomenkl} onChange={v => setForm(f => ({ ...f, nomenkl: v }))} placeholder="DM-XXX" /></Field>
-        <Field label="Класс"><KlassSelect value={form.klass} onChange={v => setForm(f => ({ ...f, klass: v }))} /></Field>
-        <Field label="Код материала"><MaterialCodeSelect value={form.metal} onChange={v => setForm(f => ({ ...f, metal: v }))} /></Field>
-        <Field label="Наименование" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование позиции" /></Field>
-        <Field label="Проба"><Input value={form.proba} onChange={v => setForm(f => ({ ...f, proba: v }))} placeholder="999" /></Field>
-        <Field label="Лигат. вес г"><Input value={form.lig} onChange={v => setForm(f => ({ ...f, lig: v }))} placeholder="0.00" /></Field>
-        <Field label="Чистый вес г"><Input value={form.net} onChange={v => setForm(f => ({ ...f, net: v }))} placeholder="0.00" /></Field>
-        <Field label="Сейф"><Select value={form.sey} options={["Сейф №1", "Сейф №2", "Сейф №3"]} onChange={v => setForm(f => ({ ...f, sey: v }))} /></Field>
-        <Field label="Полка"><Select value={form.polka} options={["Полка А", "Полка Б", "Полка В"]} onChange={v => setForm(f => ({ ...f, polka: v }))} /></Field>
-      </div>
-      <ChemCompositionBlock value={form.chem} onChange={chem => setForm(f => ({ ...f, chem }))} />
-    </Modal>
-  );
-}
-
 // ── Добавить позицию возврата (из выдачи или новую) ───────────────────────────
 
-function VozvratPickModal({ vydacha, onClose, onAdd }: { vydacha: OperPosition[]; onClose: () => void; onAdd: (rows: Omit<OperPosition, "n">[]) => void }) {
+const DM_SKLAD = spravValues("Склады")[0] ?? "";
+
+function VozvratPickModal({ vydacha, view, onClose, onAdd }: {
+  vydacha: OperPosition[];
+  // Позиция операции в виде позиции склада ДМ (код материала, веса, статус)
+  view: (p: OperPosition) => DMPositionView;
+  onClose: () => void;
+  onAdd: (rows: Omit<OperPosition, "n">[]) => void;
+}) {
+  const { storageLocations } = useApp();
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [viewing, setViewing] = useState<OperPosition | null>(null);
+  const [search, setSearch] = useState("");
+  const [klass, setKlass] = useState(ALL_KLASS);
+  const [metal, setMetal] = useState(ALL_METALS);
+  const [loc, setLoc] = useState(ALL_LOCS);
+  const [onlySelected, setOnlySelected] = useState(false);
   const screen = useScreen();
   const showAddNew = screen.has("new-position");
   const setShowAddNew = (open: boolean) => (open ? screen.open("new-position") : screen.close("new-position"));
 
-  const toggle = (n: number) => {
-    setSelected(prev => {
-      const s = new Set(prev);
-      s.has(n) ? s.delete(n) : s.add(n);
-      return s;
-    });
-  };
+  const codeLabel = useMaterialCodeLabel();
+  const metals = [ALL_METALS, ...Array.from(new Set(vydacha.map(p => view(p).metal).filter(Boolean))).sort()];
+  const locations = [ALL_LOCS, ...Array.from(new Set(vydacha.map(p => p.loc))).sort()];
+
+  const filtered = vydacha.filter(p => {
+    const q = search.trim().toLowerCase();
+    return (!q || p.name.toLowerCase().includes(q) || p.nomenkl.toLowerCase().includes(q))
+      && (klass === ALL_KLASS || p.klass === klass)
+      && (metal === ALL_METALS || view(p).metal === metal)
+      && (loc === ALL_LOCS || p.loc === loc)
+      && (!onlySelected || selected.has(p.n));
+  });
+
+  const { sorted, sort, toggleSort } = useSort(filtered, {
+    nomenkl: p => p.nomenkl,
+    name: p => p.name,
+    qty: p => p.qty ?? 0,
+    klass: p => p.klass,
+    metal: p => codeLabel(view(p).metal),
+    proba: p => p.proba,
+    lig: p => view(p).ligWeight ?? 0,
+    net: p => view(p).netWeight ?? 0,
+    loc: p => p.loc,
+    status: p => view(p).status ?? "",
+  });
+
+  const allChecked = filtered.length > 0 && filtered.every(p => selected.has(p.n));
+  const toggle = (n: number) => setSelected(prev => {
+    const s = new Set(prev);
+    s.has(n) ? s.delete(n) : s.add(n);
+    return s;
+  });
+  const toggleAll = () => setSelected(prev => {
+    const s = new Set(prev);
+    if (allChecked) filtered.forEach(p => s.delete(p.n));
+    else filtered.forEach(p => s.add(p.n));
+    return s;
+  });
+
+  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setOnlySelected(false); };
 
   const addSelected = () => {
     const chosen = vydacha.filter(p => selected.has(p.n));
@@ -311,11 +311,36 @@ function VozvratPickModal({ vydacha, onClose, onAdd }: { vydacha: OperPosition[]
     onAdd(chosen.map(({ n, ...rest }) => rest));
   };
 
+  // Новая позиция — та же форма, что при приёме на склад ДМ
+  const addNew = (p: PrihodPosition) => {
+    const lig = num(p.lig);
+    const net = num(p.net);
+    onAdd([{
+      name: p.name,
+      nomenkl: p.nomenkl,
+      klass: p.klass,
+      proba: num(p.proba),
+      qty: parseInt(p.kol, 10) || 1,
+      ves: net || lig,
+      lig,
+      net,
+      metal: p.code,
+      ag: p.chem.ag || "-",
+      cu: p.chem.cu || "-",
+      chem: p.chem,
+      loc: locOf(p),
+    }]);
+    setShowAddNew(false);
+  };
+
+  const th = "px-3 py-2";
+  const dash = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v);
+
   return (
     <Modal
       title="Добавить позицию возврата"
       onClose={onClose}
-      wide
+      extraWide
       footer={<>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
         <Btn onClick={addSelected} disabled={selected.size === 0}>Добавить{selected.size > 0 ? ` (${selected.size})` : ""}</Btn>
@@ -323,37 +348,68 @@ function VozvratPickModal({ vydacha, onClose, onAdd }: { vydacha: OperPosition[]
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции из выдачи</h3>
-        <Btn size="sm" variant="secondary" onClick={() => setShowAddNew(true)}><Plus className="w-4 h-4" />Добавить новую</Btn>
+        <Btn size="sm" onClick={() => setShowAddNew(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
       </div>
 
-      {vydacha.length === 0 ? (
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 grid grid-cols-4 gap-3 items-end">
+        <div className="col-span-2">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Наименование / Номенкл. №</label>
+          <SearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
+        </div>
+        <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
+        <Field label="Код материала"><Select value={metal} options={metals} onChange={setMetal} optionLabel={v => (v === ALL_METALS ? v : codeLabel(v))} /></Field>
+        <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
+        <label className="flex items-center gap-2 text-sm text-gray-700 h-9 cursor-pointer">
+          <input type="checkbox" checked={onlySelected} onChange={e => setOnlySelected(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+          Только выбранные
+        </label>
+        <button onClick={reset} className="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+        <span>Найдено: {filtered.length} из {vydacha.length}</span>
+        <span>Выбрано: {selected.size}</span>
+      </div>
+
+      {filtered.length === 0 ? (
         <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-          В выдаче пока нет позиций
+          {vydacha.length === 0 ? "В выдаче пока нет позиций" : "Нет позиций по заданным фильтрам"}
         </div>
       ) : (
-        <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
+        <div className="max-h-96 overflow-auto border border-gray-200 rounded-lg">
           <table className="w-full text-sm">
-            <thead className="sticky top-0"><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <th className="w-10 px-3 py-2"></th>
-              <th className="px-3 py-2 text-left">Наименование</th>
-              <th className="px-3 py-2 text-left">Номенкл.№</th>
-              <th className="px-3 py-2 text-left">Класс</th>
-              <th className="px-3 py-2 text-left">Проба</th>
-              <th className="px-3 py-2 text-left">Вес г</th>
-              <th className="px-3 py-2 text-left">Размещение</th>
+            <thead className="sticky top-0 z-10"><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
+              <th className="w-10 px-3 py-2"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 accent-blue-600" title="Выбрать все найденные" /></th>
+              <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className={th}>Номенкл. №</SortTh>
+              <SortTh sortKey="name" sort={sort} onSort={toggleSort} className={th}>Наименование</SortTh>
+              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество</SortTh>
+              <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
+              <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
+              <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
+              <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Лигат. вес г</SortTh>
+              <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Чистый вес г</SortTh>
+              <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
+              <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
+              <th className="w-10"></th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {vydacha.map(p => {
+              {sorted.map(p => {
+                const v = view(p);
                 const checked = selected.has(p.n);
                 return (
                   <tr key={p.n} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
                     <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(p.n)} className="w-4 h-4 accent-blue-600" /></td>
-                    <td className="px-3 py-2 font-medium">{p.name}</td>
                     <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                    <td className="px-3 py-2 font-medium">{p.name}</td>
+                    <td className="px-3 py-2">{p.qty ?? "—"}</td>
                     <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
+                    <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
                     <td className="px-3 py-2">{p.proba}</td>
-                    <td className="px-3 py-2">{p.ves}</td>
+                    <td className="px-3 py-2">{dash(v.ligWeight)}</td>
+                    <td className="px-3 py-2">{dash(v.netWeight)}</td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
+                    <td className="px-3 py-2">{v.status ? <Badge label={v.status} /> : <span className="text-gray-400">—</span>}</td>
+                    <td className="px-3 py-2"><EyeIcon onClick={() => setViewing(p)} /></td>
                   </tr>
                 );
               })}
@@ -362,10 +418,14 @@ function VozvratPickModal({ vydacha, onClose, onAdd }: { vydacha: OperPosition[]
         </div>
       )}
 
+      {viewing && <DMPositionViewModal item={view(viewing)} onClose={() => setViewing(null)} />}
       {showAddNew && (
-        <NewDMPositionModal
+        <PositionModal
+          mode="add"
+          sklad={DM_SKLAD}
+          initial={emptyPosition(storageLocations, DM_SKLAD, "Слиток", "1000")}
           onClose={() => setShowAddNew(false)}
-          onAdd={rows => { onAdd(rows); setShowAddNew(false); }}
+          onSave={addNew}
         />
       )}
     </Modal>
@@ -1370,6 +1430,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       {showVozvratPick && (
         <VozvratPickModal
           vydacha={vydacha}
+          view={posView}
           onClose={() => setShowVozvratPick(false)}
           onAdd={rows => { appendPositions("vozvrat", rows); setShowVozvratPick(false); show("Позиции возврата добавлены"); }}
         />
