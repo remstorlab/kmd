@@ -10,7 +10,7 @@ import { Eye, Plus, Paperclip } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
-import { PositionModal, PrihodPosition, emptyPosition, locOf } from "../components/PrihodDocModal";
+import DMPositionFormModal, { PrihodPosition, emptyPosition, locOf } from "../components/DMPositionFormModal";
 
 // ── Списание разницы modal ────────────────────────────────────────────────────
 
@@ -245,8 +245,10 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
 
 const DM_SKLAD = spravValues("Склады")[0] ?? "";
 
-function VozvratPickModal({ vydacha, view, onClose, onAdd }: {
+function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
   vydacha: OperPosition[];
+  // Номенклатурные номера позиций операции — новая позиция получает следующий свободный
+  reservedNomenkl: string[];
   // Позиция операции в виде позиции склада ДМ (код материала, веса, статус)
   view: (p: OperPosition) => DMPositionView;
   onClose: () => void;
@@ -420,10 +422,11 @@ function VozvratPickModal({ vydacha, view, onClose, onAdd }: {
 
       {viewing && <DMPositionViewModal item={view(viewing)} onClose={() => setViewing(null)} />}
       {showAddNew && (
-        <PositionModal
+        <DMPositionFormModal
           mode="add"
           sklad={DM_SKLAD}
           initial={emptyPosition(storageLocations, DM_SKLAD, "Слиток", "1000")}
+          reservedNomenkl={reservedNomenkl}
           onClose={() => setShowAddNew(false)}
           onSave={addNew}
         />
@@ -1334,6 +1337,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       {showVozvratPick && (
         <VozvratPickModal
           vydacha={vydacha}
+          reservedNomenkl={[...vydacha, ...vozvrat].map(p => p.nomenkl)}
           view={posView}
           onClose={() => setShowVozvratPick(false)}
           onAdd={rows => { appendPositions("vozvrat", rows); setShowVozvratPick(false); show("Позиции возврата добавлены"); }}

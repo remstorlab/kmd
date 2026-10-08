@@ -10,6 +10,7 @@ import { Gem, Coins, Plus } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
 import DMPositionViewModal from "../components/DMPositionViewModal";
+import { useNextNomenkl } from "../components/DMPositionFormModal";
 import { useScreen } from "../router";
 
 // Приведение позиций между учётами ГП и ДМ — для разделения складов по классу материала.
@@ -321,6 +322,7 @@ export function OstatokDM() {
     });
   };
 
+  const genNomenkl = useNextNomenkl();
   // Закрытые (выданные) позиции в объединении не участвуют
   const selectedItems = skladItems.filter(it => selected.has(it.id) && it.status !== "Закрыта");
   // Экран объединения, открытый по прямой ссылке без выбора, показывает первые две доступные позиции
@@ -336,7 +338,7 @@ export function OstatokDM() {
     const merged: DMItem = {
       id: `dm-merged-${Date.now()}`,
       name: `Объединённая позиция (${selectedItems.length} ед.)`,
-      nomenkl: `DM-M${Date.now().toString().slice(-4)}`,
+      nomenkl: genNomenkl(),
       metal: selectedItems[0].metal,
       klass: "Слиток",
       qty: totalQty,

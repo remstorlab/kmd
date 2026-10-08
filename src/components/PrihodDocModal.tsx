@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
-  Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort,
+  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort,
 } from "./ui";
-import { SkladDoc, DocStatus, StorageLocation, ChemComposition, spravochniki } from "../data/mock";
-import ChemCompositionBlock from "./ChemCompositionBlock";
+import { SkladDoc, DocStatus, spravochniki } from "../data/mock";
+import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
 import { useApp } from "../store/AppContext";
 import { Plus } from "lucide-react";
 import { useScreen } from "../router";
@@ -15,98 +15,6 @@ import { useScreen } from "../router";
 type PrihodDocType = "Приходный ордер" | "Накладная";
 
 const SKLADY = spravochniki["Склады"].items.map(i => i.value);
-
-export interface PrihodPosition {
-  id: string;
-  nomenkl: string;
-  name: string;
-  klass: string;
-  code: string;
-  kol: string;
-  unit: string;
-  proba: string;
-  lig: string;
-  net: string;
-  seyf: string;
-  polka: string;
-  chem: ChemComposition;
-}
-
-export const locOf = (p: PrihodPosition) => (p.polka ? `Сейф ${p.seyf}/Полка ${p.polka}` : p.seyf ? `Сейф ${p.seyf}` : "—");
-
-// Места хранения склада из справочника «Места хранения»
-const seyfsOf = (locs: StorageLocation[], sklad: string) =>
-  Array.from(new Set(locs.filter(l => l.sklad === sklad && l.available).map(l => l.seyfNum)));
-const polkasOf = (locs: StorageLocation[], sklad: string, seyf: string) =>
-  locs.filter(l => l.sklad === sklad && l.seyfNum === seyf && l.available && l.polkaNum).map(l => l.polkaNum);
-
-let posSeq = 0;
-const newPosId = () => `pp-${Date.now()}-${posSeq++}`;
-
-export function emptyPosition(locs: StorageLocation[], sklad: string, klass: string, code: string): PrihodPosition {
-  const seyf = seyfsOf(locs, sklad)[0] ?? "";
-  return {
-    id: newPosId(), nomenkl: "", name: "", klass, code, kol: "1", unit: "шт", proba: "999", lig: "", net: "",
-    seyf, polka: polkasOf(locs, sklad, seyf)[0] ?? "", chem: {},
-  };
-}
-
-// ── Позиция: добавление / просмотр / редактирование (с химическим составом) ──
-
-export function PositionModal({ mode, sklad, initial, onClose, onSave }: {
-  mode: "add" | "edit" | "view";
-  sklad: string;
-  initial: PrihodPosition;
-  onClose: () => void;
-  onSave: (p: PrihodPosition) => void;
-}) {
-  const ro = mode === "view";
-  const { storageLocations: locs } = useApp();
-  const [form, setForm] = useState(initial);
-  const set = (k: Exclude<keyof PrihodPosition, "chem">) => (v: string) => setForm(f => ({ ...f, [k]: v }));
-
-  const seyfs = seyfsOf(locs, sklad);
-  const seyfOptions = form.seyf && !seyfs.includes(form.seyf) ? [form.seyf, ...seyfs] : seyfs;
-  const polkas = polkasOf(locs, sklad, form.seyf);
-  const polkaOptions = form.polka && !polkas.includes(form.polka) ? [form.polka, ...polkas] : polkas;
-
-  const changeSeyf = (seyf: string) => setForm(f => ({ ...f, seyf, polka: polkasOf(locs, sklad, seyf)[0] ?? "" }));
-
-  const canSave = !!form.name.trim() && !!form.nomenkl.trim();
-  const title = mode === "add" ? "Добавить позицию ДМ" : mode === "edit" ? "Редактирование позиции ДМ" : "Просмотр позиции ДМ";
-
-  return (
-    <Modal
-      title={title}
-      onClose={onClose}
-      wide
-      footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : <>
-        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={() => onSave(form)} disabled={!canSave}>{mode === "add" ? "Добавить" : "Сохранить"}</Btn>
-      </>}
-    >
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        <Field label="Номенкл. номер"><Input value={form.nomenkl} onChange={set("nomenkl")} placeholder="НН-XXXXX" disabled={ro} /></Field>
-        <Field label="Класс"><KlassSelect value={form.klass} onChange={set("klass")} disabled={ro} /></Field>
-        <Field label="Код материала"><MaterialCodeSelect value={form.code} onChange={set("code")} disabled={ro} /></Field>
-        <Field label="Наименование" full><Input value={form.name} onChange={set("name")} placeholder="Наименование позиции" disabled={ro} /></Field>
-        <Field label="Количество"><Input value={form.kol} onChange={set("kol")} placeholder="1" disabled={ro} /></Field>
-        <Field label="Ед. изм."><Select value={form.unit} options={["шт", "г", "кг"]} onChange={set("unit")} disabled={ro} /></Field>
-        <Field label="Проба"><Input value={form.proba} onChange={set("proba")} placeholder="999" disabled={ro} /></Field>
-        <Field label="Масса лигатурная, г"><Input value={form.lig} onChange={set("lig")} placeholder="0.00" disabled={ro} /></Field>
-        <Field label="Масса чистая, г"><Input value={form.net} onChange={set("net")} placeholder="0.00" disabled={ro} /></Field>
-        <Field label="Склад"><Input value={sklad} disabled /></Field>
-        <Field label="Сейф">
-          {seyfOptions.length ? <Select value={form.seyf} options={seyfOptions} onChange={changeSeyf} disabled={ro} /> : <Input value="Нет свободных мест" disabled />}
-        </Field>
-        <Field label="Полка">
-          {polkaOptions.length ? <Select value={form.polka} options={polkaOptions} onChange={set("polka")} disabled={ro} /> : <Input value="—" disabled />}
-        </Field>
-      </div>
-      <ChemCompositionBlock value={form.chem} onChange={chem => setForm(f => ({ ...f, chem }))} disabled={ro} />
-    </Modal>
-  );
-}
 
 // ── Документ прихода ─────────────────────────────────────────────────────────
 
@@ -164,12 +72,12 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
 
   // Позиции
   const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>([
-    { id: "po-1", nomenkl: "НН-72101", name: "Слиток золотой стандартный", klass: "Слиток", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "1000.0", net: "999.9", seyf: "1", polka: "1", chem: { au: "999.9" } },
-    { id: "po-2", nomenkl: "НН-72102", name: "Слиток серебряный", klass: "Слиток", code: "2000", kol: "1", unit: "шт", proba: "925.0", lig: "318.6", net: "294.7", seyf: "2", polka: "1", chem: { ag: "294.7" } },
+    { id: "po-1", nomenkl: "5015301", name: "Слиток золотой стандартный", klass: "Слиток", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "1000.0", net: "999.9", seyf: "1", polka: "1", chem: { au: "999.9" } },
+    { id: "po-2", nomenkl: "5015302", name: "Слиток серебряный", klass: "Слиток", code: "2000", kol: "1", unit: "шт", proba: "925.0", lig: "318.6", net: "294.7", seyf: "2", polka: "1", chem: { ag: "294.7" } },
   ]);
   const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>([
-    { id: "pn-1", nomenkl: "AU-SL-12000", name: "Монета Атамекен", klass: "Готовая продукция", code: "2000", kol: "2000", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "1", chem: {} },
-    { id: "pn-2", nomenkl: "AU-SL-01000", name: "Орден Алтын алка", klass: "Готовая продукция", code: "2000", kol: "300", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "2", chem: {} },
+    { id: "pn-1", nomenkl: "5015303", name: "Монета Атамекен", klass: "Готовая продукция", code: "2000", kol: "2000", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "1", chem: {} },
+    { id: "pn-2", nomenkl: "5015304", name: "Орден Алтын алка", klass: "Готовая продукция", code: "2000", kol: "300", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "2", chem: {} },
   ]);
 
   const positions = isOrder ? orderPositions : nakladPositions;
@@ -344,11 +252,12 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
       </div>
 
       {posModal && (
-        <PositionModal
+        <DMPositionFormModal
           key={posModal.mode === "add" ? "add" : posModal.pos.id + posModal.mode}
           mode={posModal.mode}
           sklad={sklad}
           initial={posModal.pos}
+          reservedNomenkl={[...orderPositions, ...nakladPositions].map(p => p.nomenkl)}
           onClose={closePos}
           onSave={savePos}
         />
