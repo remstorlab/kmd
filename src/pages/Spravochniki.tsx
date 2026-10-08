@@ -8,7 +8,7 @@ import {
 import { spravochniki, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
-import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, LucideIcon } from "lucide-react";
+import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 
@@ -22,6 +22,7 @@ const DICT_SLUG: Record<SpravKey, string> = {
   "Типы операций": "tipy-operaciy",
   "Виды операций": "vidy-operaciy",
   "Склады": "sklady",
+  "Технологические операции": "tehnologicheskie-operacii",
 };
 export const SPRAV_SLUGS = {
   ...DICT_SLUG,
@@ -56,10 +57,17 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Типы операций": Settings2,
   "Виды операций": Layers,
   "Склады": Warehouse,
+  "Технологические операции": Wrench,
+};
+
+// Подпись поля «Значение» для справочников, где оно называется иначе
+const VALUE_LABEL: Partial<Record<SpravKey, string>> = {
+  "Технологические операции": "Наименование",
 };
 
 function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const dict = spravochniki[name];
+  const valueLabel = VALUE_LABEL[name] ?? "Значение";
   const [items, setItems] = useState(dict.items);
   const [form, setForm] = useState({ code: "", value: "", status: "Активно" });
   const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.code);
@@ -107,7 +115,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
             <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
-            <SortTh sortKey="value" sort={sort} onSort={toggleSort}>Значение</SortTh>
+            <SortTh sortKey="value" sort={sort} onSort={toggleSort}>{valueLabel}</SortTh>
             <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
             <th className="w-12"></th>
           </tr></thead>
@@ -137,7 +145,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
         >
           <div className="space-y-4">
             <Field label="Код"><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} /></Field>
-            <Field label="Значение"><Input value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} /></Field>
+            <Field label={valueLabel}><Input value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} /></Field>
             <Field label="Статус"><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>
           </div>
         </Modal>

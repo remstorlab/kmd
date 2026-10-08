@@ -6,7 +6,7 @@ import {
   Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
 } from "../components/ui";
 import { Operation, OperPosition, OperStage, ShihtovayaKarta, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
-import { Eye, Plus, Paperclip, Upload, Download, X } from "lucide-react";
+import { Eye, Plus, Paperclip } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
@@ -467,16 +467,13 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
 
 // ── Списание потерь ───────────────────────────────────────────────────────────
 
-type SpisanieDoc = { id: string; name: string; size: number; uploaded: string };
-// doc — документ-основание, прикреплённый к конкретной строке потерь (акт, скан взвешивания и т.п.).
-type LossRow = { id: string; date: string; name: string; ves: string; doc?: SpisanieDoc };
+// name — технологическая операция из справочника «Технологические операции»
+type LossRow = { id: string; date: string; name: string; ves: string };
 
-const lossNames = ["Угар", "Обрезь", "Высечка", "Опилки", "Стружка", "Шлиф-пыль", "Смывы (травление)", "Безвозвратные потери"];
 const docAccept = ".pdf,.doc,.docx,.jpg,.jpeg,.png,.tif,.tiff";
 
 const num = (s: string) => parseFloat(String(s).replace(",", ".")) || 0;
 const fmt = (v: number) => v.toFixed(2);
-const nowStr = () => new Date().toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 const uid = () => Math.random().toString(36).slice(2, 9);
 // Дата строки потерь хранится в ISO (yyyy-mm-dd) для <input type="date">, показывается в формате ru-RU.
 const todayIso = () => {
@@ -486,80 +483,35 @@ const todayIso = () => {
 const isoToRu = (iso: string) => (iso ? iso.split("-").reverse().join(".") : "");
 const newLoss = (): LossRow => ({ id: uid(), date: todayIso(), name: "", ves: "" });
 
-const fmtSize = (b: number) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
-const seedDoc: SpisanieDoc = { id: "d1", name: "Служебная_записка_потери_18082026.pdf", size: 236_000, uploaded: "18.08.2026, 16:20" };
+// Документы списания демо-операции «Производство ГП»
+const seedSpisanieFiles = () => [new File([], "Служебная_записка_потери_18082026.pdf"), new File([], "Акт_списания_18082026.pdf")];
 const seedGpLosses: LossRow[] = [
-  { id: "l1", date: "2026-08-18", name: "Угар", ves: "0.35",
-    doc: { id: "ld1", name: "Акт_списания_угар_18082026.pdf", size: 412_000, uploaded: "18.08.2026, 16:05" } },
-  { id: "l2", date: "2026-08-18", name: "Обрезь", ves: "0.80" },
-  { id: "l3", date: "2026-08-18", name: "Опилки", ves: "0.60" },
-  { id: "l4", date: "2026-08-18", name: "Шлиф-пыль", ves: "0.15",
-    doc: { id: "ld2", name: "Скан_взвешивание_шлиф.jpg", size: 1_850_000, uploaded: "18.08.2026, 10:52" } },
+  { id: "l1", date: "2026-08-18", name: "Прокат, отжиг, травление", ves: "0.35" },
+  { id: "l2", date: "2026-08-18", name: "Вырубка и обрубка", ves: "0.80" },
+  { id: "l3", date: "2026-08-18", name: "Чеканка", ves: "0.60" },
+  { id: "l4", date: "2026-08-18", name: "Полирование", ves: "0.15" },
 ];
 
 const sumLosses = (losses: LossRow[], pred: (l: LossRow) => boolean = () => true) =>
   losses.filter(pred).reduce((a, l) => a + num(l.ves), 0);
 
-function LossDocCell({ doc, readOnly, onChange, onDownload }: {
-  doc?: SpisanieDoc;
-  readOnly: boolean;
-  onChange: (d: SpisanieDoc | undefined) => void;
-  onDownload: (d: SpisanieDoc) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const pick = (list: FileList | null) => {
-    const f = list?.[0];
-    if (!f) return;
-    onChange({ id: uid(), name: f.name, size: f.size, uploaded: nowStr() });
-    if (inputRef.current) inputRef.current.value = "";
-  };
-
-  if (doc) {
-    return (
-      <div className="flex items-center gap-1 min-w-0 px-2 py-1 border border-gray-200 rounded-lg bg-gray-50">
-        <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-        <button onClick={() => onDownload(doc)} className="truncate text-xs text-blue-600 hover:underline text-left" title={`${doc.name} · ${fmtSize(doc.size)}`}>
-          {doc.name}
-        </button>
-        {!readOnly && (
-          <button onClick={() => onChange(undefined)} className="ml-auto text-gray-400 hover:text-red-600 shrink-0 p-0.5" title="Открепить">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
-    );
-  }
-  if (readOnly) return <span className="text-xs text-gray-400">—</span>;
-  return (
-    <>
-      <input ref={inputRef} type="file" accept={docAccept} className="hidden" onChange={e => pick(e.target.files)} />
-      <button
-        onClick={() => inputRef.current?.click()}
-        className="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 border border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
-      >
-        <Paperclip className="w-3.5 h-3.5" />Прикрепить
-      </button>
-    </>
-  );
-}
-
-function LossTable({ losses, readOnly, onChange, onDownload }: {
+function LossTable({ losses, readOnly, onChange }: {
   losses: LossRow[];
   readOnly: boolean;
   onChange: (rows: LossRow[]) => void;
-  onDownload: (d: SpisanieDoc) => void;
 }) {
   const upd = (id: string, patch: Partial<LossRow>) => onChange(losses.map(l => (l.id === id ? { ...l, ...patch } : l)));
+  const techOps = spravValues("Технологические операции");
+  // Пустой вариант — «не выбрано»; значение не из справочника (устаревшее) сохраняется в списке
+  const opOptions = (v: string) => ["", ...(v && !techOps.includes(v) ? [v] : []), ...techOps];
   return (
     <>
-      <datalist id="loss-names">{lossNames.map(n => <option key={n} value={n} />)}</datalist>
       <table className="w-full text-sm">
         <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
           <th className="px-3 py-2 text-left w-10">№</th>
           <th className="px-3 py-2 text-left w-44">Дата</th>
           <th className="px-3 py-2 text-left">Наименование потерь</th>
           <th className="px-3 py-2 text-left w-32">Вес потерь, г</th>
-          <th className="px-3 py-2 text-left w-48">Документ</th>
           {!readOnly && <th className="w-10"></th>}
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
@@ -576,24 +528,14 @@ function LossTable({ losses, readOnly, onChange, onDownload }: {
                 />
               </td>
               <td className="px-3 py-1.5">
-                <input
-                  list="loss-names"
-                  value={l.name}
-                  onChange={e => upd(l.id, { name: e.target.value })}
-                  disabled={readOnly}
-                  placeholder="Выберите или введите"
-                  className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
-                />
+                <Select value={l.name} options={opOptions(l.name)} onChange={v => upd(l.id, { name: v })} optionLabel={v => v || "Выберите операцию"} disabled={readOnly} />
               </td>
               <td className="px-3 py-1.5"><Input value={l.ves} onChange={v => upd(l.id, { ves: v })} placeholder="0.00" disabled={readOnly} /></td>
-              <td className="px-3 py-1.5 max-w-48">
-                <LossDocCell doc={l.doc} readOnly={readOnly} onChange={d => upd(l.id, { doc: d })} onDownload={onDownload} />
-              </td>
               {!readOnly && <td className="px-2 py-1.5"><DeleteIcon onClick={() => onChange(losses.filter(x => x.id !== l.id))} /></td>}
             </tr>
           ))}
           {losses.length === 0 && (
-            <tr><td colSpan={6} className="px-3 py-3 text-center text-xs text-gray-400">Потери не указаны</td></tr>
+            <tr><td colSpan={5} className="px-3 py-3 text-center text-xs text-gray-400">Потери не указаны</td></tr>
           )}
         </tbody>
       </table>
@@ -609,66 +551,29 @@ function LossTable({ losses, readOnly, onChange, onDownload }: {
   );
 }
 
-function SpisanieDocBlock({ doc, setDoc, readOnly, onDownload }: {
-  doc: SpisanieDoc | null;
-  setDoc: (d: SpisanieDoc | null) => void;
+function SpisanieDocBlock({ files, setFiles, readOnly }: {
+  files: File[];
+  setFiles: (f: File[]) => void;
   readOnly: boolean;
-  onDownload: (d: SpisanieDoc) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [drag, setDrag] = useState(false);
-
-  const pick = (list: FileList | null) => {
-    const f = list?.[0];
-    if (!f) return;
-    setDoc({ id: uid(), name: f.name, size: f.size, uploaded: nowStr() });
-    if (inputRef.current) inputRef.current.value = "";
-  };
-
   return (
     <div className="mt-6 border border-gray-200 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200">
-        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Документ списания</span>
-        <span className="text-xs text-gray-400">Общий документ по списанию потерь</span>
+        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Документы списания</span>
+        <span className="text-xs text-gray-400">Общие документы по списанию потерь</span>
       </div>
       <div className="p-4">
-        {doc ? (
-          <div className="flex items-center gap-3 text-sm">
-            <Paperclip className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="truncate text-gray-800 min-w-0" title={doc.name}>{doc.name}</span>
-            <span className="text-gray-500 shrink-0">Загружен: {doc.uploaded}</span>
-            <div className="ml-auto flex items-center shrink-0">
-              <button onClick={() => onDownload(doc)} className="text-gray-400 hover:text-blue-600 transition-colors p-1" title="Скачать"><Download className="w-4 h-4" /></button>
-              {!readOnly && <DeleteIcon onClick={() => setDoc(null)} />}
-            </div>
-          </div>
-        ) : readOnly ? (
-          <span className="text-sm text-gray-400">Документ не прикреплён</span>
-        ) : (
-          <div
-            onClick={() => inputRef.current?.click()}
-            onDragOver={e => { e.preventDefault(); setDrag(true); }}
-            onDragLeave={() => setDrag(false)}
-            onDrop={e => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files); }}
-            className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${drag ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"}`}
-          >
-            <input ref={inputRef} type="file" accept={docAccept} className="hidden" onChange={e => pick(e.target.files)} />
-            <Upload className="w-6 h-6 mx-auto mb-2 text-gray-400" />
-            <p className="text-sm text-gray-600">Перетащите файл сюда или <span className="text-blue-600 font-medium">выберите на компьютере</span></p>
-            <p className="text-xs text-gray-400 mt-1">PDF, DOC/DOCX, JPG, PNG, TIFF — до 10 МБ</p>
-          </div>
-        )}
+        <MultiFileUpload files={files} onChange={setFiles} accept={docAccept} disabled={readOnly} />
       </div>
     </div>
   );
 }
 
-function SpisanieTab({ losses, setLosses, doc, setDoc, vesStart, readOnly, onDownload }: {
+function SpisanieTab({ losses, setLosses, files, setFiles, vesStart, readOnly }: {
   losses: LossRow[];
   setLosses: React.Dispatch<React.SetStateAction<LossRow[]>>;
-  doc: SpisanieDoc | null;
-  setDoc: (d: SpisanieDoc | null) => void;
-  onDownload: (d: SpisanieDoc) => void;
+  files: File[];
+  setFiles: (f: File[]) => void;
   vesStart: number;
   readOnly: boolean;
 }) {
@@ -691,9 +596,9 @@ function SpisanieTab({ losses, setLosses, doc, setDoc, vesStart, readOnly, onDow
         ))}
       </div>
 
-      <LossTable losses={losses} readOnly={readOnly} onChange={rows => setLosses(rows)} onDownload={onDownload} />
+      <LossTable losses={losses} readOnly={readOnly} onChange={rows => setLosses(rows)} />
 
-      <SpisanieDocBlock doc={doc} setDoc={setDoc} readOnly={readOnly} onDownload={onDownload} />
+      <SpisanieDocBlock files={files} setFiles={setFiles} readOnly={readOnly} />
     </>
   );
 }
@@ -1086,7 +991,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [vydacha, setVydacha] = useState<OperPosition[]>(() => op?.vydachaPos ?? (op ? vydachaPositions : []));
   const [vozvrat, setVozvrat] = useState<OperPosition[]>(() => op?.vozvratPos ?? (op && phase !== "vydacha" && stage !== "Выдано" ? vozvratPositions : []));
   const [losses, setLosses] = useState<LossRow[]>(() => (op?.vid === "Производство ГП" ? seedGpLosses : [newLoss()]));
-  const [spisanieDoc, setSpisanieDoc] = useState<SpisanieDoc | null>(() => (op?.vid === "Производство ГП" ? seedDoc : null));
+  const [spisanieFiles, setSpisanieFiles] = useState<File[]>(() => (op?.vid === "Производство ГП" ? seedSpisanieFiles() : []));
   // Вложенные экраны: …/spisanie-raznicy, …/add-position, …/vozvrat-pick, …/shihta-pick
   const screen = useScreen();
   const nested = (name: string) => [screen.has(name), (open: boolean) => (open ? screen.open(name) : screen.close(name))] as const;
@@ -1336,9 +1241,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <SpisanieTab
           losses={losses}
           setLosses={setLosses}
-          doc={spisanieDoc}
-          setDoc={setSpisanieDoc}
-          onDownload={d => show(`Загрузка файла «${d.name}»...`)}
+          files={spisanieFiles}
+          setFiles={setSpisanieFiles}
           vesStart={vesVydacha}
           readOnly={vozvratRo}
         />
@@ -1394,7 +1298,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                 <div className="text-xs font-semibold text-gray-500 uppercase mt-4 mb-2">Списание потерь</div>
                 {losses.filter(l => num(l.ves) > 0).map(l => (
                   <div key={l.id} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-                    <div className="text-sm text-gray-900">{l.name || "Без наименования"} <span className="text-gray-400 text-xs">{isoToRu(l.date)}{l.doc && <Paperclip className="inline w-3 h-3 ml-1 -mt-0.5" />}</span></div>
+                    <div className="text-sm text-gray-900">{l.name || "Без наименования"} <span className="text-gray-400 text-xs">{isoToRu(l.date)}</span></div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-gray-600">{l.ves} г</span>
                       <Badge label="Списано" />
