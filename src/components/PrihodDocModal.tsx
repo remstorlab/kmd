@@ -260,6 +260,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
           reservedNomenkl={[...orderPositions, ...nakladPositions].map(p => p.nomenkl)}
           onClose={closePos}
           onSave={savePos}
+          onSaveMany={ps => { setPositions(prev => [...prev, ...ps]); show(`Добавлено позиций: ${ps.length}`); closePos(); }}
         />
       )}
       {toast && <Toast message={toast} onDone={clear} />}

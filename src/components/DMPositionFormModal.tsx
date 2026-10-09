@@ -56,7 +56,7 @@ export function emptyPosition(locs: StorageLocation[], sklad: string, klass: str
   };
 }
 
-export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave }: {
+export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany }: {
   mode: "add" | "edit" | "view";
   sklad: string;
   initial: PrihodPosition;
@@ -64,6 +64,9 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   reservedNomenkl?: string[];
   onClose: () => void;
   onSave: (p: PrihodPosition) => void;
+  // Добавление нескольких одинаковых позиций: номенклатурный номер +1 у каждой, остальные атрибуты те же.
+  // Если не передан — признак «Добавить несколько одинаковых» не показывается.
+  onSaveMany?: (ps: PrihodPosition[]) => void;
 }) {
   const ro = mode === "view";
   const { storageLocations: locs } = useApp();
@@ -79,7 +82,23 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
 
   const changeSeyf = (seyf: string) => setForm(f => ({ ...f, seyf, polka: polkasOf(locs, sklad, seyf)[0] ?? "" }));
 
-  const canSave = !!form.name.trim() && !!form.nomenkl.trim();
+  const [many, setMany] = useState(false);
+  const [manyCount, setManyCount] = useState("2");
+  const canMany = mode === "add" && !!onSaveMany;
+  const count = parseInt(manyCount, 10) || 0;
+  const badCount = canMany && many && (count < 2 || count > 100);
+  const canSave = !!form.name.trim() && !!form.nomenkl.trim() && !badCount;
+
+  const save = () => {
+    if (!canSave) return;
+    if (canMany && many && onSaveMany) {
+      const first = Number(form.nomenkl);
+      onSaveMany(Array.from({ length: count }, (_, i) => ({
+        ...form, chem: { ...form.chem }, id: `${form.id}-${i + 1}`, nomenkl: String(first + i),
+      })));
+    } else onSave(form);
+  };
+  const lastNomenkl = String(Number(form.nomenkl) + Math.max(count, 1) - 1);
   const title = mode === "add" ? "Добавить позицию ДМ" : mode === "edit" ? "Редактирование позиции ДМ" : "Просмотр позиции ДМ";
 
   return (
@@ -89,7 +108,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
       wide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : <>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={() => onSave(form)} disabled={!canSave}>{mode === "add" ? "Добавить" : "Сохранить"}</Btn>
+        <Btn onClick={save} disabled={!canSave}>{mode === "add" ? (canMany && many && count >= 2 ? `Добавить (${count})` : "Добавить") : "Сохранить"}</Btn>
       </>}
     >
       <div className="grid grid-cols-3 gap-4 mb-4">
@@ -111,6 +130,31 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         </Field>
       </div>
       <ChemCompositionBlock value={form.chem} onChange={chem => setForm(f => ({ ...f, chem }))} disabled={ro} />
+      {canMany && (
+        <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <div className="flex items-center gap-4 flex-wrap">
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={many} onChange={e => setMany(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+              Добавить несколько одинаковых
+            </label>
+            {many && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Количество позиций</span>
+                <div className={`w-24 ${badCount ? "rounded-lg ring-1 ring-red-400" : ""}`}>
+                  <Input value={manyCount} onChange={v => setManyCount(v.replace(/[^\d]/g, ""))} placeholder="2" />
+                </div>
+              </div>
+            )}
+          </div>
+          {many && (
+            <div className={`text-xs mt-2 ${badCount ? "text-red-600" : "text-gray-500"}`}>
+              {badCount
+                ? "Укажите количество позиций от 2 до 100"
+                : `Будет создано ${count} позиций с одинаковыми атрибутами, номенкл. номера ${form.nomenkl} – ${lastNomenkl}`}
+            </div>
+          )}
+        </div>
+      )}
     </Modal>
   );
 }

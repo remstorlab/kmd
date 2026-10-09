@@ -241,12 +241,11 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
   );
 }
 
-// ── Добавить позицию возврата (из выдачи или новую) ───────────────────────────
+// ── Добавить позицию возврата: новые позиции, созданные кнопкой «Добавить позицию» ──
 
 const DM_SKLAD = spravValues("Склады")[0] ?? "";
 
-function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
-  vydacha: OperPosition[];
+function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
   // Номенклатурные номера позиций операции — новая позиция получает следующий свободный
   reservedNomenkl: string[];
   // Позиция операции в виде позиции склада ДМ (код материала, веса, статус)
@@ -255,6 +254,8 @@ function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
   onAdd: (rows: Omit<OperPosition, "n">[]) => void;
 }) {
   const { storageLocations } = useApp();
+  // Позиции, созданные в этой модалке; n — локальный номер строки
+  const [created, setCreated] = useState<OperPosition[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [viewing, setViewing] = useState<OperPosition | null>(null);
   const [search, setSearch] = useState("");
@@ -267,10 +268,10 @@ function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
   const setShowAddNew = (open: boolean) => (open ? screen.open("new-position") : screen.close("new-position"));
 
   const codeLabel = useMaterialCodeLabel();
-  const metals = [ALL_METALS, ...Array.from(new Set(vydacha.map(p => view(p).metal).filter(Boolean))).sort()];
-  const locations = [ALL_LOCS, ...Array.from(new Set(vydacha.map(p => p.loc))).sort()];
+  const metals = [ALL_METALS, ...Array.from(new Set(created.map(p => view(p).metal).filter(Boolean))).sort()];
+  const locations = [ALL_LOCS, ...Array.from(new Set(created.map(p => p.loc))).sort()];
 
-  const filtered = vydacha.filter(p => {
+  const filtered = created.filter(p => {
     const q = search.trim().toLowerCase();
     return (!q || p.name.toLowerCase().includes(q) || p.nomenkl.toLowerCase().includes(q))
       && (klass === ALL_KLASS || p.klass === klass)
@@ -308,16 +309,17 @@ function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
   const reset = () => { setSearch(""); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setOnlySelected(false); };
 
   const addSelected = () => {
-    const chosen = vydacha.filter(p => selected.has(p.n));
+    const chosen = created.filter(p => selected.has(p.n));
     if (chosen.length === 0) return;
     onAdd(chosen.map(({ n, ...rest }) => rest));
   };
 
-  // Новая позиция — та же форма, что при приёме на склад ДМ
-  const addNew = (p: PrihodPosition) => {
+  // Новая позиция — та же форма, что при приёме на склад ДМ; добавленные позиции сразу отмечены
+  const toOper = (p: PrihodPosition, n: number): OperPosition => {
     const lig = num(p.lig);
     const net = num(p.net);
-    onAdd([{
+    return {
+      n,
       name: p.name,
       nomenkl: p.nomenkl,
       klass: p.klass,
@@ -331,8 +333,18 @@ function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
       cu: p.chem.cu || "-",
       chem: p.chem,
       loc: locOf(p),
-    }]);
+    };
+  };
+  const addNew = (ps: PrihodPosition[]) => {
+    const maxN = created.reduce((m, p) => Math.max(m, p.n), 0);
+    const rows = ps.map((p, i) => toOper(p, maxN + i + 1));
+    setCreated(prev => [...prev, ...rows]);
+    setSelected(prev => new Set([...prev, ...rows.map(r => r.n)]));
     setShowAddNew(false);
+  };
+  const removeCreated = (n: number) => {
+    setCreated(prev => prev.filter(p => p.n !== n));
+    setSelected(prev => { const s = new Set(prev); s.delete(n); return s; });
   };
 
   const th = "px-3 py-2";
@@ -349,7 +361,7 @@ function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
       </>}
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции из выдачи</h3>
+        <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Новые позиции возврата</h3>
         <Btn size="sm" onClick={() => setShowAddNew(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
       </div>
 
@@ -369,13 +381,13 @@ function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
       </div>
 
       <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-        <span>Найдено: {filtered.length} из {vydacha.length}</span>
+        <span>Найдено: {filtered.length} из {created.length}</span>
         <span>Выбрано: {selected.size}</span>
       </div>
 
       {filtered.length === 0 ? (
         <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-          {vydacha.length === 0 ? "В выдаче пока нет позиций" : "Нет позиций по заданным фильтрам"}
+          {created.length === 0 ? "Позиции не добавлены. Нажмите «+ Добавить позицию»" : "Нет позиций по заданным фильтрам"}
         </div>
       ) : (
         <div className="max-h-96 overflow-auto border border-gray-200 rounded-lg">
@@ -392,7 +404,7 @@ function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
               <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Чистый вес г</SortTh>
               <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
-              <th className="w-10"></th>
+              <th className="w-20"></th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {sorted.map(p => {
@@ -411,7 +423,12 @@ function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
                     <td className="px-3 py-2">{dash(v.netWeight)}</td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                     <td className="px-3 py-2">{v.status ? <Badge label={v.status} group="pozicii" /> : <span className="text-gray-400">—</span>}</td>
-                    <td className="px-3 py-2"><EyeIcon onClick={() => setViewing(p)} /></td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1">
+                        <EyeIcon onClick={() => setViewing(p)} />
+                        <DeleteIcon onClick={() => removeCreated(p.n)} />
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -426,9 +443,10 @@ function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
           mode="add"
           sklad={DM_SKLAD}
           initial={emptyPosition(storageLocations, DM_SKLAD, "Слиток", "1000")}
-          reservedNomenkl={reservedNomenkl}
+          reservedNomenkl={[...reservedNomenkl, ...created.map(p => p.nomenkl)]}
           onClose={() => setShowAddNew(false)}
-          onSave={addNew}
+          onSave={p => addNew([p])}
+          onSaveMany={addNew}
         />
       )}
     </Modal>
@@ -1324,7 +1342,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       )}
       {showVozvratPick && (
         <VozvratPickModal
-          vydacha={vydacha}
           reservedNomenkl={[...vydacha, ...vozvrat].map(p => p.nomenkl)}
           view={posView}
           onClose={() => setShowVozvratPick(false)}
