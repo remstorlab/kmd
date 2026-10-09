@@ -58,7 +58,7 @@ function GPViewModal({ item, onClose }: { item: GPItem; onClose: () => void }) {
         <Field label="Класс"><Input value={item.klass} disabled /></Field>
         <Field label="Код материала"><Input value={codeLabel(item.code)} disabled /></Field>
         <Field label="Место хранения"><Input value={item.location} disabled /></Field>
-        <Field label="Статус"><Badge label={item.status} /></Field>
+        <Field label="Статус"><Badge label={item.status} group="pozicii" /></Field>
       </div>
     </Modal>
   );
@@ -202,7 +202,7 @@ export function OstatokGP() {
                 <td className="px-4 py-3">{item.ligWeight ?? "—"}</td>
                 <td className="px-4 py-3">{item.netWeight ?? "—"}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
-                <td className="px-4 py-3"><Badge label={item.status} /></td>
+                <td className="px-4 py-3"><Badge label={item.status} group="pozicii" /></td>
                 <td className="px-4 py-3">
                   <EyeIcon onClick={() => screen.openTop("view", item.id)} />
                 </td>
@@ -423,7 +423,7 @@ export function OstatokDM() {
                 <td className="px-4 py-3">{item.ligWeight}</td>
                 <td className="px-4 py-3">{item.netWeight}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
-                <td className="px-4 py-3"><Badge label={item.status} /></td>
+                <td className="px-4 py-3"><Badge label={item.status} group="pozicii" /></td>
                 <td className="px-4 py-3"><EyeIcon onClick={() => screen.openTop("view", item.id)} /></td>
               </tr>
             ))}

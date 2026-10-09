@@ -146,7 +146,7 @@ function SnapshotCard({ item, counterpart }: { item: LogSnapshotItem; counterpar
     <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
       <div className="flex items-center justify-between mb-2 gap-2">
         <span className="font-medium text-gray-900 text-sm">{item.title}</span>
-        <Badge label={item.status} />
+        <Badge label={item.status} group="zhurnal" />
       </div>
       <div className="space-y-1">
         {item.attrs.map(a => {

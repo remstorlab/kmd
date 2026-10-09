@@ -214,7 +214,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     >
       {karta && (
         <div className="flex items-center gap-2 mb-4">
-          <Badge label={karta.status} />
+          <Badge label={karta.status} group="shihta" />
           {karta.status === "Новая" && <span className="text-xs text-gray-500">Карта оформлена — доступна для выдачи на плавку, редактирование закрыто</span>}
           {karta.status === "Редактирование" && !karta.vydannyePozicii?.length && <span className="text-xs text-gray-500">Черновик — недоступен для плавки до оформления</span>}
         </div>
@@ -293,7 +293,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                     <td key={e.id} className="px-3 py-2 text-right text-gray-600">{num(m.chem[e.id]) > 0 ? m.chem[e.id] : "—"}</td>
                   ))}
                   <td className="px-3 py-2 text-right text-blue-600">{dola(m)}%</td>
-                  <td className="px-3 py-2">{m.nomenkl ? <Badge label="Резерв" /> : <span className="text-xs text-gray-400">Доп. материал</span>}</td>
+                  <td className="px-3 py-2">{m.nomenkl ? <Badge label="Резерв" group="pozicii" /> : <span className="text-xs text-gray-400">Доп. материал</span>}</td>
                   {!ro && <td className="px-3 py-2 text-center">
                     <button onClick={() => setMaterials(prev => prev.filter(x => x.key !== m.key))} className="text-gray-400 hover:text-red-500 transition-colors" title="Убрать из карты"><X className="w-3.5 h-3.5" /></button>
                   </td>}
@@ -347,7 +347,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                   <div className="flex items-center gap-4">
                     <span className="text-sm text-gray-600">{g.pct}</span>
                     <span className="text-xs text-gray-400">норма {g.norm}</span>
-                    <Badge label={g.ok ? "Соответствует" : "Не соответствует"} />
+                    <Badge label={g.ok ? "Соответствует" : "Не соответствует"} group="gost" />
                   </div>
                 </div>
               ))}
@@ -459,7 +459,7 @@ export function ShihtovyeKarty() {
                 <td className="px-4 py-3 text-gray-500">{karta.date}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{karta.name}</td>
                 <td className="px-4 py-3 text-blue-600">{karta.plavkaNo}</td>
-                <td className="px-4 py-3"><Badge label={karta.status} /></td>
+                <td className="px-4 py-3"><Badge label={karta.status} group="shihta" /></td>
                 <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(karta.createdAt)} - {karta.createdBy}</td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewKarta(karta)} />

@@ -590,7 +590,7 @@ export function PanelAdmin() {
                 <td className="px-4 py-3 text-gray-500">{user.username}</td>
                 <td className="px-4 py-3 text-gray-600">{user.role}</td>
                 <td className="px-4 py-3 text-gray-500">{user.email}</td>
-                <td className="px-4 py-3"><Badge label={user.status} /></td>
+                <td className="px-4 py-3"><Badge label={user.status} group="polzovateli" /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => show(`Пользователь: ${user.name}`)} />
                   <EditIcon onClick={() => setEditUser(user)} />

@@ -216,7 +216,7 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
                     <td className="px-3 py-2">{i.netWeight}</td>
                     <td className="px-3 py-2 text-gray-500">{i.location}</td>
                     <td className="px-3 py-2">
-                      <Badge label={i.status} />
+                      <Badge label={i.status} group="pozicii" />
                       {karta && <div className="text-xs text-gray-400 mt-0.5" title={karta.name}>ШК {karta.plavkaNo}</div>}
                     </td>
                     <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{left(i)} шт</td>
@@ -410,7 +410,7 @@ function VozvratPickModal({ vydacha, reservedNomenkl, view, onClose, onAdd }: {
                     <td className="px-3 py-2">{dash(v.ligWeight)}</td>
                     <td className="px-3 py-2">{dash(v.netWeight)}</td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                    <td className="px-3 py-2">{v.status ? <Badge label={v.status} /> : <span className="text-gray-400">—</span>}</td>
+                    <td className="px-3 py-2">{v.status ? <Badge label={v.status} group="pozicii" /> : <span className="text-gray-400">—</span>}</td>
                     <td className="px-3 py-2"><EyeIcon onClick={() => setViewing(p)} /></td>
                   </tr>
                 );
@@ -459,7 +459,7 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
                 <div className="text-sm font-medium text-gray-900">{k.name}</div>
                 <div className="text-xs text-gray-400">{k.plavkaNo} · {k.date}</div>
               </div>
-              <Badge label={k.status} />
+              <Badge label={k.status} group="shihta" />
             </button>
           ))}
         </div>
@@ -660,7 +660,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
                 <td className="px-3 py-2">{dash(v.ligWeight)}</td>
                 <td className="px-3 py-2">{dash(v.netWeight)}</td>
                 <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                <td className="px-3 py-2">{v.status ? <Badge label={v.status} /> : <span className="text-gray-400">—</span>}</td>
+                <td className="px-3 py-2">{v.status ? <Badge label={v.status} group="pozicii" /> : <span className="text-gray-400">—</span>}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => onView(p)} />
@@ -1161,7 +1161,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       {/* Статус операции */}
       {op && (
         <div className="flex items-center gap-2 mb-4">
-          <Badge label={op.stage} />
+          <Badge label={op.stage} group="operacii" />
           {!readOnly && phase === "vozvrat" && <span className="text-xs text-gray-500">Оформление возврата: вкладка «Выдача» доступна только для просмотра</span>}
           {!readOnly && phase === "done" && <span className="text-xs text-gray-500">Операция завершена — доступна только для просмотра</span>}
         </div>
@@ -1260,7 +1260,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                 Дельта: {deltaSign}{fmt(Math.abs(delta))} г (допуск: ±5 г) {inNorm ? "— В норме!" : "— Превышение!"}
               </span>
             </div>
-            {!inNorm && raznicaSpisana && <Badge label="Разница списана" />}
+            {!inNorm && raznicaSpisana && <Badge label="Разница списана" group="itogo-operacii" />}
             {!inNorm && !raznicaSpisana && !vozvratRo && (
               <button
                 onClick={() => setShowSpisanie(true)}
@@ -1282,7 +1282,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <div className="text-sm text-gray-900">{p.name} <span className="text-gray-400 text-xs">{p.nomenkl}</span></div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-600">{p.ves} г</span>
-                    <Badge label="Преобразован" />
+                    <Badge label="Преобразован" group="itogo-operacii" />
                   </div>
                 </div>
               ))}
@@ -1293,7 +1293,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   <div className="text-sm text-gray-900">{p.name} <span className="text-gray-400 text-xs">{p.nomenkl}</span></div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-600">{p.ves} г</span>
-                    <Badge label={i === 0 ? "Без изменений" : i === 2 ? "Новая" : "Без изменений"} />
+                    <Badge label={i === 0 ? "Без изменений" : i === 2 ? "Новая" : "Без изменений"} group="itogo-operacii" />
                   </div>
                 </div>
               ))}
@@ -1304,7 +1304,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                     <div className="text-sm text-gray-900">{l.name || "Без наименования"} <span className="text-gray-400 text-xs">{isoToRu(l.date)}</span></div>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-gray-600">{l.ves} г</span>
-                      <Badge label="Списано" />
+                      <Badge label="Списано" group="itogo-operacii" />
                     </div>
                   </div>
                 ))}
@@ -1477,7 +1477,7 @@ export function DvizhenieMateriаla() {
                 </td>
                 <td className="px-4 py-3 text-blue-600">{op.document}</td>
                 <td className="px-4 py-3 text-gray-700">{op.responsible}</td>
-                <td className="px-4 py-3 whitespace-nowrap"><Badge label={op.stage} /></td>
+                <td className="px-4 py-3 whitespace-nowrap"><Badge label={op.stage} group="operacii" /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewOp(op)} />
                   <EditIcon onClick={() => setEditOp(op)} />

@@ -599,16 +599,6 @@ export const initialLogs: LogEntry[] = [
 
 // --- Справочники ---
 export const spravochniki = {
-  "Номенклатуры": {
-    count: 214,
-    items: [
-      { code: "GP-KOL-585-01", value: "Кольцо обручальное 585", status: "Активно" },
-      { code: "GP-CEP-750-03", value: "Цепочка золотая Бисмарк", status: "Активно" },
-      { code: "GP-SER-585-07", value: "Серьги с бриллиантами 0.5ct", status: "Активно" },
-      { code: "DM-001", value: "Слиток золота ЗлА-1", status: "Активно" },
-      { code: "DM-002", value: "Слиток серебра СрА-2", status: "Активно" },
-    ]
-  },
   "Единицы измерения": {
     count: 6,
     items: [
@@ -711,6 +701,62 @@ export const spravochniki = {
 export function spravValues(name: keyof typeof spravochniki): string[] {
   return spravochniki[name].items.filter(i => i.status === "Активно").map(i => i.value);
 }
+
+// --- Справочники статусов ---
+// Каждый статус: наименование и цвет. Цвет определяет вид бейджа статуса во всех разделах.
+export type StatusColor = "green" | "blue" | "yellow" | "orange" | "red" | "purple" | "gray";
+export const STATUS_COLORS: { value: StatusColor; label: string }[] = [
+  { value: "green", label: "Зелёный" },
+  { value: "blue", label: "Синий" },
+  { value: "yellow", label: "Жёлтый" },
+  { value: "orange", label: "Оранжевый" },
+  { value: "red", label: "Красный" },
+  { value: "purple", label: "Фиолетовый" },
+  { value: "gray", label: "Серый" },
+];
+
+export interface StatusItem { id: string; name: string; color: StatusColor }
+// group — ключ справочника, по которому бейдж ищет цвет статуса
+export type StatusGroup =
+  | "pozicii" | "vydacha-pozicii" | "dokumenty" | "operacii" | "itogo-operacii" | "shihta"
+  | "gost" | "podotchet" | "polzovateli" | "zhurnal" | "mesta-hraneniya" | "zapisi-spravochnikov";
+export interface StatusDict {
+  group: StatusGroup;
+  name: string;
+  // Разделы, где используются статусы справочника
+  sections: string;
+  items: StatusItem[];
+}
+
+const st = (group: string, list: [string, StatusColor][]): StatusItem[] =>
+  list.map(([name, color], i) => ({ id: `${group}-${i + 1}`, name, color }));
+
+export const initialStatusDicts: StatusDict[] = [
+  { group: "pozicii", name: "Статусы позиций", sections: "Склады ДМ и ГП, Движение материала, Подотчётники, Шихтовые карты",
+    items: st("pozicii", [["На складе", "green"], ["Резерв", "yellow"], ["В подотчёте", "blue"], ["Закрыта", "gray"]]) },
+  { group: "vydacha-pozicii", name: "Статусы позиций накладной на выдачу", sections: "Склады → Выдать со склада",
+    items: st("vydacha-pozicii", [["К выдаче", "blue"], ["Закрыта", "gray"]]) },
+  { group: "dokumenty", name: "Статусы складских документов", sections: "Складские операции (приход, выдача)",
+    items: st("dokumenty", [["Редактирование", "blue"], ["Оформлено", "green"]]) },
+  { group: "operacii", name: "Статусы операций движения материала", sections: "Движение материала",
+    items: st("operacii", [["Выдача: На редактировании", "blue"], ["Выдано", "blue"], ["Возврат: На редактировании", "yellow"], ["Завершено", "green"]]) },
+  { group: "itogo-operacii", name: "Статусы позиций в итогах операции", sections: "Движение материала → вкладка «Итого»",
+    items: st("itogo-operacii", [["Без изменений", "green"], ["Изменено", "blue"], ["Преобразован", "purple"], ["Новая", "green"], ["Утрачена", "red"], ["Списано", "red"], ["Разница списана", "gray"]]) },
+  { group: "shihta", name: "Статусы шихтовых карт", sections: "Шихтовые карты, Движение материала (выдача по шихтовой карте)",
+    items: st("shihta", [["Редактирование", "blue"], ["Новая", "green"], ["Выполнена", "gray"]]) },
+  { group: "gost", name: "Статусы соответствия ГОСТ", sections: "Шихтовые карты, Отчётность",
+    items: st("gost", [["Соответствует", "green"], ["Не соответствует", "red"]]) },
+  { group: "podotchet", name: "Статусы подотчётника", sections: "Подотчётники",
+    items: st("podotchet", [["В работе", "yellow"]]) },
+  { group: "polzovateli", name: "Статусы пользователей", sections: "Администрирование",
+    items: st("polzovateli", [["Активен", "green"], ["Заблокирован", "red"]]) },
+  { group: "zhurnal", name: "Статусы позиций в журнале событий", sections: "Логирование",
+    items: st("zhurnal", [["Новая", "green"], ["Изменена", "blue"], ["Без изменений", "green"], ["Удалена", "red"], ["Объединена", "purple"], ["Преобразована", "purple"], ["Исчезла", "red"]]) },
+  { group: "mesta-hraneniya", name: "Статусы мест хранения", sections: "Справочники → Места хранения",
+    items: st("mesta-hraneniya", [["Доступно", "green"], ["Заблокировано", "red"]]) },
+  { group: "zapisi-spravochnikov", name: "Статусы записей справочников", sections: "Справочники",
+    items: st("zapisi-spravochnikov", [["Активно", "green"], ["Неактивно", "gray"]]) },
+];
 
 // Тип документа, единственно допустимый для вида операции «Анализ в ЛКИ».
 export const DOC_TYPE_LKI = "Накладная в ЛКИ";

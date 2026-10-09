@@ -243,7 +243,7 @@ function DocList({
                 <td className="px-4 py-3 text-blue-600 font-medium">{doc.number}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.sender}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
-                <td className="px-4 py-3"><Badge label={doc.status} /></td>
+                <td className="px-4 py-3"><Badge label={doc.status} group="dokumenty" /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
                   <EditIcon onClick={() => screen.openTop("edit", doc.id)} />
@@ -357,7 +357,7 @@ export function VydachaList() {
                 <td className="px-4 py-3 text-blue-600 font-medium">{doc.number}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.sender}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
-                <td className="px-4 py-3"><Badge label={doc.status} /></td>
+                <td className="px-4 py-3"><Badge label={doc.status} group="dokumenty" /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
                   <EditIcon onClick={() => screen.openTop("edit", doc.id)} />

@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useApp } from "../store/AppContext";
 import { PageHeader } from "../components/ui";
 import { LOGIN_PATH, PAGE_PATHS as P } from "../router";
-import { SPRAV_SLUGS } from "./Spravochniki";
+import { SPRAV_SLUGS, STATUS_SPRAV_SLUGS } from "./Spravochniki";
 
 // ── Карта экранов ─────────────────────────────────────────────────────────────
 // Все экраны приложения с прямыми ссылками — для импорта страниц сайта в Figma.
@@ -109,6 +109,7 @@ export function useScreenGroups(): Group[] {
     { title: "Справочники", screens: [
       { title: "Справочники", path: P["spravochniki"] },
       ...Object.entries(S).map(([name, slug]) => ({ title: name, path: sprav(slug) })),
+      ...Object.entries(STATUS_SPRAV_SLUGS).map(([name, slug]) => ({ title: name, path: sprav(slug) })),
       { title: "Типы документов — добавить запись", path: `${sprav(S["Типы документов"])}/new` },
       { title: "Типы документов — редактировать запись", path: `${sprav(S["Типы документов"])}/edit/${encodeURIComponent("ПО")}` },
       { title: "Коды материалов — добавить запись", path: `${sprav(S["Коды материалов"])}/new` },

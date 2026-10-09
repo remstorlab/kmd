@@ -35,7 +35,7 @@ export default function DMPositionViewModal({ item, onClose }: { item: DMPositio
         <Field label="Лигатурный вес г"><Input value={val(item.ligWeight)} disabled /></Field>
         <Field label="Чистый вес г"><Input value={val(item.netWeight)} disabled /></Field>
         <Field label="Место хранения" full><Input value={item.location || "—"} disabled /></Field>
-        <Field label="Статус">{item.status ? <Badge label={item.status} /> : <Input value="—" disabled />}</Field>
+        <Field label="Статус">{item.status ? <Badge label={item.status} group="pozicii" /> : <Input value="—" disabled />}</Field>
       </div>
       <ChemCompositionBlock value={item.chem} disabled />
     </Modal>

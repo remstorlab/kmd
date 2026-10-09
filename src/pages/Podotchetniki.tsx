@@ -58,7 +58,7 @@ function ProcessCard({ process, showCompletedDate }: { process: PodotchetProcess
                 <td className="px-4 py-2 text-right">{pos.ligWeight.toFixed(2)}</td>
                 <td className="px-4 py-2 text-right">{pos.netWeight.toFixed(2)}</td>
                 <td className="px-4 py-2 text-gray-500">{pos.location}</td>
-                <td className="px-4 py-2"><Badge label={pos.status} /></td>
+                <td className="px-4 py-2"><Badge label={pos.status} group="pozicii" /></td>
               </tr>
             ))}
             {process.positions.length === 0 && (
@@ -130,7 +130,7 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
                   <td className="py-2 font-medium">{m.name}</td>
                   <td className="py-2 text-gray-500">{m.nomenkl}</td>
                   <td className="py-2 text-right font-medium">{m.weight} г</td>
-                  <td className="py-2"><Badge label="В работе" /></td>
+                  <td className="py-2"><Badge label="В работе" group="podotchet" /></td>
                 </tr>
               ))}
             </tbody>
@@ -200,7 +200,7 @@ export function Podotchetniki() {
                 <td className="px-4 py-3 text-gray-600">{p.department}</td>
                 <td className="px-4 py-3">
                   {p.materials.length > 0
-                    ? <Badge label="В работе" />
+                    ? <Badge label="В работе" group="podotchet" />
                     : <span className="text-gray-400 text-xs">—</span>
                   }
                 </td>

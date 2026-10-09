@@ -276,7 +276,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                     <td className="px-3 py-2 text-blue-600">{share(p, p.net).toFixed(2)}</td>
                   </>}
                   <td className="px-3 py-2 text-gray-500">{p.location}</td>
-                  <td className="px-3 py-2"><Badge label={issued ? "Закрыта" : "К выдаче"} /></td>
+                  <td className="px-3 py-2"><Badge label={issued ? "Закрыта" : "К выдаче"} group="vydacha-pozicii" /></td>
                   {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
                 </tr>
               ))}

@@ -3,18 +3,17 @@ import { useLocation } from "react-router";
 import {
   PageHeader, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Badge, Toggle,
   useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, SortTh, useSort, SearchInput, Pagination,
+  Field, Input, Select, SortTh, useSort, SearchInput, Pagination, statusColorClass,
 } from "../components/ui";
-import { spravochniki, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement } from "../data/mock";
+import { spravochniki, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
-import { ArrowLeft, Plus, Package, Scale, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, LucideIcon } from "lucide-react";
+import { ArrowLeft, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 
 // Адреса справочников: /spravochniki/<slug>
 const DICT_SLUG: Record<SpravKey, string> = {
-  "Номенклатуры": "nomenklatury",
   "Единицы измерения": "edinicy-izmereniya",
   "Типы документов": "tipy-dokumentov",
   "Организации": "organizacii",
@@ -31,6 +30,9 @@ export const SPRAV_SLUGS = {
   "Места хранения": "mesta-hraneniya",
   "Химический состав": "himicheskiy-sostav",
 } as const;
+// Справочники статусов: /spravochniki/status-<группа>
+const statusSlug = (d: StatusDict) => `status-${d.group}`;
+export const STATUS_SPRAV_SLUGS: Record<string, string> = Object.fromEntries(initialStatusDicts.map(d => [d.name, statusSlug(d)]));
 
 // Экраны записей справочника: …/new, …/view/:key, …/edit/:key
 function useRecordScreens<T>(items: T[], keyOf: (t: T) => string) {
@@ -49,7 +51,6 @@ function useRecordScreens<T>(items: T[], keyOf: (t: T) => string) {
 }
 
 const dictIcon: Record<SpravKey, LucideIcon> = {
-  "Номенклатуры": Package,
   "Единицы измерения": Scale,
   "Типы документов": FileText,
   "Организации": Building2,
@@ -124,7 +125,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
               <tr key={i} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-gray-900">{item.value}</td>
-                <td className="px-4 py-3"><Badge label={item.status} /></td>
+                <td className="px-4 py-3"><Badge label={item.status} group="zapisi-spravochnikov" /></td>
                 <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
               </tr>
             ))}
@@ -150,6 +151,117 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
           </div>
         </Modal>
       )}
+      {toast && <Toast message={toast} onDone={clear} />}
+    </div>
+  );
+}
+
+// ── Справочник статусов: Наименование + Цвет ─────────────────────────────────
+
+const colorLabel = (c: StatusColor) => STATUS_COLORS.find(x => x.value === c)?.label ?? c;
+
+function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void }) {
+  const { setStatusDicts } = useApp();
+  const items = dict.items;
+  const emptyForm = { name: "", color: "gray" as StatusColor };
+  const [form, setForm] = useState(emptyForm);
+  const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.id);
+  useEffect(() => {
+    if (editItem) setForm({ name: editItem.name, color: editItem.color });
+    else if (showAdd) setForm(emptyForm);
+  }, [editKey, showAdd]);
+  const { toast, show, clear } = useToast();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
+  const { sorted, sort, toggleSort } = useSort(items, {
+    name: i => i.name,
+    color: i => colorLabel(i.color),
+  });
+
+  const setItems = (next: StatusItem[]) => setStatusDicts(prev => prev.map(d => (d.group === dict.group ? { ...d, items: next } : d)));
+  const name = form.name.trim();
+  const duplicate = items.some(i => i.name.toLowerCase() === name.toLowerCase() && i.id !== editItem?.id);
+  const canSave = !!name && !duplicate;
+
+  const save = () => {
+    if (!canSave) return;
+    setItems(editItem
+      ? items.map(i => (i.id === editItem.id ? { ...i, name, color: form.color } : i))
+      : [...items, { id: `${dict.group}-${Date.now()}`, name, color: form.color }]);
+    closeAll();
+    show("Запись сохранена");
+  };
+  const remove = (item: StatusItem) => confirm(`Удалить статус «${item.name}»?`, () => { setItems(items.filter(i => i.id !== item.id)); show("Статус удалён"); });
+
+  return (
+    <div>
+      <button onClick={onBack} className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium mb-4">
+        <ArrowLeft className="w-4 h-4" />
+        Назад к справочникам
+      </button>
+
+      <div className="text-xs text-gray-500 mb-4">Справочники / {dict.name}</div>
+
+      <PageHeader
+        title={dict.name}
+        subtitle={`${items.length} значений · используется: ${dict.sections}`}
+        actions={<Btn onClick={goAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
+      />
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 border-b border-gray-200">
+            <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
+            <SortTh sortKey="color" sort={sort} onSort={toggleSort}>Цвет</SortTh>
+            <th className="w-20"></th>
+          </tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {sorted.map(item => (
+              <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3"><Badge label={item.name} group={dict.group} /></td>
+                <td className="px-4 py-3 text-gray-700">
+                  <span className="inline-flex items-center gap-2">
+                    <span className={`w-3.5 h-3.5 rounded-full border ${statusColorClass[item.color]}`} />
+                    {colorLabel(item.color)}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <EditIcon onClick={() => goEdit(item)} />
+                    <DeleteIcon onClick={() => remove(item)} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {sorted.length === 0 && (
+              <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">Нет записей</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {(showAdd || editItem) && (
+        <Modal
+          title={editItem ? "Редактировать запись" : "Добавить запись"}
+          onClose={closeAll}
+          footer={<>
+            <Btn variant="secondary" onClick={closeAll}>Отмена</Btn>
+            <Btn onClick={save} disabled={!canSave}>Сохранить</Btn>
+          </>}
+        >
+          <div className="space-y-4">
+            <Field label="Наименование"><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование статуса" /></Field>
+            {duplicate && <div className="-mt-2 text-xs text-red-600">Статус с таким наименованием уже есть</div>}
+            <Field label="Цвет">
+              <Select value={form.color} options={STATUS_COLORS.map(c => c.value)} optionLabel={v => colorLabel(v as StatusColor)} onChange={v => setForm(f => ({ ...f, color: v as StatusColor }))} />
+            </Field>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Предпросмотр</label>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusColorClass[form.color]}`}>{name || "Статус"}</span>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );
@@ -494,7 +606,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
                 <td className="px-4 py-3 text-gray-900">{loc.sklad}</td>
                 <td className="px-4 py-3 text-gray-700">{placeOf(loc)}</td>
                 <td className="px-4 py-3 font-mono text-blue-600 font-medium">{loc.code}</td>
-                <td className="px-4 py-3"><Badge label={loc.available ? "Доступно" : "Заблокировано"} /></td>
+                <td className="px-4 py-3"><Badge label={loc.available ? "Доступно" : "Заблокировано"} group="mesta-hraneniya" /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => setViewItem(loc)} />
@@ -732,7 +844,7 @@ function ChemFlagCheckbox({ label, checked, onChange, disabled = false }: { labe
 }
 
 export function Spravochniki() {
-  const { storageLocations, chemElements, materialCodes, navigate } = useApp();
+  const { storageLocations, chemElements, materialCodes, statusDicts, navigate } = useApp();
   // Справочник — /spravochniki/<slug>
   const { pathname } = useLocation();
   const { page, segs } = matchPage(pathname);
@@ -749,6 +861,10 @@ export function Spravochniki() {
   const setShowStorageLocations = (on: boolean) => open(on ? SPRAV_SLUGS["Места хранения"] : undefined);
   const setShowChemElements = (on: boolean) => open(on ? SPRAV_SLUGS["Химический состав"] : undefined);
 
+  const statusDict = statusDicts.find(d => statusSlug(d) === slug) ?? null;
+  if (statusDict) {
+    return <StatusDictPage key={statusDict.group} dict={statusDict} onBack={() => open()} />;
+  }
   if (selected) {
     return <DictPage key={selected} name={selected} onBack={() => setSelected(null)} />;
   }
@@ -830,6 +946,27 @@ export function Spravochniki() {
           <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Химический состав</h3>
           <p className="text-sm text-gray-400">{chemElements.length} значений</p>
         </button>
+      </div>
+
+      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mt-8 mb-3">Статусы</h2>
+      <div className="grid grid-cols-4 gap-4">
+        {statusDicts.map(d => (
+          <button
+            key={d.group}
+            onClick={() => open(statusSlug(d))}
+            className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md transition-all hover:border-blue-300 group"
+          >
+            <div className="w-10 h-10 mb-3 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+              <CircleDot className="w-5 h-5" />
+            </div>
+            <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{d.name}</h3>
+            <p className="text-sm text-gray-400">{d.items.length} значений</p>
+            <div className="flex flex-wrap gap-1 mt-2">
+              {d.items.slice(0, 4).map(i => <Badge key={i.id} label={i.name} group={d.group} />)}
+              {d.items.length > 4 && <span className="text-xs text-gray-400 self-center">+{d.items.length - 4}</span>}
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   );
