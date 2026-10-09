@@ -597,6 +597,22 @@ export const initialLogs: LogEntry[] = [
   },
 ];
 
+// --- Позиции операций движения материала ---
+// Демо-позиции вкладок «Выдача» / «Возврат» для операций без сохранённых позиций
+export const vydachaPositions: OperPosition[] = [
+  { n: 1, name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, qty: 1, ves: 500.25, ag: "-", cu: "-", loc: "Сейф №1, Полка А", metal: "1000", lig: 500.25, net: 499.75, chem: { au: "499.75" } },
+  { n: 2, name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", proba: 585, qty: 1, ves: 45.80, ag: "0.12", cu: "1.20", loc: "Сейф №2, Полка А", metal: "1000", lig: 45.80, net: 26.79, chem: { au: "26.79", ag: "0.12", cu: "1.20" } },
+];
+export const vozvratPositions: OperPosition[] = [
+  { n: 1, name: "Подкат 30х20", nomenkl: "DM-R01", klass: "Подкат", proba: 999, qty: 1, ves: 480.10, ag: "-", cu: "-", loc: "Сейф №1, Полка Б", metal: "1000", lig: 480.10, net: 479.62, chem: { au: "479.62" } },
+  { n: 2, name: "Королёк №1", nomenkl: "DM-R02", klass: "Королёк", proba: 999, qty: 1, ves: 55.60, ag: "-", cu: "-", loc: "Сейф №2, Полка Б", metal: "1000", lig: 55.60, net: 55.54, chem: { au: "55.54" } },
+  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Отходы", proba: 500, qty: 1, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка А", metal: "1000", lig: 8.00, net: 4.00, chem: { au: "4.00", ag: "0.05", cu: "2.10" } },
+];
+
+// Позиции операции; для демо-операций без сохранённых позиций — те же образцы, что показывает форма.
+export const opVydacha = (o: Operation) => o.vydachaPos ?? vydachaPositions;
+export const opVozvrat = (o: Operation) => o.vozvratPos ?? (o.stage === "Завершено" || o.stage === "Возврат: На редактировании" ? vozvratPositions : []);
+
 // --- Справочники ---
 export const spravochniki = {
   "Единицы измерения": {

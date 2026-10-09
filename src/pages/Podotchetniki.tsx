@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useApp } from "../store/AppContext";
 import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, KlassSelect } from "../components/ui";
-import { Podotchetnik, PodotchetProcess, PodotchetPosition, spravValues } from "../data/mock";
+import { Podotchetnik, PodotchetPosition, Operation, OperPosition, StatusDM, spravValues, opVydacha, opVozvrat } from "../data/mock";
 import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, LucideIcon } from "lucide-react";
-import { matchPage, useTabParam } from "../router";
+import { matchPage, useTabParam, PAGE_PATHS } from "../router";
 
 const vidIcon: Record<string, LucideIcon> = {
   "Плавка": Flame,
@@ -63,12 +63,13 @@ function usePositionFilters<T extends PodotchetPosition>(rows: T[]) {
 
 // ── Таблица позиций: те же столбцы, что у позиции ДМ ──────────────────────────
 
-type ProcRow = PodotchetPosition & { key: string; procName?: string; procDate?: string; procDone?: string };
+// opId / opNo / opDate / opStage — операция движения материала, в которой позиция получена или возвращена
+type ProcRow = PodotchetPosition & { key: string; opId?: string; opNo?: string; opDate?: string; opStage?: string };
 
-function PositionsTable({ rows, showProcess = false, showCompleted = false }: { rows: ProcRow[]; showProcess?: boolean; showCompleted?: boolean }) {
+function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows: ProcRow[]; showOperation?: boolean; onOpenOperation?: (r: ProcRow) => void }) {
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(rows, {
-    proc: r => r.procName ?? "",
+    op: r => parseInt(r.opNo ?? "", 10) || 0,
     nomenkl: r => r.nomenkl,
     name: r => r.name,
     qty: r => r.qty,
@@ -85,7 +86,7 @@ function PositionsTable({ rows, showProcess = false, showCompleted = false }: { 
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
-          {showProcess && <SortTh sortKey="proc" sort={sort} onSort={toggleSort} className={th}>Операция</SortTh>}
+          {showOperation && <SortTh sortKey="op" sort={sort} onSort={toggleSort} className={th}>Операция</SortTh>}
           <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className={th}>Номенкл. №</SortTh>
           <SortTh sortKey="name" sort={sort} onSort={toggleSort} className={th}>Наименование</SortTh>
           <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество</SortTh>
@@ -100,13 +101,11 @@ function PositionsTable({ rows, showProcess = false, showCompleted = false }: { 
         <tbody className="divide-y divide-gray-100">
           {sorted.map(r => (
             <tr key={r.key} className="hover:bg-gray-50">
-              {showProcess && (
-                <td className="px-3 py-2">
-                  <div className="font-medium text-gray-900">{r.procName}</div>
-                  <div className="text-xs text-gray-400 whitespace-nowrap">
-                    Начато: {r.procDate}
-                    {showCompleted && r.procDone && <span className="text-green-600 font-medium"> · Завершено: {r.procDone}</span>}
-                  </div>
+              {showOperation && (
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <button onClick={() => onOpenOperation?.(r)} className="font-medium text-blue-600 hover:underline" title="Открыть операцию">№ {r.opNo}</button>
+                  <div className="text-xs text-gray-400">от {r.opDate}</div>
+                  {r.opStage && <div className="mt-0.5"><Badge label={r.opStage} group="operacii" /></div>}
                 </td>
               )}
               <td className="px-3 py-2 text-gray-500">{r.nomenkl}</td>
@@ -122,7 +121,7 @@ function PositionsTable({ rows, showProcess = false, showCompleted = false }: { 
             </tr>
           ))}
           {sorted.length === 0 && (
-            <tr><td colSpan={showProcess ? 11 : 10} className="px-3 py-4 text-center text-gray-400 text-xs">Позиции отсутствуют</td></tr>
+            <tr><td colSpan={showOperation ? 11 : 10} className="px-3 py-4 text-center text-gray-400 text-xs">Позиции отсутствуют</td></tr>
           )}
         </tbody>
       </table>
@@ -130,9 +129,9 @@ function PositionsTable({ rows, showProcess = false, showCompleted = false }: { 
   );
 }
 
-// ── Блок вида операции: все позиции, выданные подотчётнику по этому виду ────────
+// ── Блок вида операции: позиции, полученные / возвращённые подотчётником по этому виду ──
 
-function VidBlock({ vid, processes, rows, showCompleted }: { vid: string; processes: number; rows: ProcRow[]; showCompleted: boolean }) {
+function VidBlock({ vid, operations, rows, onOpenOperation }: { vid: string; operations: number; rows: ProcRow[]; onOpenOperation: (r: ProcRow) => void }) {
   const Icon = vidIcon[vid] ?? Flame;
   const totalNet = rows.reduce((s, r) => s + r.netWeight, 0);
   return (
@@ -141,28 +140,36 @@ function VidBlock({ vid, processes, rows, showCompleted }: { vid: string; proces
         <Icon className="w-5 h-5 text-gray-500 shrink-0" />
         <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900">{vid}</div>
         <div className="text-xs text-gray-500 shrink-0">
-          Операций: {processes} · Позиций: {rows.length} · Чистый вес: {totalNet.toFixed(2)} г
+          Операций: {operations} · Позиций: {rows.length} · Чистый вес: {totalNet.toFixed(2)} г
         </div>
       </div>
-      <PositionsTable rows={rows} showProcess showCompleted={showCompleted} />
+      <PositionsTable rows={rows} showOperation onOpenOperation={onOpenOperation} />
     </div>
   );
 }
 
+// Подотчётное лицо в операции записано полным ФИО или как «Фамилия И.О.»
+const shortFio = (full: string) => {
+  const [last, ...rest] = full.trim().split(/\s+/);
+  return [last, rest.map(n => `${n[0]}.`).join("")].filter(Boolean).join(" ");
+};
+const isPersonOp = (o: Operation, person: Podotchetnik) =>
+  [o.responsible, o.poluchil].some(r => !!r && (r === person.name || r === shortFio(person.name)));
+
+// Позиции считаются полученными после проведения выдачи, возвращёнными — после завершения операции
+const isIssued = (o: Operation) => o.stage !== "Выдача: На редактировании";
+const isReturned = (o: Operation) => o.stage === "Завершено";
+
 // ── Карточка подотчётного лица ────────────────────────────────────────────────
 
-const procRows = (processes: PodotchetProcess[]): ProcRow[] =>
-  processes.flatMap(p => p.positions.map((pos, i) => ({
-    ...pos, key: `${p.id}-${i}`, procName: p.name, procDate: p.date, procDone: p.completedDate,
-  })));
-
 function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: () => void }) {
-  const [tab, setTab] = useTabParam<"Текущие процессы" | "Завершённые процессы">(
-    { "Текущие процессы": "tekushie", "Завершённые процессы": "zavershennye" },
-    "Текущие процессы",
+  const { operations, dmItems } = useApp();
+  const routerNavigate = useNavigate();
+  const [tab, setTab] = useTabParam<"Всего получено" | "Всего возвращено">(
+    { "Всего получено": "polucheno", "Всего возвращено": "vozvrashcheno" },
+    "Всего получено",
   );
-  const completed = tab === "Завершённые процессы";
-  const processes = completed ? person.completedProcesses : person.currentProcesses;
+  const received = tab === "Всего получено";
 
   // Баланс: позиции в подотчёте; атрибуты позиции ДМ берутся из процессов, где она была выдана
   const allPositions = [...person.currentProcesses, ...person.completedProcesses].flatMap(p => p.positions);
@@ -175,16 +182,32 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
   const balanceF = usePositionFilters(balance);
   const balanceRows = balance.filter(balanceF.match);
 
-  // Процессы: группы по видам операций из справочника «Виды операций»
-  const rows = procRows(processes);
-  const procF = usePositionFilters(rows);
-  const vids = [...spravValues("Виды операций"), ...processes.map(p => p.vid)].filter((v, i, a) => a.indexOf(v) === i);
+  // Операции движения материала по подотчётнику: полученные (вкладка «Выдача») / возвращённые (вкладка «Возврат») позиции
+  const personOps = operations.filter(o => isPersonOp(o, person) && (received ? isIssued(o) : isReturned(o)));
+  const toRow = (o: Operation, p: OperPosition, i: number): ProcRow => {
+    const dm = dmItems.find(d => d.nomenkl === p.nomenkl);
+    // Текущий статус — со склада ДМ; иначе: полученная в открытой операции — в подотчёте, возвращённая — на складе
+    const status: StatusDM = dm?.status ?? (received ? (isReturned(o) ? "Закрыта" : "В подотчёте") : "На складе");
+    return {
+      key: `${o.id}-${i}`, name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.metal ?? dm?.metal ?? "",
+      qty: p.qty ?? 1, proba: p.proba, ligWeight: p.lig ?? p.ves, netWeight: p.net ?? p.ves, location: p.loc, status,
+      opId: o.id, opNo: o.document, opDate: o.date, opStage: o.stage,
+    };
+  };
+  const opRows = (ops: Operation[]) => ops.flatMap(o => (received ? opVydacha(o) : opVozvrat(o)).map((p, i) => toRow(o, p, i)));
+  const rows = opRows(personOps);
+  const opF = usePositionFilters(rows);
+  // Блоки по видам операций в порядке справочника «Виды операций»
+  const vids = [...spravValues("Виды операций"), ...personOps.map(o => o.vid)].filter((v, i, a) => a.indexOf(v) === i);
   const groups = vids
     .map(vid => {
-      const procs = processes.filter(p => p.vid === vid);
-      return { vid, processes: procs.length, rows: procRows(procs).filter(procF.match) };
+      const ops = personOps.filter(o => o.vid === vid);
+      return { vid, operations: ops.length, rows: opRows(ops).filter(opF.match) };
     })
-    .filter(g => g.processes > 0 && (g.rows.length > 0 || !procF.active));
+    .filter(g => g.operations > 0 && g.rows.length > 0);
+  const openOperation = (r: ProcRow) => {
+    if (r.opId) routerNavigate(`${PAGE_PATHS["dvizhenie-mat"]}/view/${r.opId}?tab=${received ? "vydacha" : "vozvrat"}`);
+  };
 
   return (
     <div>
@@ -228,18 +251,22 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
         )}
       </div>
 
-      {/* Processes */}
+      {/* Операции движения материала */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <Tabs tabs={["Текущие процессы", "Завершённые процессы"]} active={tab} onChange={t => setTab(t as typeof tab)} />
-        {rows.length > 0 && procF.bar}
+        <Tabs tabs={["Всего получено", "Всего возвращено"]} active={tab} onChange={t => setTab(t as typeof tab)} />
+        <div className="text-xs text-gray-500 mb-3">
+          {received ? "Позиции, выданные подотчётнику" : "Позиции, возвращённые подотчётником"} в операциях движения материала ·
+          операций: {personOps.length} · позиций: {rows.length} · чистый вес: {rows.reduce((s, r) => s + r.netWeight, 0).toFixed(2)} г
+        </div>
+        {rows.length > 0 && opF.bar}
         <div className="space-y-3">
           {groups.map(g => (
-            <VidBlock key={g.vid} vid={g.vid} processes={g.processes} rows={g.rows} showCompleted={completed} />
+            <VidBlock key={g.vid} vid={g.vid} operations={g.operations} rows={g.rows} onOpenOperation={openOperation} />
           ))}
-          {processes.length === 0 && (
-            <p className="text-center text-sm text-gray-400 py-4">Процессы не найдены</p>
+          {rows.length === 0 && (
+            <p className="text-center text-sm text-gray-400 py-4">{received ? "Полученных позиций нет" : "Возвращённых позиций нет"}</p>
           )}
-          {processes.length > 0 && groups.length === 0 && (
+          {rows.length > 0 && groups.length === 0 && (
             <p className="text-center text-sm text-gray-400 py-4">Нет позиций по заданным фильтрам</p>
           )}
         </div>
