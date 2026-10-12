@@ -143,6 +143,68 @@ function PrintLabelsModal({ docs, onClose, onPrint }: { docs: SkladDoc[]; onClos
   );
 }
 
+// ── Фильтры списка документов: Тип документа, Номер, Статус, Дата (период) ────
+
+const ALL_TYPES = "Все типы";
+const ALL_STATUSES = "Все статусы";
+// Дата фильтра из <input type="date"> (yyyy-mm-dd) в число, сравнимое с parseRuDate
+const isoToNum = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return y * 100000000 + m * 1000000 + d * 10000;
+};
+const dateCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
+
+function useDocFilters(docs: SkladDoc[], onChange: () => void) {
+  const { statusDicts } = useApp();
+  const [type, setType] = useState(ALL_TYPES);
+  const [number, setNumber] = useState("");
+  const [status, setStatus] = useState(ALL_STATUSES);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  // При изменении фильтра — на первую страницу
+  const upd = <T,>(set: (v: T) => void) => (v: T) => { set(v); onChange(); };
+
+  const types = [ALL_TYPES, ...Array.from(new Set(docs.map(d => d.type))).sort()];
+  // Статусы — из справочника «Статусы складских документов»
+  const dictStatuses = statusDicts.find(d => d.group === "dokumenty")?.items.map(i => i.name) ?? [];
+  const statuses = [ALL_STATUSES, ...dictStatuses, ...docs.map(d => d.status).filter(st => !dictStatuses.includes(st))]
+    .filter((v, i, a) => a.indexOf(v) === i);
+
+  const q = number.trim().toLowerCase();
+  const from = dateFrom ? isoToNum(dateFrom) : 0;
+  const to = dateTo ? isoToNum(dateTo) + 9999 : Infinity;
+  const filtered = docs.filter(d => {
+    const dt = parseRuDate(d.date);
+    return (type === ALL_TYPES || d.type === type)
+      && (!q || d.number.toLowerCase().includes(q))
+      && (status === ALL_STATUSES || d.status === status)
+      && dt >= from && dt <= to;
+  });
+
+  const reset = () => { setType(ALL_TYPES); setNumber(""); setStatus(ALL_STATUSES); setDateFrom(""); setDateTo(""); onChange(); };
+
+  const bar = (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 grid grid-cols-6 gap-3 items-end">
+      <Field label="Тип документа"><Select value={type} options={types} onChange={upd(setType)} /></Field>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Номер</label>
+        <SearchInput value={number} onChange={upd(setNumber)} placeholder="Поиск по номеру..." />
+      </div>
+      <Field label="Статус"><Select value={status} options={statuses} onChange={upd(setStatus)} /></Field>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Дата с</label>
+        <input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => upd(setDateFrom)(e.target.value)} className={dateCls} />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Дата по</label>
+        <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => upd(setDateTo)(e.target.value)} className={dateCls} />
+      </div>
+      <button onClick={reset} className="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
+    </div>
+  );
+  return { filtered, bar };
+}
+
 // ── Список документов (общий шаблон) ─────────────────────────────────────────
 
 function DocList({
@@ -164,9 +226,8 @@ function DocList({
 }) {
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("Все статусы");
   const [page, setPage] = useState(1);
+  const { filtered, bar } = useDocFilters(docs, () => setPage(1));
   // Экраны: …/new, …/view/:id, …/edit/:id, …/labels
   const screen = useScreen();
   const viewDoc = docs.find(d => d.id === screen.after("view")) ?? null;
@@ -174,11 +235,6 @@ function DocList({
   const showModal = screen.has("new");
   const showPrintLabels = screen.has("labels");
 
-  const filtered = docs.filter(d => {
-    const matchSearch = !search || d.number.toLowerCase().includes(search.toLowerCase()) || d.type.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus === "Все статусы" || d.status === filterStatus;
-    return matchSearch && matchStatus;
-  });
   const { sorted, sort, toggleSort } = useSort(filtered, {
     date: d => parseRuDate(d.date),
     type: d => d.type,
@@ -208,19 +264,7 @@ function DocList({
         }
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex items-end gap-3 flex-wrap">
-        <div className="flex-1 min-w-48">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Тип документа / Номер</label>
-          <SearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
-        </div>
-        <div className="min-w-36">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {["Все статусы", "Оформлено", "Редактирование"].map(o => <option key={o}>{o}</option>)}
-          </select>
-        </div>
-        <button onClick={() => { setSearch(""); setFilterStatus("Все статусы"); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Сбросить</button>
-      </div>
+      {bar}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -252,6 +296,9 @@ function DocList({
                 </td>
               </tr>
             ))}
+            {pageItems.length === 0 && (
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
+            )}
           </tbody>
         </table>
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
@@ -313,8 +360,9 @@ export function VydachaList() {
   const editDoc = vydachaDocs.find(d => d.id === screen.after("edit")) ?? null;
   const showNew = screen.has("new");
   const perPage = 8;
+  const { filtered, bar } = useDocFilters(vydachaDocs, () => setPage(1));
 
-  const { sorted, sort, toggleSort } = useSort(vydachaDocs, {
+  const { sorted, sort, toggleSort } = useSort(filtered, {
     date: d => parseRuDate(d.date),
     type: d => d.type,
     number: d => d.number,
@@ -336,6 +384,7 @@ export function VydachaList() {
           </>
         }
       />
+      {bar}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -350,7 +399,7 @@ export function VydachaList() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {sorted.map(doc => (
+            {sorted.slice((page - 1) * perPage, page * perPage).map(doc => (
               <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-500">{doc.date}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{doc.type}</td>
@@ -366,9 +415,12 @@ export function VydachaList() {
                 </td>
               </tr>
             ))}
+            {sorted.length === 0 && (
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
+            )}
           </tbody>
         </table>
-        <Pagination page={page} total={vydachaDocs.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
       </div>
 
       {viewDoc && <VydachaDocModal key={viewDoc.id} doc={viewDoc} onClose={() => screen.close("view")} onSave={() => screen.close("view")} readOnly />}
