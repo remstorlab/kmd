@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import { PageHeader, Btn, Modal, Field, Input, Select, useToast, Toast, SortTh, useSort } from "../components/ui";
 import { Metal, baseMetal } from "../data/mock";
-import { ClipboardCheck, Coins, Gem, FileText, LucideIcon } from "lucide-react";
+import { ClipboardCheck, Coins, Gem, FileText, Scale, LucideIcon } from "lucide-react";
 import { useScreen } from "../router";
 import OpisHraneniyaModal from "../components/OpisHraneniyaModal";
+import BalansDmModal from "../components/BalansDmModal";
 
 const METAL_CODE: Record<Metal, string> = { Au: "1", Ag: "2", Pt: "3", Pd: "4" };
 
@@ -210,6 +211,13 @@ const reports: { slug: string; title: string; desc: string; icon: LucideIcon; da
     data: [],
   },
   {
+    slug: "balans-sdm",
+    title: "Баланс наличия и движения ДМ по СДМ",
+    desc: "Факт, учётный баланс и отклонения по сырью и сплавам; остатки, приход и расход драгоценных металлов за период",
+    icon: Scale,
+    data: [],
+  },
+  {
     slug: "nakladnye",
     title: "Накладные",
     desc: "Сводный журнал приходных и расходных документов за период",
@@ -228,6 +236,8 @@ export function Otchetnost() {
   const screen = useScreen();
   const showOpisHraneniya = screen.has("opis-hraneniya");
   const setShowOpisHraneniya = (open: boolean) => (open ? screen.openTop("opis-hraneniya") : screen.close("opis-hraneniya"));
+  const showBalans = screen.has("balans-sdm");
+  const setShowBalans = (open: boolean) => (open ? screen.openTop("balans-sdm") : screen.close("balans-sdm"));
   const viewReport = reports.find(r => r.slug === screen.after("report")) ?? null;
   const showInvOpis = screen.has("inv-opis");
   const setViewReport = (r: typeof reports[0] | null) => (r ? screen.openTop("report", r.slug) : screen.close("report"));
@@ -262,7 +272,7 @@ export function Otchetnost() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Btn onClick={() => r.slug === "inv-opis" ? setShowInvOpis(true) : r.slug === "opis-hraneniya" ? setShowOpisHraneniya(true) : setViewReport(r)}>Просмотр</Btn>
+              <Btn onClick={() => r.slug === "inv-opis" ? setShowInvOpis(true) : r.slug === "opis-hraneniya" ? setShowOpisHraneniya(true) : r.slug === "balans-sdm" ? setShowBalans(true) : setViewReport(r)}>Просмотр</Btn>
               <Btn variant="secondary" onClick={() => show(`Отчёт «${r.title}» экспортирован`)}>Экспорт</Btn>
             </div>
           </div>
@@ -314,6 +324,7 @@ export function Otchetnost() {
       )}
       {showInvOpis && <InventarizationOpisModal onClose={() => setShowInvOpis(false)} />}
       {showOpisHraneniya && <OpisHraneniyaModal onClose={() => setShowOpisHraneniya(false)} />}
+      {showBalans && <BalansDmModal onClose={() => setShowBalans(false)} />}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );

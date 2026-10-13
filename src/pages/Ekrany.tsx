@@ -103,6 +103,8 @@ export function useScreenGroups(): Group[] {
       { title: "Акт по итогам инвентаризации НЗП", path: `${P["otchetnost"]}/report/akt-nzp` },
       { title: "Опись хранения драгоценных материалов", path: `${P["otchetnost"]}/opis-hraneniya` },
       { title: "Опись хранения драгоценных материалов — сформирована", path: `${P["otchetnost"]}/opis-hraneniya/sformirovana` },
+      { title: "Баланс наличия и движения ДМ по СДМ", path: `${P["otchetnost"]}/balans-sdm` },
+      { title: "Баланс наличия и движения ДМ по СДМ — сформирован", path: `${P["otchetnost"]}/balans-sdm/sformirovan` },
       { title: "Накладные", path: `${P["otchetnost"]}/report/nakladnye` },
       { title: "Инвентаризационная опись ДМ", path: `${P["otchetnost"]}/inv-opis` },
       { title: "Инвентаризационная опись ДМ — сформирована", path: `${P["otchetnost"]}/inv-opis/sformirovana` },
