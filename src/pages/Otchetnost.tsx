@@ -65,8 +65,8 @@ function InventarizationOpisModal({ onClose }: { onClose: () => void }) {
       }
     >
       <div className="grid grid-cols-3 gap-4 mb-5 items-end">
-        <Field label="На дату"><Input value={onDate} onChange={setOnDate} placeholder="ДД.ММ.ГГГГ" /></Field>
-        <Field label="Склад"><Select value={sklad} options={["Склад ДМ №1", "Склад ДМ №2"]} onChange={setSklad} /></Field>
+        <Field label="На дату" required><Input value={onDate} onChange={setOnDate} placeholder="ДД.ММ.ГГГГ" /></Field>
+        <Field label="Склад" required><Select value={sklad} options={["Склад ДМ №1", "Склад ДМ №2"]} onChange={setSklad} /></Field>
         <Btn onClick={() => setGenerated(true)}>Сформировать</Btn>
       </div>
 

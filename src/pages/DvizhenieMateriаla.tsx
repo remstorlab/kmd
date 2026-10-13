@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
+  Field, RequiredMark, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
 } from "../components/ui";
 import { Operation, OperPosition, OperStage, ShihtovayaKarta, vydachaPositions, vozvratPositions, opVydacha, opVozvrat, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
 import { Eye, Plus, Paperclip } from "lucide-react";
@@ -37,11 +37,11 @@ function SpisanieModal({ delta, onClose, onConfirm }: { delta: number; onClose: 
         <span className="text-yellow-800 font-medium">Превышение допустимой дельты: {delta >= 0 ? "+" : "−"}{Math.abs(delta).toFixed(2)} г</span>
       </div>
       <div className="mb-4">
-        <label className="block text-xs font-medium text-gray-500 mb-1">Причина списания</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Причина списания<RequiredMark /></label>
         <Textarea value={reason} onChange={setReason} placeholder="Укажите причину списания разницы весов…" rows={4} />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-2">Акт списания (обязательно)</label>
+        <label className="block text-xs font-medium text-gray-500 mb-2">Акт списания<RequiredMark /></label>
         {files.length === 0 ? (
           <div
             className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 transition-colors"
@@ -1176,22 +1176,22 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
       {/* Fields */}
       <div className="grid grid-cols-2 gap-4 mb-5">
-        <Field label="Тип операции">
+        <Field label="Тип операции" required={!headRo}>
           <Select value={type} options={withCurrent(spravValues("Типы операций"), type)} onChange={setType} disabled={headRo || !!op} />
         </Field>
-        <Field label="Вид операции">
+        <Field label="Вид операции" required={!headRo}>
           <Select value={vid} options={withCurrent(spravValues("Виды операций"), vid)} onChange={changeVid} disabled={headRo || !!op} />
         </Field>
-        <Field label="Тип документа"><Select value={head.docType} options={docTypeOptions} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={headRo || vid === VID_LKI} /></Field>
+        <Field label="Тип документа" required={!headRo}><Select value={head.docType} options={docTypeOptions} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={headRo || vid === VID_LKI} /></Field>
         <Field label="Номер документа"><Input value={head.document} disabled /></Field>
-        <Field label="Дата операции"><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
+        <Field label="Дата операции" required={!headRo}><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
         <Field label="Заказчик"><Select value={head.zakazchik} options={withBlank(["Монетный двор"])} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={headRo} /></Field>
-        <Field label="Подотчётное лицо" full><Select value={head.responsible} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"])} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={headRo} /></Field>
+        <Field label="Подотчётное лицо" required={!headRo} full><Select value={head.responsible} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"])} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={headRo} /></Field>
         {vid === "Плавка" && (
-          <Field label="Номер плавки"><Input value={head.plavkaNo} onChange={v => setHead(h => ({ ...h, plavkaNo: v }))} disabled={headRo} /></Field>
+          <Field label="Номер плавки" required={!headRo}><Input value={head.plavkaNo} onChange={v => setHead(h => ({ ...h, plavkaNo: v }))} disabled={headRo} /></Field>
         )}
         <Field label="Выдал"><Input value={head.vydal} disabled /></Field>
-        <Field label="Получил"><Select value={head.poluchil} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович"])} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={headRo} /></Field>
+        <Field label="Получил" required={!headRo}><Select value={head.poluchil} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович"])} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={headRo} /></Field>
       </div>
 
       {/* Tabs */}

@@ -126,7 +126,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
     : isOrder ? "Приходный ордер" : nakladType;
 
   const typeSelect = (
-    <Field label="Тип документа">
+    <Field label="Тип документа" required={!ro}>
       <Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} disabled={ro || !!doc || onlyNaklad} />
     </Field>
   );
@@ -147,10 +147,10 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
       {isOrder ? (
         <div className="grid grid-cols-3 gap-4 mb-5">
           {typeSelect}
-          <Field label="Номер"><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
-          <Field label="Дата"><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-          <Field label="Отправитель"><Select value={head.otpravitel} options={Array.from(new Set([head.otpravitel, "ООО «Аффинаж-Сервис»", "АО «Металл Инвест»", "ОО «АурумПоставка»"]))} onChange={h("otpravitel")} disabled={ro} /></Field>
-          <Field label="Получатель"><Select value={head.poluchatel} options={SKLADY} onChange={h("poluchatel")} disabled={ro} /></Field>
+          <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
+          <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
+          <Field label="Отправитель" required={!ro}><Select value={head.otpravitel} options={Array.from(new Set([head.otpravitel, "ООО «Аффинаж-Сервис»", "АО «Металл Инвест»", "ОО «АурумПоставка»"]))} onChange={h("otpravitel")} disabled={ro} /></Field>
+          <Field label="Получатель" required={!ro}><Select value={head.poluchatel} options={SKLADY} onChange={h("poluchatel")} disabled={ro} /></Field>
           <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={h("schetFaktura")} disabled={ro} /></Field>
           <Field label="Дата счёт-фактуры"><Input value={head.schetFakturaData} onChange={h("schetFakturaData")} disabled={ro} /></Field>
           <Field label="Номер договора"><Input value={head.dogovor} onChange={h("dogovor")} disabled={ro} /></Field>
@@ -164,8 +164,8 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
           <Field label="Дата платёжного документа"><Input value={head.platDocData} onChange={h("platDocData")} disabled={ro} /></Field>
           <Field label="Лигатурный вес по документу"><Input value={head.ligByDoc} onChange={h("ligByDoc")} disabled={ro} /></Field>
           <Field label="Масса по документу"><Input value={head.massByDoc} onChange={h("massByDoc")} disabled={ro} /></Field>
-          <Field label="Принято лигатурный вес"><Input value={head.ligAccepted} onChange={h("ligAccepted")} disabled={ro} /></Field>
-          <Field label="Принято чистый вес"><Input value={head.netAccepted} onChange={h("netAccepted")} disabled={ro} /></Field>
+          <Field label="Принято лигатурный вес" required={!ro}><Input value={head.ligAccepted} onChange={h("ligAccepted")} disabled={ro} /></Field>
+          <Field label="Принято чистый вес" required={!ro}><Input value={head.netAccepted} onChange={h("netAccepted")} disabled={ro} /></Field>
           <Field label="Цена за единицу, тг"><Input value={head.price} onChange={h("price")} disabled={ro} /></Field>
           <Field label="Сумма в тенге"><Input value={head.sum} onChange={h("sum")} disabled={ro} /></Field>
           <Field label="Позиция годового плана"><Input value={head.planPos} onChange={h("planPos")} disabled={ro} /></Field>
@@ -173,12 +173,12 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
       ) : (
         <div className="grid grid-cols-2 gap-4 mb-5">
           {typeSelect}
-          <Field label="Номер"><Input value={head.nakladNumber} onChange={h("nakladNumber")} disabled={ro} /></Field>
-          <Field label="Дата"><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>
-          <Field label="Заказчик"><Select value={head.zakazchik} options={["Национальный банк", "Монетный двор"]} onChange={h("zakazchik")} disabled={ro} /></Field>
-          <Field label="Склад-отправитель"><Select value={head.skladOtpr} options={Array.from(new Set([head.skladOtpr, "СДМ", "Производственный цех"]))} onChange={h("skladOtpr")} disabled={ro} /></Field>
-          <Field label="Склад-получатель"><Select value={head.skladPoluch} options={SKLADY} onChange={h("skladPoluch")} disabled={ro} /></Field>
-          <Field label="Сотрудник склада-получателя" full><Select value={head.sotrudnik} options={["Петров А.Н.", "Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} onChange={h("sotrudnik")} disabled={ro} /></Field>
+          <Field label="Номер" required={!ro}><Input value={head.nakladNumber} onChange={h("nakladNumber")} disabled={ro} /></Field>
+          <Field label="Дата" required={!ro}><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>
+          <Field label="Заказчик" required={!ro}><Select value={head.zakazchik} options={["Национальный банк", "Монетный двор"]} onChange={h("zakazchik")} disabled={ro} /></Field>
+          <Field label="Склад-отправитель" required={!ro}><Select value={head.skladOtpr} options={Array.from(new Set([head.skladOtpr, "СДМ", "Производственный цех"]))} onChange={h("skladOtpr")} disabled={ro} /></Field>
+          <Field label="Склад-получатель" required={!ro}><Select value={head.skladPoluch} options={SKLADY} onChange={h("skladPoluch")} disabled={ro} /></Field>
+          <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={["Петров А.Н.", "Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} onChange={h("sotrudnik")} disabled={ro} /></Field>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
             <Toggle checked={ownProperty} onChange={setOwnProperty} disabled={ro} label={ownProperty ? "Да" : "Нет"} />

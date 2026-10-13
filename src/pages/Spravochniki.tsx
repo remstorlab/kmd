@@ -145,9 +145,9 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
           }
         >
           <div className="space-y-4">
-            <Field label="Код"><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} /></Field>
-            <Field label={valueLabel}><Input value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} /></Field>
-            <Field label="Статус"><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>
+            <Field label="Код" required><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} /></Field>
+            <Field label={valueLabel} required><Input value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} /></Field>
+            <Field label="Статус" required><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>
           </div>
         </Modal>
       )}
@@ -249,9 +249,9 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
           </>}
         >
           <div className="space-y-4">
-            <Field label="Наименование"><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование статуса" /></Field>
+            <Field label="Наименование" required><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Наименование статуса" /></Field>
             {duplicate && <div className="-mt-2 text-xs text-red-600">Статус с таким наименованием уже есть</div>}
-            <Field label="Цвет">
+            <Field label="Цвет" required>
               <Select value={form.color} options={STATUS_COLORS.map(c => c.value)} optionLabel={v => colorLabel(v as StatusColor)} onChange={v => setForm(f => ({ ...f, color: v as StatusColor }))} />
             </Field>
             <div>
@@ -366,9 +366,9 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
           }
         >
           <div className="space-y-4">
-            <Field label="Код"><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} placeholder="0000" /></Field>
-            <Field label="Наименование"><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
-            <Field label="Краткое наименование"><Input value={form.shortName} onChange={v => setForm(f => ({ ...f, shortName: v }))} /></Field>
+            <Field label="Код" required><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} placeholder="0000" /></Field>
+            <Field label="Наименование" required><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
+            <Field label="Краткое наименование" required><Input value={form.shortName} onChange={v => setForm(f => ({ ...f, shortName: v }))} /></Field>
           </div>
         </Modal>
       )}
@@ -481,8 +481,8 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
           }
         >
           <div className="space-y-4">
-            <Field label="Код"><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} /></Field>
-            <Field label="Наименование"><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
+            <Field label="Код" required><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} /></Field>
+            <Field label="Наименование" required><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
           </div>
         </Modal>
       )}
@@ -636,9 +636,9 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
           }
         >
           <div className="space-y-4">
-            <Field label="Склад"><Select value={form.sklad} options={SKLAD_OPTIONS} onChange={v => setForm(f => ({ ...f, sklad: v }))} /></Field>
-            <Field label="Номер сейфа"><Input value={form.seyfNum} onChange={v => setForm(f => ({ ...f, seyfNum: v }))} placeholder="2" /></Field>
-            <Field label="Номер полки (необязательно)"><Input value={form.polkaNum} onChange={v => setForm(f => ({ ...f, polkaNum: v }))} placeholder="5" /></Field>
+            <Field label="Склад" required><Select value={form.sklad} options={SKLAD_OPTIONS} onChange={v => setForm(f => ({ ...f, sklad: v }))} /></Field>
+            <Field label="Номер сейфа" required><Input value={form.seyfNum} onChange={v => setForm(f => ({ ...f, seyfNum: v }))} placeholder="2" /></Field>
+            <Field label="Номер полки"><Input value={form.polkaNum} onChange={v => setForm(f => ({ ...f, polkaNum: v }))} placeholder="5" /></Field>
             <Toggle checked={form.available} onChange={v => setForm(f => ({ ...f, available: v }))} label="Доступно для использования" />
           </div>
         </Modal>
@@ -809,8 +809,8 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
           }
         >
           <div className="space-y-4">
-            <Field label="Наименование"><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Золото" /></Field>
-            <Field label="Краткое наименование (обозначение)"><Input value={form.shortName} onChange={v => setForm(f => ({ ...f, shortName: v }))} placeholder="Au" /></Field>
+            <Field label="Наименование" required><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Золото" /></Field>
+            <Field label="Краткое наименование (обозначение)" required><Input value={form.shortName} onChange={v => setForm(f => ({ ...f, shortName: v }))} placeholder="Au" /></Field>
             <ChemFlagCheckbox label="Отображать в ДМ (поле выводится в блоке «Химический состав» форм позиций ДМ)" checked={form.showDm} onChange={v => setForm(f => ({ ...f, showDm: v }))} />
             <ChemFlagCheckbox label="Отображать в ШК (колонка в таблице шихтовой карты и поле доп. материала)" checked={form.showShk} onChange={v => setForm(f => ({ ...f, showShk: v }))} />
           </div>

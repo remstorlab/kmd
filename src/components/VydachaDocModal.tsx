@@ -202,7 +202,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
         </div>
       )}
       <div className="grid grid-cols-3 gap-4 mb-5">
-        <Field label="Тип документа">
+        <Field label="Тип документа" required={!ro}>
           <Select
             value={DOC_TYPE[kind]}
             options={[DOC_TYPE["ГП"], DOC_TYPE["ДМ"]]}
@@ -210,16 +210,16 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
             disabled={ro || !!fixedKind || !!doc}
           />
         </Field>
-        <Field label="Номер"><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
-        <Field label="Дата"><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-        <Field label="Склад-отправитель"><Select value={head.sender} options={Array.from(new Set([head.sender, ...SENDERS[kind]]))} onChange={h("sender")} disabled={ro} /></Field>
-        <Field label="Получатель"><Select value={head.receiver} options={receivers} onChange={h("receiver")} disabled={ro} /></Field>
+        <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
+        <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
+        <Field label="Склад-отправитель" required={!ro}><Select value={head.sender} options={Array.from(new Set([head.sender, ...SENDERS[kind]]))} onChange={h("sender")} disabled={ro} /></Field>
+        <Field label="Получатель" required={!ro}><Select value={head.receiver} options={receivers} onChange={h("receiver")} disabled={ro} /></Field>
         <Field label="Доверенность получателя"><Input value={head.doverennost} onChange={h("doverennost")} placeholder="№ и дата доверенности" disabled={ro} /></Field>
         <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={h("schetFaktura")} placeholder="СФ-XXXX" disabled={ro} /></Field>
         <Field label="Дата счёт-фактуры"><Input value={head.schetFakturaDate} onChange={h("schetFakturaDate")} disabled={ro} /></Field>
         <Field label="Номер договора"><Input value={head.dogovor} onChange={h("dogovor")} placeholder="ДОГ-XXXX" disabled={ro} /></Field>
         <div className="col-span-3">
-          <Field label="Основание выдачи"><Input value={head.osnovanie} onChange={h("osnovanie")} placeholder="Например: реализация по договору" disabled={ro} /></Field>
+          <Field label="Основание выдачи" required={!ro}><Input value={head.osnovanie} onChange={h("osnovanie")} placeholder="Например: реализация по договору" disabled={ro} /></Field>
         </div>
       </div>
 

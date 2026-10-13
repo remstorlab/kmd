@@ -228,10 +228,10 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       )}
 
       <div className="grid grid-cols-2 gap-4 mb-5">
-        <Field label="Наименование" full><Input value={name} onChange={setName} placeholder="Наименование шихты" disabled={ro} /></Field>
-        <Field label="Номер плавки"><Input value={plavkaNo} onChange={setPlavkaNo} placeholder="П-2026-XXXX" disabled={ro} /></Field>
+        <Field label="Наименование" required={!ro} full><Input value={name} onChange={setName} placeholder="Наименование шихты" disabled={ro} /></Field>
+        <Field label="Номер плавки" required={!ro}><Input value={plavkaNo} onChange={setPlavkaNo} placeholder="П-2026-XXXX" disabled={ro} /></Field>
         <Field label="Номер оборота"><Input value={oborotNo} onChange={setOborotNo} disabled={ro} /></Field>
-        <Field label="Назначение слитков"><Select value={naznachenie} options={["Слитки для реализации", "Производство ГП"]} onChange={setNaznachenie} disabled={ro} /></Field>
+        <Field label="Назначение слитков" required={!ro}><Select value={naznachenie} options={["Слитки для реализации", "Производство ГП"]} onChange={setNaznachenie} disabled={ro} /></Field>
         <Field label="Основание" full><Input value={osnovanie} onChange={setOsnovanie} disabled={ro} /></Field>
       </div>
 
@@ -385,9 +385,9 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           }}>Добавить</Btn></>
         }>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Наименование материала" full><Input value={dopForm.name} onChange={v => setDopForm(f => ({ ...f, name: v }))} placeholder="Название" /></Field>
-            <Field label="Ед. измерения"><Select value={dopForm.unit} options={["г", "кг", "шт"]} onChange={v => setDopForm(f => ({ ...f, unit: v }))} /></Field>
-            <Field label="Масса лигатурная, г"><Input value={dopForm.ves} onChange={v => setDopForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>
+            <Field label="Наименование материала" required full><Input value={dopForm.name} onChange={v => setDopForm(f => ({ ...f, name: v }))} placeholder="Название" /></Field>
+            <Field label="Ед. измерения" required><Select value={dopForm.unit} options={["г", "кг", "шт"]} onChange={v => setDopForm(f => ({ ...f, unit: v }))} /></Field>
+            <Field label="Масса лигатурная, г" required><Input value={dopForm.ves} onChange={v => setDopForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>
           </div>
           <div className="mt-4">
             <ChemCompositionBlock scope="shk" value={dopForm.chem} onChange={chem => setDopForm(f => ({ ...f, chem }))} />

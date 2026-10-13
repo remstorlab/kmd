@@ -359,18 +359,26 @@ export function SortTh({
 
 // ── Field ────────────────────────────────────────────────────────────────────
 
+// Красная «*» после названия поля — поле обязательно для заполнения
+export function RequiredMark() {
+  return <span className="text-red-500 ml-0.5" title="Обязательное поле">*</span>;
+}
+
 export function Field({
   label,
   children,
   full = false,
+  required = false,
 }: {
   label: string;
   children: React.ReactNode;
   full?: boolean;
+  // Обязательное поле (в режиме просмотра не передаётся)
+  required?: boolean;
 }) {
   return (
     <div className={full ? "col-span-2" : ""}>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-gray-500 mb-1">{label}{required && <RequiredMark />}</label>
       {children}
     </div>
   );

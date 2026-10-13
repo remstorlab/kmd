@@ -221,7 +221,7 @@ function NewRoleModal({ role, readOnly = false, onClose, onSave }: { role?: Role
       }
     >
       <div className="mb-5">
-        <Field label="Наименование роли"><Input value={roleName} onChange={setRoleName} placeholder="Введите наименование роли" disabled={readOnly} /></Field>
+        <Field label="Наименование роли" required={!readOnly}><Input value={roleName} onChange={setRoleName} placeholder="Введите наименование роли" disabled={readOnly} /></Field>
       </div>
       <div className="overflow-x-auto border border-gray-200 rounded-lg">
         <table className="w-full text-sm">
@@ -287,13 +287,13 @@ function NewUserModal({ user, onClose, onSave }: { user?: AppUser | null; onClos
       }
     >
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Username"><Input value={form.username} onChange={v => setForm(f => ({ ...f, username: v }))} placeholder="login" /></Field>
-        <Field label="Пароль"><Input value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} placeholder="••••••••" /></Field>
-        <Field label="ФИО" full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Иванов Иван Иванович" /></Field>
+        <Field label="Username" required><Input value={form.username} onChange={v => setForm(f => ({ ...f, username: v }))} placeholder="login" /></Field>
+        <Field label="Пароль" required><Input value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} placeholder="••••••••" /></Field>
+        <Field label="ФИО" required full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Иванов Иван Иванович" /></Field>
         <Field label="Должность"><Input value={form.position} onChange={v => setForm(f => ({ ...f, position: v }))} placeholder="Кладовщик" /></Field>
         <Field label="Электронная почта"><Input value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="email@company.ru" /></Field>
         <Field label="Телефон"><Input value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} placeholder="+7 (___) ___-__-__" /></Field>
-        <Field label="Роль" full>
+        <Field label="Роль" required full>
           <Select
             value={form.role}
             options={["Администратор", "Сотрудник склада ДМ", "Сотрудник ПТО", "Технолог"]}
@@ -466,19 +466,19 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
           Аутентификация пользователей должна осуществляться по логину и паролю с обязательным соблюдением парольной политики.
         </p>
         <div className="grid grid-cols-3 gap-4 mb-4">
-          <Field label="Минимальная длина пароля, символов">
+          <Field label="Минимальная длина пароля, символов" required>
             <Input value={form.minLength} onChange={v => setForm(f => ({ ...f, minLength: v }))} placeholder="8" />
           </Field>
-          <Field label="Минимальное число типов символов">
+          <Field label="Минимальное число типов символов" required>
             <Select value={form.minCharTypes} options={["2", "3", "4"]} onChange={v => setForm(f => ({ ...f, minCharTypes: v }))} />
           </Field>
-          <Field label="Периодичность смены пароля, дней">
+          <Field label="Периодичность смены пароля, дней" required>
             <Input value={form.expiryDays} onChange={v => setForm(f => ({ ...f, expiryDays: v }))} placeholder="90" />
           </Field>
-          <Field label="Запрет повтора: последних паролей">
+          <Field label="Запрет повтора: последних паролей" required>
             <Input value={form.historyDepth} onChange={v => setForm(f => ({ ...f, historyDepth: v }))} placeholder="3" />
           </Field>
-          <Field label="Минимальное отличие пароля, позиций">
+          <Field label="Минимальное отличие пароля, позиций" required>
             <Input value={form.minDiffPositions} onChange={v => setForm(f => ({ ...f, minDiffPositions: v }))} placeholder="3" />
           </Field>
         </div>
@@ -496,7 +496,7 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
           Сессия пользователя должна автоматически завершаться по истечении установленного периода неактивности.
         </p>
         <div className="max-w-xs">
-          <Field label="Таймаут неактивности сессии, минут">
+          <Field label="Таймаут неактивности сессии, минут" required>
             <Input value={form.sessionTimeoutMinutes} onChange={v => setForm(f => ({ ...f, sessionTimeoutMinutes: v }))} placeholder="30" />
           </Field>
         </div>

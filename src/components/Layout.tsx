@@ -57,9 +57,9 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
       </>}
     >
       <div className="space-y-4">
-        <Field label="Текущий пароль"><Input value={oldPwd} onChange={setOldPwd} placeholder="••••••••" /></Field>
-        <Field label="Новый пароль"><Input value={newPwd} onChange={setNewPwd} placeholder="••••••••" /></Field>
-        <Field label="Подтверждение нового пароля"><Input value={confirmPwd} onChange={setConfirmPwd} placeholder="••••••••" /></Field>
+        <Field label="Текущий пароль" required><Input value={oldPwd} onChange={setOldPwd} placeholder="••••••••" /></Field>
+        <Field label="Новый пароль" required><Input value={newPwd} onChange={setNewPwd} placeholder="••••••••" /></Field>
+        <Field label="Подтверждение нового пароля" required><Input value={confirmPwd} onChange={setConfirmPwd} placeholder="••••••••" /></Field>
 
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-500 space-y-1">
           <div>Требования к паролю:</div>
