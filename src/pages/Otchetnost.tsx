@@ -4,6 +4,7 @@ import { PageHeader, Btn, Modal, Field, Input, Select, useToast, Toast, SortTh, 
 import { Metal, baseMetal } from "../data/mock";
 import { ClipboardCheck, Coins, Gem, FileText, LucideIcon } from "lucide-react";
 import { useScreen } from "../router";
+import OpisHraneniyaModal from "../components/OpisHraneniyaModal";
 
 const METAL_CODE: Record<Metal, string> = { Au: "1", Ag: "2", Pt: "3", Pd: "4" };
 
@@ -202,14 +203,11 @@ const reports: { slug: string; title: string; desc: string; icon: LucideIcon; da
     ],
   },
   {
-    slug: "opis-kamney",
-    title: "Опись хранения драгоценных камней",
-    desc: "Инвентаризация драгоценных камней в производстве и на хранении",
+    slug: "opis-hraneniya",
+    title: "Опись хранения драгоценных материалов",
+    desc: "Опись драгоценных металлов и камней на хранении по сейфам и полкам",
     icon: Gem,
-    data: [
-      { nom: "DK-001", name: "Бриллиант 0.5ct", kol: "8 шт", ves: "Сейф №2", status: "Соответствует" },
-      { nom: "DK-002", name: "Изумруд 1ct", kol: "3 шт", ves: "Сейф №2", status: "Соответствует" },
-    ],
+    data: [],
   },
   {
     slug: "nakladnye",
@@ -226,8 +224,10 @@ const reports: { slug: string; title: string; desc: string; icon: LucideIcon; da
 
 export function Otchetnost() {
   const { toast, show, clear } = useToast();
-  // Экраны: /otchetnost/report/:slug, /otchetnost/inv-opis
+  // Экраны: /otchetnost/report/:slug, /otchetnost/inv-opis, /otchetnost/opis-hraneniya
   const screen = useScreen();
+  const showOpisHraneniya = screen.has("opis-hraneniya");
+  const setShowOpisHraneniya = (open: boolean) => (open ? screen.openTop("opis-hraneniya") : screen.close("opis-hraneniya"));
   const viewReport = reports.find(r => r.slug === screen.after("report")) ?? null;
   const showInvOpis = screen.has("inv-opis");
   const setViewReport = (r: typeof reports[0] | null) => (r ? screen.openTop("report", r.slug) : screen.close("report"));
@@ -262,7 +262,7 @@ export function Otchetnost() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Btn onClick={() => r.title === "Инвентаризационная опись ДМ" ? setShowInvOpis(true) : setViewReport(r)}>Просмотр</Btn>
+              <Btn onClick={() => r.slug === "inv-opis" ? setShowInvOpis(true) : r.slug === "opis-hraneniya" ? setShowOpisHraneniya(true) : setViewReport(r)}>Просмотр</Btn>
               <Btn variant="secondary" onClick={() => show(`Отчёт «${r.title}» экспортирован`)}>Экспорт</Btn>
             </div>
           </div>
@@ -313,6 +313,7 @@ export function Otchetnost() {
         </Modal>
       )}
       {showInvOpis && <InventarizationOpisModal onClose={() => setShowInvOpis(false)} />}
+      {showOpisHraneniya && <OpisHraneniyaModal onClose={() => setShowOpisHraneniya(false)} />}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );

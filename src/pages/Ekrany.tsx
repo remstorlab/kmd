@@ -101,7 +101,8 @@ export function useScreenGroups(): Group[] {
     { title: "Отчётность", screens: [
       { title: "Отчётность", path: P["otchetnost"] },
       { title: "Акт по итогам инвентаризации НЗП", path: `${P["otchetnost"]}/report/akt-nzp` },
-      { title: "Опись хранения драгоценных камней", path: `${P["otchetnost"]}/report/opis-kamney` },
+      { title: "Опись хранения драгоценных материалов", path: `${P["otchetnost"]}/opis-hraneniya` },
+      { title: "Опись хранения драгоценных материалов — сформирована", path: `${P["otchetnost"]}/opis-hraneniya/sformirovana` },
       { title: "Накладные", path: `${P["otchetnost"]}/report/nakladnye` },
       { title: "Инвентаризационная опись ДМ", path: `${P["otchetnost"]}/inv-opis` },
       { title: "Инвентаризационная опись ДМ — сформирована", path: `${P["otchetnost"]}/inv-opis/sformirovana` },

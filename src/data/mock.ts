@@ -282,7 +282,14 @@ export const initialDMItems: DMItem[] = [
   { id: "dm6", name: "Слиток платины ПлА-1", nomenkl: "5015376", klass: "Слиток", metal: "4000", qty: 1, proba: 999, ligWeight: 300.00, netWeight: 299.50, location: "Сейф №1, Полка 3", status: "На складе", chem: { pt: "299.50" } },
   { id: "dm7", name: "Лом золота 585", nomenkl: "5015377", klass: "Скрап", metal: "1000", qty: 1, proba: 585, ligWeight: 88.40, netWeight: 51.71, location: "Сейф №2, Полка 2", status: "На складе", chem: { au: "51.71" } },
   { id: "dm8", name: "Золотой порошок Au", nomenkl: "5015378", klass: "Гранулы", metal: "1000", qty: 1, proba: 999, ligWeight: 25.00, netWeight: 24.95, location: "Сейф №3, Полка 3", status: "Резерв", chem: { au: "24.95" } },
+  // Драгоценные камни: qty — штук, ligWeight — масса камней, г (1 кар = 0,2 г), металлов в чистоте нет
+  { id: "dm9", name: "Бриллиант Кр57 0,05 кар", nomenkl: "5015379", klass: "Драгоценные камни", metal: "0050", qty: 120, proba: 0, ligWeight: 1.20, netWeight: 0, location: "Сейф №2, Полка 1", status: "На складе" },
+  { id: "dm10", name: "Изумруд огранённый 1 кар", nomenkl: "5015380", klass: "Драгоценные камни", metal: "0050", qty: 3, proba: 0, ligWeight: 0.60, netWeight: 0, location: "Сейф №2, Полка 1", status: "На складе" },
 ];
+
+// Класс драгоценных камней (в описях масса показывается в каратах)
+export const STONE_KLASS = "Драгоценные камни";
+export const isStoneKlass = (klass: string) => klass === STONE_KLASS;
 
 // --- Складские документы ---
 export const initialSkladDocs: SkladDoc[] = [
@@ -838,6 +845,7 @@ export const initialMaterialClasses: MaterialClass[] = [
   { code: "Скр", name: "Скрап" },
   { code: "ОШ", name: "Остатки шихты" },
   { code: "Эл", name: "Электролит" },
+  { code: "ДК", name: "Драгоценные камни" },
 ];
 
 // --- Места хранения (Сейф / Полка, принадлежат складу из справочника «Склады») ---
