@@ -100,7 +100,8 @@ export function useScreenGroups(): Group[] {
     ].filter(Boolean) as Screen[] },
     { title: "Отчётность", screens: [
       { title: "Отчётность", path: P["otchetnost"] },
-      { title: "Акт по итогам инвентаризации НЗП", path: `${P["otchetnost"]}/report/akt-nzp` },
+      { title: "Акт по итогам инвентаризации НЗП", path: `${P["otchetnost"]}/akt-nzp` },
+      { title: "Акт по итогам инвентаризации НЗП — сформирован", path: `${P["otchetnost"]}/akt-nzp/sformirovan` },
       { title: "Опись хранения драгоценных материалов", path: `${P["otchetnost"]}/opis-hraneniya` },
       { title: "Опись хранения драгоценных материалов — сформирована", path: `${P["otchetnost"]}/opis-hraneniya/sformirovana` },
       { title: "Баланс наличия и движения ДМ по СДМ", path: `${P["otchetnost"]}/balans-sdm` },
