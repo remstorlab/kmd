@@ -50,8 +50,8 @@ export function SkladyHub() {
 function GPViewModal({ item, onClose }: { item: GPItem; onClose: () => void }) {
   const codeLabel = useMaterialCodeLabel();
   return (
-    <Modal title="Просмотр позиции ГП" onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Закрыть</Btn>}>
-      <div className="grid grid-cols-2 gap-4">
+    <Modal title="Просмотр позиции ГП" wide onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Закрыть</Btn>}>
+      <div className="grid grid-cols-4 gap-4">
         <Field label="Наименование"><Input value={item.name} disabled /></Field>
         <Field label="Номенклатурный №"><Input value={item.nomenkl} disabled /></Field>
         <Field label="Количество"><Input value={`${item.qty} ${item.unit}`} disabled /></Field>

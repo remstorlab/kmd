@@ -227,7 +227,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 mb-5">
+      <div className="grid grid-cols-4 gap-4 mb-5">
         <Field label="Наименование" required={!ro} full><Input value={name} onChange={setName} placeholder="Наименование шихты" disabled={ro} /></Field>
         <Field label="Номер плавки" required={!ro}><Input value={plavkaNo} onChange={setPlavkaNo} placeholder="П-2026-XXXX" disabled={ro} /></Field>
         <Field label="Номер оборота"><Input value={oborotNo} onChange={setOborotNo} disabled={ro} /></Field>
@@ -384,7 +384,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
             show("Материал добавлен");
           }}>Добавить</Btn></>
         }>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <Field label="Наименование материала" required full><Input value={dopForm.name} onChange={v => setDopForm(f => ({ ...f, name: v }))} placeholder="Название" /></Field>
             <Field label="Ед. измерения" required><Select value={dopForm.unit} options={["г", "кг", "шт"]} onChange={v => setDopForm(f => ({ ...f, unit: v }))} /></Field>
             <Field label="Масса лигатурная, г" required><Input value={dopForm.ves} onChange={v => setDopForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>

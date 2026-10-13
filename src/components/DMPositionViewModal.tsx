@@ -24,8 +24,8 @@ const val = (v: number | null | undefined) => (v === null || v === undefined ? "
 export default function DMPositionViewModal({ item, onClose }: { item: DMPositionView; onClose: () => void }) {
   const codeLabel = useMaterialCodeLabel();
   return (
-    <Modal title="Просмотр позиции ДМ" onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Закрыть</Btn>}>
-      <div className="grid grid-cols-2 gap-4 mb-4">
+    <Modal title="Просмотр позиции ДМ" wide onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Закрыть</Btn>}>
+      <div className="grid grid-cols-4 gap-4 mb-4">
         <Field label="Наименование" full><Input value={item.name} disabled /></Field>
         <Field label="Номенкл. №"><Input value={item.nomenkl} disabled /></Field>
         <Field label="Класс"><Input value={item.klass} disabled /></Field>

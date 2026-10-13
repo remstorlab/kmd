@@ -98,6 +98,7 @@ export function Modal({
   children,
   footer,
   wide = false,
+  largeWide = false,
   extraWide = false,
   fullWide = false,
 }: {
@@ -105,7 +106,11 @@ export function Modal({
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  // Формы второго уровня (позиция ДМ, пользователь и т.п.)
   wide?: boolean;
+  // Модалки подбора второго уровня с таблицами — чуть уже модалки первого уровня
+  largeWide?: boolean;
+  // Модалки первого уровня, открываемые из реестров (документы, операции)
   extraWide?: boolean;
   // Почти во всю ширину экрана — для широких таблиц (конструктор шихтовой карты)
   fullWide?: boolean;
@@ -116,7 +121,11 @@ export function Modal({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const maxW = fullWide ? "max-w-[96vw]" : extraWide ? "max-w-5xl" : wide ? "max-w-3xl" : "max-w-xl";
+  const maxW = fullWide ? "max-w-[96vw]"
+    : extraWide ? "max-w-[min(92vw,1680px)]"
+    : largeWide ? "max-w-[min(86vw,1480px)]"
+    : wide ? "max-w-6xl"
+    : "max-w-2xl";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

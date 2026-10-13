@@ -111,7 +111,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         <Btn onClick={save} disabled={!canSave}>{mode === "add" ? (canMany && many && count >= 2 ? `Добавить (${count})` : "Добавить") : "Сохранить"}</Btn>
       </>}
     >
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-4 gap-4 mb-4">
         <Field label="Номенкл. номер"><Input value={form.nomenkl} disabled /></Field>
         <Field label="Класс" required={!ro}><KlassSelect value={form.klass} onChange={set("klass")} disabled={ro} /></Field>
         <Field label="Код материала" required={!ro}><MaterialCodeSelect value={form.code} onChange={set("code")} disabled={ro} /></Field>

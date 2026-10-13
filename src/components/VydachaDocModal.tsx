@@ -201,7 +201,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
           Накладная оформлена: позиции выданы со склада и переведены в статус «Закрыта». Состав позиций изменить нельзя.
         </div>
       )}
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-4 gap-4 mb-5">
         <Field label="Тип документа" required={!ro}>
           <Select
             value={DOC_TYPE[kind]}

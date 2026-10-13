@@ -269,7 +269,6 @@ function NewUserModal({ user, onClose, onSave }: { user?: AppUser | null; onClos
     <Modal
       title={user ? "Редактировать пользователя" : "Новый пользователь"}
       onClose={onClose}
-      wide
       footer={
         <>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>

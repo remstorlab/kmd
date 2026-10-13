@@ -20,7 +20,7 @@ function SpisanieModal({ delta, onClose, onConfirm }: { delta: number; onClose: 
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <Modal title="Списание разницы" onClose={onClose} footer={
+    <Modal title="Списание разницы" wide onClose={onClose} footer={
       <>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
         <button
@@ -155,7 +155,7 @@ function AddDMPositionModal({ already = {}, onClose, onAdd }: {
     <Modal
       title="Добавить позицию ДМ со склада"
       onClose={onClose}
-      extraWide
+      largeWide
       footer={<>
         {hasBadQty && <span className="mr-auto self-center text-xs text-red-600">Количество к выдаче должно быть от 1 до остатка на складе</span>}
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
@@ -354,7 +354,7 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
     <Modal
       title="Добавить позицию возврата"
       onClose={onClose}
-      extraWide
+      largeWide
       footer={<>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
         <Btn onClick={addSelected} disabled={selected.size === 0}>Добавить{selected.size > 0 ? ` (${selected.size})` : ""}</Btn>
@@ -460,7 +460,7 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
   const available = shihtovyeKarty.filter(k => k.status === "Новая");
 
   return (
-    <Modal title="Выдача по шихтовой карте" onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Отмена</Btn>}>
+    <Modal title="Выдача по шихтовой карте" wide onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Отмена</Btn>}>
       {available.length === 0 ? (
         <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
           Нет шихтовых карт в статусе «Новая»
@@ -1175,7 +1175,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       {!op && <div className="mb-4 text-xs text-gray-500">Новая операция: заполните вкладку «Выдача». Возврат оформляется после выдачи.</div>}
 
       {/* Fields */}
-      <div className="grid grid-cols-2 gap-4 mb-5">
+      <div className="grid grid-cols-4 gap-4 mb-5">
         <Field label="Тип операции" required={!headRo}>
           <Select value={type} options={withCurrent(spravValues("Типы операций"), type)} onChange={setType} disabled={headRo || !!op} />
         </Field>

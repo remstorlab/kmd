@@ -145,7 +145,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
       )}
     >
       {isOrder ? (
-        <div className="grid grid-cols-3 gap-4 mb-5">
+        <div className="grid grid-cols-4 gap-4 mb-5">
           {typeSelect}
           <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
           <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
@@ -171,7 +171,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
           <Field label="Позиция годового плана"><Input value={head.planPos} onChange={h("planPos")} disabled={ro} /></Field>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 mb-5">
+        <div className="grid grid-cols-4 gap-4 mb-5">
           {typeSelect}
           <Field label="Номер" required={!ro}><Input value={head.nakladNumber} onChange={h("nakladNumber")} disabled={ro} /></Field>
           <Field label="Дата" required={!ro}><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>

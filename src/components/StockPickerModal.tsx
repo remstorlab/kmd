@@ -98,7 +98,7 @@ export default function StockPickerModal({
     <Modal
       title={title}
       onClose={onClose}
-      extraWide
+      largeWide
       footer={<>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
         <Btn onClick={add} disabled={selectedCount === 0}>{addLabel}{selectedCount > 0 ? ` (${selectedCount})` : ""}</Btn>
