@@ -93,8 +93,8 @@ export function useScreenGroups(): Group[] {
       kartaRed && { title: "Карта: редактирование (черновик)", path: `${P["shihtovye-karty"]}/edit/${kartaRed.id}` },
       kartaRed && { title: "Карта: результат расчёта", path: `${P["shihtovye-karty"]}/edit/${kartaRed.id}/raschet` },
     ].filter(Boolean) as Screen[] },
-    { title: "Подотчётники", screens: [
-      { title: "Реестр подотчётников", path: P["podotchetniki"] },
+    { title: "Подотчётные лица", screens: [
+      { title: "Реестр подотчётных лиц", path: P["podotchetniki"] },
       person && { title: "Карточка: текущие процессы", path: `${P["podotchetniki"]}/${person.id}` },
       person && { title: "Карточка: завершённые процессы", path: `${P["podotchetniki"]}/${person.id}?tab=zavershennye` },
     ].filter(Boolean) as Screen[] },

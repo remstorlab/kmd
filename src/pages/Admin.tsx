@@ -42,7 +42,7 @@ const permTree: PermNode[] = [
     key: "shihtovye-karty", label: "Шихтовые карты", base: ["Просмотр", "Создать", "Редактировать", "Экспорт"],
   },
   {
-    key: "podotchetniki", label: "Подотчётники", base: ["Просмотр"],
+    key: "podotchetniki", label: "Подотчётные лица", base: ["Просмотр"],
   },
   {
     key: "otchetnost", label: "Отчётность", base: ["Просмотр", "Экспорт"],

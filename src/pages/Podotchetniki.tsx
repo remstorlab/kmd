@@ -219,7 +219,7 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
       </div>
 
       <div className="flex items-center justify-between mb-1">
-        <div className="text-xs text-gray-500">Подотчётники / Карточка подотчётного лица</div>
+        <div className="text-xs text-gray-500">Подотчётные лица / Карточка подотчётного лица</div>
         <span className="text-xs text-gray-400">Обновлено: {new Date().toLocaleDateString("ru-RU")}</span>
       </div>
 
@@ -304,9 +304,9 @@ export function Podotchetniki() {
   return (
     <div>
       <PageHeader
-        title="Подотчётники"
+        title="Подотчётные лица"
         subtitle="Реестр сотрудников, у которых находятся материалы на балансе"
-        breadcrumb={["Подотчётники"]}
+        breadcrumb={["Подотчётные лица"]}
       />
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 grid grid-cols-4 gap-3 items-end">
@@ -346,7 +346,7 @@ export function Podotchetniki() {
               </tr>
             ))}
             {sorted.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-400">Подотчётники не найдены</td></tr>
+              <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-400">Подотчётное лицо не найдено</td></tr>
             )}
           </tbody>
         </table>
