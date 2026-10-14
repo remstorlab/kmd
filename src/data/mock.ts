@@ -884,6 +884,32 @@ export interface ChemElement {
   showShk: boolean;
 }
 
+// --- Допустимые отклонения от массы ---
+// Для металла (элемент справочника «Химический состав») и диапазона массы взвешивания [minKg; maxKg) — допуск вверх / вниз, г
+export interface MassTolerance {
+  id: string;
+  metal: string;
+  minKg: number;
+  maxKg: number;
+  plusG: number;
+  minusG: number;
+}
+
+const tol = (metal: string, minKg: number, maxKg: number, g: number): MassTolerance =>
+  ({ id: `tol-${metal}-${minKg}`, metal, minKg, maxKg, plusG: g, minusG: g });
+
+export const initialMassTolerances: MassTolerance[] = [
+  tol("au", 0, 0.2, 0.02), tol("au", 0.2, 1, 0.03), tol("au", 1, 10, 0.3), tol("au", 10, 20, 0.5), tol("au", 20, 50, 1.2),
+  tol("ag", 0, 0.2, 0.2), tol("ag", 0.2, 1, 0.2), tol("ag", 1, 10, 0.3), tol("ag", 10, 20, 0.5), tol("ag", 20, 50, 1.2),
+];
+
+// Допуск для массы взвешивания (г) по металлу; диапазон включает нижнюю границу, верхняя — у последнего диапазона
+export function findMassTolerance(list: MassTolerance[], metal: string, massG: number): MassTolerance | undefined {
+  const kg = massG / 1000;
+  const ranges = list.filter(t => t.metal === metal).sort((a, b) => a.minKg - b.minKg);
+  return ranges.find((t, i) => kg >= t.minKg && (kg < t.maxKg || (i === ranges.length - 1 && kg <= t.maxKg)));
+}
+
 // Значения химического состава позиции, г: id элемента → масса («-» или пусто — нет данных)
 export type ChemComposition = Record<string, string>;
 

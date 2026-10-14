@@ -5,10 +5,10 @@ import {
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination, statusColorClass,
 } from "../components/ui";
-import { spravochniki, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
+import { spravochniki, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
-import { ArrowLeft, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, LucideIcon } from "lucide-react";
+import { ArrowLeft, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 
@@ -29,6 +29,7 @@ export const SPRAV_SLUGS = {
   "Классы материалов": "klassy-materialov",
   "Места хранения": "mesta-hraneniya",
   "Химический состав": "himicheskiy-sostav",
+  "Допустимые отклонения от массы": "dopustimye-otkloneniya",
 } as const;
 // Справочники статусов: /spravochniki/status-<группа>
 const statusSlug = (d: StatusDict) => `status-${d.group}`;
@@ -834,6 +835,170 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ── Допустимые отклонения от массы (металл, диапазон взвешивания, допуск ±) ──
+
+type TolForm = { metal: string; minKg: string; maxKg: string; plusG: string; minusG: string };
+const ALL_TOL_METALS = "Все металлы";
+const numIn = (s: string) => parseFloat(String(s).replace(",", "."));
+const fmtNum = (v: number) => String(v).replace(".", ",");
+const rangeOf = (t: MassTolerance) => `${fmtNum(t.minKg)}–${fmtNum(t.maxKg)} кг`;
+
+function MassTolerancesPage({ onBack }: { onBack: () => void }) {
+  const { massTolerances: items, setMassTolerances: setItems, chemElements } = useApp();
+  const metalName = (id: string) => chemElements.find(e => e.id === id)?.name ?? id;
+  const metalOptions = chemElements.map(e => e.id);
+  const emptyForm = (): TolForm => ({ metal: chemElements[0]?.id ?? "", minKg: "", maxKg: "", plusG: "", minusG: "" });
+  const [form, setForm] = useState<TolForm>(emptyForm);
+  const [search, setSearch] = useState("");
+  const [metalFilter, setMetalFilter] = useState(ALL_TOL_METALS);
+  const [page, setPage] = useState(1);
+  const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, i => i.id);
+  useEffect(() => {
+    if (editItem) setForm({ metal: editItem.metal, minKg: fmtNum(editItem.minKg), maxKg: fmtNum(editItem.maxKg), plusG: fmtNum(editItem.plusG), minusG: fmtNum(editItem.minusG) });
+    else if (showAdd) setForm(emptyForm());
+  }, [editKey, showAdd]);
+  const { toast, show, clear } = useToast();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
+  const perPage = 10;
+
+  const usedMetals = Array.from(new Set(items.map(i => i.metal)));
+  const filtered = items.filter(i => {
+    const q = search.trim().toLowerCase();
+    return (metalFilter === ALL_TOL_METALS || i.metal === metalFilter)
+      && (!q || metalName(i.metal).toLowerCase().includes(q) || rangeOf(i).includes(q));
+  });
+  const { sorted, sort, toggleSort } = useSort(filtered, {
+    metal: i => metalName(i.metal),
+    range: i => i.minKg,
+    plus: i => i.plusG,
+    minus: i => i.minusG,
+  });
+  // По умолчанию — по металлу и нижней границе диапазона
+  const ordered = sort ? sorted : [...filtered].sort((a, b) => metalName(a.metal).localeCompare(metalName(b.metal), "ru") || a.minKg - b.minKg);
+  const pageItems = ordered.slice((page - 1) * perPage, page * perPage);
+
+  // Проверка формы: числа, нижняя граница меньше верхней, диапазоны одного металла не пересекаются
+  const minKg = numIn(form.minKg), maxKg = numIn(form.maxKg), plusG = numIn(form.plusG), minusG = numIn(form.minusG);
+  const numbersOk = [minKg, maxKg, plusG, minusG].every(v => Number.isFinite(v) && v >= 0);
+  const rangeOk = numbersOk && minKg < maxKg;
+  const overlap = rangeOk ? items.find(t => t.id !== editItem?.id && t.metal === form.metal && minKg < t.maxKg && t.minKg < maxKg) : undefined;
+  const error = !numbersOk ? "" : !rangeOk ? "Нижний предел должен быть меньше верхнего" : overlap ? `Диапазон пересекается с записью ${metalName(overlap.metal)}, ${rangeOf(overlap)}` : "";
+  const canSave = !!form.metal && numbersOk && rangeOk && !overlap;
+
+  const save = () => {
+    if (!canSave) return;
+    const rec = { metal: form.metal, minKg, maxKg, plusG, minusG };
+    if (editItem) setItems(prev => prev.map(i => (i.id === editItem.id ? { ...i, ...rec } : i)));
+    else setItems(prev => [...prev, { id: `tol-${Date.now()}`, ...rec }]);
+    closeAll();
+    show("Запись сохранена");
+  };
+
+  const f = (k: keyof TolForm) => (v: string) => setForm(x => ({ ...x, [k]: v.replace(/[^\d.,]/g, "") }));
+
+  return (
+    <div>
+      <button onClick={onBack} className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium mb-4">
+        <ArrowLeft className="w-4 h-4" />
+        Назад к справочникам
+      </button>
+
+      <div className="text-xs text-gray-500 mb-4">Справочники / Допустимые отклонения от массы</div>
+
+      <PageHeader
+        title="Допустимые отклонения от массы"
+        subtitle={`${items.length} значений · допуск при взвешивании по металлу и диапазону массы`}
+        actions={<Btn onClick={goAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
+      />
+
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex items-end gap-3">
+        <div className="w-72">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
+          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Металл, диапазон..." />
+        </div>
+        <div className="w-56">
+          <Field label="Металл">
+            <Select value={metalFilter} options={[ALL_TOL_METALS, ...usedMetals]} onChange={v => { setMetalFilter(v); setPage(1); }} optionLabel={v => (v === ALL_TOL_METALS ? v : metalName(v))} />
+          </Field>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 border-b border-gray-200">
+            <SortTh sortKey="metal" sort={sort} onSort={toggleSort}>Металл</SortTh>
+            <SortTh sortKey="range" sort={sort} onSort={toggleSort}>Диапазон массы</SortTh>
+            <SortTh sortKey="plus" sort={sort} onSort={toggleSort}>Допуск вверх (+), г</SortTh>
+            <SortTh sortKey="minus" sort={sort} onSort={toggleSort}>Допуск вниз (−), г</SortTh>
+            <th className="w-24"></th>
+          </tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {pageItems.map(item => (
+              <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 text-gray-900">{metalName(item.metal)}</td>
+                <td className="px-4 py-3 font-medium text-gray-900">{rangeOf(item)}</td>
+                <td className="px-4 py-3 text-green-700 font-medium">+{fmtNum(item.plusG)}</td>
+                <td className="px-4 py-3 text-red-600 font-medium">−{fmtNum(item.minusG)}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => goView(item)} />
+                    <EditIcon onClick={() => goEdit(item)} />
+                    <DeleteIcon onClick={() => confirm(`Удалить допуск «${metalName(item.metal)}, ${rangeOf(item)}»?`, () => { setItems(prev => prev.filter(x => x.id !== item.id)); show("Запись удалена"); })} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {pageItems.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+            )}
+          </tbody>
+        </table>
+        <Pagination page={page} total={ordered.length} perPage={perPage} onPage={setPage} />
+      </div>
+
+      {(showAdd || editItem) && (
+        <Modal
+          title={editItem ? "Редактировать запись" : "Добавить запись"}
+          onClose={closeAll}
+          footer={<>
+            <Btn variant="secondary" onClick={closeAll}>Отмена</Btn>
+            <Btn onClick={save} disabled={!canSave}>Сохранить</Btn>
+          </>}
+        >
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Металл" required full>
+              <Select value={form.metal} options={metalOptions} onChange={v => setForm(x => ({ ...x, metal: v }))} optionLabel={metalName} />
+            </Field>
+            <Field label="Предел взвешивания от, кг" required><Input value={form.minKg} onChange={f("minKg")} placeholder="0" /></Field>
+            <Field label="Предел взвешивания до, кг" required><Input value={form.maxKg} onChange={f("maxKg")} placeholder="0,2" /></Field>
+            <Field label="Допуск вверх (+), г" required><Input value={form.plusG} onChange={f("plusG")} placeholder="0,02" /></Field>
+            <Field label="Допуск вниз (−), г" required><Input value={form.minusG} onChange={f("minusG")} placeholder="0,02" /></Field>
+          </div>
+          {error && <div className="mt-3 text-xs text-red-600">{error}</div>}
+          <p className="mt-3 text-xs text-gray-500">Нижний предел входит в диапазон, верхний — нет (кроме последнего диапазона металла).</p>
+        </Modal>
+      )}
+
+      {viewItem && (
+        <Modal title={`Допуск: ${metalName(viewItem.metal)}, ${rangeOf(viewItem)}`} onClose={closeAll} footer={<>
+          <Btn variant="secondary" onClick={() => goEdit(viewItem)}>Редактировать</Btn>
+          <Btn variant="secondary" onClick={closeAll}>Закрыть</Btn>
+        </>}>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Металл" full><Input value={metalName(viewItem.metal)} disabled /></Field>
+            <Field label="Предел взвешивания от, кг"><Input value={fmtNum(viewItem.minKg)} disabled /></Field>
+            <Field label="Предел взвешивания до, кг"><Input value={fmtNum(viewItem.maxKg)} disabled /></Field>
+            <Field label="Допуск вверх (+), г"><Input value={fmtNum(viewItem.plusG)} disabled /></Field>
+            <Field label="Допуск вниз (−), г"><Input value={fmtNum(viewItem.minusG)} disabled /></Field>
+          </div>
+        </Modal>
+      )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
+      {toast && <Toast message={toast} onDone={clear} />}
+    </div>
+  );
+}
+
 function ChemFlagCheckbox({ label, checked, onChange, disabled = false }: { label: string; checked: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
   return (
     <label className={`flex items-center gap-2 text-sm text-gray-700 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
@@ -844,7 +1009,7 @@ function ChemFlagCheckbox({ label, checked, onChange, disabled = false }: { labe
 }
 
 export function Spravochniki() {
-  const { storageLocations, chemElements, materialCodes, statusDicts, navigate } = useApp();
+  const { storageLocations, chemElements, materialCodes, statusDicts, massTolerances, navigate } = useApp();
   // Справочник — /spravochniki/<slug>
   const { pathname } = useLocation();
   const { page, segs } = matchPage(pathname);
@@ -860,6 +1025,7 @@ export function Spravochniki() {
   const setShowMaterialClasses = (on: boolean) => open(on ? SPRAV_SLUGS["Классы материалов"] : undefined);
   const setShowStorageLocations = (on: boolean) => open(on ? SPRAV_SLUGS["Места хранения"] : undefined);
   const setShowChemElements = (on: boolean) => open(on ? SPRAV_SLUGS["Химический состав"] : undefined);
+  const showMassTolerances = slug === SPRAV_SLUGS["Допустимые отклонения от массы"];
 
   const statusDict = statusDicts.find(d => statusSlug(d) === slug) ?? null;
   if (statusDict) {
@@ -876,6 +1042,9 @@ export function Spravochniki() {
   }
   if (showStorageLocations) {
     return <StorageLocationsPage onBack={() => setShowStorageLocations(false)} />;
+  }
+  if (showMassTolerances) {
+    return <MassTolerancesPage onBack={() => open()} />;
   }
   if (showChemElements) {
     return <ChemElementsPage onBack={() => setShowChemElements(false)} />;
@@ -945,6 +1114,16 @@ export function Spravochniki() {
           </div>
           <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Химический состав</h3>
           <p className="text-sm text-gray-400">{chemElements.length} значений</p>
+        </button>
+        <button
+          onClick={() => open(SPRAV_SLUGS["Допустимые отклонения от массы"])}
+          className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md transition-all hover:border-blue-300 group"
+        >
+          <div className="w-10 h-10 mb-3 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+            <Ruler className="w-5 h-5" />
+          </div>
+          <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Допустимые отклонения от массы</h3>
+          <p className="text-sm text-gray-400">{massTolerances.length} значений</p>
         </button>
       </div>
 

@@ -3,10 +3,10 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { matchPage, pagePath, LOGIN_PATH } from "../router";
 import {
   GPItem, DMItem, SkladDoc, Operation, ShihtovayaKarta,
-  Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy, StorageLocation, ChemElement, MaterialCode, StatusDict,
+  Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy, StorageLocation, ChemElement, MaterialCode, StatusDict, MassTolerance,
   initialGPItems, initialDMItems, initialSkladDocs, initialVydachaDocs,
   initialOperations, initialShihtovyeKarty, initialPodotchetniki,
-  initialUsers, initialRoles, initialLogs, initialSecurityPolicy, initialStorageLocations, initialChemElements, initialMaterialCodes, initialStatusDicts,
+  initialUsers, initialRoles, initialLogs, initialSecurityPolicy, initialStorageLocations, initialChemElements, initialMaterialCodes, initialStatusDicts, initialMassTolerances,
 } from "../data/mock";
 
 export type Page =
@@ -206,6 +206,8 @@ interface AppCtx {
   setChemElements: React.Dispatch<React.SetStateAction<ChemElement[]>>;
   statusDicts: StatusDict[];
   setStatusDicts: React.Dispatch<React.SetStateAction<StatusDict[]>>;
+  massTolerances: MassTolerance[];
+  setMassTolerances: React.Dispatch<React.SetStateAction<MassTolerance[]>>;
 }
 
 const Ctx = createContext<AppCtx>(null!);
@@ -316,6 +318,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [chemElements, setChemElements] = useState(initialChemElements);
   const [materialCodes, setMaterialCodes] = useState(initialMaterialCodes);
   const [statusDicts, setStatusDicts] = useState(initialStatusDicts);
+  const [massTolerances, setMassTolerances] = useState(initialMassTolerances);
 
   return (
     <Ctx.Provider value={{
@@ -339,6 +342,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       chemElements, setChemElements,
       materialCodes, setMaterialCodes,
       statusDicts, setStatusDicts,
+      massTolerances, setMassTolerances,
     }}>
       {children}
     </Ctx.Provider>
