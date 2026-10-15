@@ -28,7 +28,6 @@ export function Logirovanie() {
     user: l => l.user,
     section: l => l.section,
     type: l => l.type,
-    description: l => l.description,
   });
 
   const sections = ["Все разделы", "Склады", "Складские операции", "Движение материала", "Шихтовые карты", "Администрирование"];
@@ -46,7 +45,7 @@ export function Logirovanie() {
         <div className="min-w-40">
           <label className="block text-xs font-medium text-gray-500 mb-1">Тип события</label>
           <select value={filterType} onChange={e => setFilterType(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {["Все типы", "Создание", "Изменение", "Удаление", "Закрытие"].map(o => <option key={o}>{o}</option>)}
+            {["Все типы", "Создание", "Изменение", "Удаление"].map(o => <option key={o}>{o}</option>)}
           </select>
         </div>
         <div className="min-w-40">
@@ -74,7 +73,6 @@ export function Logirovanie() {
               <SortTh sortKey="user" sort={sort} onSort={toggleSort}>Пользователь</SortTh>
               <SortTh sortKey="section" sort={sort} onSort={toggleSort}>Раздел</SortTh>
               <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Статус действия</SortTh>
-              <SortTh sortKey="description" sort={sort} onSort={toggleSort}>Описание</SortTh>
               <th className="w-12"></th>
             </tr>
           </thead>
@@ -87,7 +85,6 @@ export function Logirovanie() {
                   <td className="px-4 py-3 font-medium text-gray-900">{log.user}</td>
                   <td className="px-4 py-3 text-gray-600">{log.section}</td>
                   <td className="px-4 py-3"><Badge label={log.type} /></td>
-                  <td className="px-4 py-3 text-gray-700">{log.description}</td>
                   <td className="px-4 py-3">
                     <button
                       onClick={() => hasDetails ? setDetailLog(log) : show(`Просмотр события: ${log.description}`)}

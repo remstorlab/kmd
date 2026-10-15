@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
-  ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
+  ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, KlassSelect, MaterialCodeSelect, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, Badge,
 } from "../components/ui";
 import { SkladDoc, GPItem, DocStatus } from "../data/mock";
@@ -35,111 +35,6 @@ export function SkladskieOperHub() {
         ))}
       </div>
     </div>
-  );
-}
-
-// ── Печать ярлыков ДМ modal (выбор прихода + позиций) ────────────────────────
-
-const LABEL_TEMPLATES = [
-  { nomenkl: "DM-001", name: "Слиток золота ЗлА-1", klass: "Слиток", weight: "500.25", ag: "0.05", cu: "0.02", fe: "–" },
-  { nomenkl: "DM-002", name: "Слиток серебра СрА-2", klass: "Слиток", weight: "300.10", ag: "92.50", cu: "0.10", fe: "–" },
-  { nomenkl: "DM-003", name: "Стружка золотая", klass: "Стружка", weight: "120.40", ag: "0.03", cu: "0.01", fe: "0.01" },
-  { nomenkl: "DM-004", name: "Проба на анализ", klass: "Основная проба", weight: "12.40", ag: "0.02", cu: "–", fe: "–" },
-  { nomenkl: "DM-005", name: "Слиток золота ЗлБ-2", klass: "Слиток", weight: "300.00", ag: "0.04", cu: "0.02", fe: "–" },
-];
-
-function hashStr(s: string) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
-}
-
-function getDocPositions(doc: SkladDoc) {
-  const h = hashStr(doc.id);
-  const count = 2 + (h % 2);
-  const start = h % LABEL_TEMPLATES.length;
-  return Array.from({ length: count }, (_, i) => ({ id: `${doc.id}-p${i}`, docNumber: doc.number, ...LABEL_TEMPLATES[(start + i) % LABEL_TEMPLATES.length] }));
-}
-
-function PrintLabelsModal({ docs, onClose, onPrint }: { docs: SkladDoc[]; onClose: () => void; onPrint: (count: number) => void }) {
-  const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
-  const [selectedPos, setSelectedPos] = useState<Set<string>>(new Set());
-
-  const toggleDoc = (id: string) => {
-    setSelectedDocs(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
-  };
-
-  const togglePos = (id: string) => {
-    setSelectedPos(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
-  };
-
-  const positions = docs.filter(d => selectedDocs.has(d.id)).flatMap(getDocPositions);
-  const availableIds = new Set(positions.map(p => p.id));
-  const effectiveSelected = new Set([...selectedPos].filter(id => availableIds.has(id)));
-
-  return (
-    <Modal
-      title="Печать ярлыков ДМ"
-      onClose={onClose}
-      extraWide
-      footer={
-        <>
-          <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn disabled={effectiveSelected.size === 0} onClick={() => onPrint(effectiveSelected.size)}>Печать выбранных</Btn>
-        </>
-      }
-    >
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Документы прихода</div>
-          <div className="border border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto divide-y divide-gray-100">
-            {docs.length === 0 && <div className="text-sm text-gray-400 text-center py-6">Нет документов прихода</div>}
-            {docs.map(d => (
-              <label key={d.id} className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 ${selectedDocs.has(d.id) ? "bg-blue-50/50" : ""}`}>
-                <input type="checkbox" checked={selectedDocs.has(d.id)} onChange={() => toggleDoc(d.id)} className="w-4 h-4 accent-blue-600 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{d.number}</div>
-                  <div className="text-xs text-gray-500">{d.type} · {d.date}</div>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Позиции для печати</div>
-            <div className="flex items-center gap-2 text-xs">
-              <button onClick={() => setSelectedPos(new Set(availableIds))} disabled={positions.length === 0} className="text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline disabled:cursor-not-allowed">Выбрать все</button>
-              <span className="text-gray-300">|</span>
-              <button onClick={() => setSelectedPos(new Set())} disabled={effectiveSelected.size === 0} className="text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline disabled:cursor-not-allowed">Снять все</button>
-            </div>
-          </div>
-          <div className="border border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto divide-y divide-gray-100">
-            {positions.length === 0 && (
-              <div className="text-sm text-gray-400 text-center py-6 px-3">Выберите документ(ы) слева, чтобы увидеть позиции</div>
-            )}
-            {positions.map(p => (
-              <label key={p.id} className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 ${effectiveSelected.has(p.id) ? "bg-blue-50/50" : ""}`}>
-                <input type="checkbox" checked={effectiveSelected.has(p.id)} onChange={() => togglePos(p.id)} className="w-4 h-4 accent-blue-600 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{p.name}</div>
-                  <div className="text-xs text-gray-500">{p.nomenkl} · <KlassCode value={p.klass} /> · {p.weight} г · Ag {p.ag} · Cu {p.cu} · Fe {p.fe}</div>
-                </div>
-              </label>
-            ))}
-          </div>
-          <div className="text-xs text-gray-500 mt-2 text-right">Выбрано: {effectiveSelected.size} из {positions.length}</div>
-        </div>
-      </div>
-    </Modal>
   );
 }
 
@@ -214,7 +109,6 @@ function DocList({
   onSave,
   onUpdate,
   onDelete,
-  showPrint,
 }: {
   title: string;
   docs: SkladDoc[];
@@ -222,18 +116,16 @@ function DocList({
   onSave: (d: SkladDoc) => void;
   onUpdate: (d: SkladDoc) => void;
   onDelete: (id: string) => void;
-  showPrint?: boolean;
 }) {
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
   const { filtered, bar } = useDocFilters(docs, () => setPage(1));
-  // Экраны: …/new, …/view/:id, …/edit/:id, …/labels
+  // Экраны: …/new, …/view/:id, …/edit/:id
   const screen = useScreen();
   const viewDoc = docs.find(d => d.id === screen.after("view")) ?? null;
   const editDoc = docs.find(d => d.id === screen.after("edit")) ?? null;
   const showModal = screen.has("new");
-  const showPrintLabels = screen.has("labels");
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
     date: d => parseRuDate(d.date),
@@ -258,7 +150,6 @@ function DocList({
               <Plus className="w-4 h-4" />
               {addLabel}
             </Btn>
-            {showPrint && <Btn variant="secondary" onClick={() => screen.openTop("labels")}>Печать ярлыков ДМ</Btn>}
             <ExportBtn onToast={show} />
           </>
         }
@@ -319,13 +210,6 @@ function DocList({
           onSave={d => { onSave(d); screen.close("new"); show(`Документ ${d.number} сохранён`); }}
         />
       )}
-      {showPrintLabels && (
-        <PrintLabelsModal
-          docs={docs}
-          onClose={() => screen.close("labels")}
-          onPrint={count => { screen.close("labels"); show(`Печать ${count} ярлыков выполнена`); }}
-        />
-      )}
       {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
@@ -344,7 +228,6 @@ export function PrihodList() {
       onSave={d => setSkladDocs(prev => [d, ...prev])}
       onUpdate={d => setSkladDocs(prev => prev.map(x => x.id === d.id ? d : x))}
       onDelete={id => setSkladDocs(prev => prev.filter(x => x.id !== id))}
-      showPrint
     />
   );
 }

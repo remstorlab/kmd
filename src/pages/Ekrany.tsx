@@ -60,7 +60,6 @@ export function useScreenGroups(): Group[] {
       prihodOrder && { title: "Приход: просмотр ордера", path: `${P["prihod-list"]}/view/${prihodOrder.id}` },
       prihodOrder && { title: "Приход: редактирование ордера", path: `${P["prihod-list"]}/edit/${prihodOrder.id}` },
       prihodNaklad && prihodNaklad !== prihodOrder && { title: "Приход: просмотр накладной", path: `${P["prihod-list"]}/view/${prihodNaklad.id}` },
-      { title: "Печать ярлыков ДМ", path: `${P["prihod-list"]}/labels` },
       { title: "Выдача со склада", path: P["vydacha-list"] },
       { title: "Выдача: новый документ (ГП)", path: `${P["vydacha-list"]}/new` },
       { title: "Выдача: новый документ (ДМ)", path: `${P["vydacha-list"]}/new/dm` },
