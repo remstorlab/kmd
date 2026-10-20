@@ -762,7 +762,7 @@ function operationHtml(o: Operation, spisano: number) {
   const head: [string, string | undefined][] = [
     ["Тип операции", o.type],
     ["Вид операции", o.vid],
-    ["Описание", o.description],
+    ["Наименование изделия", o.description],
     ["Тип документа", o.docType],
     ["Дата операции", o.date],
     ["Заказчик", o.zakazchik],
@@ -1194,7 +1194,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <Field label="Вид операции" required={!headRo}>
           <Select value={vid} options={withCurrent(spravValues("Виды операций"), vid)} onChange={changeVid} disabled={headRo || !!op} />
         </Field>
-        <Field label="Описание" full><Input value={description} onChange={setDescription} placeholder="Краткое описание операции" disabled={headRo} /></Field>
+        <Field label="Наименование изделия" full><Input value={description} onChange={setDescription} placeholder="Краткое описание операции" disabled={headRo} /></Field>
         <Field label="Тип документа" required={!headRo}><Select value={head.docType} options={docTypeOptions} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={headRo || vid === VID_LKI} /></Field>
         <Field label="Номер документа"><Input value={head.document} disabled /></Field>
         <Field label="Дата операции" required={!headRo}><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
@@ -1456,7 +1456,7 @@ export function DvizhenieMateriаla() {
               <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
               <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип</SortTh>
               <SortTh sortKey="vid" sort={sort} onSort={toggleSort}>Вид операции</SortTh>
-              <SortTh sortKey="description" sort={sort} onSort={toggleSort}>Описание</SortTh>
+              <SortTh sortKey="description" sort={sort} onSort={toggleSort}>Наименование изделия</SortTh>
               <SortTh sortKey="document" sort={sort} onSort={toggleSort}>Документ</SortTh>
               <SortTh sortKey="responsible" sort={sort} onSort={toggleSort}>Подотчётник</SortTh>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Вес</th>
