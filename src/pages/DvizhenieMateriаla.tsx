@@ -1195,8 +1195,10 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const oformitBlock =
     vydacha.length === 0 ? "Добавьте хотя бы одну позицию во вкладке «Выдача»"
       : vozvrat.length === 0 ? "Добавьте позиции во вкладке «Возврат»"
-      : !inNorm ? `Дельта ${deltaSign}${fmt(Math.abs(delta))} г превышает допуск ±5 г — отразите расхождение во вкладке «Списание»`
       : null;
+  // Дельта вне допуска не запрещает оформление — только требует подтверждения
+  const [confirmOformit, setConfirmOformit] = useState(false);
+  const oformit = () => (inNorm ? save(true) : setConfirmOformit(true));
 
   // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
   // эта карта возвращается в «Редактирование» и пропадает из выбора ШК для плавки (там только «Новая»).
@@ -1276,7 +1278,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <>
           {/* «Оформить» закрывает операцию — вынесена влево, отдельно от «Сохранить» */}
           <div className="mr-auto flex items-center gap-3">
-            <Btn variant="secondary" onClick={() => save(true)} disabled={!!oformitBlock}>Оформить</Btn>
+            <Btn variant="secondary" onClick={oformit} disabled={!!oformitBlock}>Оформить</Btn>
             {oformitBlock && <span className="text-xs text-yellow-700">⚠ Оформление недоступно: {oformitBlock}</span>}
           </div>
           {printBtn}
@@ -1440,6 +1442,16 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           }}
         />
       )}
+      {confirmOformit && (
+        <ConfirmDialog
+          title="Превышение допустимой дельты"
+          message={`Разница между выданным и принятым весом ${deltaSign}${fmt(Math.abs(delta))} г превышает допуск ±5 г. Оформить операцию с такой разницей?`}
+          confirmLabel="Продолжить"
+          tone="primary"
+          onCancel={() => setConfirmOformit(false)}
+          onConfirm={() => { setConfirmOformit(false); save(true); }}
+        />
+      )}
       {toast && <Toast message={toast} onDone={clear} />}
     </Modal>
   );
@@ -1532,6 +1544,14 @@ export function DvizhenieMateriаla() {
       />
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex items-end gap-3 flex-wrap">
+        <div className="min-w-36">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Дата с</label>
+          <input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => upd(setDateFrom)(e.target.value)} className={filterCls} />
+        </div>
+        <div className="min-w-36">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Дата по</label>
+          <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => upd(setDateTo)(e.target.value)} className={filterCls} />
+        </div>
         <div className="flex-1 min-w-48">
           <label className="block text-xs font-medium text-gray-500 mb-1">Документ / Подотчётник</label>
           <input value={search} onChange={e => upd(setSearch)(e.target.value)} placeholder="Поиск..." className={filterCls} />
@@ -1551,14 +1571,6 @@ export function DvizhenieMateriаla() {
           <select value={filterVid} onChange={e => upd(setFilterVid)(e.target.value)} className={filterCls}>
             {["Все виды", ...spravValues("Виды операций")].map(o => <option key={o}>{o}</option>)}
           </select>
-        </div>
-        <div className="min-w-36">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Дата с</label>
-          <input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => upd(setDateFrom)(e.target.value)} className={filterCls} />
-        </div>
-        <div className="min-w-36">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Дата по</label>
-          <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => upd(setDateTo)(e.target.value)} className={filterCls} />
         </div>
         <button onClick={resetFilters} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Сбросить</button>
       </div>
