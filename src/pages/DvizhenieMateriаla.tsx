@@ -5,8 +5,8 @@ import {
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, RequiredMark, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
 } from "../components/ui";
-import { Operation, OperPosition, OperStage, ShihtovayaKarta, vydachaPositions, vozvratPositions, opVydacha, opVozvrat, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
-import { Eye, Plus, Paperclip } from "lucide-react";
+import { Operation, OperPosition, OperStage, OperLoss, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
+import { Plus, Paperclip } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
@@ -489,7 +489,7 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
 // ── Списание потерь ───────────────────────────────────────────────────────────
 
 // name — технологическая операция из справочника «Технологические операции»
-type LossRow = { id: string; date: string; name: string; ves: string };
+type LossRow = OperLoss;
 
 const docAccept = ".pdf,.doc,.docx,.jpg,.jpeg,.png,.tif,.tiff";
 
@@ -506,12 +506,6 @@ const newLoss = (): LossRow => ({ id: uid(), date: todayIso(), name: "", ves: ""
 
 // Документы списания демо-операции «Производство ГП»
 const seedSpisanieFiles = () => [new File([], "Служебная_записка_потери_18082026.pdf"), new File([], "Акт_списания_18082026.pdf")];
-const seedGpLosses: LossRow[] = [
-  { id: "l1", date: "2026-08-18", name: "Прокат, отжиг, травление", ves: "0.35" },
-  { id: "l2", date: "2026-08-18", name: "Вырубка и обрубка", ves: "0.80" },
-  { id: "l3", date: "2026-08-18", name: "Чеканка", ves: "0.60" },
-  { id: "l4", date: "2026-08-18", name: "Полирование", ves: "0.15" },
-];
 
 const sumLosses = (losses: LossRow[], pred: (l: LossRow) => boolean = () => true) =>
   losses.filter(pred).reduce((a, l) => a + num(l.ves), 0);
@@ -703,9 +697,6 @@ type TabName = "Выдача" | "Возврат" | "Списание" | "Ито�
 
 const VID_LKI = "Анализ в ЛКИ";
 
-// Операция оформлена — выдача проведена («Выдано») или операция закрыта («Завершено»). Только такие можно печатать.
-const isOformlena = (o: Operation) => o.stage === "Выдано" || o.stage === "Завершено";
-
 // Номер документа — сквозной целочисленный счётчик по всем операциям.
 const nextDocNo = (ops: Operation[]) =>
   String(ops.reduce((m, o) => Math.max(m, parseInt(o.document, 10) || 0), 0) + 1);
@@ -751,6 +742,7 @@ function operationHtml(o: Operation, spisano: number) {
   const head: [string, string | undefined][] = [
     ["Тип операции", o.type],
     ["Вид операции", o.vid],
+    ["Описание", o.description],
     ["Тип документа", o.docType],
     ["Дата операции", o.date],
     ["Заказчик", o.zakazchik],
@@ -980,27 +972,26 @@ function printHtml(html: string) {
 }
 
 function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation | null; onClose: () => void; onSave: (o: Operation) => void; readOnly?: boolean }) {
-  // Этап операции определяет, какие вкладки доступны и что редактируется:
-  // выдача — только вкладка «Выдача»; возврат — «Возврат»/«Списание»/«Итого», «Выдача» только просмотр; завершено — всё только просмотр.
-  const stage: OperStage = op?.stage ?? "Выдача: На редактировании";
-  const phase: "vydacha" | "vozvrat" | "done" = stage === "Выдача: На редактировании" ? "vydacha" : stage === "Завершено" ? "done" : "vozvrat";
-  const ro = readOnly || phase === "done";
-  const vydachaRo = ro || phase !== "vydacha";
-  const vozvratRo = ro || phase !== "vozvrat";
-  const headRo = vydachaRo;
-  const disabledTabs: TabName[] = phase === "vydacha" ? ["Возврат", "Списание", "Итого"] : [];
+  // Статус: «В работе» — все вкладки редактируются; «Завершено» — только просмотр.
+  // Поля над вкладками заполняются при создании и после сохранения не редактируются.
+  const done = op?.stage === "Завершено";
+  const ro = readOnly || done;
+  const headRo = ro || !!op;
 
-  // Вкладка — ?tab=…; по умолчанию на этапе возврата открывается «Возврат»
   const [tab, setTab] = useTabParam<TabName>(
     { "Выдача": "vydacha", "Возврат": "vozvrat", "Списание": "spisanie", "Итого": "itogo" },
-    phase === "vozvrat" && !readOnly ? "Возврат" : "Выдача",
+    "Выдача",
   );
   const [vid, setVid] = useState<string>(op?.vid || "Плавка");
   const [type, setType] = useState<string>(op?.type || "Выдача");
-  const [vydacha, setVydacha] = useState<OperPosition[]>(() => op?.vydachaPos ?? (op ? vydachaPositions : []));
-  const [vozvrat, setVozvrat] = useState<OperPosition[]>(() => op?.vozvratPos ?? (op && phase !== "vydacha" && stage !== "Выдано" ? vozvratPositions : []));
-  const [losses, setLosses] = useState<LossRow[]>(() => (op?.vid === "Производство ГП" ? seedGpLosses : [newLoss()]));
-  const [spisanieFiles, setSpisanieFiles] = useState<File[]>(() => (op?.vid === "Производство ГП" ? seedSpisanieFiles() : []));
+  const [description, setDescription] = useState(op?.description ?? "");
+  const [vydacha, setVydacha] = useState<OperPosition[]>(() => (op ? opVydacha(op) : []));
+  const [vozvrat, setVozvrat] = useState<OperPosition[]>(() => (op ? opVozvrat(op) : []));
+  const [losses, setLosses] = useState<LossRow[]>(() => {
+    const saved = op ? opLosses(op) : [];
+    return saved.length ? saved : [newLoss()];
+  });
+  const [spisanieFiles, setSpisanieFiles] = useState<File[]>(() => op?.spisanieFiles ?? (op?.vid === "Производство ГП" ? seedSpisanieFiles() : []));
   // Вложенные экраны: …/spisanie-raznicy, …/add-position, …/vozvrat-pick, …/shihta-pick
   const screen = useScreen();
   const nested = (name: string) => [screen.has(name), (open: boolean) => (open ? screen.open(name) : screen.close(name))] as const;
@@ -1014,7 +1005,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [vydachaFiles, setVydachaFiles] = useState<File[]>(() =>
     op?.vydachaFiles ?? (op?.vid === "Плавка" ? [new File([], `Приказ-${op.document}.pdf`)] : []));
   const [vozvratFiles, setVozvratFiles] = useState<File[]>(() =>
-    op?.vozvratFiles ?? (op && phase !== "vydacha" && stage !== "Выдано" ? [new File([], `МСЛ-${op.document}.pdf`)] : []));
+    op?.vozvratFiles ?? (op && op.statusVozvrat !== "Не начат" ? [new File([], `МСЛ-${op.document}.pdf`)] : []));
   const { toast, show, clear } = useToast();
 
   const appendPositions = (target: "vydacha" | "vozvrat", rows: Omit<OperPosition, "n">[]) => {
@@ -1080,18 +1071,22 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const raznicaSpisana = spisanaRaznica !== null && spisanaRaznica === delta;
 
   const oformitBlock =
-    phase === "vydacha"
-      ? (vydacha.length === 0 ? "Добавьте хотя бы одну позицию во вкладке «Выдача»" : null)
+    vydacha.length === 0 ? "Добавьте хотя бы одну позицию во вкладке «Выдача»"
       : vozvrat.length === 0 ? "Добавьте позиции во вкладке «Возврат»"
       : !inNorm && !raznicaSpisana ? `Дельта ${deltaSign}${fmt(Math.abs(delta))} г превышает допуск ±5 г — спишите разницу во вкладке «Итого»`
       : null;
 
   // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
   // эта карта возвращается в «Редактирование» и пропадает из выбора ШК для плавки (там только «Новая»).
+  // Выдача проводится при каждом сохранении: позиции, убранные из выдачи, возвращаются на склад.
   const applyVydacha = () => {
     const vydanoNomenkl = new Set(vydacha.filter(p => !isGPKlass(p.klass)).map(p => p.nomenkl));
+    const ubrano = new Set((op ? opVydacha(op) : []).map(p => p.nomenkl).filter(n => !vydanoNomenkl.has(n)));
     const izRezerva = dmItems.filter(i => i.status === "Резерв" && vydanoNomenkl.has(i.nomenkl));
-    setDmItems(prev => prev.map(i => (vydanoNomenkl.has(i.nomenkl) && i.status !== "В подотчёте" ? { ...i, status: "В подотчёте" } : i)));
+    setDmItems(prev => prev.map(i =>
+      vydanoNomenkl.has(i.nomenkl) && i.status !== "В подотчёте" ? { ...i, status: "В подотчёте" }
+        : ubrano.has(i.nomenkl) && i.status === "В подотчёте" ? { ...i, status: "На складе" }
+        : i));
     if (izRezerva.length === 0) return;
     const rezNomenkl = new Set(izRezerva.map(i => i.nomenkl));
     const zatronuty: string[] = [];
@@ -1114,13 +1109,16 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     document: head.document,
     responsible: head.responsible,
     stage: next,
-    statusVydacha: next === "Выдача: На редактировании" ? "Не выдано" : "Выдано",
+    description,
+    statusVydacha: "Выдано",
     statusVozvrat: next === "Завершено" ? "Полностью" : vozvrat.length > 0 ? "Частично" : "Не начат",
     statusClose: next !== "Завершено" ? "Не закрыто" : !inNorm ? "Закрыто: списано" : "Закрыто",
     vydachaPos: vydacha,
     vozvratPos: vozvrat,
     vydachaFiles,
     vozvratFiles,
+    losses,
+    spisanieFiles,
     docType: head.docType,
     zakazchik: head.zakazchik,
     plavkaNo: vid === "Плавка" ? head.plavkaNo : undefined,
@@ -1128,22 +1126,20 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     poluchil: head.poluchil,
   });
 
+  // «Сохранить» — операция «В работе», «Оформить» — «Завершено»
   const save = (oformit = false) => {
-    const next: OperStage = phase === "vydacha"
-      ? (oformit ? "Выдано" : "Выдача: На редактировании")
-      : (oformit ? "Завершено" : "Возврат: На редактировании");
-    // Позиции уходят в подотчёт только при оформлении выдачи
-    if (phase === "vydacha" && oformit) applyVydacha();
+    const next: OperStage = oformit ? "Завершено" : "В работе";
+    applyVydacha();
     onSave(buildOp(next));
   };
 
-  // Печать доступна только для оформленной операции — печатается текущее состояние формы.
-  const canPrint = !!op && isOformlena(op);
+  // Печать доступна для сохранённой операции — печатается текущее состояние формы.
+  const canPrint = !!op;
   const printBtn = (
     <span className="self-center">
       <PrintIcon
         disabled={!canPrint}
-        title={canPrint ? "Печать (PDF)" : "Печать доступна после оформления операции"}
+        title={canPrint ? "Печать (PDF)" : "Печать доступна после сохранения операции"}
         onClick={() => op && printOperation(buildOp(op.stage), vesSpisano)}
       />
     </span>
@@ -1156,11 +1152,14 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       extraWide
       footer={ro ? <>{printBtn}<Btn variant="secondary" onClick={onClose}>Закрыть</Btn></> : (
         <>
-          {oformitBlock && <span className="mr-auto self-center text-xs text-yellow-700">⚠ Оформление недоступно: {oformitBlock}</span>}
+          {/* «Оформить» закрывает операцию — вынесена влево, отдельно от «Сохранить» */}
+          <div className="mr-auto flex items-center gap-3">
+            <Btn variant="secondary" onClick={() => save(true)} disabled={!!oformitBlock}>Оформить</Btn>
+            {oformitBlock && <span className="text-xs text-yellow-700">⚠ Оформление недоступно: {oformitBlock}</span>}
+          </div>
           {printBtn}
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn onClick={() => save(true)} disabled={!!oformitBlock}>Оформить</Btn>
-          <Btn variant="secondary" onClick={() => save()}>Сохранить</Btn>
+          <Btn onClick={() => save()}>Сохранить</Btn>
         </>
       )}
     >
@@ -1168,11 +1167,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       {op && (
         <div className="flex items-center gap-2 mb-4">
           <Badge label={op.stage} group="operacii" />
-          {!readOnly && phase === "vozvrat" && <span className="text-xs text-gray-500">Оформление возврата: вкладка «Выдача» доступна только для просмотра</span>}
-          {!readOnly && phase === "done" && <span className="text-xs text-gray-500">Операция завершена — доступна только для просмотра</span>}
         </div>
       )}
-      {!op && <div className="mb-4 text-xs text-gray-500">Новая операция: заполните вкладку «Выдача». Возврат оформляется после выдачи.</div>}
 
       {/* Fields */}
       <div className="grid grid-cols-4 gap-4 mb-5">
@@ -1182,6 +1178,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <Field label="Вид операции" required={!headRo}>
           <Select value={vid} options={withCurrent(spravValues("Виды операций"), vid)} onChange={changeVid} disabled={headRo || !!op} />
         </Field>
+        <Field label="Описание" full><Input value={description} onChange={setDescription} placeholder="Краткое описание операции" disabled={headRo} /></Field>
         <Field label="Тип документа" required={!headRo}><Select value={head.docType} options={docTypeOptions} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={headRo || vid === VID_LKI} /></Field>
         <Field label="Номер документа"><Input value={head.document} disabled /></Field>
         <Field label="Дата операции" required={!headRo}><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
@@ -1195,11 +1192,11 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       </div>
 
       {/* Tabs */}
-      <Tabs tabs={["Выдача", "Возврат", "Списание", "Итого"]} active={tab} onChange={t => setTab(t as TabName)} disabled={disabledTabs} />
+      <Tabs tabs={["Выдача", "Возврат", "Списание", "Итого"]} active={tab} onChange={t => setTab(t as TabName)} />
 
       {tab === "Выдача" && (
         <>
-          {!vydachaRo && (
+          {!ro && (
             <div className="flex gap-2 mb-3">
               {vid === "Плавка" ? (
                 // Для плавки состав выдачи определяет только шихтовая карта.
@@ -1213,20 +1210,20 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           <OperPositionsTable
             rows={vydacha}
             view={posView}
-            readOnly={vydachaRo}
+            readOnly={ro}
             onView={p => screen.open("position", `vydacha-${p.n}`)}
             onDelete={p => setVydacha(prev => prev.filter(x => x.n !== p.n))}
           />
           <div className="mt-4">
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
-            <MultiFileUpload files={vydachaFiles} onChange={setVydachaFiles} accept={docAccept} disabled={vydachaRo} />
+            <MultiFileUpload files={vydachaFiles} onChange={setVydachaFiles} accept={docAccept} disabled={ro} />
           </div>
         </>
       )}
 
       {tab === "Возврат" && (
         <>
-          {!vozvratRo && (
+          {!ro && (
             <div className="flex gap-2 mb-3">
               <Btn size="sm" onClick={() => setShowVozvratPick(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               <ExportBtn onToast={show} />
@@ -1235,13 +1232,13 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           <OperPositionsTable
             rows={vozvrat}
             view={posView}
-            readOnly={vozvratRo}
+            readOnly={ro}
             onView={p => screen.open("position", `vozvrat-${p.n}`)}
             onDelete={p => setVozvrat(prev => prev.filter(x => x.n !== p.n))}
           />
           <div className="mt-4">
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
-            <MultiFileUpload files={vozvratFiles} onChange={setVozvratFiles} accept={docAccept} disabled={vozvratRo} />
+            <MultiFileUpload files={vozvratFiles} onChange={setVozvratFiles} accept={docAccept} disabled={ro} />
           </div>
         </>
       )}
@@ -1253,7 +1250,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           files={spisanieFiles}
           setFiles={setSpisanieFiles}
           vesStart={vesVydacha}
-          readOnly={vozvratRo}
+          readOnly={ro}
         />
       )}
 
@@ -1267,7 +1264,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               </span>
             </div>
             {!inNorm && raznicaSpisana && <Badge label="Разница списана" group="itogo-operacii" />}
-            {!inNorm && !raznicaSpisana && !vozvratRo && (
+            {!inNorm && !raznicaSpisana && !ro && (
               <button
                 onClick={() => setShowSpisanie(true)}
                 className="px-3 py-1.5 border border-red-500 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
@@ -1395,7 +1392,8 @@ export function DvizhenieMateriаla() {
   };
 
   const filtered = operations.filter(o => {
-    const matchSearch = !search || o.document.toLowerCase().includes(search.toLowerCase()) || o.responsible.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchSearch = !q || [o.document, o.responsible, o.description ?? ""].some(v => v.toLowerCase().includes(q));
     const matchVid = filterVid === "Все виды" || o.vid === filterVid;
     return matchSearch && matchVid;
   });
@@ -1404,15 +1402,15 @@ export function DvizhenieMateriаla() {
     date: o => parseRuDate(o.date),
     type: o => o.type,
     vid: o => o.vid,
-    positions: o => o.positions,
+    description: o => o.description ?? "",
     document: o => o.document,
     responsible: o => o.responsible,
     stage: o => o.stage,
   });
 
-  // Возврат оформляется по выданной операции (или продолжается по черновику возврата)
+  // Возврат оформляется по операции в работе
   const selectedOp = operations.find(o => o.id === selected) ?? null;
-  const canVozvrat = !!selectedOp && (selectedOp.stage === "Выдано" || selectedOp.stage === "Возврат: На редактировании");
+  const canVozvrat = !!selectedOp && selectedOp.stage === "В работе";
 
   const typeColor: Record<string, string> = {
     "Выдача": "text-green-600",
@@ -1456,15 +1454,18 @@ export function DvizhenieMateriаla() {
               <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
               <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип</SortTh>
               <SortTh sortKey="vid" sort={sort} onSort={toggleSort}>Вид операции</SortTh>
-              <SortTh sortKey="positions" sort={sort} onSort={toggleSort}>Позиции</SortTh>
+              <SortTh sortKey="description" sort={sort} onSort={toggleSort}>Описание</SortTh>
               <SortTh sortKey="document" sort={sort} onSort={toggleSort}>Документ</SortTh>
               <SortTh sortKey="responsible" sort={sort} onSort={toggleSort}>Подотчётник</SortTh>
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Вес</th>
               <SortTh sortKey="stage" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <th className="w-32"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {sorted.slice((page - 1) * perPage, page * perPage).map(op => (
+            {sorted.slice((page - 1) * perPage, page * perPage).map(op => {
+              const w = opWeights(op);
+              return (
               <tr key={op.id} className={`hover:bg-gray-50 transition-colors ${selected === op.id ? "bg-blue-50/50" : ""}`}>
                 <td className="px-4 py-3">
                   <input type="checkbox" checked={selected === op.id} onChange={() => toggleSelect(op.id)} className="w-4 h-4 accent-blue-600" />
@@ -1474,27 +1475,24 @@ export function DvizhenieMateriаla() {
                 <td className="px-4 py-3">
                   <button onClick={() => setViewOp(op)} className="text-blue-600 hover:underline">{op.vid}</button>
                 </td>
-                <td className="px-4 py-3">
-                  <button onClick={() => setViewOp(op)} className="flex items-center gap-1 text-gray-600 hover:text-blue-600">
-                    {op.positions}
-                    <Eye className="w-3.5 h-3.5" />
-                  </button>
-                </td>
+                <td className="px-4 py-3 text-gray-700 max-w-64">{op.description || <span className="text-gray-400">—</span>}</td>
                 <td className="px-4 py-3 text-blue-600">{op.document}</td>
                 <td className="px-4 py-3 text-gray-700">{op.responsible}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-700 leading-5 tabular-nums">
+                  <div>Выдача: {fmt(w.vydacha)}</div>
+                  <div>Возврат: {fmt(w.vozvrat)}</div>
+                  <div>Списание: {fmt(w.spisanie)}</div>
+                </td>
                 <td className="px-4 py-3 whitespace-nowrap"><Badge label={op.stage} group="operacii" /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewOp(op)} />
                   <EditIcon onClick={() => setEditOp(op)} />
-                  <PrintIcon
-                    disabled={!isOformlena(op)}
-                    title={isOformlena(op) ? "Печать (PDF)" : "Печать доступна после оформления операции"}
-                    onClick={() => printOperation(op)}
-                  />
+                  <PrintIcon title="Печать (PDF)" onClick={() => printOperation(op, w.spisanie)} />
                   <DeleteIcon onClick={() => confirm("Удалить операцию?", () => setOperations(prev => prev.filter(o => o.id !== op.id)))} />
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />

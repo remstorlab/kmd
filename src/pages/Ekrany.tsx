@@ -14,8 +14,8 @@ type Group = { title: string; screens: Screen[] };
 
 export function useScreenGroups(): Group[] {
   const { gpItems, dmItems, skladDocs, vydachaDocs, operations, shihtovyeKarty, podotchetniki, logs, users, roles, storageLocations } = useApp();
-  const opVydano = operations.find(o => o.stage === "Выдано") ?? operations[0];
-  const opVozvrat = operations.find(o => o.stage === "Возврат: На редактировании") ?? operations[0];
+  const opVydano = operations.find(o => o.stage === "В работе") ?? operations[0];
+  const opVozvrat = operations.find(o => o.stage === "В работе" && o.statusVozvrat !== "Не начат") ?? operations[0];
   const opDone = operations.find(o => o.stage === "Завершено") ?? operations[0];
   const prihodOrder = skladDocs.find(d => d.type === "Приходный ордер") ?? skladDocs[0];
   const prihodNaklad = skladDocs.find(d => d.type !== "Приходный ордер") ?? skladDocs[0];
@@ -72,8 +72,8 @@ export function useScreenGroups(): Group[] {
       { title: "Новая операция", path: `${P["dvizhenie-mat"]}/new` },
       { title: "Новая операция — добавить позицию ДМ со склада", path: `${P["dvizhenie-mat"]}/new/add-position` },
       { title: "Новая операция — выдача по шихтовой карте", path: `${P["dvizhenie-mat"]}/new/shihta-pick` },
-      opVydano && { title: "Операция: просмотр (выдано)", path: `${P["dvizhenie-mat"]}/view/${opVydano.id}` },
-      opVydano && { title: "Операция: оформление возврата", path: `${P["dvizhenie-mat"]}/edit/${opVydano.id}?tab=vozvrat` },
+      opVydano && { title: "Операция: просмотр (в работе)", path: `${P["dvizhenie-mat"]}/view/${opVydano.id}` },
+      opVydano && { title: "Операция в работе — вкладка «Возврат»", path: `${P["dvizhenie-mat"]}/edit/${opVydano.id}?tab=vozvrat` },
       opVozvrat && { title: "Возврат — вкладка «Выдача»", path: `${P["dvizhenie-mat"]}/edit/${opVozvrat.id}?tab=vydacha` },
       opVozvrat && { title: "Возврат — вкладка «Возврат»", path: `${P["dvizhenie-mat"]}/edit/${opVozvrat.id}?tab=vozvrat` },
       opVozvrat && { title: "Возврат — добавить позицию возврата", path: `${P["dvizhenie-mat"]}/edit/${opVozvrat.id}/vozvrat-pick?tab=vozvrat` },

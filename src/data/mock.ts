@@ -80,9 +80,12 @@ export interface VydachaDocPosition {
   issue: number;
 }
 
-// Этап операции движения материала:
-// «Выдача: На редактировании» → (Оформить) «Выдано» → (Оформить возврат, Сохранить) «Возврат: На редактировании» → (Оформить) «Завершено»
-export type OperStage = "Выдача: На редактировании" | "Выдано" | "Возврат: На редактировании" | "Завершено";
+// Статус операции движения материала: (Сохранить) «В работе» → (Оформить) «Завершено».
+// В работе все вкладки операции редактируются; завершённая операция — только для просмотра.
+export type OperStage = "В работе" | "Завершено";
+
+// Строка вкладки «Списание»: date — ISO (yyyy-mm-dd), name — технологическая операция, ves — вес потерь, г
+export type OperLoss = { id: string; date: string; name: string; ves: string };
 
 // ves — вес позиции для расчётов операции; metal (код материала), lig / net (лигатурный / чистый вес, г) — для отображения как на складе ДМ
 export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string; metal?: string; lig?: number; net?: number };
@@ -96,6 +99,8 @@ export interface Operation {
   document: string;
   responsible: string;
   stage: OperStage;
+  // Описание операции (вводится при создании)
+  description?: string;
   statusVydacha: "Выдано" | "Не выдано";
   statusVozvrat: "Не начат" | "Частично" | "Полностью";
   statusClose: "Не закрыто" | "Закрыто: списано" | "Закрыто";
@@ -105,6 +110,9 @@ export interface Operation {
   // Документы, прикреплённые во вкладках «Выдача» / «Возврат»
   vydachaFiles?: File[];
   vozvratFiles?: File[];
+  // Вкладка «Списание»: потери и документы списания
+  losses?: OperLoss[];
+  spisanieFiles?: File[];
   // Реквизиты шапки (для печатной формы)
   docType?: string;
   zakazchik?: string;
@@ -309,11 +317,11 @@ export const initialVydachaDocs: SkladDoc[] = [
 
 // --- Операции движения ---
 export const initialOperations: Operation[] = [
-  { id: "op1", date: "19.08.2026", type: "Выдача", vid: "Плавка", positions: 3, document: "1234", responsible: "Нурланов А.Б.", stage: "Выдано", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
-  { id: "op2", date: "18.08.2026", type: "Выдача-Возврат", vid: "Производство ГП", positions: 5, document: "1233", responsible: "Петров С.В.", stage: "Возврат: На редактировании", statusVydacha: "Выдано", statusVozvrat: "Частично", statusClose: "Не закрыто" },
-  { id: "op3", date: "17.08.2026", type: "Выдача-Возврат", vid: "Отбор пробы", positions: 2, document: "1232", responsible: "Смирнов К.Д.", stage: "Завершено", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто" },
-  { id: "op4", date: "16.08.2026", type: "Возврат", vid: "Анализ в ЛКИ", positions: 4, document: "1231", responsible: "Нурланов А.Б.", stage: "Завершено", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто: списано" },
-  { id: "op5", date: "15.08.2026", type: "Выдача", vid: "Гальванопокрытие", positions: 6, document: "1230", docType: "Маршрутный лист", responsible: "Иванова М.С.", stage: "Выдано", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
+  { id: "op1", date: "19.08.2026", type: "Выдача", vid: "Плавка", positions: 3, document: "1234", responsible: "Нурланов А.Б.", stage: "В работе", description: "Плавка золотых слитков из шихты", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
+  { id: "op2", date: "18.08.2026", type: "Выдача-Возврат", vid: "Производство ГП", positions: 5, document: "1233", responsible: "Петров С.В.", stage: "В работе", description: "Изготовление памятных монет", statusVydacha: "Выдано", statusVozvrat: "Частично", statusClose: "Не закрыто" },
+  { id: "op3", date: "17.08.2026", type: "Выдача-Возврат", vid: "Отбор пробы", positions: 2, document: "1232", responsible: "Смирнов К.Д.", stage: "Завершено", description: "Отбор проб от партии слитков", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто" },
+  { id: "op4", date: "16.08.2026", type: "Возврат", vid: "Анализ в ЛКИ", positions: 4, document: "1231", responsible: "Нурланов А.Б.", stage: "Завершено", description: "Химический анализ проб", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто: списано" },
+  { id: "op5", date: "15.08.2026", type: "Выдача", vid: "Гальванопокрытие", positions: 6, document: "1230", docType: "Маршрутный лист", responsible: "Иванова М.С.", stage: "В работе", description: "Золочение заготовок", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто" },
 ];
 
 // --- Шихтовые карты ---
@@ -618,7 +626,26 @@ export const vozvratPositions: OperPosition[] = [
 
 // Позиции операции; для демо-операций без сохранённых позиций — те же образцы, что показывает форма.
 export const opVydacha = (o: Operation) => o.vydachaPos ?? vydachaPositions;
-export const opVozvrat = (o: Operation) => o.vozvratPos ?? (o.stage === "Завершено" || o.stage === "Возврат: На редактировании" ? vozvratPositions : []);
+export const opVozvrat = (o: Operation) => o.vozvratPos ?? (o.statusVozvrat !== "Не начат" ? vozvratPositions : []);
+
+// Потери демо-операции «Производство ГП» (вкладка «Списание»)
+const demoGpLosses: OperLoss[] = [
+  { id: "l1", date: "2026-08-18", name: "Прокат, отжиг, травление", ves: "0.35" },
+  { id: "l2", date: "2026-08-18", name: "Вырубка и обрубка", ves: "0.80" },
+  { id: "l3", date: "2026-08-18", name: "Чеканка", ves: "0.60" },
+  { id: "l4", date: "2026-08-18", name: "Полирование", ves: "0.15" },
+];
+export const opLosses = (o: Operation) => o.losses ?? (o.vid === "Производство ГП" ? demoGpLosses : []);
+
+// Суммарные веса операции, г: выдано / возвращено / списано
+export function opWeights(o: Operation) {
+  const sum = (xs: number[]) => xs.reduce((a, v) => a + v, 0);
+  return {
+    vydacha: sum(opVydacha(o).map(p => p.ves)),
+    vozvrat: sum(opVozvrat(o).map(p => p.ves)),
+    spisanie: sum(opLosses(o).map(l => parseFloat(String(l.ves).replace(",", ".")) || 0)),
+  };
+}
 
 // --- Справочники ---
 export const spravochniki = {
@@ -799,7 +826,7 @@ export const initialStatusDicts: StatusDict[] = [
   { group: "dokumenty", name: "Статусы складских документов", sections: "Складские операции (приход, выдача)",
     items: st("dokumenty", [["Редактирование", "blue"], ["Оформлено", "green"]]) },
   { group: "operacii", name: "Статусы операций движения материала", sections: "Движение материала",
-    items: st("operacii", [["Выдача: На редактировании", "blue"], ["Выдано", "blue"], ["Возврат: На редактировании", "yellow"], ["Завершено", "green"]]) },
+    items: st("operacii", [["В работе", "blue"], ["Завершено", "green"]]) },
   { group: "itogo-operacii", name: "Статусы позиций в итогах операции", sections: "Движение материала → вкладка «Итого»",
     items: st("itogo-operacii", [["Без изменений", "green"], ["Изменено", "blue"], ["Преобразован", "purple"], ["Новая", "green"], ["Утрачена", "red"], ["Списано", "red"], ["Разница списана", "gray"]]) },
   { group: "shihta", name: "Статусы шихтовых карт", sections: "Шихтовые карты, Движение материала (выдача по шихтовой карте)",

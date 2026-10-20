@@ -6,7 +6,7 @@ import { useScreen } from "../router";
 
 // ── Акт по итогам инвентаризации НЗП ─────────────────────────────────────────
 // НЗП — драгоценные металлы, выданные в производство и ещё не возвращённые: позиции вкладки «Выдача»
-// операций движения материала в статусах «Выдано» и «Возврат: На редактировании» на дату инвентаризации.
+// операций движения материала в статусе «В работе» на дату инвентаризации.
 // Строки — металл по кладовым (подотчётным лицам); Остаток (баланс) — учётная масса в чистоте,
 // Остаток (факт) — вводится по результатам инвентаризации; излишки / недостача — разница.
 
@@ -35,8 +35,8 @@ const num = (v: string | undefined) => {
 const fmt = (v: number) => (Math.abs(v) < 0.005 ? "-" : v.toFixed(2));
 const blank = (v: string, w = "px-16") => (v.trim() ? <span className="border-b border-black px-1">{v}</span> : <span className={`border-b border-black ${w}`}>&nbsp;</span>);
 
-// Операция в производстве (НЗП): выдача проведена, возврат не завершён
-const inProduction = (o: Operation) => o.stage === "Выдано" || o.stage === "Возврат: На редактировании";
+// Операция в производстве (НЗП): операция в работе, ещё не завершена
+const inProduction = (o: Operation) => o.stage === "В работе";
 
 export default function AktNzpModal({ onClose }: { onClose: () => void }) {
   const { operations, materialCodes, chemElements } = useApp();

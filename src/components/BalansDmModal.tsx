@@ -87,7 +87,8 @@ export default function BalansDmModal({ onClose }: { onClose: () => void }) {
   const dmPos = (list: OperPosition[]) => list.filter(p => !isGPKlass(p.klass) && !isStoneKlass(p.klass));
   const posMass = (list: OperPosition[], id: string) =>
     dmPos(list).reduce((s, p) => s + massOf({ code: p.metal ?? "", netWeight: p.net ?? p.ves, chem: p.chem }, id), 0);
-  const issued = (o: Operation) => o.stage !== "Выдача: На редактировании";
+  // Выдача проводится при сохранении операции — выданы позиции любой сохранённой операции
+  const issued = (_o: Operation) => true;
   const returned = (o: Operation) => o.stage === "Завершено";
 
   const opDoc = (o: Operation, what: string) => `${o.docType || "Документ"} № ${o.document} от ${o.date} — ${what} (${o.vid})`;

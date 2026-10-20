@@ -156,8 +156,8 @@ const shortFio = (full: string) => {
 const isPersonOp = (o: Operation, person: Podotchetnik) =>
   [o.responsible, o.poluchil].some(r => !!r && (r === person.name || r === shortFio(person.name)));
 
-// Позиции считаются полученными после проведения выдачи, возвращёнными — после завершения операции
-const isIssued = (o: Operation) => o.stage !== "Выдача: На редактировании";
+// Позиции считаются полученными с сохранения операции («В работе»), возвращёнными — после её завершения
+const isIssued = (_o: Operation) => true;
 const isReturned = (o: Operation) => o.stage === "Завершено";
 
 // ── Карточка подотчётного лица ────────────────────────────────────────────────
