@@ -853,7 +853,7 @@ function mslHtml(o: Operation, spisano: number) {
   const probas = uniq(vyd.map(p => String(p.proba)));
   const marka = uniq(vyd.map(p => `${metalOf(p.name)} ${p.proba}`.trim())).join(", ");
   const slitki = vyd.filter(p => /слит/i.test(p.klass)).map(p => p.nomenkl).join(", ");
-  const izdelie = uniq(voz.filter(p => isGPKlass(p.klass)).map(p => p.name)).join(", ");
+  const izdelie = o.description?.trim() || uniq(voz.filter(p => isGPKlass(p.klass)).map(p => p.name)).join(", ");
   const zagotovki = uniq(vyd.map(p => p.klass.toLowerCase())).join(", ");
   const litsevik = o.poluchil || o.responsible;
   // Разбивка результата операции по классам: «Пдк 480.10», «Отх 8.00» …
@@ -1371,13 +1371,26 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
 // ── Реестр операций ───────────────────────────────────────────────────────────
 
+const filterCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
+// Дата фильтра из <input type="date"> (yyyy-mm-dd) в число, сравнимое с parseRuDate
+const isoToNum = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return y * 100000000 + m * 1000000 + d * 10000;
+};
+
 export function DvizhenieMateriаla() {
   const { operations, setOperations } = useApp();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
   const [filterVid, setFilterVid] = useState("Все виды");
+  const [filterType, setFilterType] = useState("Все типы");
+  const [filterIzdelie, setFilterIzdelie] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
+  // При изменении фильтра — на первую страницу
+  const upd = (set: (v: string) => void) => (v: string) => { set(v); setPage(1); };
   // Экраны: /dvizhenie-materiala/new, /view/:id, /edit/:id
   const screen = useScreen();
   const viewOp = operations.find(o => o.id === screen.after("view")) ?? null;
@@ -1393,12 +1406,20 @@ export function DvizhenieMateriаla() {
     setSelected(prev => (prev === id ? null : id));
   };
 
+  const from = dateFrom ? isoToNum(dateFrom) : 0;
+  const to = dateTo ? isoToNum(dateTo) + 9999 : Infinity;
   const filtered = operations.filter(o => {
     const q = search.toLowerCase();
-    const matchSearch = !q || [o.document, o.responsible, o.description ?? ""].some(v => v.toLowerCase().includes(q));
+    const matchSearch = !q || [o.document, o.responsible].some(v => v.toLowerCase().includes(q));
     const matchVid = filterVid === "Все виды" || o.vid === filterVid;
-    return matchSearch && matchVid;
+    const matchType = filterType === "Все типы" || o.type === filterType;
+    const matchIzdelie = !filterIzdelie || (o.description ?? "").toLowerCase().includes(filterIzdelie.toLowerCase());
+    const d = parseRuDate(o.date);
+    return matchSearch && matchVid && matchType && matchIzdelie && d >= from && d <= to;
   });
+  const resetFilters = () => {
+    setSearch(""); setFilterVid("Все виды"); setFilterType("Все типы"); setFilterIzdelie(""); setDateFrom(""); setDateTo(""); setPage(1);
+  };
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
     date: o => parseRuDate(o.date),
@@ -1437,15 +1458,33 @@ export function DvizhenieMateriаla() {
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex items-end gap-3 flex-wrap">
         <div className="flex-1 min-w-48">
           <label className="block text-xs font-medium text-gray-500 mb-1">Документ / Подотчётник</label>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input value={search} onChange={e => upd(setSearch)(e.target.value)} placeholder="Поиск..." className={filterCls} />
+        </div>
+        <div className="flex-1 min-w-48">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Наименование изделия</label>
+          <input value={filterIzdelie} onChange={e => upd(setFilterIzdelie)(e.target.value)} placeholder="Поиск..." className={filterCls} />
+        </div>
+        <div className="min-w-40">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Тип операции</label>
+          <select value={filterType} onChange={e => upd(setFilterType)(e.target.value)} className={filterCls}>
+            {["Все типы", ...spravValues("Типы операций")].map(o => <option key={o}>{o}</option>)}
+          </select>
         </div>
         <div className="min-w-40">
           <label className="block text-xs font-medium text-gray-500 mb-1">Вид операции</label>
-          <select value={filterVid} onChange={e => setFilterVid(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+          <select value={filterVid} onChange={e => upd(setFilterVid)(e.target.value)} className={filterCls}>
             {["Все виды", ...spravValues("Виды операций")].map(o => <option key={o}>{o}</option>)}
           </select>
         </div>
-        <button onClick={() => { setSearch(""); setFilterVid("Все виды"); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Сбросить</button>
+        <div className="min-w-36">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Дата с</label>
+          <input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => upd(setDateFrom)(e.target.value)} className={filterCls} />
+        </div>
+        <div className="min-w-36">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Дата по</label>
+          <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => upd(setDateTo)(e.target.value)} className={filterCls} />
+        </div>
+        <button onClick={resetFilters} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Сбросить</button>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -1459,14 +1498,12 @@ export function DvizhenieMateriаla() {
               <SortTh sortKey="description" sort={sort} onSort={toggleSort}>Наименование изделия</SortTh>
               <SortTh sortKey="document" sort={sort} onSort={toggleSort}>Документ</SortTh>
               <SortTh sortKey="responsible" sort={sort} onSort={toggleSort}>Подотчётник</SortTh>
-              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Вес</th>
               <SortTh sortKey="stage" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <th className="w-32"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {sorted.slice((page - 1) * perPage, page * perPage).map(op => {
-              const w = opWeights(op);
               return (
               <tr key={op.id} className={`hover:bg-gray-50 transition-colors ${selected === op.id ? "bg-blue-50/50" : ""}`}>
                 <td className="px-4 py-3">
@@ -1480,16 +1517,11 @@ export function DvizhenieMateriаla() {
                 <td className="px-4 py-3 text-gray-700 max-w-64">{op.description || <span className="text-gray-400">—</span>}</td>
                 <td className="px-4 py-3 text-blue-600">{op.document}</td>
                 <td className="px-4 py-3 text-gray-700">{op.responsible}</td>
-                <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-700 leading-5 tabular-nums">
-                  <div>Выдача: {fmt(w.vydacha)}</div>
-                  <div>Возврат: {fmt(w.vozvrat)}</div>
-                  <div>Списание: {fmt(w.spisanie)}</div>
-                </td>
                 <td className="px-4 py-3 whitespace-nowrap"><Badge label={op.stage} group="operacii" /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewOp(op)} />
                   <EditIcon onClick={() => setEditOp(op)} />
-                  <PrintIcon title="Печать (PDF)" onClick={() => printOperation(op, w.spisanie)} />
+                  <PrintIcon title="Печать (PDF)" onClick={() => printOperation(op, opWeights(op).spisanie)} />
                   <DeleteIcon onClick={() => confirm("Удалить операцию?", () => setOperations(prev => prev.filter(o => o.id !== op.id)))} />
                 </td>
               </tr>
