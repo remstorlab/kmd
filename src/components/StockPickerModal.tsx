@@ -18,6 +18,7 @@ export default function StockPickerModal({
   already = {},
   showWeights = false,
   qtyLabel = "Кол-во к выдаче",
+  qtyInput = true,
   emptyText = "Нет доступных позиций на складе",
   addLabel = "Добавить",
   onClose,
@@ -30,6 +31,8 @@ export default function StockPickerModal({
   // Показывать пробу и массы (для ДМ)
   showWeights?: boolean;
   qtyLabel?: string;
+  // false — без ввода количества: позиция берётся целиком (весь доступный остаток)
+  qtyInput?: boolean;
   emptyText?: string;
   addLabel?: string;
   onClose: () => void;
@@ -43,7 +46,8 @@ export default function StockPickerModal({
   const [selectedQty, setSelectedQty] = useState<Record<string, string>>({});
 
   const left = (r: StockRow) => r.qty - (already[r.id] ?? 0);
-  const available = rows.filter(r => left(r) > 0);
+  // Без ввода количества позиция доступна, пока её не взяли (количество изделий может быть не указано)
+  const available = rows.filter(r => (qtyInput ? left(r) > 0 : !(r.id in already)));
   const codeLabel = useMaterialCodeLabel();
   const codes = [ALL_CODES, ...Array.from(new Set(available.map(r => r.code))).sort()];
   const locations = [ALL_LOCS, ...Array.from(new Set(available.map(r => r.location))).sort()];
@@ -90,7 +94,7 @@ export default function StockPickerModal({
   const add = () => {
     const picked = available
       .filter(r => r.id in selectedQty)
-      .map(r => ({ row: r, qty: Math.max(1, Math.min(parseInt(selectedQty[r.id], 10) || 1, left(r))) }));
+      .map(r => ({ row: r, qty: qtyInput ? Math.max(1, Math.min(parseInt(selectedQty[r.id], 10) || 1, left(r))) : left(r) }));
     if (picked.length) onAdd(picked);
   };
 
@@ -145,8 +149,8 @@ export default function StockPickerModal({
                 <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый г</SortTh>
               </>}
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
-              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Доступно</SortTh>
-              <th className="px-3 py-2 text-left w-28">{qtyLabel}</th>
+              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
+              {qtyInput && <th className="px-3 py-2 text-left w-28">{qtyLabel}</th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {sorted.map(r => {
@@ -165,7 +169,7 @@ export default function StockPickerModal({
                     </>}
                     <td className="px-3 py-2 text-gray-500">{r.location}</td>
                     <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{left(r)} {r.unit}</td>
-                    <td className="px-3 py-2"><Input value={selectedQty[r.id] ?? ""} onChange={v => setQty(r.id, v)} placeholder="1" disabled={!checked} /></td>
+                    {qtyInput && <td className="px-3 py-2"><Input value={selectedQty[r.id] ?? ""} onChange={v => setQty(r.id, v)} placeholder="1" disabled={!checked} /></td>}
                   </tr>
                 );
               })}

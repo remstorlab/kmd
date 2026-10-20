@@ -44,7 +44,8 @@ function issueGp(items: GPItem[], issue: Map<string, number>, stamp: number): GP
 function issueDm(items: DMItem[], issue: Map<string, number>, stamp: number): DMItem[] {
   return items.flatMap(it => {
     const q = issue.get(it.id);
-    if (!q) return [it];
+    if (q === undefined) return [it];
+    // Позиция без количества изделий выдаётся целиком
     if (q >= it.qty) return [{ ...it, status: "Закрыта" as const }];
     const k = q / it.qty;
     const issuedLig = round2(it.ligWeight * k);
@@ -103,7 +104,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       ...gpItems.filter(i => i.status === "На складе").map(i => i.id),
       ...dmItems.filter(i => i.status === "На складе").map(i => i.id),
     ];
-    return [...fromGp, ...fromDm].filter(r => available.includes(r.id) && r.qty > 0 && (isDM ? !isGPKlass(r.klass) : isGPKlass(r.klass)));
+    return [...fromGp, ...fromDm].filter(r => available.includes(r.id) && (r.src === "dm" || r.qty > 0) && (isDM ? !isGPKlass(r.klass) : isGPKlass(r.klass)));
   }, [gpItems, dmItems, isDM]);
 
   const already = Object.fromEntries(positions.map(p => [p.id, p.issue]));
@@ -146,7 +147,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
   const totalQty = positions.reduce((s, p) => s + p.issue, 0);
   // Для ДМ массы пересчитываем пропорционально выдаваемому количеству
-  const share = (p: VydachaPosition, v: number | null) => (v == null ? 0 : (v * p.issue) / (p.qty || 1));
+  // ДМ выдаётся целиком — весь вес позиции; ГП — пропорционально количеству
+  const share = (p: VydachaPosition, v: number | null) => (v == null ? 0 : p.src === "dm" ? v : (v * p.issue) / (p.qty || 1));
   const totalLig = positions.reduce((s, p) => s + share(p, p.lig), 0);
   const totalNet = positions.reduce((s, p) => s + share(p, p.net), 0);
 
@@ -247,7 +249,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               <SortTh sortKey="name" sort={sort} onSort={toggleSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код</SortTh>
-              <SortTh sortKey="issue" sort={sort} onSort={toggleSort} className="px-3 py-2">Кол-во</SortTh>
+              <SortTh sortKey="issue" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
               {isDM && <>
                 <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Лигат. г</SortTh>
                 <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый г</SortTh>
@@ -264,7 +266,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                   <td className="px-3 py-2 w-32">
-                    {lockPos ? `${p.issue} ${p.unit}` : (
+                    {lockPos || isDM ? `${p.issue} ${p.unit}` : (
                       <div className="flex items-center gap-1.5">
                         <Input value={String(p.issue)} onChange={v => setIssue(p.id, v)} />
                         <span className="text-xs text-gray-400 whitespace-nowrap">/ {p.qty}</span>
@@ -296,6 +298,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
       {showPick && (
         <StockPickerModal
+          qtyInput={!isDM}
           title={`Добавить позиции со склада ${kind}`}
           rows={stock}
           already={already}

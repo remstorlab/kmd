@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Btn, Modal, Field, Input, Select, KlassSelect, MaterialCodeSelect } from "./ui";
-import { StorageLocation, ChemComposition } from "../data/mock";
+import { StorageLocation, ChemComposition, spravValues } from "../data/mock";
 import ChemCompositionBlock from "./ChemCompositionBlock";
 import { useApp } from "../store/AppContext";
 
@@ -51,7 +51,7 @@ const newPosId = () => `pp-${Date.now()}-${posSeq++}`;
 export function emptyPosition(locs: StorageLocation[], sklad: string, klass: string, code: string): PrihodPosition {
   const seyf = seyfsOf(locs, sklad)[0] ?? "";
   return {
-    id: newPosId(), nomenkl: "", name: "", klass, code, kol: "1", unit: "шт", proba: "999", lig: "", net: "",
+    id: newPosId(), nomenkl: "", name: "", klass, code, kol: "", unit: "шт", proba: "999", lig: "", net: "",
     seyf, polka: polkasOf(locs, sklad, seyf)[0] ?? "", chem: {},
   };
 }
@@ -79,6 +79,10 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   const seyfOptions = form.seyf && !seyfs.includes(form.seyf) ? [form.seyf, ...seyfs] : seyfs;
   const polkas = polkasOf(locs, sklad, form.seyf);
   const polkaOptions = form.polka && !polkas.includes(form.polka) ? [form.polka, ...polkas] : polkas;
+
+  // Проба — из справочника «Пробы»; значение не из справочника сохраняется в списке
+  const probas = spravValues("Пробы");
+  const probaOptions = form.proba && !probas.includes(form.proba) ? [form.proba, ...probas] : probas;
 
   const changeSeyf = (seyf: string) => setForm(f => ({ ...f, seyf, polka: polkasOf(locs, sklad, seyf)[0] ?? "" }));
 
@@ -116,9 +120,10 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         <Field label="Класс" required={!ro}><KlassSelect value={form.klass} onChange={set("klass")} disabled={ro} /></Field>
         <Field label="Код материала" required={!ro}><MaterialCodeSelect value={form.code} onChange={set("code")} disabled={ro} /></Field>
         <Field label="Наименование" required={!ro} full><Input value={form.name} onChange={set("name")} placeholder="Наименование позиции" disabled={ro} /></Field>
-        <Field label="Количество" required={!ro}><Input value={form.kol} onChange={set("kol")} placeholder="1" disabled={ro} /></Field>
+        {/* Необязательное: сколько изделий входит в одну позицию */}
+        <Field label="Количество изделий"><Input value={form.kol} onChange={v => set("kol")(v.replace(/[^\d]/g, ""))} placeholder="количество в пределах одной позиции" disabled={ro} /></Field>
         <Field label="Ед. изм." required={!ro}><Select value={form.unit} options={["шт", "г", "кг"]} onChange={set("unit")} disabled={ro} /></Field>
-        <Field label="Проба" required={!ro}><Input value={form.proba} onChange={set("proba")} placeholder="999" disabled={ro} /></Field>
+        <Field label="Проба" required={!ro}><Select value={form.proba} options={probaOptions} onChange={set("proba")} disabled={ro} /></Field>
         <Field label="Масса лигатурная, г" required={!ro}><Input value={form.lig} onChange={set("lig")} placeholder="0.00" disabled={ro} /></Field>
         <Field label="Масса чистая, г" required={!ro}><Input value={form.net} onChange={set("net")} placeholder="0.00" disabled={ro} /></Field>
         <Field label="Склад"><Input value={sklad} disabled /></Field>

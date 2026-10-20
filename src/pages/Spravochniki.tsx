@@ -8,7 +8,7 @@ import {
 import { spravochniki, techOpLossNorms, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
-import { ArrowLeft, ArrowDownUp, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowDownUp, Gem, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 
@@ -23,6 +23,7 @@ const DICT_SLUG: Record<SpravKey, string> = {
   "Склады": "sklady",
   "Технологические операции": "tehnologicheskie-operacii",
   "Тип списания": "tip-spisaniya",
+  "Пробы": "proby",
 };
 export const SPRAV_SLUGS = {
   ...DICT_SLUG,
@@ -62,15 +63,17 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Склады": Warehouse,
   "Технологические операции": Wrench,
   "Тип списания": ArrowDownUp,
+  "Пробы": Gem,
 };
 
 // Подпись поля «Значение» для справочников, где оно называется иначе
 const VALUE_LABEL: Partial<Record<SpravKey, string>> = {
   "Технологические операции": "Наименование",
   "Тип списания": "Наименование",
+  "Пробы": "Проба",
 };
 // Справочники только с номером строки и наименованием: номер присваивается автоматически, статуса нет
-const NUMBERED: SpravKey[] = ["Тип списания"];
+const NUMBERED: SpravKey[] = ["Тип списания", "Пробы"];
 
 const emptyNorm: TechOpLossNorm = { unit: "", au: "", ag: "" };
 const normCell = (v: string) => v || <span className="text-gray-400">—</span>;

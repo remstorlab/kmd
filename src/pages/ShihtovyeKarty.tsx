@@ -269,7 +269,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
               <tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
                 <SortTh sortKey="mat" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Материал</SortTh>
                 <SortTh sortKey="klass" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Класс</SortTh>
-                <SortTh sortKey="qty" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Кол-во, шт</SortTh>
+                <SortTh sortKey="qty" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Количество изделий</SortTh>
                 <SortTh sortKey="ves" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Масса лигатурная, г</SortTh>
                 {shkEls.map(e => (
                   <SortTh key={e.id} sortKey={`el-${e.id}`} sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">{e.shortName}</SortTh>
@@ -362,7 +362,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           rows={skladRows}
           already={already}
           showWeights
-          qtyLabel="Кол-во, шт"
+          qtyLabel="Количество изделий"
           emptyText="Нет доступных позиций на складе ДМ"
           addLabel="Добавить выбранные"
           onClose={() => setShowFromSklad(false)}

@@ -54,7 +54,7 @@ function GPViewModal({ item, onClose }: { item: GPItem; onClose: () => void }) {
       <div className="grid grid-cols-4 gap-4">
         <Field label="Наименование"><Input value={item.name} disabled /></Field>
         <Field label="Номенклатурный №"><Input value={item.nomenkl} disabled /></Field>
-        <Field label="Количество"><Input value={`${item.qty} ${item.unit}`} disabled /></Field>
+        <Field label="Количество изделий"><Input value={`${item.qty} ${item.unit}`} disabled /></Field>
         <Field label="Класс"><Input value={item.klass} disabled /></Field>
         <Field label="Код материала"><Input value={codeLabel(item.code)} disabled /></Field>
         <Field label="Место хранения"><Input value={item.location} disabled /></Field>
@@ -176,7 +176,7 @@ export function OstatokGP() {
               <th className="w-10 px-4 py-3"><input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(filtered.map(i => i.id)) : new Set())} /></th>
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort}>Номенкл. №</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
-              <SortTh sortKey="qty" sort={sort} onSort={toggleSort}>Количество</SortTh>
+              <SortTh sortKey="qty" sort={sort} onSort={toggleSort}>Количество изделий</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort}>Класс</SortTh>
               <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код материала</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort}>Проба</SortTh>
@@ -399,7 +399,7 @@ export function OstatokDM() {
               <th className="w-10 px-4 py-3"><input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(filtered.filter(i => i.status !== "Закрыта").map(i => i.id)) : new Set())} /></th>
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort}>Номенкл. №</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
-              <SortTh sortKey="qty" sort={sort} onSort={toggleSort}>Количество</SortTh>
+              <SortTh sortKey="qty" sort={sort} onSort={toggleSort}>Количество изделий</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort}>Класс</SortTh>
               <SortTh sortKey="metal" sort={sort} onSort={toggleSort}>Код материала</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort}>Проба</SortTh>

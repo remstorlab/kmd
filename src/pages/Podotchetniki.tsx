@@ -89,7 +89,7 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
           {showOperation && <SortTh sortKey="op" sort={sort} onSort={toggleSort} className={th}>Операция</SortTh>}
           <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className={th}>Номенкл. №</SortTh>
           <SortTh sortKey="name" sort={sort} onSort={toggleSort} className={th}>Наименование</SortTh>
-          <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество</SortTh>
+          <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество изделий</SortTh>
           <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
           <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
           <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>

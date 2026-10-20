@@ -214,7 +214,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
               <SortTh sortKey="name" sort={sort} onSort={toggleSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код материала</SortTh>
-              <SortTh sortKey="kol" sort={sort} onSort={toggleSort} className="px-3 py-2">Кол-во</SortTh>
+              <SortTh sortKey="kol" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
               {isOrder && <>
                 <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
                 <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Лигат.</SortTh>
@@ -230,7 +230,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
-                  <td className="px-3 py-2">{isOrder ? p.kol : `${p.kol} ${p.unit}`}</td>
+                  <td className="px-3 py-2">{!p.kol ? "—" : isOrder ? p.kol : `${p.kol} ${p.unit}`}</td>
                   {isOrder && <>
                     <td className="px-3 py-2">{p.proba}</td>
                     <td className="px-3 py-2 font-medium">{p.lig}</td>

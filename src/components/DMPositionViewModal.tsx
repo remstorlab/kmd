@@ -30,7 +30,7 @@ export default function DMPositionViewModal({ item, onClose }: { item: DMPositio
         <Field label="Номенкл. №"><Input value={item.nomenkl} disabled /></Field>
         <Field label="Класс"><Input value={item.klass} disabled /></Field>
         <Field label="Код материала"><Input value={item.metal ? codeLabel(item.metal) : "—"} disabled /></Field>
-        <Field label="Количество"><Input value={val(item.qty)} disabled /></Field>
+        <Field label="Количество изделий"><Input value={val(item.qty)} disabled /></Field>
         <Field label="Проба"><Input value={val(item.proba)} disabled /></Field>
         <Field label="Лигатурный вес г"><Input value={val(item.ligWeight)} disabled /></Field>
         <Field label="Чистый вес г"><Input value={val(item.netWeight)} disabled /></Field>
