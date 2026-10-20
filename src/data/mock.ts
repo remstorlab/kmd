@@ -843,7 +843,7 @@ export const initialStatusDicts: StatusDict[] = [
   { group: "operacii", name: "Статусы операций движения материала", sections: "Движение материала",
     items: st("operacii", [["В работе", "blue"], ["Завершено", "green"]]) },
   { group: "itogo-operacii", name: "Статусы позиций в итогах операции", sections: "Движение материала → вкладка «Итого»",
-    items: st("itogo-operacii", [["Без изменений", "green"], ["Изменено", "blue"], ["Преобразован", "purple"], ["Новая", "green"], ["Утрачена", "red"], ["Списано", "red"], ["Разница списана", "gray"]]) },
+    items: st("itogo-operacii", [["Без изменений", "green"], ["Изменено", "blue"], ["Преобразован", "purple"], ["Новая", "green"], ["Утрачена", "red"], ["Списано", "red"]]) },
   { group: "shihta", name: "Статусы шихтовых карт", sections: "Шихтовые карты, Движение материала (выдача по шихтовой карте)",
     items: st("shihta", [["Редактирование", "blue"], ["Новая", "green"], ["Выполнена", "gray"]]) },
   { group: "gost", name: "Статусы соответствия ГОСТ", sections: "Шихтовые карты, Отчётность",

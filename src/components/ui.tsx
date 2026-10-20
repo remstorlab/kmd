@@ -51,7 +51,6 @@ const badgePalette: Record<string, string> = {
   "Возвращено в обработку": "bg-blue-100 text-blue-700 border-blue-200",
   "Списано": "bg-red-100 text-red-700 border-red-200",
   "На редактировании": "bg-orange-100 text-orange-700 border-orange-200",
-  "Разница списана": "bg-gray-100 text-gray-600 border-gray-200",
   "Передано в возврат":"bg-purple-100 text-purple-700 border-purple-200",
 
   "Преобразован": "bg-purple-100 text-purple-700 border-purple-200",

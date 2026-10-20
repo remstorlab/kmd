@@ -1,63 +1,16 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, RequiredMark, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
+  Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
 } from "../components/ui";
 import { Operation, OperPosition, OperStage, OperLoss, lossWeight, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
-import { Plus, Paperclip } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
 import DMPositionFormModal, { PrihodPosition, emptyPosition, locOf } from "../components/DMPositionFormModal";
-
-// ── Списание разницы modal ────────────────────────────────────────────────────
-
-function SpisanieModal({ delta, onClose, onConfirm }: { delta: number; onClose: () => void; onConfirm: () => void }) {
-  const [reason, setReason] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  return (
-    <Modal title="Списание разницы" wide onClose={onClose} footer={
-      <>
-        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <button
-          onClick={files.length > 0 && reason ? onConfirm : undefined}
-          disabled={files.length === 0 || !reason}
-          className="px-4 py-2 rounded-lg border border-red-500 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Списать разницу
-        </button>
-      </>
-    }>
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex items-center gap-2 mb-4 text-sm">
-        <span className="text-yellow-600">⚠</span>
-        <span className="text-yellow-800 font-medium">Превышение допустимой дельты: {delta >= 0 ? "+" : "−"}{Math.abs(delta).toFixed(2)} г</span>
-      </div>
-      <div className="mb-4">
-        <label className="block text-xs font-medium text-gray-500 mb-1">Причина списания<RequiredMark /></label>
-        <Textarea value={reason} onChange={setReason} placeholder="Укажите причину списания разницы весов…" rows={4} />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-500 mb-2">Акт списания<RequiredMark /></label>
-        {files.length === 0 ? (
-          <div
-            className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 transition-colors"
-            onClick={() => inputRef.current?.click()}
-          >
-            <input ref={inputRef} type="file" multiple className="hidden" onChange={e => { if (e.target.files?.length) setFiles(Array.from(e.target.files)); }} />
-            <Paperclip className="w-6 h-6 mx-auto mb-2 text-gray-400" />
-            <p className="text-sm text-gray-500">Прикрепите файл акта списания<br /><span className="text-xs text-gray-400">PDF, DOCX — до 10 МБ</span></p>
-          </div>
-        ) : (
-          <MultiFileUpload files={files} onChange={setFiles} />
-        )}
-      </div>
-    </Modal>
-  );
-}
 
 // ── Добавить позицию ДМ со склада ─────────────────────────────────────────────
 
@@ -646,13 +599,12 @@ function SpisanieTab({ losses, setLosses, files, setFiles, vydacha, vozvrat, cod
       <td className="px-3 py-2 text-right">{fmt(r.vydano)} г</td>
       <td className="px-3 py-2 text-right">{fmt(r.spisano)} г</td>
       <td className="px-3 py-2 text-right">{fmt(r.vozvrat)} г</td>
-      <td className="px-3 py-2 text-right">{fmt(r.vydano - r.spisano - r.vozvrat)} г</td>
     </>
   );
 
   return (
     <>
-      {/* Сводка по кодам материалов. Списано: потеря — «+», прирост — «−»; остаток = выдано − списано − возврат */}
+      {/* Сводка по кодам материалов. Списано: потеря — «+», прирост — «−» */}
       <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
         <table className="w-full text-sm tabular-nums">
           <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
@@ -660,7 +612,6 @@ function SpisanieTab({ losses, setLosses, files, setFiles, vydacha, vozvrat, cod
             <th className={th}>Выдано в работу</th>
             <th className={th}>Списано</th>
             <th className={th}>Возврат</th>
-            <th className={th}>Остаток в работе</th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
             {rows.map(r => (
@@ -670,7 +621,7 @@ function SpisanieTab({ losses, setLosses, files, setFiles, vydacha, vozvrat, cod
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-2 text-center text-xs text-gray-400">Во вкладке «Выдача» нет позиций</td></tr>
+              <tr><td colSpan={4} className="px-3 py-2 text-center text-xs text-gray-400">Во вкладке «Выдача» нет позиций</td></tr>
             )}
             <tr className="bg-gray-50 font-semibold text-gray-900 border-t border-gray-200">
               <td className="px-3 py-2">{total.label}</td>
@@ -1061,10 +1012,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     return saved.length ? saved : [newLoss()];
   });
   const [spisanieFiles, setSpisanieFiles] = useState<File[]>(() => op?.spisanieFiles ?? (op?.vid === "Производство ГП" ? seedSpisanieFiles() : []));
-  // Вложенные экраны: …/spisanie-raznicy, …/add-position, …/vozvrat-pick, …/shihta-pick
+  // Вложенные экраны: …/add-position, …/vozvrat-pick, …/shihta-pick
   const screen = useScreen();
   const nested = (name: string) => [screen.has(name), (open: boolean) => (open ? screen.open(name) : screen.close(name))] as const;
-  const [showSpisanie, setShowSpisanie] = nested("spisanie-raznicy");
   const [showAddDM, setShowAddDM] = nested("add-position");
   const [showVozvratPick, setShowVozvratPick] = nested("vozvrat-pick");
   const [showShihtaPick, setShowShihtaPick] = nested("shihta-pick");
@@ -1135,14 +1085,11 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const deltaSign = delta >= 0 ? "+" : "−";
   const inNorm = Math.abs(delta) <= 5;
 
-  // Дельта, на которую оформлен акт «Списать разницу». Действует, только пока дельта не изменилась.
-  const [spisanaRaznica, setSpisanaRaznica] = useState<number | null>(() => (op?.statusClose === "Закрыто: списано" ? delta : null));
-  const raznicaSpisana = spisanaRaznica !== null && spisanaRaznica === delta;
 
   const oformitBlock =
     vydacha.length === 0 ? "Добавьте хотя бы одну позицию во вкладке «Выдача»"
       : vozvrat.length === 0 ? "Добавьте позиции во вкладке «Возврат»"
-      : !inNorm && !raznicaSpisana ? `Дельта ${deltaSign}${fmt(Math.abs(delta))} г превышает допуск ±5 г — спишите разницу во вкладке «Итого»`
+      : !inNorm ? `Дельта ${deltaSign}${fmt(Math.abs(delta))} г превышает допуск ±5 г — отразите расхождение во вкладке «Списание»`
       : null;
 
   // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
@@ -1181,7 +1128,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     description,
     statusVydacha: "Выдано",
     statusVozvrat: next === "Завершено" ? "Полностью" : vozvrat.length > 0 ? "Частично" : "Не начат",
-    statusClose: next !== "Завершено" ? "Не закрыто" : !inNorm ? "Закрыто: списано" : "Закрыто",
+    statusClose: next !== "Завершено" ? "Не закрыто" : "Закрыто",
     vydachaPos: vydacha,
     vozvratPos: vozvrat,
     vydachaFiles,
@@ -1334,15 +1281,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                 Дельта: {deltaSign}{fmt(Math.abs(delta))} г (допуск: ±5 г) {inNorm ? "— В норме!" : "— Превышение!"}
               </span>
             </div>
-            {!inNorm && raznicaSpisana && <Badge label="Разница списана" group="itogo-operacii" />}
-            {!inNorm && !raznicaSpisana && !ro && (
-              <button
-                onClick={() => setShowSpisanie(true)}
-                className="px-3 py-1.5 border border-red-500 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
-              >
-                Списать разницу
-              </button>
-            )}
           </div>
 
           <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -1394,13 +1332,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         </>
       )}
 
-      {showSpisanie && (
-        <SpisanieModal
-          delta={delta}
-          onClose={() => setShowSpisanie(false)}
-          onConfirm={() => { setShowSpisanie(false); setSpisanaRaznica(delta); show("Разница списана — операцию можно оформить"); }}
-        />
-      )}
       {showAddDM && (
         <AddDMPositionModal
           already={vydacha.reduce<Record<string, number>>((m, p) => ({ ...m, [p.nomenkl]: (m[p.nomenkl] ?? 0) + (p.qty ?? 0) }), {})}

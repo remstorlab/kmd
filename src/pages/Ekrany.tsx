@@ -80,7 +80,6 @@ export function useScreenGroups(): Group[] {
       opVozvrat && { title: "Возврат — новая позиция ДМ", path: `${P["dvizhenie-mat"]}/edit/${opVozvrat.id}/vozvrat-pick/new-position?tab=vozvrat` },
       opVozvrat && { title: "Возврат — вкладка «Списание»", path: `${P["dvizhenie-mat"]}/edit/${opVozvrat.id}?tab=spisanie` },
       opVozvrat && { title: "Возврат — вкладка «Итого»", path: `${P["dvizhenie-mat"]}/edit/${opVozvrat.id}?tab=itogo` },
-      opVozvrat && { title: "Возврат — списание разницы", path: `${P["dvizhenie-mat"]}/edit/${opVozvrat.id}/spisanie-raznicy?tab=itogo` },
       opDone && { title: "Операция: просмотр (завершено)", path: `${P["dvizhenie-mat"]}/view/${opDone.id}?tab=itogo` },
     ].filter(Boolean) as Screen[] },
     { title: "Шихтовые карты", screens: [
