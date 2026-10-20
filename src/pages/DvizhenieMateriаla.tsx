@@ -5,7 +5,7 @@ import {
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, RequiredMark, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, Textarea, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
 } from "../components/ui";
-import { Operation, OperPosition, OperStage, OperLoss, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
+import { Operation, OperPosition, OperStage, OperLoss, lossWeight, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
 import { Plus, Paperclip } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
@@ -488,7 +488,7 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
 
 // ── Списание потерь ───────────────────────────────────────────────────────────
 
-// name — технологическая операция из справочника «Технологические операции»
+// name — технологическая операция из справочника «Технологические операции»; type — «Тип списания»; metal — код материала выдачи
 type LossRow = OperLoss;
 
 const docAccept = ".pdf,.doc,.docx,.jpg,.jpeg,.png,.tif,.tiff";
@@ -502,23 +502,31 @@ const todayIso = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 const isoToRu = (iso: string) => (iso ? iso.split("-").reverse().join(".") : "");
-const newLoss = (): LossRow => ({ id: uid(), date: todayIso(), name: "", ves: "" });
+const newLoss = (metal = ""): LossRow => ({ id: uid(), date: todayIso(), name: "", ves: "", type: SPISANIE_POTERYA, metal });
 
 // Документы списания демо-операции «Производство ГП»
 const seedSpisanieFiles = () => [new File([], "Служебная_записка_потери_18082026.pdf"), new File([], "Акт_списания_18082026.pdf")];
 
+// Списанный вес: потеря — «+», прирост — «−»
 const sumLosses = (losses: LossRow[], pred: (l: LossRow) => boolean = () => true) =>
-  losses.filter(pred).reduce((a, l) => a + num(l.ves), 0);
+  losses.filter(pred).reduce((a, l) => a + lossWeight(l), 0);
+// Фон поля «Вес» по типу списания
+const vesBg = (type?: string) =>
+  type === SPISANIE_PRIROST ? "bg-green-100" : type === SPISANIE_POTERYA ? "bg-red-100" : "bg-white";
 
-function LossTable({ losses, readOnly, onChange }: {
+function LossTable({ losses, codes, readOnly, onChange }: {
   losses: LossRow[];
+  // Коды материалов позиций вкладки «Выдача»
+  codes: string[];
   readOnly: boolean;
   onChange: (rows: LossRow[]) => void;
 }) {
   const upd = (id: string, patch: Partial<LossRow>) => onChange(losses.map(l => (l.id === id ? { ...l, ...patch } : l)));
+  const codeLabel = useMaterialCodeLabel();
   const techOps = spravValues("Технологические операции");
-  // Пустой вариант — «не выбрано»; значение не из справочника (устаревшее) сохраняется в списке
-  const opOptions = (v: string) => ["", ...(v && !techOps.includes(v) ? [v] : []), ...techOps];
+  const types = spravValues("Тип списания");
+  // Пустой вариант — «не выбрано»; значение не из списка (устаревшее) сохраняется в списке
+  const optionsOf = (list: string[], v: string) => ["", ...(v && !list.includes(v) ? [v] : []), ...list];
   return (
     <>
       <table className="w-full text-sm">
@@ -526,6 +534,8 @@ function LossTable({ losses, readOnly, onChange }: {
           <th className="px-3 py-2 text-left w-10">№</th>
           <th className="px-3 py-2 text-left w-44">Дата</th>
           <th className="px-3 py-2 text-left">Тех. операция</th>
+          <th className="px-3 py-2 text-left w-48">Код материала</th>
+          <th className="px-3 py-2 text-left w-36">Тип</th>
           <th className="px-3 py-2 text-left w-32">Вес, г</th>
           {!readOnly && <th className="w-10"></th>}
         </tr></thead>
@@ -543,23 +553,37 @@ function LossTable({ losses, readOnly, onChange }: {
                 />
               </td>
               <td className="px-3 py-1.5">
-                <Select value={l.name} options={opOptions(l.name)} onChange={v => upd(l.id, { name: v })} optionLabel={v => v || "Выберите операцию"} disabled={readOnly} />
+                <Select value={l.name} options={optionsOf(techOps, l.name)} onChange={v => upd(l.id, { name: v })} optionLabel={v => v || "Выберите операцию"} disabled={readOnly} />
               </td>
-              <td className="px-3 py-1.5"><Input value={l.ves} onChange={v => upd(l.id, { ves: v })} placeholder="0.00" disabled={readOnly} /></td>
+              <td className="px-3 py-1.5">
+                <Select value={l.metal ?? ""} options={optionsOf(codes, l.metal ?? "")} onChange={v => upd(l.id, { metal: v })} optionLabel={v => (v ? codeLabel(v) : "Выберите код")} disabled={readOnly} />
+              </td>
+              <td className="px-3 py-1.5">
+                <Select value={l.type ?? ""} options={optionsOf(types, l.type ?? "")} onChange={v => upd(l.id, { type: v })} optionLabel={v => v || "Выберите тип"} disabled={readOnly} />
+              </td>
+              <td className="px-3 py-1.5">
+                <input
+                  value={l.ves}
+                  onChange={e => upd(l.id, { ves: e.target.value })}
+                  placeholder="0.00"
+                  disabled={readOnly}
+                  className={`w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:text-gray-600 ${vesBg(l.type)}`}
+                />
+              </td>
               {!readOnly && <td className="px-2 py-1.5"><DeleteIcon onClick={() => onChange(losses.filter(x => x.id !== l.id))} /></td>}
             </tr>
           ))}
           {losses.length === 0 && (
-            <tr><td colSpan={5} className="px-3 py-3 text-center text-xs text-gray-400">Потери не указаны</td></tr>
+            <tr><td colSpan={7} className="px-3 py-3 text-center text-xs text-gray-400">Списания не указаны</td></tr>
           )}
         </tbody>
       </table>
       {!readOnly && (
         <button
-          onClick={() => onChange([...losses, newLoss()])}
+          onClick={() => onChange([...losses, newLoss(codes.length === 1 ? codes[0] : "")])}
           className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
         >
-          <Plus className="w-4 h-4" />Добавить потерю
+          <Plus className="w-4 h-4" />Добавить списание
         </button>
       )}
     </>
@@ -584,34 +608,79 @@ function SpisanieDocBlock({ files, setFiles, readOnly }: {
   );
 }
 
-function SpisanieTab({ losses, setLosses, files, setFiles, vesStart, readOnly }: {
+type WeightRow = { label: string; vydano: number; spisano: number; vozvrat: number };
+
+function SpisanieTab({ losses, setLosses, files, setFiles, vydacha, vozvrat, codeOf, readOnly }: {
   losses: LossRow[];
   setLosses: React.Dispatch<React.SetStateAction<LossRow[]>>;
   files: File[];
   setFiles: (f: File[]) => void;
-  vesStart: number;
+  vydacha: OperPosition[];
+  vozvrat: OperPosition[];
+  // Код материала позиции
+  codeOf: (p: OperPosition) => string;
   readOnly: boolean;
 }) {
-  const total = sumLosses(losses);
-  const vesInWork = vesStart - total;
+  const codeLabel = useMaterialCodeLabel();
+  const ves = (rows: OperPosition[], code: string) => rows.filter(p => codeOf(p) === code).reduce((a, p) => a + p.ves, 0);
+  // Строки сводки — по кодам материалов вкладки «Выдача»
+  const codes = [...new Set(vydacha.map(codeOf).filter(Boolean))];
+  const rows: WeightRow[] = codes.map(c => ({
+    label: codeLabel(c),
+    vydano: ves(vydacha, c),
+    spisano: sumLosses(losses, l => l.metal === c),
+    vozvrat: ves(vozvrat, c),
+  }));
+  // Списания без кода материала (или с кодом не из выдачи) попадают только во «Всего»
+  const unassigned = sumLosses(losses, l => !codes.includes(l.metal ?? ""));
+  if (unassigned !== 0) rows.push({ label: "Без кода материала", vydano: 0, spisano: unassigned, vozvrat: 0 });
+  const total: WeightRow = {
+    label: "Всего",
+    vydano: vydacha.reduce((a, p) => a + p.ves, 0),
+    spisano: sumLosses(losses),
+    vozvrat: vozvrat.reduce((a, p) => a + p.ves, 0),
+  };
+  const th = "px-3 py-2 text-right font-medium";
+  const cells = (r: WeightRow) => (
+    <>
+      <td className="px-3 py-2 text-right">{fmt(r.vydano)} г</td>
+      <td className="px-3 py-2 text-right">{fmt(r.spisano)} г</td>
+      <td className="px-3 py-2 text-right">{fmt(r.vozvrat)} г</td>
+      <td className="px-3 py-2 text-right">{fmt(r.vydano - r.spisano - r.vozvrat)} г</td>
+    </>
+  );
 
   return (
     <>
-      {/* Сводка */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        {[
-          { label: "Выдано в работу", value: vesStart },
-          { label: "Списано всего", value: total },
-          { label: "Остаток в работе", value: vesInWork },
-        ].map(c => (
-          <div key={c.label} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-            <div className="text-xs text-gray-500">{c.label}</div>
-            <div className="text-base font-semibold text-gray-900">{fmt(c.value)} г</div>
-          </div>
-        ))}
+      {/* Сводка по кодам материалов. Списано: потеря — «+», прирост — «−»; остаток = выдано − списано − возврат */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+        <table className="w-full text-sm tabular-nums">
+          <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+            <th className="px-3 py-2 text-left font-medium">Код материала</th>
+            <th className={th}>Выдано в работу</th>
+            <th className={th}>Списано</th>
+            <th className={th}>Возврат</th>
+            <th className={th}>Остаток в работе</th>
+          </tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.map(r => (
+              <tr key={r.label}>
+                <td className="px-3 py-2 text-blue-600 font-medium">{r.label}</td>
+                {cells(r)}
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={5} className="px-3 py-2 text-center text-xs text-gray-400">Во вкладке «Выдача» нет позиций</td></tr>
+            )}
+            <tr className="bg-gray-50 font-semibold text-gray-900 border-t border-gray-200">
+              <td className="px-3 py-2">{total.label}</td>
+              {cells(total)}
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <LossTable losses={losses} readOnly={readOnly} onChange={rows => setLosses(rows)} />
+      <LossTable losses={losses} codes={codes} readOnly={readOnly} onChange={rows => setLosses(rows)} />
 
       <SpisanieDocBlock files={files} setFiles={setFiles} readOnly={readOnly} />
     </>
@@ -1249,7 +1318,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           setLosses={setLosses}
           files={spisanieFiles}
           setFiles={setSpisanieFiles}
-          vesStart={vesVydacha}
+          vydacha={vydacha}
+          vozvrat={vozvrat}
+          codeOf={p => posView(p).metal}
           readOnly={ro}
         />
       )}
@@ -1300,13 +1371,13 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                   </div>
                 </div>
               ))}
-              {vesSpisano > 0 && <>
-                <div className="text-xs font-semibold text-gray-500 uppercase mt-4 mb-2">Списание потерь</div>
+              {losses.some(l => num(l.ves) > 0) && <>
+                <div className="text-xs font-semibold text-gray-500 uppercase mt-4 mb-2">Списание</div>
                 {losses.filter(l => num(l.ves) > 0).map(l => (
                   <div key={l.id} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
                     <div className="text-sm text-gray-900">{l.name || "Без наименования"} <span className="text-gray-400 text-xs">{isoToRu(l.date)}</span></div>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-600">{l.ves} г</span>
+                      <span className={`text-sm px-1.5 rounded ${vesBg(l.type)} text-gray-700`}>{l.type === SPISANIE_PRIROST ? "−" : "+"}{l.ves} г</span>
                       <Badge label="Списано" group="itogo-operacii" />
                     </div>
                   </div>

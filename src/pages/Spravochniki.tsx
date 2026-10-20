@@ -8,7 +8,7 @@ import {
 import { spravochniki, techOpLossNorms, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
-import { ArrowLeft, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowDownUp, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 
@@ -22,6 +22,7 @@ const DICT_SLUG: Record<SpravKey, string> = {
   "Виды операций": "vidy-operaciy",
   "Склады": "sklady",
   "Технологические операции": "tehnologicheskie-operacii",
+  "Тип списания": "tip-spisaniya",
 };
 export const SPRAV_SLUGS = {
   ...DICT_SLUG,
@@ -60,12 +61,16 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Виды операций": Layers,
   "Склады": Warehouse,
   "Технологические операции": Wrench,
+  "Тип списания": ArrowDownUp,
 };
 
 // Подпись поля «Значение» для справочников, где оно называется иначе
 const VALUE_LABEL: Partial<Record<SpravKey, string>> = {
   "Технологические операции": "Наименование",
+  "Тип списания": "Наименование",
 };
+// Справочники только с номером строки и наименованием: номер присваивается автоматически, статуса нет
+const NUMBERED: SpravKey[] = ["Тип списания"];
 
 const emptyNorm: TechOpLossNorm = { unit: "", au: "", ag: "" };
 const normCell = (v: string) => v || <span className="text-gray-400">—</span>;
@@ -75,6 +80,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const valueLabel = VALUE_LABEL[name] ?? "Значение";
   // У технологических операций — нормативы допустимых потерь по золоту и серебру
   const withNorms = name === "Технологические операции";
+  const numbered = NUMBERED.includes(name);
   const [items, setItems] = useState(dict.items);
   const [norms, setNorms] = useState(techOpLossNorms);
   const [form, setForm] = useState({ code: "", value: "", status: "Активно" });
@@ -83,7 +89,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   // Форма заполняется при открытии экрана добавления / редактирования (в т.ч. по прямой ссылке)
   useEffect(() => {
     if (editItem) { setForm(editItem); setNormForm(norms[editItem.code] ?? emptyNorm); }
-    else if (showAdd) { setForm({ code: "", value: "", status: "Активно" }); setNormForm(emptyNorm); }
+    else if (showAdd) {
+      const nextNo = String(items.reduce((m, i) => Math.max(m, parseInt(i.code, 10) || 0), 0) + 1);
+      setForm({ code: numbered ? nextNo : "", value: "", status: "Активно" });
+      setNormForm(emptyNorm);
+    }
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { sorted, sort, toggleSort } = useSort(items, {
@@ -128,14 +138,14 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
-            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
+            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>{numbered ? "№" : "Код"}</SortTh>
             <SortTh sortKey="value" sort={sort} onSort={toggleSort}>{valueLabel}</SortTh>
             {withNorms && <>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Ед. изм. норматива</th>
               <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Потери Au, %</th>
               <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Потери Ag, %</th>
             </>}
-            <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
+            {!numbered && <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>}
             <th className="w-12"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
@@ -148,7 +158,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                   <td className="px-4 py-3 text-right tabular-nums">{normCell(norms[item.code]?.au ?? "")}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{normCell(norms[item.code]?.ag ?? "")}</td>
                 </>}
-                <td className="px-4 py-3"><Badge label={item.status} group="zapisi-spravochnikov" /></td>
+                {!numbered && <td className="px-4 py-3"><Badge label={item.status} group="zapisi-spravochnikov" /></td>}
                 <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
               </tr>
             ))}
@@ -168,7 +178,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
           }
         >
           <div className="space-y-4">
-            <Field label="Код" required><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} /></Field>
+            <Field label={numbered ? "№" : "Код"} required={!numbered}><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem || numbered} /></Field>
             <Field label={valueLabel} required><Input value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} /></Field>
             {withNorms && <>
               <Field label="Единицы измерения норматива"><Input value={normForm.unit} onChange={v => setNormForm(f => ({ ...f, unit: v }))} placeholder="% к массе навески" /></Field>
@@ -177,7 +187,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                 <Field label="Допустимые потери — Серебро, %"><Input value={normForm.ag} onChange={v => setNormForm(f => ({ ...f, ag: v }))} placeholder="Не установлен" /></Field>
               </div>
             </>}
-            <Field label="Статус" required><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>
+            {!numbered && <Field label="Статус" required><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>}
           </div>
         </Modal>
       )}

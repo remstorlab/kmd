@@ -84,8 +84,15 @@ export interface VydachaDocPosition {
 // В работе все вкладки операции редактируются; завершённая операция — только для просмотра.
 export type OperStage = "В работе" | "Завершено";
 
-// Строка вкладки «Списание»: date — ISO (yyyy-mm-dd), name — технологическая операция, ves — вес потерь, г
-export type OperLoss = { id: string; date: string; name: string; ves: string };
+// Строка вкладки «Списание»: date — ISO (yyyy-mm-dd), name — технологическая операция, ves — вес, г,
+// type — значение справочника «Тип списания», metal — код материала из позиций вкладки «Выдача»
+export type OperLoss = { id: string; date: string; name: string; ves: string; type?: string; metal?: string };
+
+// Тип списания: потеря увеличивает списанный вес, прирост — уменьшает
+export const SPISANIE_POTERYA = "Потеря";
+export const SPISANIE_PRIROST = "Прирост";
+export const lossWeight = (l: OperLoss) =>
+  (l.type === SPISANIE_PRIROST ? -1 : 1) * (parseFloat(String(l.ves).replace(",", ".")) || 0);
 
 // ves — вес позиции для расчётов операции; metal (код материала), lig / net (лигатурный / чистый вес, г) — для отображения как на складе ДМ
 export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string; metal?: string; lig?: number; net?: number };
@@ -630,10 +637,10 @@ export const opVozvrat = (o: Operation) => o.vozvratPos ?? (o.statusVozvrat !== 
 
 // Потери демо-операции «Производство ГП» (вкладка «Списание»)
 const demoGpLosses: OperLoss[] = [
-  { id: "l1", date: "2026-08-18", name: "Прокат, отжиг, травление", ves: "0.35" },
-  { id: "l2", date: "2026-08-18", name: "Вырубка и обрубка", ves: "0.80" },
-  { id: "l3", date: "2026-08-18", name: "Чеканка", ves: "0.60" },
-  { id: "l4", date: "2026-08-18", name: "Полирование", ves: "0.15" },
+  { id: "l1", date: "2026-08-18", name: "Прокат, отжиг, травление", ves: "0.35", type: "Потеря", metal: "1000" },
+  { id: "l2", date: "2026-08-18", name: "Вырубка и обрубка", ves: "0.80", type: "Потеря", metal: "1000" },
+  { id: "l3", date: "2026-08-18", name: "Чеканка", ves: "0.60", type: "Потеря", metal: "1000" },
+  { id: "l4", date: "2026-08-18", name: "Полирование", ves: "0.15", type: "Потеря", metal: "1000" },
 ];
 export const opLosses = (o: Operation) => o.losses ?? (o.vid === "Производство ГП" ? demoGpLosses : []);
 
@@ -643,7 +650,7 @@ export function opWeights(o: Operation) {
   return {
     vydacha: sum(opVydacha(o).map(p => p.ves)),
     vozvrat: sum(opVozvrat(o).map(p => p.ves)),
-    spisanie: sum(opLosses(o).map(l => parseFloat(String(l.ves).replace(",", ".")) || 0)),
+    spisanie: sum(opLosses(o).map(lossWeight)),
   };
 }
 
@@ -743,6 +750,14 @@ export const spravochniki = {
       { code: "ТХ-17", value: "Определение хлористого серебра и извлечение его из отходов", status: "Активно" },
       { code: "ТХ-18", value: "Извлечение драгоценных металлов из отходов (растворов, порошков, шлифов, шламов)", status: "Активно" },
       { code: "ТХ-19", value: "Проведение входного контроля стандартных слитков", status: "Активно" },
+    ]
+  },
+  // Код — номер строки справочника
+  "Тип списания": {
+    count: 2,
+    items: [
+      { code: "1", value: "Потеря", status: "Активно" },
+      { code: "2", value: "Прирост", status: "Активно" },
     ]
   },
 };
