@@ -525,8 +525,8 @@ function LossTable({ losses, readOnly, onChange }: {
         <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
           <th className="px-3 py-2 text-left w-10">№</th>
           <th className="px-3 py-2 text-left w-44">Дата</th>
-          <th className="px-3 py-2 text-left">Наименование потерь</th>
-          <th className="px-3 py-2 text-left w-32">Вес потерь, г</th>
+          <th className="px-3 py-2 text-left">Тех. операция</th>
+          <th className="px-3 py-2 text-left w-32">Вес, г</th>
           {!readOnly && <th className="w-10"></th>}
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
