@@ -5,7 +5,7 @@ import {
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination, statusColorClass,
 } from "../components/ui";
-import { spravochniki, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
+import { spravochniki, techOpLossNorms, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
 import { ArrowLeft, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
@@ -67,16 +67,23 @@ const VALUE_LABEL: Partial<Record<SpravKey, string>> = {
   "Технологические операции": "Наименование",
 };
 
+const emptyNorm: TechOpLossNorm = { unit: "", au: "", ag: "" };
+const normCell = (v: string) => v || <span className="text-gray-400">—</span>;
+
 function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const dict = spravochniki[name];
   const valueLabel = VALUE_LABEL[name] ?? "Значение";
+  // У технологических операций — нормативы допустимых потерь по золоту и серебру
+  const withNorms = name === "Технологические операции";
   const [items, setItems] = useState(dict.items);
+  const [norms, setNorms] = useState(techOpLossNorms);
   const [form, setForm] = useState({ code: "", value: "", status: "Активно" });
+  const [normForm, setNormForm] = useState(emptyNorm);
   const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.code);
   // Форма заполняется при открытии экрана добавления / редактирования (в т.ч. по прямой ссылке)
   useEffect(() => {
-    if (editItem) setForm(editItem);
-    else if (showAdd) setForm({ code: "", value: "", status: "Активно" });
+    if (editItem) { setForm(editItem); setNormForm(norms[editItem.code] ?? emptyNorm); }
+    else if (showAdd) { setForm({ code: "", value: "", status: "Активно" }); setNormForm(emptyNorm); }
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { sorted, sort, toggleSort } = useSort(items, {
@@ -94,6 +101,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
     // Справочник — общий источник вариантов для полей форм, поэтому изменения пишем в него.
     if (!editItem) dict.count += 1;
     dict.items = next;
+    if (withNorms) {
+      // Нормативы читает раздел «Списание», поэтому также пишем их в общий источник
+      techOpLossNorms[form.code] = normForm;
+      setNorms({ ...techOpLossNorms });
+    }
     closeAll();
     show("Запись сохранена");
   };
@@ -118,6 +130,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
           <thead><tr className="bg-gray-50 border-b border-gray-200">
             <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
             <SortTh sortKey="value" sort={sort} onSort={toggleSort}>{valueLabel}</SortTh>
+            {withNorms && <>
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Ед. изм. норматива</th>
+              <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Потери Au, %</th>
+              <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Потери Ag, %</th>
+            </>}
             <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
             <th className="w-12"></th>
           </tr></thead>
@@ -126,6 +143,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
               <tr key={i} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-gray-900">{item.value}</td>
+                {withNorms && <>
+                  <td className="px-4 py-3 text-gray-500">{normCell(norms[item.code]?.unit ?? "")}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{normCell(norms[item.code]?.au ?? "")}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{normCell(norms[item.code]?.ag ?? "")}</td>
+                </>}
                 <td className="px-4 py-3"><Badge label={item.status} group="zapisi-spravochnikov" /></td>
                 <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
               </tr>
@@ -148,6 +170,13 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
           <div className="space-y-4">
             <Field label="Код" required><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} /></Field>
             <Field label={valueLabel} required><Input value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} /></Field>
+            {withNorms && <>
+              <Field label="Единицы измерения норматива"><Input value={normForm.unit} onChange={v => setNormForm(f => ({ ...f, unit: v }))} placeholder="% к массе навески" /></Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Допустимые потери — Золото, %"><Input value={normForm.au} onChange={v => setNormForm(f => ({ ...f, au: v }))} placeholder="Не установлен" /></Field>
+                <Field label="Допустимые потери — Серебро, %"><Input value={normForm.ag} onChange={v => setNormForm(f => ({ ...f, ag: v }))} placeholder="Не установлен" /></Field>
+              </div>
+            </>}
             <Field label="Статус" required><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>
           </div>
         </Modal>
