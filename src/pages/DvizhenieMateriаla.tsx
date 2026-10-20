@@ -5,7 +5,7 @@ import {
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
 } from "../components/ui";
-import { Operation, OperPosition, OperStage, OperLoss, lossWeight, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
+import { Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
@@ -711,6 +711,100 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
   );
 }
 
+// ── Вкладка «Итого»: позиции выдачи / возврата и списания с промежуточными итогами ──
+
+// Лигатурный вес — основа расчёта итогов и списаний, поэтому колонка выделена
+const ligCls = "bg-blue-50 font-semibold text-gray-900";
+
+function ItogoPositions({ title, rows, view, total }: {
+  title: string;
+  rows: OperPosition[];
+  view: (p: OperPosition) => DMPositionView;
+  total: number;
+}) {
+  const codeLabel = useMaterialCodeLabel();
+  const dash = (v: number | null | undefined) => (v === null || v === undefined ? "—" : fmt(v));
+  return (
+    <div className="mb-5">
+      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">{title}</div>
+      <table className="w-full text-sm tabular-nums">
+        <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+          <th className="px-3 py-2 text-left">Наименование</th>
+          <th className="px-3 py-2 text-left">Класс</th>
+          <th className="px-3 py-2 text-left">Код материала</th>
+          <th className={`px-3 py-2 text-right w-36 ${ligCls}`}>Лигат. вес г</th>
+          <th className="px-3 py-2 text-right w-36">Чистый вес г</th>
+        </tr></thead>
+        <tbody className="divide-y divide-gray-100">
+          {rows.map(p => {
+            const v = view(p);
+            return (
+              <tr key={p.n}>
+                <td className="px-3 py-2 text-gray-900">{p.name} <span className="text-gray-400 text-xs">{p.nomenkl}</span></td>
+                <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
+                <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
+                <td className={`px-3 py-2 text-right ${ligCls}`}>{fmt(p.ves)}</td>
+                <td className="px-3 py-2 text-right text-gray-600">{dash(v.netWeight)}</td>
+              </tr>
+            );
+          })}
+          {rows.length === 0 && (
+            <tr><td colSpan={5} className="px-3 py-3 text-center text-xs text-gray-400">Позиции не добавлены</td></tr>
+          )}
+        </tbody>
+        <tfoot><tr className="border-t border-gray-200 bg-gray-50">
+          <td colSpan={3} className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Итого {title.toLowerCase()}</td>
+          <td className={`px-3 py-2 text-right ${ligCls}`}>{fmt(total)} г</td>
+          <td></td>
+        </tr></tfoot>
+      </table>
+    </div>
+  );
+}
+
+function ItogoLosses({ losses, total }: { losses: LossRow[]; total: number }) {
+  const codeLabel = useMaterialCodeLabel();
+  const { materialCodes } = useApp();
+  // Норма потерь — из справочника «Технологические операции» по металлу кода материала
+  const normOf = (l: LossRow) => {
+    const n = l.name && l.metal ? techOpLossNorm(l.name, baseMetal(l.metal, materialCodes)) : undefined;
+    return n ? `${n.value} ${n.unit}` : "—";
+  };
+  return (
+    <div className="mb-5">
+      <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Списание</div>
+      <table className="w-full text-sm tabular-nums">
+        <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+          <th className="px-3 py-2 text-left">Тех. операция</th>
+          <th className="px-3 py-2 text-left">Дата</th>
+          <th className="px-3 py-2 text-left">Код материала</th>
+          <th className="px-3 py-2 text-left">Норма потерь</th>
+          <th className={`px-3 py-2 text-right w-36 ${ligCls}`}>Лигат. вес г</th>
+        </tr></thead>
+        <tbody className="divide-y divide-gray-100">
+          {losses.map(l => (
+            <tr key={l.id}>
+              <td className="px-3 py-2 text-gray-900">{l.name || "Без наименования"}</td>
+              <td className="px-3 py-2 text-gray-500">{isoToRu(l.date)}</td>
+              <td className="px-3 py-2 text-blue-600 font-medium">{l.metal ? codeLabel(l.metal) : "—"}</td>
+              <td className="px-3 py-2 text-gray-600">{normOf(l)}</td>
+              {/* Потеря — светло-красный фон, прирост — светло-зелёный */}
+              <td className={`px-3 py-2 text-right font-semibold text-gray-900 ${vesBg(l.type)}`}>{fmt(num(l.ves))}</td>
+            </tr>
+          ))}
+          {losses.length === 0 && (
+            <tr><td colSpan={5} className="px-3 py-3 text-center text-xs text-gray-400">Списания не указаны</td></tr>
+          )}
+        </tbody>
+        <tfoot><tr className="border-t border-gray-200 bg-gray-50">
+          <td colSpan={4} className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Итого списание</td>
+          <td className={`px-3 py-2 text-right ${ligCls}`}>{fmt(total)} г</td>
+        </tr></tfoot>
+      </table>
+    </div>
+  );
+}
+
 // ── Operation modal ───────────────────────────────────────────────────────────
 
 type TabName = "Выдача" | "Возврат" | "Списание" | "Итого";
@@ -1285,42 +1379,12 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide border-b border-gray-200">
-              Операция 1 — Плавка золотых слитков
+              Операция — {vid}{description.trim() ? ` — ${description.trim()}` : ""}
             </div>
             <div className="p-4">
-              <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Выдача</div>
-              {vydacha.map((p, i) => (
-                <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-                  <div className="text-sm text-gray-900">{p.name} <span className="text-gray-400 text-xs">{p.nomenkl}</span></div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600">{p.ves} г</span>
-                    <Badge label="Преобразован" group="itogo-operacii" />
-                  </div>
-                </div>
-              ))}
-              <div className="flex items-center justify-center py-2 text-gray-400 text-xs">↓ связь ↓</div>
-              <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Возврат</div>
-              {vozvrat.map((p, i) => (
-                <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-                  <div className="text-sm text-gray-900">{p.name} <span className="text-gray-400 text-xs">{p.nomenkl}</span></div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600">{p.ves} г</span>
-                    <Badge label={i === 0 ? "Без изменений" : i === 2 ? "Новая" : "Без изменений"} group="itogo-operacii" />
-                  </div>
-                </div>
-              ))}
-              {losses.some(l => num(l.ves) > 0) && <>
-                <div className="text-xs font-semibold text-gray-500 uppercase mt-4 mb-2">Списание</div>
-                {losses.filter(l => num(l.ves) > 0).map(l => (
-                  <div key={l.id} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
-                    <div className="text-sm text-gray-900">{l.name || "Без наименования"} <span className="text-gray-400 text-xs">{isoToRu(l.date)}</span></div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-sm px-1.5 rounded ${vesBg(l.type)} text-gray-700`}>{l.type === SPISANIE_PRIROST ? "−" : "+"}{l.ves} г</span>
-                      <Badge label="Списано" group="itogo-operacii" />
-                    </div>
-                  </div>
-                ))}
-              </>}
+              <ItogoPositions title="Выдача" rows={vydacha} view={posView} total={vesVydacha} />
+              <ItogoPositions title="Возврат" rows={vozvrat} view={posView} total={vesVozvrat} />
+              <ItogoLosses losses={losses.filter(l => num(l.ves) > 0)} total={vesSpisano} />
               <div className="mt-4 pt-3 border-t border-gray-200 grid grid-cols-4 gap-3 text-sm">
                 <div><span className="text-gray-500">Выдано:</span> <b>{fmt(vesVydacha)} г</b></div>
                 <div><span className="text-gray-500">Возврат:</span> <b>{fmt(vesVozvrat)} г</b></div>

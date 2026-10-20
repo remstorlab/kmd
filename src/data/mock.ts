@@ -820,7 +820,7 @@ export const STATUS_COLORS: { value: StatusColor; label: string }[] = [
 export interface StatusItem { id: string; name: string; color: StatusColor }
 // group — ключ справочника, по которому бейдж ищет цвет статуса
 export type StatusGroup =
-  | "pozicii" | "vydacha-pozicii" | "dokumenty" | "operacii" | "itogo-operacii" | "shihta"
+  | "pozicii" | "vydacha-pozicii" | "dokumenty" | "operacii" | "shihta"
   | "gost" | "podotchet" | "polzovateli" | "zhurnal" | "mesta-hraneniya" | "zapisi-spravochnikov";
 export interface StatusDict {
   group: StatusGroup;
@@ -842,8 +842,6 @@ export const initialStatusDicts: StatusDict[] = [
     items: st("dokumenty", [["Редактирование", "blue"], ["Оформлено", "green"]]) },
   { group: "operacii", name: "Статусы операций движения материала", sections: "Движение материала",
     items: st("operacii", [["В работе", "blue"], ["Завершено", "green"]]) },
-  { group: "itogo-operacii", name: "Статусы позиций в итогах операции", sections: "Движение материала → вкладка «Итого»",
-    items: st("itogo-operacii", [["Без изменений", "green"], ["Изменено", "blue"], ["Преобразован", "purple"], ["Новая", "green"], ["Утрачена", "red"], ["Списано", "red"]]) },
   { group: "shihta", name: "Статусы шихтовых карт", sections: "Шихтовые карты, Движение материала (выдача по шихтовой карте)",
     items: st("shihta", [["Редактирование", "blue"], ["Новая", "green"], ["Выполнена", "gray"]]) },
   { group: "gost", name: "Статусы соответствия ГОСТ", sections: "Шихтовые карты, Отчётность",
