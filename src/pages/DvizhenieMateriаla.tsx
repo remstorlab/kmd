@@ -449,12 +449,11 @@ const docAccept = ".pdf,.doc,.docx,.jpg,.jpeg,.png,.tif,.tiff";
 const num = (s: string) => parseFloat(String(s).replace(",", ".")) || 0;
 const fmt = (v: number) => v.toFixed(2);
 const uid = () => Math.random().toString(36).slice(2, 9);
-// Дата строки потерь хранится в ISO (yyyy-mm-dd) для <input type="date">, показывается в формате ru-RU.
+// Дата строки потерь хранится в ISO (yyyy-mm-dd) для <input type="date">.
 const todayIso = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-const isoToRu = (iso: string) => (iso ? iso.split("-").reverse().join(".") : "");
 const newLoss = (metal = ""): LossRow => ({ id: uid(), date: todayIso(), name: "", ves: "", type: SPISANIE_POTERYA, metal });
 
 // Документы списания демо-операции «Производство ГП»
@@ -715,6 +714,16 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
 
 // Лигатурный вес — основа расчёта итогов и списаний, поэтому колонка выделена
 const ligCls = "bg-blue-50 font-semibold text-gray-900";
+// Общая сетка колонок таблиц вкладки — колонки всех блоков стоят друг под другом
+const ItogoCols = () => (
+  <colgroup>
+    <col style={{ width: "34%" }} />
+    <col style={{ width: "18%" }} />
+    <col style={{ width: "16%" }} />
+    <col style={{ width: "16%" }} />
+    <col style={{ width: "16%" }} />
+  </colgroup>
+);
 
 function ItogoPositions({ title, rows, view, total }: {
   title: string;
@@ -727,20 +736,21 @@ function ItogoPositions({ title, rows, view, total }: {
   return (
     <div className="mb-5">
       <div className="text-xs font-semibold text-gray-500 uppercase mb-2">{title}</div>
-      <table className="w-full text-sm tabular-nums">
+      <table className="w-full table-fixed text-sm tabular-nums">
+        <ItogoCols />
         <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
           <th className="px-3 py-2 text-left">Наименование</th>
           <th className="px-3 py-2 text-left">Класс</th>
           <th className="px-3 py-2 text-left">Код материала</th>
-          <th className={`px-3 py-2 text-right w-36 ${ligCls}`}>Лигат. вес г</th>
-          <th className="px-3 py-2 text-right w-36">Чистый вес г</th>
+          <th className={`px-3 py-2 text-right ${ligCls}`}>Лигат. вес г</th>
+          <th className="px-3 py-2 text-right">Чистый вес г</th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {rows.map(p => {
             const v = view(p);
             return (
               <tr key={p.n}>
-                <td className="px-3 py-2 text-gray-900">{p.name} <span className="text-gray-400 text-xs">{p.nomenkl}</span></td>
+                <td className="px-3 py-2 text-gray-900">{p.name}</td>
                 <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                 <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
                 <td className={`px-3 py-2 text-right ${ligCls}`}>{fmt(p.ves)}</td>
@@ -773,23 +783,24 @@ function ItogoLosses({ losses, total }: { losses: LossRow[]; total: number }) {
   return (
     <div className="mb-5">
       <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Списание</div>
-      <table className="w-full text-sm tabular-nums">
+      <table className="w-full table-fixed text-sm tabular-nums">
+        <ItogoCols />
         <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
           <th className="px-3 py-2 text-left">Тех. операция</th>
-          <th className="px-3 py-2 text-left">Дата</th>
-          <th className="px-3 py-2 text-left">Код материала</th>
           <th className="px-3 py-2 text-left">Норма потерь</th>
-          <th className={`px-3 py-2 text-right w-36 ${ligCls}`}>Лигат. вес г</th>
+          <th className="px-3 py-2 text-left">Код материала</th>
+          <th className={`px-3 py-2 text-right ${ligCls}`}>Лигат. вес г</th>
+          <th></th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {losses.map(l => (
             <tr key={l.id}>
               <td className="px-3 py-2 text-gray-900">{l.name || "Без наименования"}</td>
-              <td className="px-3 py-2 text-gray-500">{isoToRu(l.date)}</td>
-              <td className="px-3 py-2 text-blue-600 font-medium">{l.metal ? codeLabel(l.metal) : "—"}</td>
               <td className="px-3 py-2 text-gray-600">{normOf(l)}</td>
+              <td className="px-3 py-2 text-blue-600 font-medium">{l.metal ? codeLabel(l.metal) : "—"}</td>
               {/* Потеря — светло-красный фон, прирост — светло-зелёный */}
               <td className={`px-3 py-2 text-right font-semibold text-gray-900 ${vesBg(l.type)}`}>{fmt(num(l.ves))}</td>
+              <td></td>
             </tr>
           ))}
           {losses.length === 0 && (
@@ -797,8 +808,9 @@ function ItogoLosses({ losses, total }: { losses: LossRow[]; total: number }) {
           )}
         </tbody>
         <tfoot><tr className="border-t border-gray-200 bg-gray-50">
-          <td colSpan={4} className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Итого списание</td>
+          <td colSpan={3} className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Итого списание</td>
           <td className={`px-3 py-2 text-right ${ligCls}`}>{fmt(total)} г</td>
+          <td></td>
         </tr></tfoot>
       </table>
     </div>
@@ -1381,16 +1393,16 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
             <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide border-b border-gray-200">
               Операция — {vid}{description.trim() ? ` — ${description.trim()}` : ""}
             </div>
+            <div className="px-4 py-3 border-b border-gray-200 grid grid-cols-4 gap-3 text-sm">
+              <div><span className="text-gray-500">Выдано:</span> <b>{fmt(vesVydacha)} г</b></div>
+              <div><span className="text-gray-500">Возврат:</span> <b>{fmt(vesVozvrat)} г</b></div>
+              <div><span className="text-gray-500">Списано:</span> <b>{fmt(vesSpisano)} г</b></div>
+              <div><span className="text-gray-500">Дельта:</span> <b>{deltaSign}{fmt(Math.abs(delta))} г</b></div>
+            </div>
             <div className="p-4">
               <ItogoPositions title="Выдача" rows={vydacha} view={posView} total={vesVydacha} />
               <ItogoPositions title="Возврат" rows={vozvrat} view={posView} total={vesVozvrat} />
               <ItogoLosses losses={losses.filter(l => num(l.ves) > 0)} total={vesSpisano} />
-              <div className="mt-4 pt-3 border-t border-gray-200 grid grid-cols-4 gap-3 text-sm">
-                <div><span className="text-gray-500">Выдано:</span> <b>{fmt(vesVydacha)} г</b></div>
-                <div><span className="text-gray-500">Возврат:</span> <b>{fmt(vesVozvrat)} г</b></div>
-                <div><span className="text-gray-500">Списано:</span> <b>{fmt(vesSpisano)} г</b></div>
-                <div><span className="text-gray-500">Дельта:</span> <b>{deltaSign}{fmt(Math.abs(delta))} г</b></div>
-              </div>
             </div>
           </div>
         </>
