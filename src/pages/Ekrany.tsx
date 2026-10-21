@@ -41,7 +41,7 @@ export function useScreenGroups(): Group[] {
       { title: "ГП: приём на склад", path: `${P["ostatok-gp"]}/prihod` },
       { title: "ГП: выдача со склада", path: `${P["ostatok-gp"]}/vydacha` },
       { title: "ГП: выдача — подбор позиций", path: `${P["ostatok-gp"]}/vydacha/pick` },
-      { title: "Остатки на складе ДМ", path: P["ostatok-dm"] },
+      { title: "Остатки на складе ДМ (СДМ2)", path: P["ostatok-dm"] },
       dm && { title: "Просмотр позиции ДМ", path: `${P["ostatok-dm"]}/view/${dm.id}` },
       { title: "ДМ: объединение позиций", path: `${P["ostatok-dm"]}/merge` },
       { title: "ДМ: приём — приходный ордер", path: `${P["ostatok-dm"]}/prihod` },

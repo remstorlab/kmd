@@ -37,7 +37,7 @@ export function SkladyHub() {
           <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-4">
             <Coins className="w-5 h-5 text-blue-600" />
           </div>
-          <h3 className="font-semibold text-gray-900 mb-1">Остатки на складе ДМ</h3>
+          <h3 className="font-semibold text-gray-900 mb-1">Остатки на складе ДМ (СДМ2)</h3>
           <p className="text-sm text-gray-500">Драгоценные материалы</p>
         </div>
       </div>
