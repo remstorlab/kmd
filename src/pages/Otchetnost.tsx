@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import { PageHeader, Btn, Modal, Field, Input, Select, useToast, Toast, SortTh, useSort } from "../components/ui";
-import { Metal, baseMetal } from "../data/mock";
+import { Metal, baseMetal, MAIN_SKLAD, spravValues } from "../data/mock";
 import { ClipboardCheck, Coins, Gem, FileText, Scale, LucideIcon } from "lucide-react";
 import { useScreen } from "../router";
 import OpisHraneniyaModal from "../components/OpisHraneniyaModal";
@@ -16,7 +16,7 @@ function InventarizationOpisModal({ onClose }: { onClose: () => void }) {
   const { dmItems, materialCodes } = useApp();
   const { toast, show, clear } = useToast();
   const [onDate, setOnDate] = useState(() => new Date().toLocaleDateString("ru-RU"));
-  const [sklad, setSklad] = useState("Склад ДМ №1");
+  const [sklad, setSklad] = useState(MAIN_SKLAD);
   // Сформированная опись — …/inv-opis/sformirovana
   const screen = useScreen();
   const generated = screen.has("sformirovana");
@@ -69,7 +69,7 @@ function InventarizationOpisModal({ onClose }: { onClose: () => void }) {
     >
       <div className="grid grid-cols-3 gap-4 mb-5 items-end">
         <Field label="На дату" required><Input value={onDate} onChange={setOnDate} placeholder="ДД.ММ.ГГГГ" /></Field>
-        <Field label="Склад" required><Select value={sklad} options={["Склад ДМ №1", "Склад ДМ №2"]} onChange={setSklad} /></Field>
+        <Field label="Склад" required><Select value={sklad} options={spravValues("Склады")} onChange={setSklad} /></Field>
         <Btn onClick={() => setGenerated(true)}>Сформировать</Btn>
       </div>
 

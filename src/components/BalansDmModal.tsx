@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import { Btn, Modal, Field, Select, useToast, Toast, parseRuDate } from "./ui";
-import { ChemComposition, Operation, OperPosition, baseMetal, isGPKlass, isStoneKlass, spravValues, opVydacha, opVozvrat } from "../data/mock";
+import { ChemComposition, Operation, OperPosition, baseMetal, isGPKlass, isStoneKlass, spravValues, opVydacha, opVozvrat, MAIN_SKLAD } from "../data/mock";
 import { useScreen } from "../router";
 
 // ── Баланс наличия и движения ДМ по СДМ ──────────────────────────────────────
@@ -57,7 +57,7 @@ export default function BalansDmModal({ onClose }: { onClose: () => void }) {
     const y = Math.floor(firstOp / 100000000), m = Math.floor(firstOp / 1000000) % 100;
     return `${y}-${pad(m)}-01`;
   })();
-  const [sklad, setSklad] = useState(sklady[0] ?? "");
+  const [sklad, setSklad] = useState(MAIN_SKLAD);
   const [dateFrom, setDateFrom] = useState(defaultFrom);
   const [dateTo, setDateTo] = useState(() => isoOf(new Date()));
   const [metal, setMetal] = useState(ALL_METALS);
@@ -179,7 +179,7 @@ export default function BalansDmModal({ onClose }: { onClose: () => void }) {
           <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => setDateTo(e.target.value)} className={dateCls} />
         </div>
         <Field label="Драгоценный металл"><Select value={metal} options={[ALL_METALS, ...allMetals.map(m => m.name)]} onChange={setMetal} /></Field>
-        <button onClick={() => { setSklad(sklady[0] ?? ""); setDateFrom(defaultFrom); setDateTo(isoOf(new Date())); setMetal(ALL_METALS); setFact({}); }}
+        <button onClick={() => { setSklad(MAIN_SKLAD); setDateFrom(defaultFrom); setDateTo(isoOf(new Date())); setMetal(ALL_METALS); setFact({}); }}
           className="h-9 px-3 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить</button>
         <Btn onClick={() => setGenerated(true)} disabled={!canGenerate}>Сформировать</Btn>
       </div>

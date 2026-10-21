@@ -80,12 +80,6 @@ function useDocFilters(docs: SkladDoc[], onChange: () => void) {
 
   const bar = (
     <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 grid grid-cols-6 gap-3 items-end">
-      <Field label="Тип документа"><Select value={type} options={types} onChange={upd(setType)} /></Field>
-      <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Номер</label>
-        <SearchInput value={number} onChange={upd(setNumber)} placeholder="Поиск по номеру..." />
-      </div>
-      <Field label="Статус"><Select value={status} options={statuses} onChange={upd(setStatus)} /></Field>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1">Дата с</label>
         <input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => upd(setDateFrom)(e.target.value)} className={dateCls} />
@@ -94,6 +88,12 @@ function useDocFilters(docs: SkladDoc[], onChange: () => void) {
         <label className="block text-xs font-medium text-gray-500 mb-1">Дата по</label>
         <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => upd(setDateTo)(e.target.value)} className={dateCls} />
       </div>
+      <Field label="Тип документа"><Select value={type} options={types} onChange={upd(setType)} /></Field>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Номер</label>
+        <SearchInput value={number} onChange={upd(setNumber)} placeholder="Поиск по номеру..." />
+      </div>
+      <Field label="Статус"><Select value={status} options={statuses} onChange={upd(setStatus)} /></Field>
       <button onClick={reset} className="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
     </div>
   );

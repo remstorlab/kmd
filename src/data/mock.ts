@@ -963,14 +963,14 @@ export interface StorageLocation {
 }
 
 export const initialStorageLocations: StorageLocation[] = [
-  { id: "sl-1", sklad: "Склад ДМ №1", seyfNum: "1", polkaNum: "1", code: "СДМ1-С1-П1", available: true },
-  { id: "sl-2", sklad: "Склад ДМ №1", seyfNum: "1", polkaNum: "2", code: "СДМ1-С1-П2", available: true },
-  { id: "sl-3", sklad: "Склад ДМ №1", seyfNum: "2", polkaNum: "1", code: "СДМ1-С2-П1", available: true },
-  { id: "sl-4", sklad: "Склад ДМ №1", seyfNum: "2", polkaNum: "2", code: "СДМ1-С2-П2", available: false },
-  { id: "sl-5", sklad: "Склад ДМ №1", seyfNum: "3", polkaNum: "1", code: "СДМ1-С3-П1", available: true },
-  { id: "sl-6", sklad: "Склад ДМ №2", seyfNum: "1", polkaNum: "1", code: "СДМ2-С1-П1", available: true },
-  { id: "sl-7", sklad: "Склад ДМ №2", seyfNum: "1", polkaNum: "2", code: "СДМ2-С1-П2", available: true },
-  { id: "sl-8", sklad: "Склад ДМ №2", seyfNum: "2", polkaNum: "1", code: "СДМ2-С2-П1", available: true },
+  { id: "sl-1", sklad: "Склад ДМ №2", seyfNum: "1", polkaNum: "1", code: "СДМ2-С1-П1", available: true },
+  { id: "sl-2", sklad: "Склад ДМ №2", seyfNum: "1", polkaNum: "2", code: "СДМ2-С1-П2", available: true },
+  { id: "sl-3", sklad: "Склад ДМ №2", seyfNum: "2", polkaNum: "1", code: "СДМ2-С2-П1", available: true },
+  { id: "sl-4", sklad: "Склад ДМ №2", seyfNum: "2", polkaNum: "2", code: "СДМ2-С2-П2", available: false },
+  { id: "sl-5", sklad: "Склад ДМ №2", seyfNum: "3", polkaNum: "1", code: "СДМ2-С3-П1", available: true },
+  { id: "sl-6", sklad: "Склад ДМ №2", seyfNum: "3", polkaNum: "2", code: "СДМ2-С3-П2", available: true },
+  { id: "sl-7", sklad: "Склад ДМ №2", seyfNum: "4", polkaNum: "1", code: "СДМ2-С4-П1", available: true },
+  { id: "sl-8", sklad: "Склад ДМ №2", seyfNum: "4", polkaNum: "2", code: "СДМ2-С4-П2", available: true },
 ];
 
 // Класс, по которому позиция относится к складу ГП; все остальные классы — склад ДМ.
