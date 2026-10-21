@@ -10,7 +10,7 @@ import { Plus } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
-import DMPositionFormModal, { PrihodPosition, emptyPosition, locOf } from "../components/DMPositionFormModal";
+import DMPositionFormModal, { PrihodPosition, emptyPosition, locOf, NO_LOC } from "../components/DMPositionFormModal";
 
 // ── Добавить позицию ДМ со склада ─────────────────────────────────────────────
 
@@ -1191,7 +1191,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     const ubrano = new Set((op ? opVydacha(op) : []).map(p => p.nomenkl).filter(n => !vydanoNomenkl.has(n)));
     const izRezerva = dmItems.filter(i => i.status === "Резерв" && vydanoNomenkl.has(i.nomenkl));
     setDmItems(prev => prev.map(i =>
-      vydanoNomenkl.has(i.nomenkl) && i.status !== "В подотчёте" ? { ...i, status: "В подотчёте" }
+      vydanoNomenkl.has(i.nomenkl) && i.status !== "В подотчёте" ? { ...i, status: "В подотчёте", location: NO_LOC }
         : ubrano.has(i.nomenkl) && i.status === "В подотчёте" ? { ...i, status: "На складе" }
         : i));
     if (izRezerva.length === 0) return;

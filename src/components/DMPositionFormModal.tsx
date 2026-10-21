@@ -23,15 +23,20 @@ export interface PrihodPosition {
   chem: ChemComposition;
 }
 
+// «-» — место хранения не задано (сейф / полка не выбраны, позиция в подотчёте)
+export const NO_LOC = "-";
+const isSet = (v: string) => !!v && v !== NO_LOC;
+
 // Место хранения позиции записывается одной строкой по ячейке справочника «Места хранения»: «Сейф №1, Полка 2»
-export const formatLoc = (seyf: string, polka: string) => (!seyf ? "" : polka ? `Сейф №${seyf}, Полка ${polka}` : `Сейф №${seyf}`);
+export const formatLoc = (seyf: string, polka: string) =>
+  !isSet(seyf) ? NO_LOC : isSet(polka) ? `Сейф №${seyf}, Полка ${polka}` : `Сейф №${seyf}`;
 // Обратный разбор строки места хранения (понимает и старый вид «Сейф 1/Полка 2»)
 export const parseLoc = (loc: string) => {
   const m = /Сейф\s*№?\s*([^,/\s]+)\s*(?:[,/]\s*Полка\s*№?\s*([^,/\s]+))?/.exec(loc);
-  return { seyf: m?.[1] ?? "", polka: m?.[2] ?? "" };
+  return { seyf: m?.[1] ?? NO_LOC, polka: m?.[2] ?? NO_LOC };
 };
 
-export const locOf = (p: PrihodPosition) => formatLoc(p.seyf, p.polka) || "—";
+export const locOf = (p: PrihodPosition) => formatLoc(p.seyf, p.polka);
 
 // Места хранения склада из справочника «Места хранения»
 export const seyfsOf = (locs: StorageLocation[], sklad: string) =>
@@ -56,15 +61,15 @@ export function useNextNomenkl() {
 let posSeq = 0;
 const newPosId = () => `pp-${Date.now()}-${posSeq++}`;
 
-export function emptyPosition(locs: StorageLocation[], sklad: string, klass: string, code: string): PrihodPosition {
-  const seyf = seyfsOf(locs, sklad)[0] ?? "";
+// Новая позиция: сейф и полка не выбраны («-»), проба не задана
+export function emptyPosition(_locs: StorageLocation[], _sklad: string, klass: string, code: string): PrihodPosition {
   return {
-    id: newPosId(), nomenkl: "", name: "", klass, code, kol: "", unit: "шт", proba: "999", lig: "", net: "",
-    seyf, polka: polkasOf(locs, sklad, seyf)[0] ?? "", chem: {},
+    id: newPosId(), nomenkl: "", name: "", klass, code, kol: "", unit: "шт", proba: "", lig: "", net: "",
+    seyf: NO_LOC, polka: NO_LOC, chem: {},
   };
 }
 
-export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany, title: titleProp, saveLabel, lockWeights = false, header }: {
+export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany, title: titleProp, saveLabel, lockWeights = false, header, extraWide = false }: {
   mode: "add" | "edit" | "view";
   sklad: string;
   initial: PrihodPosition;
@@ -81,6 +86,8 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   saveLabel?: string;
   lockWeights?: boolean;
   header?: React.ReactNode;
+  // Ширина окна первого уровня (как у документов)
+  extraWide?: boolean;
 }) {
   const ro = mode === "view";
   const { storageLocations: locs } = useApp();
@@ -90,15 +97,16 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   const set = (k: Exclude<keyof PrihodPosition, "chem" | "nomenkl">) => (v: string) => setForm(f => ({ ...f, [k]: v }));
 
   const seyfs = seyfsOf(locs, sklad);
-  const seyfOptions = form.seyf && !seyfs.includes(form.seyf) ? [form.seyf, ...seyfs] : seyfs;
-  const polkas = polkasOf(locs, sklad, form.seyf);
-  const polkaOptions = form.polka && !polkas.includes(form.polka) ? [form.polka, ...polkas] : polkas;
+  // «-» — не выбрано; значение не из справочника сохраняется в списке
+  const withNone = (list: string[], v: string) => [NO_LOC, ...(isSet(v) && !list.includes(v) ? [v] : []), ...list];
+  const seyfOptions = withNone(seyfs, form.seyf);
+  const polkaOptions = isSet(form.seyf) ? withNone(polkasOf(locs, sklad, form.seyf), form.polka) : [NO_LOC];
 
   // Проба — из справочника «Пробы»; значение не из справочника сохраняется в списке
   const probas = spravValues("Пробы");
-  const probaOptions = form.proba && !probas.includes(form.proba) ? [form.proba, ...probas] : probas;
+  const probaOptions = ["", ...(form.proba && !probas.includes(form.proba) ? [form.proba] : []), ...probas];
 
-  const changeSeyf = (seyf: string) => setForm(f => ({ ...f, seyf, polka: polkasOf(locs, sklad, seyf)[0] ?? "" }));
+  const changeSeyf = (seyf: string) => setForm(f => ({ ...f, seyf, polka: NO_LOC }));
 
   const [many, setMany] = useState(false);
   const [manyCount, setManyCount] = useState("2");
@@ -123,7 +131,8 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
     <Modal
       title={title}
       onClose={onClose}
-      wide
+      wide={!extraWide}
+      extraWide={extraWide}
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : <>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
         <Btn onClick={save} disabled={!canSave}>{saveLabel ?? (mode === "add" ? (canMany && many && count >= 2 ? `Добавить (${count})` : "Добавить") : "Сохранить")}</Btn>
@@ -138,16 +147,13 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         {/* Необязательное: сколько изделий входит в одну позицию */}
         <Field label="Количество изделий"><Input value={form.kol} onChange={v => set("kol")(v.replace(/[^\d]/g, ""))} placeholder="количество в пределах одной позиции" disabled={ro} /></Field>
         <Field label="Ед. изм." required={!ro}><Select value={form.unit} options={["шт", "г", "кг"]} onChange={set("unit")} disabled={ro} /></Field>
-        <Field label="Проба" required={!ro}><Select value={form.proba} options={probaOptions} onChange={set("proba")} disabled={ro} /></Field>
+        <Field label="Проба" required={!ro}><Select value={form.proba} options={probaOptions} onChange={set("proba")} optionLabel={v => v || "Выберите пробу"} disabled={ro} /></Field>
         <Field label="Масса лигатурная, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={set("lig")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
         <Field label="Масса чистая, г" required={!ro && !lockWeights}><Input value={form.net} onChange={set("net")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
         <Field label="Склад"><Input value={sklad} disabled /></Field>
-        <Field label="Сейф" required={!ro}>
-          {seyfOptions.length ? <Select value={form.seyf} options={seyfOptions} onChange={changeSeyf} disabled={ro} /> : <Input value="Нет свободных мест" disabled />}
-        </Field>
-        <Field label="Полка">
-          {polkaOptions.length ? <Select value={form.polka} options={polkaOptions} onChange={set("polka")} disabled={ro} /> : <Input value="—" disabled />}
-        </Field>
+        {/* Необязательные: «-» — место хранения не задано */}
+        <Field label="Сейф"><Select value={form.seyf || NO_LOC} options={seyfOptions} onChange={changeSeyf} disabled={ro} /></Field>
+        <Field label="Полка"><Select value={form.polka || NO_LOC} options={polkaOptions} onChange={set("polka")} disabled={ro || !isSet(form.seyf)} /></Field>
       </div>
       <ChemCompositionBlock value={form.chem} onChange={chem => setForm(f => ({ ...f, chem }))} disabled={ro} />
       {canMany && (

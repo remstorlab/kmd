@@ -10,7 +10,7 @@ import { Coins } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
 import DMPositionViewModal from "../components/DMPositionViewModal";
-import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, parseLoc } from "../components/DMPositionFormModal";
+import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, parseLoc, NO_LOC } from "../components/DMPositionFormModal";
 import { useScreen } from "../router";
 
 // Позиции учёта ГП в виде позиций склада ДМ — склад один, показываются все классы.
@@ -46,12 +46,12 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
   const cur = parseLoc(item.location);
   // Ячейки склада системы из справочника «Места хранения» (только доступные)
   const seyfs = seyfsOf(locs, MAIN_SKLAD);
-  const [seyf, setSeyf] = useState(seyfs.includes(cur.seyf) ? cur.seyf : seyfs[0] ?? "");
+  const [seyf, setSeyf] = useState(seyfs.includes(cur.seyf) ? cur.seyf : seyfs[0] ?? NO_LOC);
   const polkas = polkasOf(locs, MAIN_SKLAD, seyf);
-  const [polka, setPolka] = useState(polkas.includes(cur.polka) ? cur.polka : polkas[0] ?? "");
-  const changeSeyf = (s: string) => { setSeyf(s); setPolka(polkasOf(locs, MAIN_SKLAD, s)[0] ?? ""); };
-  const next = formatLoc(seyf, polka);
-  const same = !!cur.seyf && cur.seyf === seyf && cur.polka === polka;
+  const [polka, setPolka] = useState(polkas.includes(cur.polka) ? cur.polka : polkas[0] ?? NO_LOC);
+  const changeSeyf = (s: string) => { setSeyf(s); setPolka(polkasOf(locs, MAIN_SKLAD, s)[0] ?? NO_LOC); };
+  const next = seyf !== NO_LOC ? formatLoc(seyf, polka) : "";
+  const same = cur.seyf !== NO_LOC && cur.seyf === seyf && cur.polka === polka;
 
   const attrs: [string, React.ReactNode][] = [
     ["Номенкл. №", item.nomenkl],
@@ -84,11 +84,11 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Текущее место хранения</h4>
       <div className="grid grid-cols-3 gap-4 mb-5">
         <Field label="Склад"><Input value={MAIN_SKLAD} disabled /></Field>
-        {cur.seyf ? <>
+        {cur.seyf !== NO_LOC || !item.location || item.location === NO_LOC ? <>
           <Field label="Сейф"><Input value={cur.seyf} disabled /></Field>
-          <Field label="Полка"><Input value={cur.polka || "—"} disabled /></Field>
+          <Field label="Полка"><Input value={cur.polka} disabled /></Field>
         </> : (
-          <div className="col-span-2"><Field label="Место хранения"><Input value={item.location || "—"} disabled /></Field></div>
+          <div className="col-span-2"><Field label="Место хранения"><Input value={item.location} disabled /></Field></div>
         )}
       </div>
 
@@ -114,8 +114,6 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
 function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: () => void; onConfirm: (p: PrihodPosition) => void }) {
   const totalLig = items.reduce((s, i) => s + i.ligWeight, 0);
   const totalNet = items.reduce((s, i) => s + i.netWeight, 0);
-  const totalQty = items.reduce((s, i) => s + (i.qty || 0), 0);
-  const avgProba = totalLig > 0 ? Math.round(items.reduce((s, i) => s + i.proba * i.ligWeight, 0) / totalLig) : items[0].proba;
   const same = <T,>(f: (i: DMItem) => T) => (items.every(i => f(i) === f(items[0])) ? f(items[0]) : undefined);
   // Химический состав — сумма по элементам
   const chem: Record<string, string> = {};
@@ -125,32 +123,54 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
   }
   const loc = parseLoc(items[0].location);
   const [initial] = useState<PrihodPosition>(() => ({
-    id: `merge-${Date.now()}`, nomenkl: "", name: `Объединённая позиция (${items.length} ед.)`,
+    // Наименование, количество изделий и проба не подставляются — вводятся вручную
+    id: `merge-${Date.now()}`, nomenkl: "", name: "",
     klass: same(i => i.klass) ?? "Слиток", code: same(i => i.metal) ?? items[0].metal,
-    kol: totalQty > 0 ? String(totalQty) : "", unit: "шт", proba: String(avgProba),
+    kol: "", unit: "шт", proba: "",
     lig: totalLig.toFixed(2), net: totalNet.toFixed(2), seyf: loc.seyf, polka: loc.polka, chem,
   }));
 
+  const codeLabel = useMaterialCodeLabel();
+  const th = "px-3 py-2 text-left font-medium";
   const header = (
     <div className="mb-4 border border-gray-200 rounded-lg overflow-hidden">
       <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
         Объединяемые позиции ({items.length})
       </div>
       <table className="w-full text-sm tabular-nums">
+        <thead><tr className="text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
+          <th className={th}>Номенкл. №</th>
+          <th className={th}>Наименование</th>
+          <th className={th}>Количество изделий</th>
+          <th className={th}>Класс</th>
+          <th className={th}>Код материала</th>
+          <th className={th}>Проба</th>
+          <th className="px-3 py-2 text-right font-medium">Лигат. вес г</th>
+          <th className="px-3 py-2 text-right font-medium">Чистый вес г</th>
+          <th className={th}>Место хранения</th>
+          <th className={th}>Статус</th>
+        </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {items.map(it => (
             <tr key={it.id}>
-              <td className="px-3 py-1.5 text-gray-500 w-28">{it.nomenkl}</td>
+              <td className="px-3 py-1.5 text-gray-500">{it.nomenkl}</td>
               <td className="px-3 py-1.5 font-medium text-gray-900">{it.name}</td>
-              <td className="px-3 py-1.5 text-right text-gray-600 w-36">лиг. {it.ligWeight.toFixed(2)} г</td>
-              <td className="px-3 py-1.5 text-right text-gray-600 w-36">чист. {it.netWeight.toFixed(2)} г</td>
+              <td className="px-3 py-1.5">{it.qty || "—"}</td>
+              <td className="px-3 py-1.5"><KlassCode value={it.klass} /></td>
+              <td className="px-3 py-1.5 text-blue-600 font-medium">{codeLabel(it.metal)}</td>
+              <td className="px-3 py-1.5">{it.proba || "—"}</td>
+              <td className="px-3 py-1.5 text-right">{it.ligWeight.toFixed(2)}</td>
+              <td className="px-3 py-1.5 text-right">{it.netWeight.toFixed(2)}</td>
+              <td className="px-3 py-1.5 text-gray-500">{it.location}</td>
+              <td className="px-3 py-1.5"><Badge label={it.status} group="pozicii" /></td>
             </tr>
           ))}
         </tbody>
         <tfoot><tr className="bg-gray-50 font-semibold border-t border-gray-200">
-          <td colSpan={2} className="px-3 py-1.5 text-xs uppercase text-gray-600">Итого</td>
-          <td className="px-3 py-1.5 text-right">{totalLig.toFixed(2)} г</td>
-          <td className="px-3 py-1.5 text-right">{totalNet.toFixed(2)} г</td>
+          <td colSpan={6} className="px-3 py-1.5 text-xs uppercase text-gray-600">Итого</td>
+          <td className="px-3 py-1.5 text-right">{totalLig.toFixed(2)}</td>
+          <td className="px-3 py-1.5 text-right">{totalNet.toFixed(2)}</td>
+          <td colSpan={2}></td>
         </tr></tfoot>
       </table>
     </div>
@@ -164,6 +184,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
       title="Объединение позиций"
       saveLabel="Подтвердить объединение"
       lockWeights
+      extraWide
       header={header}
       onClose={onClose}
       onSave={onConfirm}
@@ -232,9 +253,11 @@ export function OstatokDM() {
   };
 
   // Закрытые (выданные) позиции в объединении не участвуют
-  const selectedItems = skladItems.filter(it => selected.has(it.id) && it.status !== "Закрыта");
+  // В объединении участвуют только позиции на складе: закрытые и выданные в подотчёт — нет
+  const canMerge = (it: DMItem) => it.status !== "Закрыта" && it.status !== "В подотчёте";
+  const selectedItems = skladItems.filter(it => selected.has(it.id) && canMerge(it));
   // Экран объединения, открытый по прямой ссылке без выбора, показывает первые две доступные позиции
-  const mergeItems = selectedItems.length >= 2 ? selectedItems : skladItems.filter(it => it.status !== "Закрыта").slice(0, 2);
+  const mergeItems = selectedItems.length >= 2 ? selectedItems : skladItems.filter(canMerge).slice(0, 2);
 
   const doMerge = (p: PrihodPosition) => {
     const ids = new Set(mergeItems.map(it => it.id));
@@ -248,7 +271,7 @@ export function OstatokDM() {
       proba: parseFloat(p.proba) || 0,
       ligWeight: parseFloat(p.lig) || 0,
       netWeight: parseFloat(p.net) || 0,
-      location: formatLoc(p.seyf, p.polka) || mergeItems[0].location,
+      location: formatLoc(p.seyf, p.polka),
       status: "На складе",
       chem: p.chem,
     };
@@ -300,7 +323,12 @@ export function OstatokDM() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="w-10 px-4 py-3"><input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(filtered.filter(i => i.status !== "Закрыта").map(i => i.id)) : new Set())} /></th>
+              <th className="px-4 py-3 text-left">
+                <label className="flex items-center gap-2 whitespace-nowrap">
+                  <input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(filtered.filter(canMerge).map(i => i.id)) : new Set())} />
+                  <span className={`text-xs font-medium ${selectedItems.length ? "text-blue-600" : "text-gray-400"}`}>Выбрано: {selectedItems.length}</span>
+                </label>
+              </th>
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort}>Номенкл. №</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort}>Количество изделий</SortTh>
@@ -317,7 +345,7 @@ export function OstatokDM() {
           <tbody className="divide-y divide-gray-100">
             {pageItems.map(item => (
               <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3"><input type="checkbox" checked={selected.has(item.id)} onChange={() => toggleSelect(item.id)} disabled={item.status === "Закрыта"} title={item.status === "Закрыта" ? "Позиция закрыта — объединение недоступно" : undefined} /></td>
+                <td className="px-4 py-3"><input type="checkbox" checked={selected.has(item.id) && canMerge(item)} onChange={() => toggleSelect(item.id)} disabled={!canMerge(item)} title={canMerge(item) ? undefined : `Позиция «${item.status}» — объединение недоступно`} /></td>
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                 <td className="px-4 py-3">{item.qty}</td>
