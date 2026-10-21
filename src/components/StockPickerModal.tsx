@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort, useMaterialCodeLabel } from "./ui";
+import { Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort, useMaterialCodeLabel, ProbaChem,
+} from "./ui";
 import { VydachaDocPosition } from "../data/mock";
 
 // ── Подбор позиций со склада (чекбокс + количество по каждой позиции) ─────────
@@ -148,8 +149,8 @@ export default function StockPickerModal({
               <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код</SortTh>
               {showWeights && <>
                 <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
-                <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Лигат. г</SortTh>
-                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый г</SortTh>
+                <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
+                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес чист.</SortTh>
               </>}
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
@@ -166,7 +167,7 @@ export default function StockPickerModal({
                     <td className="px-3 py-2"><KlassCode value={r.klass} /></td>
                     <td className="px-3 py-2 text-blue-600">{codeLabel(r.code)}</td>
                     {showWeights && <>
-                      <td className="px-3 py-2">{r.proba}</td>
+                      <td className="px-3 py-2"><ProbaChem proba={r.proba} chem={r.chem} /></td>
                       <td className="px-3 py-2">{r.lig}</td>
                       <td className="px-3 py-2">{r.net}</td>
                     </>}

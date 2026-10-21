@@ -96,7 +96,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const skladChem = (id: string) => dmItems.find(i => i.id === id)?.chem;
   const skladRows = useMemo<StockRow[]>(() => dmItems
     .filter(i => i.status === "На складе" && i.qty > 0 && !isGPKlass(i.klass))
-    .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location })),
+    .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, chem: i.chem })),
   [dmItems]);
 
   // Уже взято в карту из каждой позиции склада (в этой сессии)
@@ -270,7 +270,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                 <SortTh sortKey="mat" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Материал</SortTh>
                 <SortTh sortKey="klass" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Класс</SortTh>
                 <SortTh sortKey="qty" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Количество изделий</SortTh>
-                <SortTh sortKey="ves" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Масса лигатурная, г</SortTh>
+                <SortTh sortKey="ves" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Вес лигат.</SortTh>
                 {shkEls.map(e => (
                   <SortTh key={e.id} sortKey={`el-${e.id}`} sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">{e.shortName}</SortTh>
                 ))}

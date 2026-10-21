@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
-  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort,
+  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem,
 } from "./ui";
 import { SkladDoc, DocStatus, spravValues, MAIN_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD } from "../data/mock";
 import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
@@ -213,8 +213,8 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
               <SortTh sortKey="kol" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
               {isOrder && <>
                 <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
-                <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Лигат.</SortTh>
-                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый</SortTh>
+                <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
+                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес чист.</SortTh>
               </>}
               <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <th className="w-24"></th>
@@ -228,7 +228,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                   <td className="px-3 py-2">{p.kol || "—"}</td>
                   {isOrder && <>
-                    <td className="px-3 py-2">{p.proba}</td>
+                    <td className="px-3 py-2"><ProbaChem proba={p.proba} chem={p.chem} /></td>
                     <td className="px-3 py-2 font-medium">{p.lig}</td>
                     <td className="px-3 py-2 text-blue-600">{p.net}</td>
                   </>}

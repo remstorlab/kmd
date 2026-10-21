@@ -78,6 +78,8 @@ export interface VydachaDocPosition {
   lig: number | null;
   net: number | null;
   location: string;
+  // Химический состав (для подсказки у пробы)
+  chem?: ChemComposition;
   issue: number;
 }
 

@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort,
+  Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
 } from "../components/ui";
 import { GPItem, DMItem, MAIN_SKLAD } from "../data/mock";
 import { Coins } from "lucide-react";
@@ -59,7 +59,7 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
     ["Класс", <KlassCode value={item.klass} />],
     ["Код материала", codeLabel(item.metal)],
     ["Проба", item.proba || "—"],
-    ["Лигат. вес г", item.ligWeight],
+    ["Вес лигат.", item.ligWeight],
   ];
 
   return (
@@ -152,8 +152,8 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
           <th className={th}>Класс</th>
           <th className={th}>Код материала</th>
           <th className={th}>Проба</th>
-          <th className="px-3 py-1.5 text-right font-medium">Лигат. вес г</th>
-          <th className="px-3 py-1.5 text-right font-medium">Чистый вес г</th>
+          <th className="px-3 py-1.5 text-right font-medium">Вес лигат.</th>
+          <th className="px-3 py-1.5 text-right font-medium">Вес чист.</th>
           <th className={th}>Место хранения</th>
           <th className={th}>Статус</th>
         </tr></thead>
@@ -165,7 +165,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
               <td className="px-3 py-1.5">{it.qty || "—"}</td>
               <td className="px-3 py-1.5"><KlassCode value={it.klass} /></td>
               <td className="px-3 py-1.5 text-blue-600 font-medium">{codeLabel(it.metal)}</td>
-              <td className="px-3 py-1.5">{it.proba || "—"}</td>
+              <td className="px-3 py-1.5"><ProbaChem proba={it.proba} chem={it.chem} /></td>
               <td className="px-3 py-1.5 text-right">{it.ligWeight.toFixed(2)}</td>
               <td className="px-3 py-1.5 text-right">{it.netWeight.toFixed(2)}</td>
               <td className="px-3 py-1.5 text-gray-500">{it.location}</td>
@@ -348,8 +348,8 @@ export function OstatokDM() {
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort}>Класс</SortTh>
               <SortTh sortKey="metal" sort={sort} onSort={toggleSort}>Код материала</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort}>Проба</SortTh>
-              <SortTh sortKey="ligWeight" sort={sort} onSort={toggleSort}>Лигат. вес г</SortTh>
-              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort}>Чистый вес г</SortTh>
+              <SortTh sortKey="ligWeight" sort={sort} onSort={toggleSort}>Вес лигат.</SortTh>
+              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort}>Вес чист.</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <th className="w-20"></th>
@@ -364,7 +364,7 @@ export function OstatokDM() {
                 <td className="px-4 py-3">{item.qty || "—"}</td>
                 <td className="px-4 py-3"><KlassCode value={item.klass} /></td>
                 <td className="px-4 py-3 text-blue-600 font-medium">{codeLabel(item.metal)}</td>
-                <td className="px-4 py-3">{item.proba}</td>
+                <td className="px-4 py-3"><ProbaChem proba={item.proba} chem={item.chem} /></td>
                 <td className="px-4 py-3">{item.ligWeight}</td>
                 <td className="px-4 py-3">{item.netWeight}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>

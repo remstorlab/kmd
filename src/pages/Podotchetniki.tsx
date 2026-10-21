@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useApp } from "../store/AppContext";
-import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, KlassSelect } from "../components/ui";
+import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, KlassSelect, ProbaChem,
+} from "../components/ui";
 import { Podotchetnik, PodotchetPosition, Operation, OperPosition, StatusDM, spravValues, opVydacha, opVozvrat } from "../data/mock";
 import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, LucideIcon } from "lucide-react";
 import { matchPage, useTabParam, PAGE_PATHS } from "../router";
@@ -68,6 +69,8 @@ type ProcRow = PodotchetPosition & { key: string; opId?: string; opNo?: string; 
 
 function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows: ProcRow[]; showOperation?: boolean; onOpenOperation?: (r: ProcRow) => void }) {
   const codeLabel = useMaterialCodeLabel();
+  // Химический состав для подсказки у пробы — из позиции склада ДМ
+  const { dmItems } = useApp();
   const { sorted, sort, toggleSort } = useSort(rows, {
     op: r => parseInt(r.opNo ?? "", 10) || 0,
     nomenkl: r => r.nomenkl,
@@ -93,8 +96,8 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
           <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
           <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
           <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
-          <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Лигат. вес г</SortTh>
-          <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Чистый вес г</SortTh>
+          <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
+          <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Вес чист.</SortTh>
           <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
           <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
         </tr></thead>
@@ -113,7 +116,7 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
               <td className="px-3 py-2">{r.qty}</td>
               <td className="px-3 py-2"><KlassCode value={r.klass} /></td>
               <td className="px-3 py-2 text-blue-600 font-medium">{r.metal ? codeLabel(r.metal) : "—"}</td>
-              <td className="px-3 py-2">{r.proba}</td>
+              <td className="px-3 py-2"><ProbaChem proba={r.proba} chem={dmItems.find(d => d.nomenkl === r.nomenkl)?.chem} /></td>
               <td className="px-3 py-2">{r.ligWeight.toFixed(2)}</td>
               <td className="px-3 py-2">{r.netWeight.toFixed(2)}</td>
               <td className="px-3 py-2 text-gray-500">{r.location}</td>

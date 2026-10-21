@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Plus } from "lucide-react";
-import { initialMaterialClasses, MaterialCode, StatusColor, StatusGroup } from "../data/mock";
+import { initialMaterialClasses, MaterialCode, StatusColor, StatusGroup, ChemComposition } from "../data/mock";
 import { useApp } from "../store/AppContext";
 
 // ── Badge ────────────────────────────────────────────────────────────────────
@@ -84,6 +85,60 @@ export function Badge({ label, group }: { label: string; group?: StatusGroup }) 
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
       {label}
     </span>
+  );
+}
+
+// ── Проба с подсказкой химического состава ───────────────────────────────────
+// Значение пробы в таблицах позиций. Если у позиции есть химический состав, проба подчёркнута пунктиром,
+// а при наведении на неё появляется компактная подсказка «элемент — масса в чистоте, г».
+// Подсказка выводится поверх всего (в body), поэтому не обрезается таблицами с прокруткой.
+
+export function ProbaChem({ proba, chem }: { proba: React.ReactNode; chem?: ChemComposition | null }) {
+  const { chemElements } = useApp();
+  const [pos, setPos] = useState<{ x: number; y: number; up: boolean } | null>(null);
+  const val = (v: string | undefined) => {
+    const n = parseFloat(String(v ?? "").replace(",", "."));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  // Элементы в порядке справочника «Химический состав»; затем — ключи, которых в справочнике нет
+  const known = chemElements.map(e => ({ id: e.id, label: e.shortName }));
+  const extra = Object.keys(chem ?? {}).filter(k => !known.some(e => e.id === k)).map(k => ({ id: k, label: k }));
+  const rows = [...known, ...extra].map(e => ({ ...e, v: val(chem?.[e.id]) })).filter(e => e.v !== null);
+  const shown = proba === null || proba === undefined || proba === "" || proba === 0 ? "—" : proba;
+  if (rows.length === 0) return <>{shown}</>;
+
+  const open = (e: React.MouseEvent<HTMLSpanElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const up = r.bottom + 180 > window.innerHeight;
+    setPos({ x: r.left, y: up ? r.top - 6 : r.bottom + 6, up });
+  };
+  return (
+    <>
+      <span
+        onMouseEnter={open}
+        onMouseLeave={() => setPos(null)}
+        className="cursor-help border-b border-dotted border-gray-400 hover:border-blue-500 hover:text-blue-600"
+      >
+        {shown}
+      </span>
+      {pos && createPortal(
+        <div
+          className="fixed z-[80] pointer-events-none bg-slate-900 text-white rounded-lg shadow-lg px-3 py-2 text-xs"
+          style={{ left: pos.x, top: pos.y, transform: pos.up ? "translateY(-100%)" : undefined }}
+        >
+          <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1">Хим. состав (в чистоте), г</div>
+          <div className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 tabular-nums">
+            {rows.map(e => (
+              <React.Fragment key={e.id}>
+                <span className="text-slate-300">{e.label}</span>
+                <span className="text-right font-medium">{e.v!.toFixed(2)}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 

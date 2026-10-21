@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
+  Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, ProbaChem,
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
@@ -138,7 +138,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл.№</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
-              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый вес г</SortTh>
+              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес чист.</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <th className="px-3 py-2 text-left">Статус</th>
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
@@ -153,7 +153,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                     <td className="px-3 py-2 font-medium">{i.name}</td>
                     <td className="px-3 py-2 text-gray-500">{i.nomenkl}</td>
                     <td className="px-3 py-2"><KlassCode value={i.klass} /></td>
-                    <td className="px-3 py-2">{i.proba}</td>
+                    <td className="px-3 py-2"><ProbaChem proba={i.proba} chem={i.chem} /></td>
                     <td className="px-3 py-2">{i.netWeight}</td>
                     <td className="px-3 py-2 text-gray-500">{i.location}</td>
                     <td className="px-3 py-2">
@@ -336,8 +336,8 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
               <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
-              <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Лигат. вес г</SortTh>
-              <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Чистый вес г</SortTh>
+              <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
+              <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Вес чист.</SortTh>
               <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
               <th className="w-20"></th>
@@ -354,7 +354,7 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
                     <td className="px-3 py-2">{p.qty ?? "—"}</td>
                     <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                     <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
-                    <td className="px-3 py-2">{p.proba}</td>
+                    <td className="px-3 py-2"><ProbaChem proba={p.proba} chem={v.chem} /></td>
                     <td className="px-3 py-2">{dash(v.ligWeight)}</td>
                     <td className="px-3 py-2">{dash(v.netWeight)}</td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
@@ -654,8 +654,8 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
           <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
           <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
           <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
-          <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Лигат. вес г</SortTh>
-          <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Чистый вес г</SortTh>
+          <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
+          <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Вес чист.</SortTh>
           <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
           <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
           <th className={readOnly ? "w-10" : "w-20"}></th>
@@ -670,7 +670,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
                 <td className="px-3 py-2">{p.qty ?? "—"}</td>
                 <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                 <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
-                <td className="px-3 py-2">{p.proba}</td>
+                <td className="px-3 py-2"><ProbaChem proba={p.proba} chem={v.chem} /></td>
                 <td className="px-3 py-2">{dash(v.ligWeight)}</td>
                 <td className="px-3 py-2">{dash(v.netWeight)}</td>
                 <td className="px-3 py-2 text-gray-500">{p.loc}</td>
@@ -725,8 +725,8 @@ function ItogoPositions({ title, rows, view, total }: {
           <th className="px-3 py-2 text-left">Наименование</th>
           <th className="px-3 py-2 text-left">Класс</th>
           <th className="px-3 py-2 text-left">Код материала</th>
-          <th className={`px-3 py-2 text-right ${ligCls}`}>Лигат. вес г</th>
-          <th className="px-3 py-2 text-right">Чистый вес г</th>
+          <th className={`px-3 py-2 text-right ${ligCls}`}>Вес лигат.</th>
+          <th className="px-3 py-2 text-right">Вес чист.</th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {rows.map(p => {
@@ -772,7 +772,7 @@ function ItogoLosses({ losses, total }: { losses: LossRow[]; total: number }) {
           <th className="px-3 py-2 text-left">Тех. операция</th>
           <th className="px-3 py-2 text-left">Норма потерь</th>
           <th className="px-3 py-2 text-left">Код материала</th>
-          <th className={`px-3 py-2 text-right ${ligCls}`}>Лигат. вес г</th>
+          <th className={`px-3 py-2 text-right ${ligCls}`}>Вес лигат.</th>
           <th></th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
