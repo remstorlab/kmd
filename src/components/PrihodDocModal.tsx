@@ -13,6 +13,8 @@ import { useScreen } from "../router";
 // Общая модалка для «Остатки на складе ДМ → Принять на склад» и «Приход на склад». Получатель — склад системы.
 
 type PrihodDocType = string;
+// Отправители приходного ордера — из справочника «Организации»
+const ORGS = spravValues("Организации");
 
 // ── Документ прихода ─────────────────────────────────────────────────────────
 
@@ -36,7 +38,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
   const [head, setHead] = useState(() => ({
     number: doc?.number || "ПО-0342",
     date: doc?.date || today,
-    otpravitel: doc?.sender || "ООО «Аффинаж-Сервис»",
+    otpravitel: doc?.sender || ORGS[0],
     // Получатель — всегда склад системы
     poluchatel: MAIN_SKLAD,
     schetFaktura: "СФ-0091",
@@ -58,7 +60,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
     zakazchik: "Национальный банк",
     skladOtpr: doc?.sender || "СДМ",
     skladPoluch: MAIN_SKLAD,
-    sotrudnik: "Петров А.Н.",
+    sotrudnik: "Ким Александр Юрьевич",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
   const [ownProperty, setOwnProperty] = useState(true);
@@ -69,12 +71,12 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
 
   // Позиции
   const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>([
-    { id: "po-1", nomenkl: "5015301", name: "Слиток золотой стандартный", klass: "Слиток", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "1000.0", net: "999.9", seyf: "1", polka: "1", chem: { au: "999.9" } },
-    { id: "po-2", nomenkl: "5015302", name: "Слиток серебряный", klass: "Слиток", code: "2000", kol: "1", unit: "шт", proba: "925.0", lig: "318.6", net: "294.7", seyf: "2", polka: "1", chem: { ag: "294.7" } },
+    { id: "po-1", nomenkl: "5015301", name: "Слиток золотой стандартный", klass: "Слиток", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "1000.00", net: "999.90", seyf: "1", polka: "1", chem: { au: "999.90" } },
+    { id: "po-2", nomenkl: "5015302", name: "Слиток серебряный", klass: "Слиток", code: "2000", kol: "1", unit: "шт", proba: "925", lig: "318.60", net: "294.71", seyf: "2", polka: "1", chem: { ag: "294.71" } },
   ]);
   const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>([
-    { id: "pn-1", nomenkl: "5015303", name: "Монета Атамекен", klass: "Готовая продукция", code: "2000", kol: "2000", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "1", chem: {} },
-    { id: "pn-2", nomenkl: "5015304", name: "Орден Алтын алка", klass: "Готовая продукция", code: "2000", kol: "300", unit: "шт", proba: "925", lig: "", net: "", seyf: "1", polka: "2", chem: {} },
+    { id: "pn-1", nomenkl: "5015303", name: "Монета «Атамекен» Ag 925", klass: "Готовая продукция", code: "2000", kol: "200", unit: "шт", proba: "925", lig: "6220.00", net: "5753.50", seyf: "1", polka: "1", chem: { ag: "5753.50" } },
+    { id: "pn-2", nomenkl: "5015304", name: "Орден «Алтын алка»", klass: "Готовая продукция", code: "0300", kol: "30", unit: "шт", proba: "750", lig: "672.00", net: "504.00", seyf: "1", polka: "2", chem: { au: "504.00", ag: "100.80", cu: "67.20" } },
   ]);
 
   const positions = isOrder ? orderPositions : nakladPositions;
@@ -134,9 +136,9 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
       extraWide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
         <>
+          <div className="mr-auto"><Btn variant="success" onClick={() => save("Оформлено")}>Оформить</Btn></div>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn onClick={() => save("Оформлено")}>Оформить</Btn>
-          <Btn variant="secondary" onClick={() => save("Редактирование")}>Сохранить</Btn>
+          <Btn onClick={() => save("Редактирование")}>Сохранить</Btn>
         </>
       )}
     >
@@ -145,7 +147,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
           {typeSelect}
           <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
           <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-          <Field label="Отправитель" required={!ro}><Select value={head.otpravitel} options={Array.from(new Set([head.otpravitel, "ООО «Аффинаж-Сервис»", "АО «Металл Инвест»", "ОО «АурумПоставка»"]))} onChange={h("otpravitel")} disabled={ro} /></Field>
+          <Field label="Отправитель" required={!ro}><Select value={head.otpravitel} options={Array.from(new Set([head.otpravitel, ...ORGS]))} onChange={h("otpravitel")} disabled={ro} /></Field>
           <Field label="Получатель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
           <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={h("schetFaktura")} disabled={ro} /></Field>
           <Field label="Дата счёт-фактуры"><Input value={head.schetFakturaData} onChange={h("schetFakturaData")} disabled={ro} /></Field>
@@ -174,7 +176,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
           <Field label="Заказчик" required={!ro}><Select value={head.zakazchik} options={["Национальный банк", "Монетный двор"]} onChange={h("zakazchik")} disabled={ro} /></Field>
           <Field label="Склад-отправитель" required={!ro}><Select value={head.skladOtpr} options={Array.from(new Set([head.skladOtpr, "СДМ", "Производственный цех"]))} onChange={h("skladOtpr")} disabled={ro} /></Field>
           <Field label="Склад-получатель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
-          <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={["Петров А.Н.", "Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} onChange={h("sotrudnik")} disabled={ro} /></Field>
+          <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные сотрудники")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
             <Toggle checked={ownProperty} onChange={setOwnProperty} disabled={ro} label={ownProperty ? "Да" : "Нет"} />

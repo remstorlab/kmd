@@ -89,7 +89,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
     const chosen = availableItems.filter(i => selected.has(i.id));
     if (chosen.length === 0) return;
     onAdd(chosen.map(i => ({
-      name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: i.qty || undefined, ves: i.netWeight,
+      name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: i.qty || undefined, ves: i.ligWeight,
       ag: i.chem?.ag || "-", cu: i.chem?.cu || "-", chem: i.chem, loc: i.location, metal: i.metal, lig: i.ligWeight, net: i.netWeight,
     })));
   };
@@ -1261,7 +1261,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <>
           {/* «Оформить» закрывает операцию — вынесена влево, отдельно от «Сохранить» */}
           <div className="mr-auto flex items-center gap-3">
-            <Btn variant="secondary" onClick={oformit} disabled={!!oformitBlock}>Оформить</Btn>
+            <Btn variant="success" onClick={oformit} disabled={!!oformitBlock}>Оформить</Btn>
             {oformitBlock && <span className="text-xs text-yellow-700">⚠ Оформление недоступно: {oformitBlock}</span>}
           </div>
           {printBtn}

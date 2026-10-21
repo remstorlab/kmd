@@ -206,9 +206,9 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       fullWide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
         <>
+          <div className="mr-auto"><Btn variant="success" onClick={() => save(true)}>Оформить</Btn></div>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn onClick={() => save(true)}>Оформить</Btn>
-          <Btn variant="secondary" onClick={() => save()}>Сохранить</Btn>
+          <Btn onClick={() => save()}>Сохранить</Btn>
         </>
       )}
     >

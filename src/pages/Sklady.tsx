@@ -14,7 +14,7 @@ import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, pars
 import { useScreen } from "../router";
 
 // Позиции учёта ГП в виде позиций склада ДМ — склад один, показываются все классы.
-const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, status: i.status });
+const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, status: i.status, chem: i.chem });
 
 // ── Склады ХАБ ───────────────────────────────────────────────────────────────
 

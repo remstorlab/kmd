@@ -213,7 +213,8 @@ export function Btn({
 }: {
   children: React.ReactNode;
   onClick?: () => void;
-  variant?: "primary" | "secondary" | "danger" | "ghost";
+  // success — светло-зелёная кнопка «Оформить» (закрывающее действие, всегда слева в футере)
+  variant?: "primary" | "secondary" | "danger" | "ghost" | "success";
   size?: "sm" | "md";
   disabled?: boolean;
   type?: "button" | "submit";
@@ -225,6 +226,7 @@ export function Btn({
     secondary: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:hover:bg-gray-100 disabled:cursor-not-allowed",
     danger: "border border-red-500 text-red-600 hover:bg-red-50 disabled:opacity-50",
     ghost: "text-blue-600 hover:bg-blue-50 disabled:opacity-50",
+    success: "bg-green-100 text-green-800 border border-green-300 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-green-100",
   };
   return (
     <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${sizes[size]} ${variants[variant]}`}>

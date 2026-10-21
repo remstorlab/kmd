@@ -93,7 +93,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
   // Остатки склада — все позиции «На складе» из обоих учётов, любого класса
   const stock = useMemo<StockRow[]>(() => {
-    const fromGp: StockRow[] = gpItems.map(i => ({ id: i.id, src: "gp", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: i.qty, unit: i.unit, proba: null, lig: null, net: null, location: i.location }));
+    const fromGp: StockRow[] = gpItems.map(i => ({ id: i.id, src: "gp", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: i.qty, unit: i.unit, proba: i.proba ?? null, lig: i.ligWeight ?? null, net: i.netWeight ?? null, location: i.location, chem: i.chem }));
     const fromDm: StockRow[] = dmItems.map(i => ({ id: i.id, src: "dm", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, chem: i.chem }));
     const available = [
       ...gpItems.filter(i => canIssue(i.status)).map(i => i.id),
@@ -203,9 +203,9 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
         <Btn onClick={() => save("Оформлено")}>Сохранить</Btn>
       </> : <>
+        <div className="mr-auto"><Btn variant="success" onClick={() => save("Оформлено")}>Оформить</Btn></div>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={() => save("Оформлено")}>Оформить</Btn>
-        <Btn variant="secondary" onClick={() => save("Редактирование")}>Сохранить</Btn>
+        <Btn onClick={() => save("Редактирование")}>Сохранить</Btn>
       </>}
     >
       {!issued && !ro && affectedKarty.length > 0 && (
