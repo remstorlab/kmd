@@ -130,12 +130,9 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     show(`Добавлено позиций: ${picked.length}`);
   };
 
-  const setIssue = (id: string, v: string) =>
-    setPositions(prev => prev.map(p => p.id === id ? { ...p, issue: Math.max(1, Math.min(parseInt(v.replace(/[^\d]/g, ""), 10) || 1, p.qty)) } : p));
 
   const changeType = (t: string) => screen.toggle("gp", t === DOC_PEREDACHA_GP);
-  // ГП выдаётся в штуках, ДМ — позицией целиком
-  const qtyEditable = (r: { src: string }) => r.src === "gp";
+  // Позиции выдаются целиком — количество изделий не редактируется
 
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(positions, {
@@ -271,7 +268,6 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Лигат. г</SortTh>
               <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый г</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
-              <th className="px-3 py-2 text-left">Статус</th>
               {!lockPos && <th className="w-12"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -281,18 +277,10 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
-                  <td className="px-3 py-2 w-32">
-                    {lockPos || !qtyEditable(p) ? `${p.issue} ${p.unit}` : (
-                      <div className="flex items-center gap-1.5">
-                        <Input value={String(p.issue)} onChange={v => setIssue(p.id, v)} />
-                        <span className="text-xs text-gray-400 whitespace-nowrap">/ {p.qty}</span>
-                      </div>
-                    )}
-                  </td>
+                  <td className="px-3 py-2">{p.issue || "—"}</td>
                   <td className="px-3 py-2">{p.lig == null ? "—" : share(p, p.lig).toFixed(2)}</td>
                   <td className="px-3 py-2 text-blue-600">{p.net == null ? "—" : share(p, p.net).toFixed(2)}</td>
                   <td className="px-3 py-2 text-gray-500">{p.location}</td>
-                  <td className="px-3 py-2"><Badge label={issued ? "Закрыта" : "К выдаче"} group="vydacha-pozicii" /></td>
                   {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
                 </tr>
               ))}
@@ -302,7 +290,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               <td className="px-3 py-2">{totalQty}</td>
               <td className="px-3 py-2">{totalLig.toFixed(2)}</td>
               <td className="px-3 py-2 text-blue-600">{totalNet.toFixed(2)}</td>
-              <td colSpan={lockPos ? 2 : 3}></td>
+              <td colSpan={lockPos ? 1 : 2}></td>
             </tr></tfoot>
           </table>
         )}
@@ -310,7 +298,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
       {showPick && (
         <StockPickerModal
-          qtyInput={qtyEditable}
+          qtyInput={false}
           title={`Добавить позиции со склада «${MAIN_SKLAD}»`}
           rows={stock}
           already={already}

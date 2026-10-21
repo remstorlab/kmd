@@ -847,7 +847,7 @@ export const STATUS_COLORS: { value: StatusColor; label: string }[] = [
 export interface StatusItem { id: string; name: string; color: StatusColor }
 // group — ключ справочника, по которому бейдж ищет цвет статуса
 export type StatusGroup =
-  | "pozicii" | "vydacha-pozicii" | "dokumenty" | "operacii" | "shihta"
+  | "pozicii" | "dokumenty" | "operacii" | "shihta"
   | "gost" | "podotchet" | "polzovateli" | "zhurnal" | "mesta-hraneniya" | "zapisi-spravochnikov";
 export interface StatusDict {
   group: StatusGroup;
@@ -863,8 +863,6 @@ const st = (group: string, list: [string, StatusColor][]): StatusItem[] =>
 export const initialStatusDicts: StatusDict[] = [
   { group: "pozicii", name: "Статусы позиций", sections: "Склады ДМ и ГП, Движение материала, Подотчётники, Шихтовые карты",
     items: st("pozicii", [["На складе", "green"], ["Резерв", "yellow"], ["В подотчёте", "blue"], ["Закрыта", "gray"]]) },
-  { group: "vydacha-pozicii", name: "Статусы позиций накладной на выдачу", sections: "Склады → Выдать со склада",
-    items: st("vydacha-pozicii", [["К выдаче", "blue"], ["Закрыта", "gray"]]) },
   { group: "dokumenty", name: "Статусы складских документов", sections: "Складские операции (приход, выдача)",
     items: st("dokumenty", [["Редактирование", "blue"], ["Оформлено", "green"]]) },
   { group: "operacii", name: "Статусы операций движения материала", sections: "Движение материала",

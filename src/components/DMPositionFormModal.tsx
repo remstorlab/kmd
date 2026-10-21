@@ -69,7 +69,7 @@ export function emptyPosition(_locs: StorageLocation[], _sklad: string, klass: s
   };
 }
 
-export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany, title: titleProp, saveLabel, lockWeights = false, header, extraWide = false }: {
+export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany, title: titleProp, saveLabel, lockWeights = false, header, extraWide = false, fixedHeight = false }: {
   mode: "add" | "edit" | "view";
   sklad: string;
   initial: PrihodPosition;
@@ -88,6 +88,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   header?: React.ReactNode;
   // Ширина окна первого уровня (как у документов)
   extraWide?: boolean;
+  fixedHeight?: boolean;
 }) {
   const ro = mode === "view";
   const { storageLocations: locs } = useApp();
@@ -133,6 +134,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
       onClose={onClose}
       wide={!extraWide}
       extraWide={extraWide}
+      fixedHeight={fixedHeight}
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : <>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
         <Btn onClick={save} disabled={!canSave}>{saveLabel ?? (mode === "add" ? (canMany && many && count >= 2 ? `Добавить (${count})` : "Добавить") : "Сохранить")}</Btn>

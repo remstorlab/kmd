@@ -122,16 +122,23 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
     if (Number.isFinite(n)) chem[k] = String(+((parseFloat(chem[k] ?? "0") || 0) + n).toFixed(2));
   }
   const loc = parseLoc(items[0].location);
+  // Количество изделий — сумма по позициям, где оно указано (поле остаётся редактируемым)
+  const totalQty = items.reduce((s, i) => s + (i.qty || 0), 0);
   const [initial] = useState<PrihodPosition>(() => ({
-    // Наименование, количество изделий и проба не подставляются — вводятся вручную
+    // Наименование и проба не подставляются — вводятся вручную
     id: `merge-${Date.now()}`, nomenkl: "", name: "",
     klass: same(i => i.klass) ?? "Слиток", code: same(i => i.metal) ?? items[0].metal,
-    kol: "", unit: "шт", proba: "",
+    kol: totalQty > 0 ? String(totalQty) : "", unit: "шт", proba: "",
     lig: totalLig.toFixed(2), net: totalNet.toFixed(2), seyf: loc.seyf, polka: loc.polka, chem,
   }));
 
   const codeLabel = useMaterialCodeLabel();
-  const th = "px-3 py-2 text-left font-medium";
+  const th = "px-3 py-1.5 text-left font-medium";
+  // Позиции объединения — по 10 на странице; пустые строки сохраняют высоту таблицы
+  const PER_PAGE = 10;
+  const [page, setPage] = useState(1);
+  const pageItems = items.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const fillers = items.length > PER_PAGE ? PER_PAGE - pageItems.length : 0;
   const header = (
     <div className="mb-4 border border-gray-200 rounded-lg overflow-hidden">
       <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
@@ -145,14 +152,14 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
           <th className={th}>Класс</th>
           <th className={th}>Код материала</th>
           <th className={th}>Проба</th>
-          <th className="px-3 py-2 text-right font-medium">Лигат. вес г</th>
-          <th className="px-3 py-2 text-right font-medium">Чистый вес г</th>
+          <th className="px-3 py-1.5 text-right font-medium">Лигат. вес г</th>
+          <th className="px-3 py-1.5 text-right font-medium">Чистый вес г</th>
           <th className={th}>Место хранения</th>
           <th className={th}>Статус</th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
-          {items.map(it => (
-            <tr key={it.id}>
+          {pageItems.map(it => (
+            <tr key={it.id} className="h-8">
               <td className="px-3 py-1.5 text-gray-500">{it.nomenkl}</td>
               <td className="px-3 py-1.5 font-medium text-gray-900">{it.name}</td>
               <td className="px-3 py-1.5">{it.qty || "—"}</td>
@@ -165,6 +172,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
               <td className="px-3 py-1.5"><Badge label={it.status} group="pozicii" /></td>
             </tr>
           ))}
+          {Array.from({ length: fillers }, (_, i) => <tr key={`f${i}`} className="h-8"><td colSpan={10}></td></tr>)}
         </tbody>
         <tfoot><tr className="bg-gray-50 font-semibold border-t border-gray-200">
           <td colSpan={6} className="px-3 py-1.5 text-xs uppercase text-gray-600">Итого</td>
@@ -173,6 +181,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
           <td colSpan={2}></td>
         </tr></tfoot>
       </table>
+      {items.length > PER_PAGE && <Pagination page={page} total={items.length} perPage={PER_PAGE} onPage={setPage} />}
     </div>
   );
 
@@ -185,6 +194,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
       saveLabel="Подтвердить объединение"
       lockWeights
       extraWide
+      fixedHeight
       header={header}
       onClose={onClose}
       onSave={onConfirm}
@@ -329,7 +339,7 @@ export function OstatokDM() {
               <th className="px-4 py-3 text-left">
                 <label className="flex items-center gap-2 whitespace-nowrap">
                   <input type="checkbox" onChange={e => setSelected(e.target.checked ? new Set(filtered.filter(canMerge).map(i => i.id)) : new Set())} />
-                  <span className={`text-xs font-medium ${selectedItems.length ? "text-blue-600" : "text-gray-400"}`}>Выбрано: {selectedItems.length}</span>
+                  <span className={`text-xs font-medium ${selectedItems.length ? "text-blue-600" : "text-gray-400"}`} title="Выбрано позиций">{selectedItems.length}</span>
                 </label>
               </th>
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort}>Номенкл. №</SortTh>
@@ -351,7 +361,7 @@ export function OstatokDM() {
                 <td className="px-4 py-3"><input type="checkbox" checked={selected.has(item.id) && canMerge(item)} onChange={() => toggleSelect(item.id)} disabled={!canMerge(item)} title={canMerge(item) ? undefined : `Позиция «${item.status}» — объединение недоступно`} /></td>
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
-                <td className="px-4 py-3">{item.qty}</td>
+                <td className="px-4 py-3">{item.qty || "—"}</td>
                 <td className="px-4 py-3"><KlassCode value={item.klass} /></td>
                 <td className="px-4 py-3 text-blue-600 font-medium">{codeLabel(item.metal)}</td>
                 <td className="px-4 py-3">{item.proba}</td>

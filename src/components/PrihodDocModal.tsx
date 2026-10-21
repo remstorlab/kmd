@@ -226,7 +226,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
-                  <td className="px-3 py-2">{!p.kol ? "—" : isOrder ? p.kol : `${p.kol} ${p.unit}`}</td>
+                  <td className="px-3 py-2">{p.kol || "—"}</td>
                   {isOrder && <>
                     <td className="px-3 py-2">{p.proba}</td>
                     <td className="px-3 py-2 font-medium">{p.lig}</td>
