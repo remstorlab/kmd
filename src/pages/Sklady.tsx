@@ -10,7 +10,7 @@ import { Coins } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
 import DMPositionViewModal from "../components/DMPositionViewModal";
-import { useNextNomenkl } from "../components/DMPositionFormModal";
+import { useNextNomenkl, seyfsOf, polkasOf, formatLoc, parseLoc } from "../components/DMPositionFormModal";
 import { useScreen } from "../router";
 
 // Позиции учёта ГП в виде позиций склада ДМ — склад один, показываются все классы.
@@ -34,6 +34,76 @@ export function SkladyHub() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Смена места хранения позиции ──────────────────────────────────────────────
+
+
+function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: () => void; onSave: (location: string) => void }) {
+  const { storageLocations: locs } = useApp();
+  const codeLabel = useMaterialCodeLabel();
+  const cur = parseLoc(item.location);
+  // Ячейки склада системы из справочника «Места хранения» (только доступные)
+  const seyfs = seyfsOf(locs, MAIN_SKLAD);
+  const [seyf, setSeyf] = useState(seyfs.includes(cur.seyf) ? cur.seyf : seyfs[0] ?? "");
+  const polkas = polkasOf(locs, MAIN_SKLAD, seyf);
+  const [polka, setPolka] = useState(polkas.includes(cur.polka) ? cur.polka : polkas[0] ?? "");
+  const changeSeyf = (s: string) => { setSeyf(s); setPolka(polkasOf(locs, MAIN_SKLAD, s)[0] ?? ""); };
+  const next = formatLoc(seyf, polka);
+  const same = !!cur.seyf && cur.seyf === seyf && cur.polka === polka;
+
+  const attrs: [string, React.ReactNode][] = [
+    ["Номенкл. №", item.nomenkl],
+    ["Наименование", item.name],
+    ["Класс", <KlassCode value={item.klass} />],
+    ["Код материала", codeLabel(item.metal)],
+    ["Проба", item.proba || "—"],
+    ["Лигат. вес г", item.ligWeight],
+  ];
+
+  return (
+    <Modal
+      title="Изменение места хранения"
+      onClose={onClose}
+      footer={<>
+        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+        <Btn onClick={() => onSave(next)} disabled={!next || same}>Сохранить</Btn>
+      </>}
+    >
+      {/* Позиция, у которой меняется место хранения */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4 grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
+        {attrs.map(([label, value]) => (
+          <div key={label} className="min-w-0">
+            <div className="text-xs text-gray-500">{label}</div>
+            <div className="font-medium text-gray-900 truncate">{value}</div>
+          </div>
+        ))}
+      </div>
+
+      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Текущее место хранения</h4>
+      <div className="grid grid-cols-3 gap-4 mb-5">
+        <Field label="Склад"><Input value={MAIN_SKLAD} disabled /></Field>
+        {cur.seyf ? <>
+          <Field label="Сейф"><Input value={cur.seyf} disabled /></Field>
+          <Field label="Полка"><Input value={cur.polka || "—"} disabled /></Field>
+        </> : (
+          <div className="col-span-2"><Field label="Место хранения"><Input value={item.location || "—"} disabled /></Field></div>
+        )}
+      </div>
+
+      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Новое место хранения</h4>
+      <div className="grid grid-cols-3 gap-4">
+        <Field label="Склад"><Input value={MAIN_SKLAD} disabled /></Field>
+        <Field label="Сейф" required>
+          {seyfs.length ? <Select value={seyf} options={seyfs} onChange={changeSeyf} /> : <Input value="Нет свободных мест" disabled />}
+        </Field>
+        <Field label="Полка">
+          {polkas.length ? <Select value={polka} options={polkas} onChange={setPolka} /> : <Input value="—" disabled />}
+        </Field>
+      </div>
+      {same && <div className="mt-3 text-xs text-gray-500">Выберите место хранения, отличное от текущего</div>}
+    </Modal>
   );
 }
 
@@ -94,6 +164,17 @@ export function OstatokDM() {
   const showMerge = screen.has("merge");
   const showPrihod = screen.has("prihod");
   const showVydacha = screen.has("vydacha");
+  // Смена места хранения: …/mesto/:id
+  const moveItem = skladItems.find(it => it.id === screen.after("mesto")) ?? null;
+  // Позиция физически на складе — место хранения можно изменить
+  const canMove = (it: DMItem) => it.status === "На складе" || it.status === "Резерв";
+  const saveLocation = (it: DMItem, location: string) => {
+    // Позиция хранится в учёте ДМ или ГП — меняем там, где она есть
+    if (dmItems.some(d => d.id === it.id)) setDmItems(prev => prev.map(d => (d.id === it.id ? { ...d, location } : d)));
+    else setGpItems(prev => prev.map(g => (g.id === it.id ? { ...g, location } : g)));
+    screen.close("mesto");
+    show(`Место хранения изменено: ${location}`);
+  };
 
   const perPage = 8;
   const filtered = skladItems.filter(it => {
@@ -209,7 +290,7 @@ export function OstatokDM() {
               <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort}>Чистый вес г</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
-              <th className="w-12"></th>
+              <th className="w-20"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -226,7 +307,16 @@ export function OstatokDM() {
                 <td className="px-4 py-3">{item.netWeight}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><Badge label={item.status} group="pozicii" /></td>
-                <td className="px-4 py-3"><EyeIcon onClick={() => screen.openTop("view", item.id)} /></td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => screen.openTop("view", item.id)} />
+                    <EditIcon
+                      onClick={() => screen.openTop("mesto", item.id)}
+                      disabled={!canMove(item)}
+                      title={canMove(item) ? "Изменить место хранения" : "Позиция не на складе — место хранения не меняется"}
+                    />
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -236,6 +326,9 @@ export function OstatokDM() {
 
       {viewItem && (
         <DMPositionViewModal item={viewItem} onClose={() => screen.close("view")} />
+      )}
+      {moveItem && (
+        <MoveLocationModal key={moveItem.id} item={moveItem} onClose={() => screen.close("mesto")} onSave={loc => saveLocation(moveItem, loc)} />
       )}
       {showMerge && mergeItems.length >= 2 && <MergeModal items={mergeItems} onClose={() => screen.close("merge")} onConfirm={doMerge} />}
       {showPrihod && (

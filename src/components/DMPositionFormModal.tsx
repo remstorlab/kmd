@@ -23,7 +23,15 @@ export interface PrihodPosition {
   chem: ChemComposition;
 }
 
-export const locOf = (p: PrihodPosition) => (p.polka ? `Сейф ${p.seyf}/Полка ${p.polka}` : p.seyf ? `Сейф ${p.seyf}` : "—");
+// Место хранения позиции записывается одной строкой по ячейке справочника «Места хранения»: «Сейф №1, Полка 2»
+export const formatLoc = (seyf: string, polka: string) => (!seyf ? "" : polka ? `Сейф №${seyf}, Полка ${polka}` : `Сейф №${seyf}`);
+// Обратный разбор строки места хранения (понимает и старый вид «Сейф 1/Полка 2»)
+export const parseLoc = (loc: string) => {
+  const m = /Сейф\s*№?\s*([^,/\s]+)\s*(?:[,/]\s*Полка\s*№?\s*([^,/\s]+))?/.exec(loc);
+  return { seyf: m?.[1] ?? "", polka: m?.[2] ?? "" };
+};
+
+export const locOf = (p: PrihodPosition) => formatLoc(p.seyf, p.polka) || "—";
 
 // Места хранения склада из справочника «Места хранения»
 export const seyfsOf = (locs: StorageLocation[], sklad: string) =>

@@ -256,32 +256,32 @@ export const initialGPItems: GPItem[] = [
   { id: "gp2", name: "Цепочка золотая Бисмарк", nomenkl: "5015313", qty: 12, unit: "шт", klass: "Готовая продукция", code: "0300", location: "Сейф №1, Полка 2", status: "На складе" },
   { id: "gp3", name: "Серьги с бриллиантами 0.5ct", nomenkl: "5015314", qty: 8, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Сейф №2, Полка 1", status: "Резерв" },
   { id: "gp4", name: "Браслет серебряный", nomenkl: "5015315", qty: 36, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №2, Полка 2", status: "На складе" },
-  { id: "gp5", name: "Подвеска платиновая", nomenkl: "5015316", qty: 6, unit: "шт", klass: "Готовая продукция", code: "4000", location: "Витрина №1", status: "В подотчёте" },
-  { id: "gp6", name: "Запонки золотые", nomenkl: "5015317", qty: 18, unit: "шт", klass: "Готовая продукция", code: "0300", location: "Витрина №2", status: "На складе" },
+  { id: "gp5", name: "Подвеска платиновая", nomenkl: "5015316", qty: 6, unit: "шт", klass: "Готовая продукция", code: "4000", location: "Сейф №4, Полка 1", status: "В подотчёте" },
+  { id: "gp6", name: "Запонки золотые", nomenkl: "5015317", qty: 18, unit: "шт", klass: "Готовая продукция", code: "0300", location: "Сейф №4, Полка 2", status: "На складе" },
   { id: "gp7", name: "Колье серебряное ажурное", nomenkl: "5015318", qty: 14, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №3, Полка 1", status: "Резерв" },
   { id: "gp8", name: "Печатка мужская золотая", nomenkl: "5015319", qty: 10, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Сейф №3, Полка 2", status: "В подотчёте" },
   { id: "gp9", name: "Кулон сердце серебро", nomenkl: "5015321", qty: 22, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №1, Полка 1", status: "На складе" },
   { id: "gp10", name: "Браслет золотой плетёный", nomenkl: "5015322", qty: 9, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Сейф №1, Полка 2", status: "На складе" },
   { id: "gp11", name: "Серьги серебряные с топазом", nomenkl: "5015323", qty: 16, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №2, Полка 1", status: "Резерв" },
   { id: "gp12", name: "Кольцо с изумрудом 750", nomenkl: "5015324", qty: 4, unit: "шт", klass: "Готовая продукция", code: "0300", location: "Сейф №2, Полка 2", status: "В подотчёте" },
-  { id: "gp13", name: "Цепочка серебряная якорная", nomenkl: "5015325", qty: 30, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Витрина №1", status: "На складе" },
-  { id: "gp14", name: "Перстень золотой с рубином", nomenkl: "5015326", qty: 5, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Витрина №2", status: "На складе" },
+  { id: "gp13", name: "Цепочка серебряная якорная", nomenkl: "5015325", qty: 30, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №4, Полка 1", status: "На складе" },
+  { id: "gp14", name: "Перстень золотой с рубином", nomenkl: "5015326", qty: 5, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Сейф №4, Полка 2", status: "На складе" },
   { id: "gp15", name: "Брошь серебряная", nomenkl: "5015327", qty: 11, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №3, Полка 1", status: "На складе" },
   { id: "gp16", name: "Медальон золотой 585", nomenkl: "5015328", qty: 7, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Сейф №3, Полка 2", status: "Резерв" },
   { id: "gp17", name: "Кольцо обручальное 750", nomenkl: "5015329", qty: 20, unit: "шт", klass: "Готовая продукция", code: "0300", location: "Сейф №1, Полка 1", status: "На складе" },
   { id: "gp18", name: "Подвеска серебряная луна", nomenkl: "5015330", qty: 19, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №1, Полка 2", status: "На складе" },
   { id: "gp19", name: "Серьги золотые пуссеты", nomenkl: "5015331", qty: 28, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Сейф №2, Полка 1", status: "На складе" },
   { id: "gp20", name: "Браслет платиновый тонкий", nomenkl: "5015332", qty: 3, unit: "шт", klass: "Готовая продукция", code: "4000", location: "Сейф №2, Полка 2", status: "В подотчёте" },
-  { id: "gp21", name: "Колье золотое с жемчугом", nomenkl: "5015333", qty: 6, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Витрина №1", status: "Резерв" },
-  { id: "gp22", name: "Кулон серебряный якорь", nomenkl: "5015334", qty: 15, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Витрина №2", status: "На складе" },
+  { id: "gp21", name: "Колье золотое с жемчугом", nomenkl: "5015333", qty: 6, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Сейф №4, Полка 1", status: "Резерв" },
+  { id: "gp22", name: "Кулон серебряный якорь", nomenkl: "5015334", qty: 15, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №4, Полка 2", status: "На складе" },
   { id: "gp23", name: "Часы золотые Au-750", nomenkl: "5015335", qty: 2, unit: "шт", klass: "Готовая продукция", code: "0300", location: "Сейф №3, Полка 1", status: "В подотчёте" },
   { id: "gp24", name: "Кольцо серебряное с ониксом", nomenkl: "5015336", qty: 13, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №3, Полка 2", status: "На складе" },
   { id: "gp25", name: "Брошь золотая бабочка", nomenkl: "5015337", qty: 8, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Сейф №1, Полка 1", status: "На складе" },
   { id: "gp26", name: "Цепочка золотая гурмет", nomenkl: "5015338", qty: 11, unit: "шт", klass: "Готовая продукция", code: "0300", location: "Сейф №1, Полка 2", status: "Резерв" },
   { id: "gp27", name: "Серьги серебряные геометрия", nomenkl: "5015339", qty: 25, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №2, Полка 1", status: "На складе" },
   { id: "gp28", name: "Перстень золотой классика", nomenkl: "5015340", qty: 9, unit: "шт", klass: "Готовая продукция", code: "0300", location: "Сейф №2, Полка 2", status: "На складе" },
-  { id: "gp29", name: "Ожерелье серебряное rose", nomenkl: "5015341", qty: 7, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Витрина №1", status: "В подотчёте" },
-  { id: "gp30", name: "Кольцо платиновое обручальное", nomenkl: "5015342", qty: 17, unit: "шт", klass: "Готовая продукция", code: "4000", location: "Витрина №2", status: "На складе" },
+  { id: "gp29", name: "Ожерелье серебряное rose", nomenkl: "5015341", qty: 7, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №4, Полка 1", status: "В подотчёте" },
+  { id: "gp30", name: "Кольцо платиновое обручальное", nomenkl: "5015342", qty: 17, unit: "шт", klass: "Готовая продукция", code: "4000", location: "Сейф №4, Полка 2", status: "На складе" },
   { id: "gp31", name: "Браслет серебряный шармы", nomenkl: "5015343", qty: 21, unit: "шт", klass: "Готовая продукция", code: "2000", location: "Сейф №3, Полка 1", status: "На складе" },
   { id: "gp32", name: "Серьги золотые капли", nomenkl: "5015344", qty: 14, unit: "шт", klass: "Готовая продукция", code: "0100", location: "Сейф №3, Полка 2", status: "Резерв" },
   { id: "gp33", name: "Колье платиновое с бриллиантом", nomenkl: "5015345", qty: 1, unit: "шт", klass: "Готовая продукция", code: "4000", location: "Сейф №1, Полка 1", status: "В подотчёте" },
@@ -293,11 +293,11 @@ export const initialDMItems: DMItem[] = [
   { id: "dm1", name: "Слиток золота ЗлА-1", nomenkl: "5015371", klass: "Слиток", metal: "1000", qty: 1, proba: 999, ligWeight: 500.25, netWeight: 498.12, location: "Сейф №1, Полка 1", status: "Резерв", chem: { au: "498.12" } },
   { id: "dm2", name: "Слиток серебра СрА-2", nomenkl: "5015372", klass: "Слиток", metal: "2000", qty: 1, proba: 999, ligWeight: 1000.50, netWeight: 998.30, location: "Сейф №1, Полка 2", status: "На складе", chem: { ag: "998.30" } },
   { id: "dm3", name: "Стружка золотая", nomenkl: "5015373", klass: "Стружка", metal: "1000", qty: 1, proba: 585, ligWeight: 45.80, netWeight: 26.79, location: "Сейф №2, Полка 1", status: "Резерв", chem: { au: "26.79" } },
-  { id: "dm4", name: "Проба золота Au-750", nomenkl: "5015374", klass: "Основная проба", metal: "1000", qty: 1, proba: 750, ligWeight: 12.30, netWeight: 9.22, location: "Сейф №2, Полка 3", status: "Резерв", chem: { au: "9.22" } },
+  { id: "dm4", name: "Проба золота Au-750", nomenkl: "5015374", klass: "Основная проба", metal: "1000", qty: 1, proba: 750, ligWeight: 12.30, netWeight: 9.22, location: "Сейф №2, Полка 1", status: "Резерв", chem: { au: "9.22" } },
   { id: "dm5", name: "Раствор серебра AgNO3", nomenkl: "5015375", klass: "Электролит", metal: "2000", qty: 1, proba: 999, ligWeight: 250.00, netWeight: 249.10, location: "Сейф №3, Полка 1", status: "В подотчёте", chem: { ag: "249.10" } },
-  { id: "dm6", name: "Слиток платины ПлА-1", nomenkl: "5015376", klass: "Слиток", metal: "4000", qty: 1, proba: 999, ligWeight: 300.00, netWeight: 299.50, location: "Сейф №1, Полка 3", status: "На складе", chem: { pt: "299.50" } },
+  { id: "dm6", name: "Слиток платины ПлА-1", nomenkl: "5015376", klass: "Слиток", metal: "4000", qty: 1, proba: 999, ligWeight: 300.00, netWeight: 299.50, location: "Сейф №1, Полка 1", status: "На складе", chem: { pt: "299.50" } },
   { id: "dm7", name: "Лом золота 585", nomenkl: "5015377", klass: "Скрап", metal: "1000", qty: 1, proba: 585, ligWeight: 88.40, netWeight: 51.71, location: "Сейф №2, Полка 2", status: "На складе", chem: { au: "51.71" } },
-  { id: "dm8", name: "Золотой порошок Au", nomenkl: "5015378", klass: "Гранулы", metal: "1000", qty: 1, proba: 999, ligWeight: 25.00, netWeight: 24.95, location: "Сейф №3, Полка 3", status: "Резерв", chem: { au: "24.95" } },
+  { id: "dm8", name: "Золотой порошок Au", nomenkl: "5015378", klass: "Гранулы", metal: "1000", qty: 1, proba: 999, ligWeight: 25.00, netWeight: 24.95, location: "Сейф №3, Полка 1", status: "Резерв", chem: { au: "24.95" } },
   // Драгоценные камни: qty — штук, ligWeight — масса камней, г (1 кар = 0,2 г), металлов в чистоте нет
   { id: "dm9", name: "Бриллиант Кр57 0,05 кар", nomenkl: "5015379", klass: "Драгоценные камни", metal: "0050", qty: 120, proba: 0, ligWeight: 1.20, netWeight: 0, location: "Сейф №2, Полка 1", status: "На складе" },
   { id: "dm10", name: "Изумруд огранённый 1 кар", nomenkl: "5015380", klass: "Драгоценные камни", metal: "0050", qty: 3, proba: 0, ligWeight: 0.60, netWeight: 0, location: "Сейф №2, Полка 1", status: "На складе" },
@@ -359,22 +359,22 @@ export const initialShihtovyeKarty: ShihtovayaKarta[] = [
   {
     id: "sk2", date: "15.08.2026", name: "Шихта золото 750 пробы", plavkaNo: "П-2026-0088", status: "Новая",
     materials: [
-      { name: "Проба золота Au-750", nomenkl: "5015374", klass: "Основная проба", proba: 750, ves: 12.30, loc: "Сейф №2, Полка 3" },
-      { name: "Золотой порошок Au", nomenkl: "5015378", klass: "Гранулы", proba: 999, ves: 25.00, loc: "Сейф №3, Полка 3" },
+      { name: "Проба золота Au-750", nomenkl: "5015374", klass: "Основная проба", proba: 750, ves: 12.30, loc: "Сейф №2, Полка 1" },
+      { name: "Золотой порошок Au", nomenkl: "5015378", klass: "Гранулы", proba: 999, ves: 25.00, loc: "Сейф №3, Полка 1" },
     ],
     createdAt: "2026-08-15T14:45:00", createdBy: "Нурланов Асхат Бекович",
   },
   {
     id: "sk3", date: "10.08.2026", name: "Шихта серебро 925 (кольца)", plavkaNo: "П-2026-0087", status: "Выполнена",
     materials: [
-      { name: "Слиток серебра СрА-2", nomenkl: "DM-002", klass: "Слиток", proba: 925, ves: 1000.50, loc: "Сейф №1, Полка Б" },
+      { name: "Слиток серебра СрА-2", nomenkl: "DM-002", klass: "Слиток", proba: 925, ves: 1000.50, loc: "Сейф №1, Полка 2" },
     ],
     createdAt: "2026-08-10T08:30:00", createdBy: "Петров Сергей Владимирович",
   },
   {
     id: "sk4", date: "05.08.2026", name: "Шихта Au-999 слитки партия Б", plavkaNo: "П-2026-0086", status: "Выполнена",
     materials: [
-      { name: "Слиток золота стандартный", nomenkl: "НН-72101", klass: "Слиток", proba: 999, ves: 1000.00, loc: "Сейф 1/Полка 1" },
+      { name: "Слиток золота стандартный", nomenkl: "НН-72101", klass: "Слиток", proba: 999, ves: 1000.00, loc: "Сейф №1, Полка 1" },
     ],
     createdAt: "2026-08-05T11:00:00", createdBy: "Ковалева Елена",
   },
@@ -392,8 +392,8 @@ export const initialPodotchetniki: Podotchetnik[] = [
       {
         id: "pr-p1-1", name: "Плавка золотых слитков", vid: "Плавка", date: "19.08.2026, 09:00",
         positions: [
-          { name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", metal: "1000", qty: 1, proba: 999, ligWeight: 500.25, netWeight: 499.75, location: "Сейф №1, Полка А", status: "В подотчёте" },
-          { name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", metal: "1000", qty: 1, proba: 750, ligWeight: 45.80, netWeight: 34.35, location: "Сейф №2, Полка А", status: "В подотчёте" },
+          { name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", metal: "1000", qty: 1, proba: 999, ligWeight: 500.25, netWeight: 499.75, location: "Сейф №1, Полка 1", status: "В подотчёте" },
+          { name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", metal: "1000", qty: 1, proba: 750, ligWeight: 45.80, netWeight: 34.35, location: "Сейф №2, Полка 1", status: "В подотчёте" },
         ],
       },
     ],
@@ -401,7 +401,7 @@ export const initialPodotchetniki: Podotchetnik[] = [
       {
         id: "pr-p1-c1", name: "Плавка серебряного лома", vid: "Плавка", date: "10.08.2026, 08:30", completedDate: "12.08.2026, 17:15",
         positions: [
-          { name: "Слиток серебра СрА-2", nomenkl: "DM-002", klass: "Слиток", metal: "2000", qty: 1, proba: 925, ligWeight: 300.00, netWeight: 277.50, location: "Сейф №1, Полка Б", status: "На складе" },
+          { name: "Слиток серебра СрА-2", nomenkl: "DM-002", klass: "Слиток", metal: "2000", qty: 1, proba: 925, ligWeight: 300.00, netWeight: 277.50, location: "Сейф №1, Полка 2", status: "На складе" },
         ],
       },
     ],
@@ -423,7 +423,7 @@ export const initialPodotchetniki: Podotchetnik[] = [
       {
         id: "pr-p2-c1", name: "Производство кольца Au-585", vid: "Производство ГП", date: "05.08.2026, 10:00", completedDate: "07.08.2026, 16:00",
         positions: [
-          { name: "Слиток золота ЗлБ-1", nomenkl: "DM-006", klass: "Слиток", metal: "1000", qty: 1, proba: 585, ligWeight: 20.00, netWeight: 11.70, location: "Сейф №2, Полка А", status: "На складе" },
+          { name: "Слиток золота ЗлБ-1", nomenkl: "DM-006", klass: "Слиток", metal: "1000", qty: 1, proba: 585, ligWeight: 20.00, netWeight: 11.70, location: "Сейф №2, Полка 1", status: "На складе" },
         ],
       },
     ],
@@ -464,7 +464,7 @@ export const initialPodotchetniki: Podotchetnik[] = [
       {
         id: "pr-p5-c1", name: "Инвентаризация склада ДМ №1", vid: "Отбор пробы", date: "08.08.2026, 08:00", completedDate: "08.08.2026, 18:00",
         positions: [
-          { name: "Слиток золота ЗлА-3", nomenkl: "DM-008", klass: "Слиток", metal: "1000", qty: 1, proba: 999, ligWeight: 150.00, netWeight: 149.85, location: "Сейф №3, Полка А", status: "На складе" },
+          { name: "Слиток золота ЗлА-3", nomenkl: "DM-008", klass: "Слиток", metal: "1000", qty: 1, proba: 999, ligWeight: 150.00, netWeight: 149.85, location: "Сейф №3, Полка 1", status: "На складе" },
         ],
       },
     ],
@@ -510,17 +510,17 @@ export const initialLogs: LogEntry[] = [
       { title: "DM-101 · Слиток золота ЗлА-5", status: "Новая", attrs: [
         { label: "Наименование", value: "Слиток золота ЗлА-5" }, { label: "Номенкл. №", value: "DM-101" }, { label: "Класс", value: "Слиток" }, { label: "Код материала", value: "1000-Au чистое" },
         { label: "Кол-во", value: "1" }, { label: "Проба", value: "999" }, { label: "Лигатурный вес", value: "1000.00 г" }, { label: "Чистый вес", value: "999.00 г" },
-        { label: "Место хранения", value: "Сейф №1, Полка А" }, { label: "Статус", value: "На складе" },
+        { label: "Место хранения", value: "Сейф №1, Полка 1" }, { label: "Статус", value: "На складе" },
       ] },
       { title: "DM-102 · Слиток серебра СрА-3", status: "Новая", attrs: [
         { label: "Наименование", value: "Слиток серебра СрА-3" }, { label: "Номенкл. №", value: "DM-102" }, { label: "Класс", value: "Слиток" }, { label: "Код материала", value: "2000-Ag чистое" },
         { label: "Кол-во", value: "1" }, { label: "Проба", value: "925" }, { label: "Лигатурный вес", value: "500.00 г" }, { label: "Чистый вес", value: "462.50 г" },
-        { label: "Место хранения", value: "Сейф №1, Полка Б" }, { label: "Статус", value: "На складе" },
+        { label: "Место хранения", value: "Сейф №1, Полка 2" }, { label: "Статус", value: "На складе" },
       ] },
       { title: "DM-103 · Стружка золотая", status: "Новая", attrs: [
         { label: "Наименование", value: "Стружка золотая" }, { label: "Номенкл. №", value: "DM-103" }, { label: "Класс", value: "Стружка" }, { label: "Код материала", value: "1000-Au чистое" },
         { label: "Кол-во", value: "1" }, { label: "Проба", value: "750" }, { label: "Лигатурный вес", value: "120.00 г" }, { label: "Чистый вес", value: "90.00 г" },
-        { label: "Место хранения", value: "Сейф №2, Полка А" }, { label: "Статус", value: "На складе" },
+        { label: "Место хранения", value: "Сейф №2, Полка 1" }, { label: "Статус", value: "На складе" },
       ] },
     ],
   },
@@ -530,12 +530,12 @@ export const initialLogs: LogEntry[] = [
     before: [{ title: "DM-001 · Слиток золота ЗлА-1", status: "Изменена", attrs: [
       { label: "Наименование", value: "Слиток золота ЗлА-1" }, { label: "Номенкл. №", value: "DM-001" }, { label: "Класс", value: "Слиток" }, { label: "Код материала", value: "1000-Au чистое" },
       { label: "Кол-во", value: "1" }, { label: "Проба", value: "999" }, { label: "Лигатурный вес", value: "850.00 г" }, { label: "Чистый вес", value: "849.15 г" },
-      { label: "Место хранения", value: "Сейф №2, Полка А" }, { label: "Статус", value: "На складе" },
+      { label: "Место хранения", value: "Сейф №2, Полка 1" }, { label: "Статус", value: "На складе" },
     ] }],
     after: [{ title: "DM-001 · Слиток золота ЗлА-1", status: "Изменена", attrs: [
       { label: "Наименование", value: "Слиток золота ЗлА-1" }, { label: "Номенкл. №", value: "DM-001" }, { label: "Класс", value: "Слиток" }, { label: "Код материала", value: "1000-Au чистое" },
       { label: "Кол-во", value: "1" }, { label: "Проба", value: "999" }, { label: "Лигатурный вес", value: "850.00 г" }, { label: "Чистый вес", value: "849.15 г" },
-      { label: "Место хранения", value: "Сейф №1, Полка А" }, { label: "Статус", value: "На складе" },
+      { label: "Место хранения", value: "Сейф №1, Полка 1" }, { label: "Статус", value: "На складе" },
     ] }],
   },
   {
@@ -544,7 +544,7 @@ export const initialLogs: LogEntry[] = [
     before: [],
     after: [{ title: "GP-KOL-585-22 · Кольцо обручальное 585", status: "Новая", attrs: [
       { label: "Наименование", value: "Кольцо обручальное 585" }, { label: "Номенкл. №", value: "GP-KOL-585-22" }, { label: "Класс", value: "Готовая продукция" }, { label: "Код", value: "AU-585" },
-      { label: "Кол-во", value: "6 шт" }, { label: "Место хранения", value: "Сейф №1, Полка А" }, { label: "Статус", value: "На складе" },
+      { label: "Кол-во", value: "6 шт" }, { label: "Место хранения", value: "Сейф №1, Полка 1" }, { label: "Статус", value: "На складе" },
     ] }],
   },
   {
@@ -570,7 +570,7 @@ export const initialLogs: LogEntry[] = [
     description: "Удалена позиция GP-BRA-925-02 из списка (ошибочный ввод)",
     before: [{ title: "GP-BRA-925-02 · Браслет серебряный", status: "Удалена", attrs: [
       { label: "Наименование", value: "Браслет серебряный" }, { label: "Номенкл. №", value: "GP-BRA-925-02" }, { label: "Класс", value: "Готовая продукция" }, { label: "Код", value: "AG-925" },
-      { label: "Кол-во", value: "36 шт" }, { label: "Место хранения", value: "Сейф №2, Полка Б" }, { label: "Статус", value: "На складе" },
+      { label: "Кол-во", value: "36 шт" }, { label: "Место хранения", value: "Сейф №2, Полка 2" }, { label: "Статус", value: "На складе" },
     ] }],
     after: [],
   },
@@ -599,18 +599,18 @@ export const initialLogs: LogEntry[] = [
       { title: "DM-005 · Слиток золота ЗлБ-2", status: "Объединена", attrs: [
         { label: "Наименование", value: "Слиток золота ЗлБ-2" }, { label: "Номенкл. №", value: "DM-005" }, { label: "Класс", value: "Слиток" }, { label: "Код материала", value: "1000-Au чистое" },
         { label: "Кол-во", value: "1" }, { label: "Проба", value: "958" }, { label: "Лигатурный вес", value: "300.00 г" }, { label: "Чистый вес", value: "287.40 г" },
-        { label: "Место хранения", value: "Сейф №3, Полка А" }, { label: "Статус", value: "На складе" },
+        { label: "Место хранения", value: "Сейф №3, Полка 1" }, { label: "Статус", value: "На складе" },
       ] },
       { title: "DM-006 · Слиток золота ЗлБ-3", status: "Объединена", attrs: [
         { label: "Наименование", value: "Слиток золота ЗлБ-3" }, { label: "Номенкл. №", value: "DM-006" }, { label: "Класс", value: "Слиток" }, { label: "Код материала", value: "1000-Au чистое" },
         { label: "Кол-во", value: "1" }, { label: "Проба", value: "999" }, { label: "Лигатурный вес", value: "200.00 г" }, { label: "Чистый вес", value: "199.80 г" },
-        { label: "Место хранения", value: "Сейф №3, Полка А" }, { label: "Статус", value: "На складе" },
+        { label: "Место хранения", value: "Сейф №3, Полка 1" }, { label: "Статус", value: "На складе" },
       ] },
     ],
     after: [{ title: "DM-M9931 · Объединённая позиция (2 ед.)", status: "Новая", attrs: [
       { label: "Наименование", value: "Объединённая позиция (2 ед.)" }, { label: "Номенкл. №", value: "DM-M9931" }, { label: "Класс", value: "Слиток" }, { label: "Код материала", value: "1000-Au чистое" },
       { label: "Кол-во", value: "2" }, { label: "Проба", value: "974" }, { label: "Лигатурный вес", value: "500.00 г" }, { label: "Чистый вес", value: "487.20 г" },
-      { label: "Место хранения", value: "Сейф №3, Полка А" }, { label: "Статус", value: "На складе" },
+      { label: "Место хранения", value: "Сейф №3, Полка 1" }, { label: "Статус", value: "На складе" },
     ] }],
   },
   {
@@ -619,12 +619,12 @@ export const initialLogs: LogEntry[] = [
     before: [{ title: "DM-014 · Слиток золота ЗлВ-1", status: "Преобразована", attrs: [
       { label: "Наименование", value: "Слиток золота ЗлВ-1" }, { label: "Номенкл. №", value: "DM-014" }, { label: "Класс", value: "Слиток" }, { label: "Код материала", value: "1000-Au чистое" },
       { label: "Кол-во", value: "1" }, { label: "Проба", value: "916" }, { label: "Лигатурный вес", value: "410.00 г" }, { label: "Чистый вес", value: "375.60 г" },
-      { label: "Место хранения", value: "Сейф №2, Полка Б" }, { label: "Статус", value: "На складе" },
+      { label: "Место хранения", value: "Сейф №2, Полка 2" }, { label: "Статус", value: "На складе" },
     ] }],
     after: [{ title: "DM-014-С · Стружка золотая ЗлВ-1", status: "Преобразована", attrs: [
       { label: "Наименование", value: "Стружка золотая ЗлВ-1" }, { label: "Номенкл. №", value: "DM-014-С" }, { label: "Класс", value: "Стружка" }, { label: "Код материала", value: "1000-Au чистое" },
       { label: "Кол-во", value: "1" }, { label: "Проба", value: "916" }, { label: "Лигатурный вес", value: "405.00 г" }, { label: "Чистый вес", value: "371.00 г" },
-      { label: "Место хранения", value: "Сейф №2, Полка Б" }, { label: "Статус", value: "На складе" },
+      { label: "Место хранения", value: "Сейф №2, Полка 2" }, { label: "Статус", value: "На складе" },
     ] }],
   },
 ];
@@ -632,13 +632,13 @@ export const initialLogs: LogEntry[] = [
 // --- Позиции операций движения материала ---
 // Демо-позиции вкладок «Выдача» / «Возврат» для операций без сохранённых позиций
 export const vydachaPositions: OperPosition[] = [
-  { n: 1, name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, qty: 1, ves: 500.25, ag: "-", cu: "-", loc: "Сейф №1, Полка А", metal: "1000", lig: 500.25, net: 499.75, chem: { au: "499.75" } },
-  { n: 2, name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", proba: 585, qty: 1, ves: 45.80, ag: "0.12", cu: "1.20", loc: "Сейф №2, Полка А", metal: "1000", lig: 45.80, net: 26.79, chem: { au: "26.79", ag: "0.12", cu: "1.20" } },
+  { n: 1, name: "Слиток золота ЗлА-1", nomenkl: "DM-001", klass: "Слиток", proba: 999, qty: 1, ves: 500.25, ag: "-", cu: "-", loc: "Сейф №1, Полка 1", metal: "1000", lig: 500.25, net: 499.75, chem: { au: "499.75" } },
+  { n: 2, name: "Стружка золотая", nomenkl: "DM-003", klass: "Стружка", proba: 585, qty: 1, ves: 45.80, ag: "0.12", cu: "1.20", loc: "Сейф №2, Полка 1", metal: "1000", lig: 45.80, net: 26.79, chem: { au: "26.79", ag: "0.12", cu: "1.20" } },
 ];
 export const vozvratPositions: OperPosition[] = [
-  { n: 1, name: "Подкат 30х20", nomenkl: "DM-R01", klass: "Подкат", proba: 999, qty: 1, ves: 480.10, ag: "-", cu: "-", loc: "Сейф №1, Полка Б", metal: "1000", lig: 480.10, net: 479.62, chem: { au: "479.62" } },
-  { n: 2, name: "Королёк №1", nomenkl: "DM-R02", klass: "Королёк", proba: 999, qty: 1, ves: 55.60, ag: "-", cu: "-", loc: "Сейф №2, Полка Б", metal: "1000", lig: 55.60, net: 55.54, chem: { au: "55.54" } },
-  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Отходы", proba: 500, qty: 1, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка А", metal: "1000", lig: 8.00, net: 4.00, chem: { au: "4.00", ag: "0.05", cu: "2.10" } },
+  { n: 1, name: "Подкат 30х20", nomenkl: "DM-R01", klass: "Подкат", proba: 999, qty: 1, ves: 480.10, ag: "-", cu: "-", loc: "Сейф №1, Полка 2", metal: "1000", lig: 480.10, net: 479.62, chem: { au: "479.62" } },
+  { n: 2, name: "Королёк №1", nomenkl: "DM-R02", klass: "Королёк", proba: 999, qty: 1, ves: 55.60, ag: "-", cu: "-", loc: "Сейф №2, Полка 2", metal: "1000", lig: 55.60, net: 55.54, chem: { au: "55.54" } },
+  { n: 3, name: "Шлак золотосодержащий", nomenkl: "DM-R03", klass: "Отходы", proba: 500, qty: 1, ves: 8.00, ag: "0.05", cu: "2.10", loc: "Сейф №3, Полка 1", metal: "1000", lig: 8.00, net: 4.00, chem: { au: "4.00", ag: "0.05", cu: "2.10" } },
 ];
 
 // Позиции операции; для демо-операций без сохранённых позиций — те же образцы, что показывает форма.
