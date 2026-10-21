@@ -211,8 +211,9 @@ export function OstatokDM() {
   const showMerge = screen.has("merge");
   const showPrihod = screen.has("prihod");
   const showVydacha = screen.has("vydacha");
-  // Отмеченные позиции, которые можно выдать (только «На складе») — сразу попадают в накладную
-  const vydachaIds = skladItems.filter(it => selected.has(it.id) && it.status === "На складе").map(it => it.id);
+  // Отмеченные позиции (кроме «Закрыта» и «В подотчёте») — сразу попадают в накладную;
+  // позиция из резерва при оформлении возвращает свою шихтовую карту в «Редактирование»
+  const vydachaIds = skladItems.filter(it => selected.has(it.id) && (it.status === "На складе" || it.status === "Резерв")).map(it => it.id);
   // Смена места хранения: …/mesto/:id
   const moveItem = skladItems.find(it => it.id === screen.after("mesto")) ?? null;
   // Позиция физически на складе — место хранения можно изменить
@@ -294,7 +295,7 @@ export function OstatokDM() {
           <>
             <Btn onClick={() => screen.openTop("prihod")}>Принять на склад</Btn>
             <Btn variant="secondary" onClick={() => screen.openTop("vydacha")}>Выдать со склада{vydachaIds.length ? ` (${vydachaIds.length})` : ""}</Btn>
-            <Btn variant="secondary" disabled={selectedItems.length < 2} onClick={() => screen.openTop("merge")}>Объединить позиции</Btn>
+            <Btn variant="secondary" disabled={selectedItems.length < 2} onClick={() => screen.openTop("merge")}>Объединить позиции{selectedItems.length ? ` (${selectedItems.length})` : ""}</Btn>
             <ExportBtn onToast={show} />
           </>
         }

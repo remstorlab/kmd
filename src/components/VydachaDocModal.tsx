@@ -25,6 +25,8 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 // закрывается и снимается с места хранения («-»); при частичной выдаче остаток остаётся на складе на своём
 // месте, а выданная часть выделяется в отдельную позицию «Закрыта» без места хранения.
 const NO_LOC = "-";
+// Выдать можно позицию на складе или в резерве; «В подотчёте» и «Закрыта» — нет
+const canIssue = (status: string) => status === "На складе" || status === "Резерв";
 function issueGp(items: GPItem[], issue: Map<string, number>, stamp: number): GPItem[] {
   return items.flatMap(it => {
     const q = issue.get(it.id);
@@ -64,7 +66,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   // Оформленная накладная: позиции уже выданы и закрыты — состав менять нельзя
   const issued = doc?.status === "Оформлено";
   const lockPos = ro || issued;
-  const { gpItems, dmItems, setGpItems, setDmItems } = useApp();
+  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty } = useApp();
   const { toast, show, clear } = useToast();
   // Вложенные экраны: …/gp («Накладная на передачу ГП» в «Тип документа»), …/pick (подбор со склада)
   const screen = useScreen();
@@ -94,8 +96,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     const fromGp: StockRow[] = gpItems.map(i => ({ id: i.id, src: "gp", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: i.qty, unit: i.unit, proba: null, lig: null, net: null, location: i.location }));
     const fromDm: StockRow[] = dmItems.map(i => ({ id: i.id, src: "dm", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location }));
     const available = [
-      ...gpItems.filter(i => i.status === "На складе").map(i => i.id),
-      ...dmItems.filter(i => i.status === "На складе").map(i => i.id),
+      ...gpItems.filter(i => canIssue(i.status)).map(i => i.id),
+      ...dmItems.filter(i => canIssue(i.status)).map(i => i.id),
     ];
     return [...fromGp, ...fromDm].filter(r => available.includes(r.id) && (r.src === "dm" || r.qty > 0));
   }, [gpItems, dmItems]);
@@ -103,6 +105,14 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   // Новая накладная: отмеченные позиции склада добавляются целиком (всё доступное количество)
   const [positions, setPositions] = useState<VydachaPosition[]>(() =>
     doc?.positions ?? stock.filter(r => preselectIds.includes(r.id)).map(r => ({ ...r, issue: r.qty })));
+
+  // Позиции из резерва и шихтовые карты, которые их резервируют (кроме выполненных)
+  const isRezerv = (p: VydachaPosition) =>
+    (p.src === "gp" ? gpItems.find(i => i.id === p.id) : dmItems.find(i => i.id === p.id))?.status === "Резерв";
+  const rezNomenkl = new Set(positions.filter(isRezerv).map(p => p.nomenkl));
+  const affectedKarty = rezNomenkl.size
+    ? shihtovyeKarty.filter(k => k.status !== "Выполнена" && k.materials.some(m => rezNomenkl.has(m.nomenkl)))
+    : [];
 
   const already = Object.fromEntries(positions.map(p => [p.id, p.issue]));
 
@@ -152,7 +162,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       if (positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
       const lacking = positions.filter(p => {
         const it = p.src === "gp" ? gpItems.find(i => i.id === p.id) : dmItems.find(i => i.id === p.id);
-        return !it || it.status !== "На складе" || it.qty < p.issue;
+        return !it || !canIssue(it.status) || it.qty < p.issue;
       });
       if (lacking.length) {
         show(`Недостаточно остатка на складе: ${lacking.map(p => p.name).join(", ")}`);
@@ -163,6 +173,15 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       const dmIssue = new Map(positions.filter(p => p.src === "dm").map(p => [p.id, p.issue]));
       if (gpIssue.size) setGpItems(prev => issueGp(prev, gpIssue, stamp));
       if (dmIssue.size) setDmItems(prev => issueDm(prev, dmIssue, stamp));
+      // Выданные позиции из резерва: шихтовая карта, которая их резервировала, возвращается в «Редактирование»
+      if (affectedKarty.length) {
+        const ids = new Set(affectedKarty.map(k => k.id));
+        setShihtovyeKarty(prev => prev.map(k => {
+          if (!ids.has(k.id)) return k;
+          const hit = k.materials.filter(m => rezNomenkl.has(m.nomenkl)).map(m => m.name);
+          return { ...k, status: "Редактирование", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
+        }));
+      }
     }
     onSave({
       id: doc?.id ?? `vd-${Date.now()}`,
@@ -192,6 +211,11 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
         <Btn variant="secondary" onClick={() => save("Редактирование")}>Сохранить</Btn>
       </>}
     >
+      {!issued && !ro && affectedKarty.length > 0 && (
+        <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm text-orange-800">
+          ⚠ В выдаче есть позиции из резерва. После оформления шихтовая карта {affectedKarty.map(k => `«${k.name}»`).join(", ")} вернётся в статус «Редактирование» и станет недоступна для плавки.
+        </div>
+      )}
       {issued && (
         <div className="mb-4 text-sm bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5">
           Накладная оформлена: позиции выданы со склада и переведены в статус «Закрыта». Состав позиций изменить нельзя.
