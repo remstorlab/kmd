@@ -12,7 +12,6 @@ import type { Page } from "./store/AppContext";
 export const PAGE_PATHS: Record<Page, string> = {
   "dashboard": "/",
   "sklady-hub": "/sklady",
-  "ostatok-gp": "/sklady/gp",
   "ostatok-dm": "/sklady/dm",
   "sklad-oper-hub": "/skladskie-operacii",
   "prihod-list": "/skladskie-operacii/prihod",

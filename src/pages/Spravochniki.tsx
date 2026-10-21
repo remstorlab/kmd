@@ -15,7 +15,9 @@ type SpravKey = keyof typeof spravochniki;
 // Адреса справочников: /spravochniki/<slug>
 const DICT_SLUG: Record<SpravKey, string> = {
   "Единицы измерения": "edinicy-izmereniya",
-  "Типы документов": "tipy-dokumentov",
+  "Типы документов приёмки": "tipy-dokumentov-priemki",
+  "Типы документов отгрузки": "tipy-dokumentov-otgruzki",
+  "Типы документов движения материала": "tipy-dokumentov-dvizheniya",
   "Организации": "organizacii",
   "Подотчётные сотрудники": "podotchetnye-sotrudniki",
   "Типы операций": "tipy-operaciy",
@@ -55,7 +57,9 @@ function useRecordScreens<T>(items: T[], keyOf: (t: T) => string) {
 
 const dictIcon: Record<SpravKey, LucideIcon> = {
   "Единицы измерения": Scale,
-  "Типы документов": FileText,
+  "Типы документов приёмки": FileText,
+  "Типы документов отгрузки": FileText,
+  "Типы документов движения материала": FileText,
   "Организации": Building2,
   "Подотчётные сотрудники": UserRound,
   "Типы операций": Settings2,

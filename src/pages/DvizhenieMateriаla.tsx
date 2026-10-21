@@ -5,7 +5,7 @@ import {
   ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate,
 } from "../components/ui";
-import { Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
+import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
@@ -179,7 +179,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
 
 // ── Добавить позицию возврата: новые позиции, созданные кнопкой «Добавить позицию» ──
 
-const DM_SKLAD = spravValues("Склады")[0] ?? "";
+const DM_SKLAD = MAIN_SKLAD;
 
 function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
   // Номенклатурные номера позиций операции — новая позиция получает следующий свободный
@@ -1160,7 +1160,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   // «Накладная в ЛКИ» — единственный тип документа для «Анализ в ЛКИ» и только для него.
   const docTypeOptions = vid === VID_LKI
     ? [DOC_TYPE_LKI]
-    : withBlank(withCurrent(spravValues("Типы документов").filter(t => t !== DOC_TYPE_LKI), head.docType));
+    : withBlank(withCurrent(spravValues("Типы документов движения материала").filter(t => t !== DOC_TYPE_LKI), head.docType));
   const changeVid = (v: string) => {
     setVid(v);
     if (v === VID_LKI) setHead(h => ({ ...h, docType: DOC_TYPE_LKI }));

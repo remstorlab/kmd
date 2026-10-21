@@ -221,7 +221,7 @@ const reports: { slug: string; title: string; desc: string; icon: LucideIcon; da
     icon: FileText,
     data: [
       { nom: "ПО-0342", name: "Приходный ордер", kol: "19.08.2026", ves: "Выполнено", status: "Завершён" },
-      { nom: "НО-0205", name: "Накладная на отгрузку ГП", kol: "19.08.2026", ves: "В работе", status: "Открыт" },
+      { nom: "НО-0205", name: "Накладная на передачу ГП", kol: "19.08.2026", ves: "В работе", status: "Открыт" },
       { nom: "ПО-0341", name: "Приходный ордер", kol: "17.08.2026", ves: "В работе", status: "Открыт" },
     ],
   },

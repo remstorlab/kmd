@@ -3,26 +3,17 @@ import {
   Badge, Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel,
 } from "./ui";
-import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravochniki, isGPKlass } from "../data/mock";
+import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravochniki, spravValues, MAIN_SKLAD, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
-// ── Выдача со склада наружу (получателю) — единая для ГП и ДМ ─────────────────
-// Не связана с «Движением материала»: это отгрузка стороннему получателю.
+// ── Выдача со склада наружу (получателю): «Накладная» ─────────────────────────
+// Не связана с «Движением материала»: это отгрузка стороннему получателю со склада системы.
+// Тип документа — из справочника «Типы документов отгрузки»; набор полей общий, отличается печатная форма.
+// Выдать можно любую позицию склада, независимо от класса.
 
-export type VydachaKind = "ГП" | "ДМ";
-
-const DOC_TYPE: Record<VydachaKind, SkladDoc["type"]> = {
-  "ГП": "Накладная на отгрузку ГП",
-  "ДМ": "Накладная на отгрузку ДМ",
-};
-
-export const vydachaKindOf = (d: SkladDoc): VydachaKind => (d.type === "Накладная на отгрузку ГП" ? "ГП" : "ДМ");
-
-const SKLADY_DM = spravochniki["Склады"].items.map(i => i.value);
-const SENDERS: Record<VydachaKind, string[]> = { "ГП": ["Склад ГП"], "ДМ": SKLADY_DM };
 const RECEIVERS = spravochniki["Организации"].items.map(i => i.value);
 
 type VydachaPosition = VydachaDocPosition;
@@ -59,13 +50,11 @@ function issueDm(items: DMItem[], issue: Map<string, number>, stamp: number): DM
 
 // ── Накладная на отгрузку ────────────────────────────────────────────────────
 
-export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false, kind: fixedKind }: {
+export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false }: {
   onClose: () => void;
   onSave: (d: SkladDoc) => void;
   doc?: SkladDoc | null;
   readOnly?: boolean;
-  // Склад фиксирован (вызов из «Остатки на складе ГП/ДМ»); без него — выбор в «Тип документа»
-  kind?: VydachaKind;
 }) {
   const ro = readOnly;
   // Оформленная накладная: позиции уже выданы и закрыты — состав менять нельзя
@@ -73,16 +62,17 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const lockPos = ro || issued;
   const { gpItems, dmItems, setGpItems, setDmItems } = useApp();
   const { toast, show, clear } = useToast();
-  // Вложенные экраны: …/dm (склад ДМ при выборе в «Тип документа»), …/pick (подбор со склада)
+  // Вложенные экраны: …/gp («Накладная на передачу ГП» в «Тип документа»), …/pick (подбор со склада)
   const screen = useScreen();
-  const kind: VydachaKind = fixedKind ?? (doc ? vydachaKindOf(doc) : screen.has("dm") ? "ДМ" : "ГП");
-  const isDM = kind === "ДМ";
+  const docType = doc?.type ?? (screen.has("gp") ? DOC_PEREDACHA_GP : DOC_OTGRUZKA_DM);
+  const typeOptions = spravValues("Типы документов отгрузки");
   const today = new Date().toLocaleDateString("ru-RU");
 
   const [head, setHead] = useState(() => ({
     number: doc?.number || `НО-${Math.floor(Math.random() * 900 + 100)}`,
     date: doc?.date || today,
-    sender: doc?.sender && SENDERS[kind].includes(doc.sender) ? doc.sender : SENDERS[kind][0],
+    // Отправитель — всегда склад системы
+    sender: MAIN_SKLAD,
     receiver: doc?.receiver || RECEIVERS[0],
     schetFaktura: "",
     schetFakturaDate: today,
@@ -96,7 +86,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const showPick = screen.has("pick");
   const setShowPick = (open: boolean) => (open ? screen.open("pick") : screen.close("pick"));
 
-  // Остатки склада: ГП — класс «Готовая продукция», ДМ — все остальные (из обоих учётов)
+  // Остатки склада — все позиции «На складе» из обоих учётов, любого класса
   const stock = useMemo<StockRow[]>(() => {
     const fromGp: StockRow[] = gpItems.map(i => ({ id: i.id, src: "gp", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: i.qty, unit: i.unit, proba: null, lig: null, net: null, location: i.location }));
     const fromDm: StockRow[] = dmItems.map(i => ({ id: i.id, src: "dm", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location }));
@@ -104,8 +94,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       ...gpItems.filter(i => i.status === "На складе").map(i => i.id),
       ...dmItems.filter(i => i.status === "На складе").map(i => i.id),
     ];
-    return [...fromGp, ...fromDm].filter(r => available.includes(r.id) && (r.src === "dm" || r.qty > 0) && (isDM ? !isGPKlass(r.klass) : isGPKlass(r.klass)));
-  }, [gpItems, dmItems, isDM]);
+    return [...fromGp, ...fromDm].filter(r => available.includes(r.id) && (r.src === "dm" || r.qty > 0));
+  }, [gpItems, dmItems]);
 
   const already = Object.fromEntries(positions.map(p => [p.id, p.issue]));
 
@@ -126,12 +116,9 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const setIssue = (id: string, v: string) =>
     setPositions(prev => prev.map(p => p.id === id ? { ...p, issue: Math.max(1, Math.min(parseInt(v.replace(/[^\d]/g, ""), 10) || 1, p.qty)) } : p));
 
-  const changeKind = (k: VydachaKind) => {
-    if (k === kind) return;
-    screen.toggle("dm", k === "ДМ");
-    setPositions([]);
-    setHead(x => ({ ...x, sender: SENDERS[k][0] }));
-  };
+  const changeType = (t: string) => screen.toggle("gp", t === DOC_PEREDACHA_GP);
+  // ГП выдаётся в штуках, ДМ — позицией целиком
+  const qtyEditable = (r: { src: string }) => r.src === "gp";
 
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(positions, {
@@ -173,10 +160,10 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     onSave({
       id: doc?.id ?? `vd-${Date.now()}`,
       date: head.date,
-      type: DOC_TYPE[kind],
+      type: docType,
       number: head.number,
       status,
-      sender: head.sender,
+      sender: MAIN_SKLAD,
       receiver: head.receiver,
       positions,
     });
@@ -186,7 +173,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
   return (
     <Modal
-      title={`Накладная на отгрузку ${kind}${doc ? ` ${doc.number}` : ""}`}
+      title={`Накладная${doc ? ` ${doc.number}` : ""}`}
       onClose={onClose}
       extraWide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : issued ? <>
@@ -206,15 +193,15 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Field label="Тип документа" required={!ro}>
           <Select
-            value={DOC_TYPE[kind]}
-            options={[DOC_TYPE["ГП"], DOC_TYPE["ДМ"]]}
-            onChange={v => changeKind(v === DOC_TYPE["ГП"] ? "ГП" : "ДМ")}
-            disabled={ro || !!fixedKind || !!doc}
+            value={docType}
+            options={typeOptions.includes(docType) ? typeOptions : [docType, ...typeOptions]}
+            onChange={changeType}
+            disabled={ro || !!doc}
           />
         </Field>
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
         <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-        <Field label="Склад-отправитель" required={!ro}><Select value={head.sender} options={Array.from(new Set([head.sender, ...SENDERS[kind]]))} onChange={h("sender")} disabled={ro} /></Field>
+        <Field label="Склад-отправитель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
         <Field label="Получатель" required={!ro}><Select value={head.receiver} options={receivers} onChange={h("receiver")} disabled={ro} /></Field>
         <Field label="Доверенность получателя"><Input value={head.doverennost} onChange={h("doverennost")} placeholder="№ и дата доверенности" disabled={ro} /></Field>
         <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={h("schetFaktura")} placeholder="СФ-XXXX" disabled={ro} /></Field>
@@ -250,10 +237,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код</SortTh>
               <SortTh sortKey="issue" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
-              {isDM && <>
-                <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Лигат. г</SortTh>
-                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый г</SortTh>
-              </>}
+              <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Лигат. г</SortTh>
+              <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Чистый г</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
               <th className="px-3 py-2 text-left">Статус</th>
               {!lockPos && <th className="w-12"></th>}
@@ -266,17 +251,15 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                   <td className="px-3 py-2 w-32">
-                    {lockPos || isDM ? `${p.issue} ${p.unit}` : (
+                    {lockPos || !qtyEditable(p) ? `${p.issue} ${p.unit}` : (
                       <div className="flex items-center gap-1.5">
                         <Input value={String(p.issue)} onChange={v => setIssue(p.id, v)} />
                         <span className="text-xs text-gray-400 whitespace-nowrap">/ {p.qty}</span>
                       </div>
                     )}
                   </td>
-                  {isDM && <>
-                    <td className="px-3 py-2">{share(p, p.lig).toFixed(2)}</td>
-                    <td className="px-3 py-2 text-blue-600">{share(p, p.net).toFixed(2)}</td>
-                  </>}
+                  <td className="px-3 py-2">{p.lig == null ? "—" : share(p, p.lig).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-blue-600">{p.net == null ? "—" : share(p, p.net).toFixed(2)}</td>
                   <td className="px-3 py-2 text-gray-500">{p.location}</td>
                   <td className="px-3 py-2"><Badge label={issued ? "Закрыта" : "К выдаче"} group="vydacha-pozicii" /></td>
                   {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
@@ -286,10 +269,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
             <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
               <td className="px-3 py-2">{totalQty}</td>
-              {isDM && <>
-                <td className="px-3 py-2">{totalLig.toFixed(2)}</td>
-                <td className="px-3 py-2 text-blue-600">{totalNet.toFixed(2)}</td>
-              </>}
+              <td className="px-3 py-2">{totalLig.toFixed(2)}</td>
+              <td className="px-3 py-2 text-blue-600">{totalNet.toFixed(2)}</td>
               <td colSpan={lockPos ? 2 : 3}></td>
             </tr></tfoot>
           </table>
@@ -298,12 +279,12 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
       {showPick && (
         <StockPickerModal
-          qtyInput={!isDM}
-          title={`Добавить позиции со склада ${kind}`}
+          qtyInput={qtyEditable}
+          title={`Добавить позиции со склада «${MAIN_SKLAD}»`}
           rows={stock}
           already={already}
-          showWeights={isDM}
-          emptyText={`Нет доступных позиций на складе ${kind}`}
+          showWeights
+          emptyText="Нет доступных позиций на складе"
           onClose={() => setShowPick(false)}
           onAdd={addPicked}
         />

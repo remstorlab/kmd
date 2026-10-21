@@ -3,37 +3,33 @@ import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
   Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort,
 } from "./ui";
-import { SkladDoc, DocStatus, spravochniki } from "../data/mock";
+import { SkladDoc, DocStatus, spravValues, MAIN_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD } from "../data/mock";
 import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
 import { useApp } from "../store/AppContext";
 import { Plus } from "lucide-react";
 import { useScreen } from "../router";
 
 // ── Приём на склад: Приходный ордер / Накладная ──────────────────────────────
-// Общая модалка для «Остатки на складе ДМ → Принять на склад» и «Приход на склад».
+// Общая модалка для «Остатки на складе ДМ → Принять на склад» и «Приход на склад». Получатель — склад системы.
 
-type PrihodDocType = "Приходный ордер" | "Накладная";
-
-const SKLADY = spravochniki["Склады"].items.map(i => i.value);
+type PrihodDocType = string;
 
 // ── Документ прихода ─────────────────────────────────────────────────────────
 
-export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false, onlyNaklad = false, nakladType = "Накладная на приём ДМ" }: {
+export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false }: {
   onClose: () => void;
   onSave: (d: SkladDoc) => void;
   doc?: SkladDoc | null;
   readOnly?: boolean;
-  // Жёстко зафиксировать тип документа = «Накладная» (например, приём на склад ГП)
-  onlyNaklad?: boolean;
-  nakladType?: "Накладная на приём ДМ" | "Накладная на приём ГП";
 }) {
   const ro = readOnly;
   const { storageLocations } = useApp();
   // Вложенные экраны: …/nakladnaya (тип документа), …/position-new, …/position/:id, …/position-edit/:id
   const screen = useScreen();
-  const docType: PrihodDocType = onlyNaklad || (doc ? doc.type !== "Приходный ордер" : screen.has("nakladnaya")) ? "Накладная" : "Приходный ордер";
-  const setDocType = (t: PrihodDocType) => screen.toggle("nakladnaya", t === "Накладная");
-  const isOrder = docType === "Приходный ордер";
+  // Тип документа — из справочника «Типы документов приёмки»: «Приходный ордер» или «Накладная»
+  const docType: PrihodDocType = (doc ? doc.type !== DOC_PRIHOD_ORDER : screen.has("nakladnaya")) ? DOC_PRIHOD_NAKLAD : DOC_PRIHOD_ORDER;
+  const setDocType = (t: PrihodDocType) => screen.toggle("nakladnaya", t !== DOC_PRIHOD_ORDER);
+  const isOrder = docType === DOC_PRIHOD_ORDER;
   const { toast, show, clear } = useToast();
   const today = new Date().toLocaleDateString("ru-RU");
 
@@ -41,7 +37,8 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
     number: doc?.number || "ПО-0342",
     date: doc?.date || today,
     otpravitel: doc?.sender || "ООО «Аффинаж-Сервис»",
-    poluchatel: doc?.receiver && SKLADY.includes(doc.receiver) ? doc.receiver : SKLADY[0],
+    // Получатель — всегда склад системы
+    poluchatel: MAIN_SKLAD,
     schetFaktura: "СФ-0091",
     schetFakturaData: today,
     dogovor: "ДОГ-2026-045",
@@ -60,7 +57,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
     nakladDate: doc?.date || today,
     zakazchik: "Национальный банк",
     skladOtpr: doc?.sender || "СДМ",
-    skladPoluch: doc?.receiver && SKLADY.includes(doc.receiver) ? doc.receiver : SKLADY[0],
+    skladPoluch: MAIN_SKLAD,
     sotrudnik: "Петров А.Н.",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
@@ -116,18 +113,17 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
 
   const save = (status: DocStatus) => {
     const d: SkladDoc = isOrder
-      ? { id: doc?.id ?? `sd-${Date.now()}`, date: head.date, type: "Приходный ордер", number: head.number, status, sender: head.otpravitel, receiver: head.poluchatel }
-      : { id: doc?.id ?? `sd-${Date.now()}`, date: head.nakladDate, type: nakladType, number: head.nakladNumber, status, sender: head.skladOtpr, receiver: head.skladPoluch };
+      ? { id: doc?.id ?? `sd-${Date.now()}`, date: head.date, type: DOC_PRIHOD_ORDER, number: head.number, status, sender: head.otpravitel, receiver: MAIN_SKLAD }
+      : { id: doc?.id ?? `sd-${Date.now()}`, date: head.nakladDate, type: DOC_PRIHOD_NAKLAD, number: head.nakladNumber, status, sender: head.skladOtpr, receiver: MAIN_SKLAD };
     onSave(d);
   };
 
-  const title = doc
-    ? `${isOrder ? "Приходный ордер" : nakladType} ${doc.number}`
-    : isOrder ? "Приходный ордер" : nakladType;
+  const title = doc ? `${docType} ${doc.number}` : docType;
+  const typeOptions = spravValues("Типы документов приёмки");
 
   const typeSelect = (
     <Field label="Тип документа" required={!ro}>
-      <Select value={docType} options={["Приходный ордер", "Накладная"]} onChange={v => setDocType(v as PrihodDocType)} disabled={ro || !!doc || onlyNaklad} />
+      <Select value={docType} options={typeOptions.includes(docType) ? typeOptions : [docType, ...typeOptions]} onChange={setDocType} disabled={ro || !!doc} />
     </Field>
   );
 
@@ -150,7 +146,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
           <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
           <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
           <Field label="Отправитель" required={!ro}><Select value={head.otpravitel} options={Array.from(new Set([head.otpravitel, "ООО «Аффинаж-Сервис»", "АО «Металл Инвест»", "ОО «АурумПоставка»"]))} onChange={h("otpravitel")} disabled={ro} /></Field>
-          <Field label="Получатель" required={!ro}><Select value={head.poluchatel} options={SKLADY} onChange={h("poluchatel")} disabled={ro} /></Field>
+          <Field label="Получатель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
           <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={h("schetFaktura")} disabled={ro} /></Field>
           <Field label="Дата счёт-фактуры"><Input value={head.schetFakturaData} onChange={h("schetFakturaData")} disabled={ro} /></Field>
           <Field label="Номер договора"><Input value={head.dogovor} onChange={h("dogovor")} disabled={ro} /></Field>
@@ -177,7 +173,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false,
           <Field label="Дата" required={!ro}><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>
           <Field label="Заказчик" required={!ro}><Select value={head.zakazchik} options={["Национальный банк", "Монетный двор"]} onChange={h("zakazchik")} disabled={ro} /></Field>
           <Field label="Склад-отправитель" required={!ro}><Select value={head.skladOtpr} options={Array.from(new Set([head.skladOtpr, "СДМ", "Производственный цех"]))} onChange={h("skladOtpr")} disabled={ro} /></Field>
-          <Field label="Склад-получатель" required={!ro}><Select value={head.skladPoluch} options={SKLADY} onChange={h("skladPoluch")} disabled={ro} /></Field>
+          <Field label="Склад-получатель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
           <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={["Петров А.Н.", "Ким Александр Юрьевич", "Нурланов Асхат Бекович"]} onChange={h("sotrudnik")} disabled={ro} /></Field>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>

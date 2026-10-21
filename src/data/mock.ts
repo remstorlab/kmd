@@ -54,7 +54,8 @@ export interface DMItem {
 export interface SkladDoc {
   id: string;
   date: string;
-  type: "Приходный ордер" | "Накладная на приём ГП" | "Накладная на приём ДМ" | "Накладная на отгрузку ГП" | "Накладная на отгрузку ДМ" | "Накладная на отгрузку";
+  // Значение справочника «Типы документов приёмки» / «Типы документов отгрузки»
+  type: string;
   number: string;
   status: DocStatus;
   sender: string;
@@ -307,19 +308,28 @@ export const STONE_KLASS = "Драгоценные камни";
 export const isStoneKlass = (klass: string) => klass === STONE_KLASS;
 
 // --- Складские документы ---
+// Система ведёт один склад: он получатель при приёме и отправитель при выдаче.
+export const MAIN_SKLAD = "Склад ДМ №2";
+
+// Типы документов приёмки / отгрузки — значения справочников
+export const DOC_PRIHOD_ORDER = "Приходный ордер";
+export const DOC_PRIHOD_NAKLAD = "Накладная";
+export const DOC_OTGRUZKA_DM = "Накладная на отгрузку ДМ";
+export const DOC_PEREDACHA_GP = "Накладная на передачу ГП";
+
 export const initialSkladDocs: SkladDoc[] = [
-  { id: "sd1", date: "19.08.2026", type: "Приходный ордер", number: "ПО-0342", status: "Редактирование", sender: "ОО «АурумПоставка»", receiver: "Склад ДМ №1" },
-  { id: "sd2", date: "18.08.2026", type: "Накладная на приём ГП", number: "НП-0118", status: "Редактирование", sender: "Производственный цех", receiver: "Склад ГП" },
-  { id: "sd3", date: "17.08.2026", type: "Приходный ордер", number: "ПО-0341", status: "Оформлено", sender: "АО «Металл Инвест»", receiver: "Склад ДМ №2" },
-  { id: "sd4", date: "16.08.2026", type: "Накладная на приём ГП", number: "НП-0117", status: "Оформлено", sender: "Ювелирный цех", receiver: "Склад ГП" },
-  { id: "sd5", date: "15.08.2026", type: "Приходный ордер", number: "ПО-0340", status: "Оформлено", sender: "ОО «СереброТрейд»", receiver: "Склад ДМ №1" },
-  { id: "sd6", date: "14.08.2026", type: "Накладная на приём ГП", number: "НП-0116", status: "Оформлено", sender: "Производственный цех", receiver: "Склад ГП" },
+  { id: "sd1", date: "19.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0342", status: "Редактирование", sender: "ОО «АурумПоставка»", receiver: MAIN_SKLAD },
+  { id: "sd2", date: "18.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0118", status: "Редактирование", sender: "Производственный цех", receiver: MAIN_SKLAD },
+  { id: "sd3", date: "17.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0341", status: "Оформлено", sender: "АО «Металл Инвест»", receiver: MAIN_SKLAD },
+  { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "Ювелирный цех", receiver: MAIN_SKLAD },
+  { id: "sd5", date: "15.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0340", status: "Оформлено", sender: "ОО «СереброТрейд»", receiver: MAIN_SKLAD },
+  { id: "sd6", date: "14.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0116", status: "Оформлено", sender: "Производственный цех", receiver: MAIN_SKLAD },
 ];
 
 export const initialVydachaDocs: SkladDoc[] = [
-  { id: "vd1", date: "19.08.2026", type: "Накладная на отгрузку ГП", number: "НО-0205", status: "Редактирование", sender: "Склад ДМ №2", receiver: "ОАО КАЗЦИНК" },
-  { id: "vd2", date: "17.08.2026", type: "Накладная на отгрузку ГП", number: "НО-0204", status: "Оформлено", sender: "Склад ДМ №2", receiver: "НБРК" },
-  { id: "vd3", date: "15.08.2026", type: "Накладная на отгрузку", number: "НО-0203", status: "Оформлено", sender: "Склад ДМ №2", receiver: "Отдел продаж" },
+  { id: "vd1", date: "19.08.2026", type: DOC_PEREDACHA_GP, number: "НО-0205", status: "Редактирование", sender: MAIN_SKLAD, receiver: "ОАО КАЗЦИНК" },
+  { id: "vd2", date: "17.08.2026", type: DOC_PEREDACHA_GP, number: "НО-0204", status: "Оформлено", sender: MAIN_SKLAD, receiver: "НБРК" },
+  { id: "vd3", date: "15.08.2026", type: DOC_OTGRUZKA_DM, number: "НО-0203", status: "Оформлено", sender: MAIN_SKLAD, receiver: "Отдел продаж" },
 ];
 
 // --- Операции движения ---
@@ -667,12 +677,23 @@ export const spravochniki = {
       { code: "мл", value: "Миллилитр", status: "Активно" },
     ]
   },
-  "Типы документов": {
-    count: 11,
+  "Типы документов приёмки": {
+    count: 2,
     items: [
       { code: "ПО", value: "Приходный ордер", status: "Активно" },
-      { code: "НП", value: "Накладная на приём", status: "Активно" },
-      { code: "НО", value: "Накладная на отгрузку", status: "Активно" },
+      { code: "НП", value: "Накладная", status: "Активно" },
+    ]
+  },
+  "Типы документов отгрузки": {
+    count: 2,
+    items: [
+      { code: "НО-ДМ", value: "Накладная на отгрузку ДМ", status: "Активно" },
+      { code: "НП-ГП", value: "Накладная на передачу ГП", status: "Активно" },
+    ]
+  },
+  "Типы документов движения материала": {
+    count: 8,
+    items: [
       { code: "ДВ", value: "Движение материала", status: "Активно" },
       { code: "ЗН", value: "Заказ-наряд", status: "Активно" },
       { code: "АС", value: "Акт списания", status: "Активно" },
