@@ -211,6 +211,8 @@ export function OstatokDM() {
   const showMerge = screen.has("merge");
   const showPrihod = screen.has("prihod");
   const showVydacha = screen.has("vydacha");
+  // Отмеченные позиции, которые можно выдать (только «На складе») — сразу попадают в накладную
+  const vydachaIds = skladItems.filter(it => selected.has(it.id) && it.status === "На складе").map(it => it.id);
   // Смена места хранения: …/mesto/:id
   const moveItem = skladItems.find(it => it.id === screen.after("mesto")) ?? null;
   // Позиция физически на складе — место хранения можно изменить
@@ -291,7 +293,7 @@ export function OstatokDM() {
         actions={
           <>
             <Btn onClick={() => screen.openTop("prihod")}>Принять на склад</Btn>
-            <Btn variant="secondary" onClick={() => screen.openTop("vydacha")}>Выдать со склада</Btn>
+            <Btn variant="secondary" onClick={() => screen.openTop("vydacha")}>Выдать со склада{vydachaIds.length ? ` (${vydachaIds.length})` : ""}</Btn>
             <Btn variant="secondary" disabled={selectedItems.length < 2} onClick={() => screen.openTop("merge")}>Объединить позиции</Btn>
             <ExportBtn onToast={show} />
           </>
@@ -388,8 +390,9 @@ export function OstatokDM() {
       )}
       {showVydacha && (
         <VydachaDocModal
+          preselectIds={vydachaIds}
           onClose={() => screen.close("vydacha")}
-          onSave={d => { setVydachaDocs(prev => [d, ...prev]); screen.close("vydacha"); show(`Накладная ${d.number} сохранена`); }}
+          onSave={d => { setVydachaDocs(prev => [d, ...prev]); setSelected(new Set()); screen.close("vydacha"); show(`Накладная ${d.number} сохранена`); }}
         />
       )}
       {toast && <Toast message={toast} onDone={clear} />}

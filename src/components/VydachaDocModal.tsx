@@ -20,15 +20,17 @@ type VydachaPosition = VydachaDocPosition;
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
-// Списание выдаваемого количества: полностью выданная позиция закрывается,
-// при частичной выдаче остаток остаётся на складе, а выданная часть
-// выделяется в отдельную позицию со статусом «Закрыта».
+// Списание выдаваемого количества — только при оформлении накладной. Пока накладная «Редактирование»,
+// позиции склада не меняются (статус и место хранения прежние). При оформлении полностью выданная позиция
+// закрывается и снимается с места хранения («-»); при частичной выдаче остаток остаётся на складе на своём
+// месте, а выданная часть выделяется в отдельную позицию «Закрыта» без места хранения.
+const NO_LOC = "-";
 function issueGp(items: GPItem[], issue: Map<string, number>, stamp: number): GPItem[] {
   return items.flatMap(it => {
     const q = issue.get(it.id);
     if (!q) return [it];
-    if (q >= it.qty) return [{ ...it, status: "Закрыта" as const }];
-    return [{ ...it, qty: it.qty - q }, { ...it, id: `${it.id}-v${stamp}`, qty: q, status: "Закрыта" as const }];
+    if (q >= it.qty) return [{ ...it, status: "Закрыта" as const, location: NO_LOC }];
+    return [{ ...it, qty: it.qty - q }, { ...it, id: `${it.id}-v${stamp}`, qty: q, status: "Закрыта" as const, location: NO_LOC }];
   });
 }
 
@@ -37,24 +39,26 @@ function issueDm(items: DMItem[], issue: Map<string, number>, stamp: number): DM
     const q = issue.get(it.id);
     if (q === undefined) return [it];
     // Позиция без количества изделий выдаётся целиком
-    if (q >= it.qty) return [{ ...it, status: "Закрыта" as const }];
+    if (q >= it.qty) return [{ ...it, status: "Закрыта" as const, location: NO_LOC }];
     const k = q / it.qty;
     const issuedLig = round2(it.ligWeight * k);
     const issuedNet = round2(it.netWeight * k);
     return [
       { ...it, qty: it.qty - q, ligWeight: round2(it.ligWeight - issuedLig), netWeight: round2(it.netWeight - issuedNet) },
-      { ...it, id: `${it.id}-v${stamp}`, qty: q, ligWeight: issuedLig, netWeight: issuedNet, status: "Закрыта" as const },
+      { ...it, id: `${it.id}-v${stamp}`, qty: q, ligWeight: issuedLig, netWeight: issuedNet, status: "Закрыта" as const, location: NO_LOC },
     ];
   });
 }
 
 // ── Накладная на отгрузку ────────────────────────────────────────────────────
 
-export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false }: {
+export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false, preselectIds = [] }: {
   onClose: () => void;
   onSave: (d: SkladDoc) => void;
   doc?: SkladDoc | null;
   readOnly?: boolean;
+  // Позиции, отмеченные на складе перед «Выдать со склада», — сразу в позициях новой накладной
+  preselectIds?: string[];
 }) {
   const ro = readOnly;
   // Оформленная накладная: позиции уже выданы и закрыты — состав менять нельзя
@@ -82,7 +86,6 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
   const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Накладная_${doc.number}.pdf`)] : []));
-  const [positions, setPositions] = useState<VydachaPosition[]>(() => doc?.positions ?? []);
   const showPick = screen.has("pick");
   const setShowPick = (open: boolean) => (open ? screen.open("pick") : screen.close("pick"));
 
@@ -96,6 +99,10 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     ];
     return [...fromGp, ...fromDm].filter(r => available.includes(r.id) && (r.src === "dm" || r.qty > 0));
   }, [gpItems, dmItems]);
+
+  // Новая накладная: отмеченные позиции склада добавляются целиком (всё доступное количество)
+  const [positions, setPositions] = useState<VydachaPosition[]>(() =>
+    doc?.positions ?? stock.filter(r => preselectIds.includes(r.id)).map(r => ({ ...r, issue: r.qty })));
 
   const already = Object.fromEntries(positions.map(p => [p.id, p.issue]));
 
