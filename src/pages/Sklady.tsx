@@ -10,7 +10,7 @@ import { Coins } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
 import DMPositionViewModal from "../components/DMPositionViewModal";
-import { useNextNomenkl, seyfsOf, polkasOf, formatLoc, parseLoc } from "../components/DMPositionFormModal";
+import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, parseLoc } from "../components/DMPositionFormModal";
 import { useScreen } from "../router";
 
 // Позиции учёта ГП в виде позиций склада ДМ — склад один, показываются все классы.
@@ -109,39 +109,65 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
 
 // ── Merge DM modal ────────────────────────────────────────────────────────────
 
-function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: () => void; onConfirm: () => void }) {
+// Форма «Добавить позицию ДМ» с данными объединяемых позиций: массы и хим. состав суммируются,
+// массы не редактируются; остальные поля (наименование, класс, код, проба, место и т.д.) — редактируемые.
+function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: () => void; onConfirm: (p: PrihodPosition) => void }) {
   const totalLig = items.reduce((s, i) => s + i.ligWeight, 0);
-  const avgProba = Math.round(items.reduce((s, i) => s + i.proba * i.ligWeight, 0) / totalLig);
   const totalNet = items.reduce((s, i) => s + i.netWeight, 0);
+  const totalQty = items.reduce((s, i) => s + (i.qty || 0), 0);
+  const avgProba = totalLig > 0 ? Math.round(items.reduce((s, i) => s + i.proba * i.ligWeight, 0) / totalLig) : items[0].proba;
+  const same = <T,>(f: (i: DMItem) => T) => (items.every(i => f(i) === f(items[0])) ? f(items[0]) : undefined);
+  // Химический состав — сумма по элементам
+  const chem: Record<string, string> = {};
+  for (const it of items) for (const [k, v] of Object.entries(it.chem ?? {})) {
+    const n = parseFloat(String(v).replace(",", "."));
+    if (Number.isFinite(n)) chem[k] = String(+((parseFloat(chem[k] ?? "0") || 0) + n).toFixed(2));
+  }
+  const loc = parseLoc(items[0].location);
+  const [initial] = useState<PrihodPosition>(() => ({
+    id: `merge-${Date.now()}`, nomenkl: "", name: `Объединённая позиция (${items.length} ед.)`,
+    klass: same(i => i.klass) ?? "Слиток", code: same(i => i.metal) ?? items[0].metal,
+    kol: totalQty > 0 ? String(totalQty) : "", unit: "шт", proba: String(avgProba),
+    lig: totalLig.toFixed(2), net: totalNet.toFixed(2), seyf: loc.seyf, polka: loc.polka, chem,
+  }));
+
+  const header = (
+    <div className="mb-4 border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
+        Объединяемые позиции ({items.length})
+      </div>
+      <table className="w-full text-sm tabular-nums">
+        <tbody className="divide-y divide-gray-100">
+          {items.map(it => (
+            <tr key={it.id}>
+              <td className="px-3 py-1.5 text-gray-500 w-28">{it.nomenkl}</td>
+              <td className="px-3 py-1.5 font-medium text-gray-900">{it.name}</td>
+              <td className="px-3 py-1.5 text-right text-gray-600 w-36">лиг. {it.ligWeight.toFixed(2)} г</td>
+              <td className="px-3 py-1.5 text-right text-gray-600 w-36">чист. {it.netWeight.toFixed(2)} г</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot><tr className="bg-gray-50 font-semibold border-t border-gray-200">
+          <td colSpan={2} className="px-3 py-1.5 text-xs uppercase text-gray-600">Итого</td>
+          <td className="px-3 py-1.5 text-right">{totalLig.toFixed(2)} г</td>
+          <td className="px-3 py-1.5 text-right">{totalNet.toFixed(2)} г</td>
+        </tr></tfoot>
+      </table>
+    </div>
+  );
 
   return (
-    <Modal
+    <DMPositionFormModal
+      mode="add"
+      sklad={MAIN_SKLAD}
+      initial={initial}
       title="Объединение позиций"
+      saveLabel="Подтвердить объединение"
+      lockWeights
+      header={header}
       onClose={onClose}
-      wide
-      footer={<><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={onConfirm}>Подтвердить объединение</Btn></>}
-    >
-      <div className="mb-4 space-y-2">
-        {items.map(it => (
-          <div key={it.id} className="flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg text-sm">
-            <div>
-              <span className="font-medium text-gray-900">{it.name}</span>
-              <span className="text-gray-400 ml-2">{it.nomenkl}</span>
-            </div>
-            <span className="text-gray-600">{it.ligWeight} г</span>
-          </div>
-        ))}
-      </div>
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3">Итоговая позиция</h4>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div><span className="text-gray-500">Класс:</span> <span className="font-medium">Слиток</span></div>
-          <div><span className="text-gray-500">Средняя проба:</span> <span className="font-medium">{avgProba}</span></div>
-          <div><span className="text-gray-500">Лигатурный вес:</span> <span className="font-medium">{totalLig.toFixed(2)} г</span></div>
-          <div><span className="text-gray-500">Чистый вес:</span> <span className="font-medium">{totalNet.toFixed(2)} г</span></div>
-        </div>
-      </div>
-    </Modal>
+      onSave={onConfirm}
+    />
   );
 }
 
@@ -205,37 +231,32 @@ export function OstatokDM() {
     });
   };
 
-  const genNomenkl = useNextNomenkl();
   // Закрытые (выданные) позиции в объединении не участвуют
   const selectedItems = skladItems.filter(it => selected.has(it.id) && it.status !== "Закрыта");
   // Экран объединения, открытый по прямой ссылке без выбора, показывает первые две доступные позиции
   const mergeItems = selectedItems.length >= 2 ? selectedItems : skladItems.filter(it => it.status !== "Закрыта").slice(0, 2);
 
-  const doMerge = () => {
+  const doMerge = (p: PrihodPosition) => {
     const ids = new Set(mergeItems.map(it => it.id));
-    const selectedItems = mergeItems;
-    const totalLig = selectedItems.reduce((s, i) => s + i.ligWeight, 0);
-    const avgProba = Math.round(selectedItems.reduce((s, i) => s + i.proba * i.ligWeight, 0) / totalLig);
-    const totalNet = selectedItems.reduce((s, i) => s + i.netWeight, 0);
-    const totalQty = selectedItems.reduce((s, i) => s + i.qty, 0);
     const merged: DMItem = {
       id: `dm-merged-${Date.now()}`,
-      name: `Объединённая позиция (${selectedItems.length} ед.)`,
-      nomenkl: genNomenkl(),
-      metal: selectedItems[0].metal,
-      klass: "Слиток",
-      qty: totalQty,
-      proba: avgProba,
-      ligWeight: totalLig,
-      netWeight: totalNet,
-      location: selectedItems[0].location,
+      name: p.name.trim(),
+      nomenkl: p.nomenkl,
+      metal: p.code,
+      klass: p.klass,
+      qty: parseInt(p.kol, 10) || 0,
+      proba: parseFloat(p.proba) || 0,
+      ligWeight: parseFloat(p.lig) || 0,
+      netWeight: parseFloat(p.net) || 0,
+      location: formatLoc(p.seyf, p.polka) || mergeItems[0].location,
       status: "На складе",
+      chem: p.chem,
     };
     setDmItems(prev => [...prev.filter(it => !ids.has(it.id)), merged]);
     setGpItems(prev => prev.filter(it => !ids.has(it.id)));
     setSelected(new Set());
     screen.close("merge");
-    show("Позиции объединены");
+    show(`Позиции объединены: ${merged.nomenkl}`);
   };
 
   return (

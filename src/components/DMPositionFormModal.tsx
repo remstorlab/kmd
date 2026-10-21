@@ -64,7 +64,7 @@ export function emptyPosition(locs: StorageLocation[], sklad: string, klass: str
   };
 }
 
-export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany }: {
+export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany, title: titleProp, saveLabel, lockWeights = false, header }: {
   mode: "add" | "edit" | "view";
   sklad: string;
   initial: PrihodPosition;
@@ -75,6 +75,12 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   // Добавление нескольких одинаковых позиций: номенклатурный номер +1 у каждой, остальные атрибуты те же.
   // Если не передан — признак «Добавить несколько одинаковых» не показывается.
   onSaveMany?: (ps: PrihodPosition[]) => void;
+  // Для других сценариев на основе формы (напр. объединение позиций): свой заголовок и кнопка,
+  // блок над полями, массы — только для чтения (рассчитаны заранее)
+  title?: string;
+  saveLabel?: string;
+  lockWeights?: boolean;
+  header?: React.ReactNode;
 }) {
   const ro = mode === "view";
   const { storageLocations: locs } = useApp();
@@ -111,7 +117,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
     } else onSave(form);
   };
   const lastNomenkl = String(Number(form.nomenkl) + Math.max(count, 1) - 1);
-  const title = mode === "add" ? "Добавить позицию ДМ" : mode === "edit" ? "Редактирование позиции ДМ" : "Просмотр позиции ДМ";
+  const title = titleProp ?? (mode === "add" ? "Добавить позицию ДМ" : mode === "edit" ? "Редактирование позиции ДМ" : "Просмотр позиции ДМ");
 
   return (
     <Modal
@@ -120,9 +126,10 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
       wide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : <>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={save} disabled={!canSave}>{mode === "add" ? (canMany && many && count >= 2 ? `Добавить (${count})` : "Добавить") : "Сохранить"}</Btn>
+        <Btn onClick={save} disabled={!canSave}>{saveLabel ?? (mode === "add" ? (canMany && many && count >= 2 ? `Добавить (${count})` : "Добавить") : "Сохранить")}</Btn>
       </>}
     >
+      {header}
       <div className="grid grid-cols-4 gap-4 mb-4">
         <Field label="Номенкл. номер"><Input value={form.nomenkl} disabled /></Field>
         <Field label="Класс" required={!ro}><KlassSelect value={form.klass} onChange={set("klass")} disabled={ro} /></Field>
@@ -132,8 +139,8 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         <Field label="Количество изделий"><Input value={form.kol} onChange={v => set("kol")(v.replace(/[^\d]/g, ""))} placeholder="количество в пределах одной позиции" disabled={ro} /></Field>
         <Field label="Ед. изм." required={!ro}><Select value={form.unit} options={["шт", "г", "кг"]} onChange={set("unit")} disabled={ro} /></Field>
         <Field label="Проба" required={!ro}><Select value={form.proba} options={probaOptions} onChange={set("proba")} disabled={ro} /></Field>
-        <Field label="Масса лигатурная, г" required={!ro}><Input value={form.lig} onChange={set("lig")} placeholder="0.00" disabled={ro} /></Field>
-        <Field label="Масса чистая, г" required={!ro}><Input value={form.net} onChange={set("net")} placeholder="0.00" disabled={ro} /></Field>
+        <Field label="Масса лигатурная, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={set("lig")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
+        <Field label="Масса чистая, г" required={!ro && !lockWeights}><Input value={form.net} onChange={set("net")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
         <Field label="Склад"><Input value={sklad} disabled /></Field>
         <Field label="Сейф" required={!ro}>
           {seyfOptions.length ? <Select value={form.seyf} options={seyfOptions} onChange={changeSeyf} disabled={ro} /> : <Input value="Нет свободных мест" disabled />}
