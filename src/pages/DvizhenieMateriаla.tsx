@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
-  ExportBtn, PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
+  PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, ProbaChem,
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
@@ -1311,7 +1311,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               ) : (
                 <Btn size="sm" onClick={() => setShowAddDM(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               )}
-              <ExportBtn onToast={show} />
             </div>
           )}
           <OperPositionsTable
@@ -1333,7 +1332,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           {!ro && (
             <div className="flex gap-2 mb-3">
               <Btn size="sm" onClick={() => setShowVozvratPick(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
-              <ExportBtn onToast={show} />
             </div>
           )}
           <OperPositionsTable
