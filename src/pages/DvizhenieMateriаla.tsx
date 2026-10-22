@@ -1470,12 +1470,7 @@ export function DvizhenieMateriаla() {
   const setViewOp = (o: Operation | null) => (o ? screen.openTop("view", o.id) : screen.close("view"));
   const setEditOp = (o: Operation | null) => (o ? screen.openTop("edit", o.id) : screen.close("edit"));
   const setShowNew = (open: boolean) => (open ? screen.openTop("new") : screen.close("new"));
-  const [selected, setSelected] = useState<string | null>(null);
   const perPage = 8;
-
-  const toggleSelect = (id: string) => {
-    setSelected(prev => (prev === id ? null : id));
-  };
 
   const from = dateFrom ? isoToNum(dateFrom) : 0;
   const to = dateTo ? isoToNum(dateTo) + 9999 : Infinity;
@@ -1502,10 +1497,6 @@ export function DvizhenieMateriаla() {
     stage: o => o.stage,
   });
 
-  // Возврат оформляется по операции в работе
-  const selectedOp = operations.find(o => o.id === selected) ?? null;
-  const canVozvrat = !!selectedOp && selectedOp.stage === "В работе";
-
   const typeColor: Record<string, string> = {
     "Выдача": "text-green-600",
     "Возврат": "text-blue-600",
@@ -1519,10 +1510,7 @@ export function DvizhenieMateriаla() {
         subtitle="Выдача и возврат материалов подотчётным лицам"
         breadcrumb={["Движение материала", "Реестр операций"]}
         actions={
-          <>
-            <Btn variant="secondary" disabled={!canVozvrat} onClick={() => selectedOp && setEditOp(selectedOp)}>Оформить возврат</Btn>
-            <Btn onClick={() => setShowNew(true)}>Новая операция</Btn>
-          </>
+<Btn onClick={() => setShowNew(true)}>Новая операция</Btn>
         }
       />
 
@@ -1562,7 +1550,6 @@ export function DvizhenieMateriаla() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="w-10 px-4 py-3"></th>
               <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
               <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип</SortTh>
               <SortTh sortKey="vid" sort={sort} onSort={toggleSort}>Вид операции</SortTh>
@@ -1576,10 +1563,7 @@ export function DvizhenieMateriаla() {
           <tbody className="divide-y divide-gray-100">
             {sorted.slice((page - 1) * perPage, page * perPage).map(op => {
               return (
-              <tr key={op.id} className={`hover:bg-gray-50 transition-colors ${selected === op.id ? "bg-blue-50/50" : ""}`}>
-                <td className="px-4 py-3">
-                  <input type="checkbox" checked={selected === op.id} onChange={() => toggleSelect(op.id)} className="w-4 h-4 accent-blue-600" />
-                </td>
+              <tr key={op.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-500">{op.date}</td>
                 <td className={`px-4 py-3 font-medium ${typeColor[op.type] || "text-gray-700"}`}>{op.type}</td>
                 <td className="px-4 py-3">
@@ -1612,7 +1596,6 @@ export function DvizhenieMateriаla() {
           onSave={updated => {
             setOperations(prev => prev.map(o => o.id === updated.id ? updated : o));
             setEditOp(null);
-            setSelected(null);
             show(`Операция ${updated.document || ""} — ${updated.stage}`);
           }}
         />
