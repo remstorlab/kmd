@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
-import { Btn, Modal, Field, Input, Select, KlassSelect, MaterialCodeSelect, useMaterialCodeLabel, useToast, Toast } from "./ui";
+import { Btn, Modal, Field, Input, Select, MultiSelect, KlassSelect, MaterialCodeSelect, useMaterialCodeLabel, useToast, Toast } from "./ui";
 import { ChemComposition, baseMetal, isGPKlass, isStoneKlass } from "../data/mock";
 import { useScreen } from "../router";
 
@@ -15,7 +15,8 @@ const ALL_CODES = "Все коды";
 const TYPE_ALL = "Металлы и камни";
 const TYPE_METALS = "Драгоценные металлы";
 const TYPE_STONES = "Драгоценные камни";
-const ST_STORAGE = "На хранении (на складе и в резерве)";
+// По умолчанию — позиции на хранении (на складе и в резерве)
+const ST_STORAGE = ["На складе", "Резерв"];
 const ALL_STATUSES = "Все статусы";
 const NO_PLACE = "Без места хранения";
 
@@ -97,13 +98,13 @@ export default function OpisHraneniyaModal({ onClose }: { onClose: () => void })
   const [type, setType] = useState(TYPE_ALL);
   const [klass, setKlass] = useState(ALL_KLASS);
   const [code, setCode] = useState(ALL_CODES);
-  const [status, setStatus] = useState(ST_STORAGE);
+  const [status, setStatus] = useState<string[]>(ST_STORAGE);
   const [withGp, setWithGp] = useState(true);
   const [search, setSearch] = useState("");
 
   const seyfs = [ALL, ...Array.from(new Set(all.map(r => r.seyf).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ru", { numeric: true }))];
   const polkas = [ALL, ...Array.from(new Set(all.filter(r => seyf === ALL || r.seyf === seyf).map(r => r.polka).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ru", { numeric: true }))];
-  const statuses = [ST_STORAGE, ALL_STATUSES, ...Array.from(new Set(all.map(r => r.status)))];
+  const statuses = Array.from(new Set([...ST_STORAGE, ...all.map(r => r.status)]));
 
   const reset = () => {
     setOnDate(todayIso()); setOnHour(nowHour()); setSeyf(ALL); setPolka(ALL); setType(TYPE_ALL);
@@ -117,7 +118,7 @@ export default function OpisHraneniyaModal({ onClose }: { onClose: () => void })
     && (type === TYPE_ALL || (type === TYPE_STONES ? r.stone : !r.stone))
     && (klass === ALL_KLASS || r.klass === klass)
     && (code === ALL_CODES || r.code === code)
-    && (status === ALL_STATUSES || (status === ST_STORAGE ? r.status === "На складе" || r.status === "Резерв" : r.status === status))
+    && (status.length === 0 || status.includes(r.status))
     && (withGp || !isGPKlass(r.klass))
     && (!q || r.name.toLowerCase().includes(q) || r.nomenkl.toLowerCase().includes(q)),
   );
@@ -203,7 +204,7 @@ export default function OpisHraneniyaModal({ onClose }: { onClose: () => void })
         <Field label="Сейф"><Select value={seyf} options={seyfs} onChange={v => { setSeyf(v); setPolka(ALL); }} optionLabel={v => (v === ALL ? "Все сейфы" : `Сейф № ${v}`)} /></Field>
         <Field label="Полка"><Select value={polka} options={polkas} onChange={setPolka} optionLabel={v => (v === ALL ? "Все полки" : `Полка № ${v}`)} /></Field>
         <Field label="Тип материала"><Select value={type} options={[TYPE_ALL, TYPE_METALS, TYPE_STONES]} onChange={setType} /></Field>
-        <Field label="Статус позиций"><Select value={status} options={statuses} onChange={setStatus} /></Field>
+        <Field label="Статус позиций"><MultiSelect values={status} options={statuses} onChange={setStatus} allLabel={ALL_STATUSES} /></Field>
         <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
         <Field label="Код материала"><MaterialCodeSelect value={code} onChange={setCode} allLabel={ALL_CODES} /></Field>
         <div className="col-span-2">
@@ -236,7 +237,7 @@ export default function OpisHraneniyaModal({ onClose }: { onClose: () => void })
             </p>
             <p className="text-gray-500 mt-1">
               {type}{klass !== ALL_KLASS ? ` · класс: ${klass}` : ""}{code !== ALL_CODES ? ` · код: ${codeLabel(code)}` : ""}
-              {status !== ALL_STATUSES ? ` · ${status === ST_STORAGE ? "на хранении" : status}` : ""}
+              {status.length > 0 ? ` · ${status.length === ST_STORAGE.length && ST_STORAGE.every(s => status.includes(s)) ? "на хранении" : status.join(", ")}` : ""}
             </p>
           </div>
 

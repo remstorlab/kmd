@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useApp } from "../store/AppContext";
-import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, KlassSelect, ProbaChem,
+import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, MultiSelect, KlassSelect, ProbaChem,
 } from "../components/ui";
 import { Podotchetnik, PodotchetPosition, Operation, OperPosition, StatusDM, spravValues, opVydacha, opVozvrat } from "../data/mock";
 import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, LucideIcon } from "lucide-react";
@@ -28,11 +28,11 @@ function usePositionFilters<T extends PodotchetPosition>(rows: T[]) {
   const [klass, setKlass] = useState(ALL_KLASS);
   const [metal, setMetal] = useState(ALL_METALS);
   const [loc, setLoc] = useState(ALL_LOCS);
-  const [status, setStatus] = useState(ALL_STATUSES);
+  const [status, setStatus] = useState<string[]>([]);
 
   const metals = [ALL_METALS, ...Array.from(new Set(rows.map(r => r.metal).filter(Boolean))).sort()];
   const locations = [ALL_LOCS, ...Array.from(new Set(rows.map(r => r.location).filter(Boolean))).sort()];
-  const statuses = [ALL_STATUSES, ...Array.from(new Set(rows.map(r => r.status).filter(Boolean)))];
+  const statuses = Array.from(new Set(rows.map(r => r.status).filter(Boolean)));
 
   const q = search.trim().toLowerCase();
   const match = (r: T) =>
@@ -40,9 +40,9 @@ function usePositionFilters<T extends PodotchetPosition>(rows: T[]) {
     && (klass === ALL_KLASS || r.klass === klass)
     && (metal === ALL_METALS || r.metal === metal)
     && (loc === ALL_LOCS || r.location === loc)
-    && (status === ALL_STATUSES || r.status === status);
-  const active = !!q || klass !== ALL_KLASS || metal !== ALL_METALS || loc !== ALL_LOCS || status !== ALL_STATUSES;
-  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setStatus(ALL_STATUSES); };
+    && (status.length === 0 || status.includes(r.status));
+  const active = !!q || klass !== ALL_KLASS || metal !== ALL_METALS || loc !== ALL_LOCS || status.length > 0;
+  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setStatus([]); };
 
   const bar = (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 grid grid-cols-4 gap-3 items-end">
@@ -53,7 +53,7 @@ function usePositionFilters<T extends PodotchetPosition>(rows: T[]) {
       <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
       <Field label="Код материала"><Select value={metal} options={metals} onChange={setMetal} optionLabel={v => (v === ALL_METALS ? v : codeLabel(v))} /></Field>
       <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
-      <Field label="Статус"><Select value={status} options={statuses} onChange={setStatus} /></Field>
+      <Field label="Статус"><MultiSelect values={status} options={statuses} onChange={setStatus} allLabel={ALL_STATUSES} /></Field>
       <div className="col-start-4">
         <button onClick={reset} className="w-full h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
       </div>

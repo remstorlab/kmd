@@ -483,6 +483,74 @@ export function Select({ value, onChange, options, disabled = false, optionLabel
   );
 }
 
+// Множественный выбор из списка по чекбоксам (фильтры реестров, напр. «Статус»).
+// Пустой выбор = «все значения» (выводится allLabel).
+export function MultiSelect({ values, onChange, options, allLabel = "Все", disabled = false }: { values: string[]; onChange: (v: string[]) => void; options: string[]; allLabel?: string; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const update = () => btnRef.current && setRect(btnRef.current.getBoundingClientRect());
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!btnRef.current?.contains(t) && !listRef.current?.contains(t)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const toggle = (o: string) => onChange(values.includes(o) ? values.filter(v => v !== o) : [...values, o]);
+  const label = values.length === 0 ? allLabel : values.length <= 2 ? values.join(", ") : `Выбрано: ${values.length}`;
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        title={values.length ? values.join(", ") : allLabel}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500 bg-white"
+      >
+        <span className={`truncate ${values.length ? "text-gray-900" : "text-gray-700"}`}>{label}</span>
+        <svg className="w-4 h-4 text-gray-500 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
+      </button>
+      {open && rect && createPortal(
+        <div
+          ref={listRef}
+          style={{ position: "fixed", top: rect.bottom + 4, left: rect.left, minWidth: rect.width, zIndex: 1000 }}
+          className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-72 overflow-auto text-sm"
+        >
+          <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+            <input type="checkbox" className="accent-blue-600" checked={values.length === 0} onChange={() => onChange([])} />
+            <span>{allLabel}</span>
+          </label>
+          {options.map(o => (
+            <label key={o} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer whitespace-nowrap">
+              <input type="checkbox" className="accent-blue-600" checked={values.includes(o)} onChange={() => toggle(o)} />
+              <span>{o}</span>
+            </label>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 // Выпадающий список «Класс материала» для форм ввода: полные наименования из справочника.
 export function KlassSelect({ value, onChange, disabled = false, allLabel }: { value: string; onChange?: (v: string) => void; disabled?: boolean; allLabel?: string }) {
   const names = initialMaterialClasses.map(c => c.name);

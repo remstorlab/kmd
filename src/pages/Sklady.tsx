@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
+  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
 } from "../components/ui";
 import { GPItem, DMItem, MAIN_SKLAD } from "../data/mock";
 import { Coins } from "lucide-react";
@@ -212,7 +212,7 @@ export function OstatokDM() {
   const { toast, show, clear } = useToast();
   const [search, setSearch] = useState("");
   const [filterKlass, setFilterKlass] = useState("Все классы");
-  const [filterStatus, setFilterStatus] = useState("Все статусы");
+  const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Экраны: /sklady/dm/view/:id, /sklady/dm/merge, /sklady/dm/prihod, /sklady/dm/vydacha
@@ -240,7 +240,7 @@ export function OstatokDM() {
   const filtered = skladItems.filter(it => {
     const matchSearch = !search || it.name.toLowerCase().includes(search.toLowerCase());
     const matchKlass = filterKlass === "Все классы" || it.klass === filterKlass;
-    const matchStatus = filterStatus === "Все статусы" || it.status === filterStatus;
+    const matchStatus = filterStatus.length === 0 || filterStatus.includes(it.status);
     return matchSearch && matchKlass && matchStatus;
   });
   const { sorted, sort, toggleSort } = useSort(filtered, {
@@ -323,11 +323,9 @@ export function OstatokDM() {
         </div>
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-            {["Все статусы", "На складе", "Резерв", "В подотчёте", "Закрыта"].map(o => <option key={o}>{o}</option>)}
-          </select>
+          <MultiSelect values={filterStatus} options={["На складе", "Резерв", "В подотчёте", "Закрыта"]} onChange={setFilterStatus} allLabel="Все статусы" />
         </div>
-        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus("Все статусы"); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus([]); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
           Сбросить фильтры
         </button>
       </div>

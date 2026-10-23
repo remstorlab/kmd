@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
-  ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, KlassSelect, MaterialCodeSelect, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
+  ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, MultiSelect, KlassSelect, MaterialCodeSelect, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, Badge,
 } from "../components/ui";
 import { SkladDoc, GPItem, DocStatus } from "../data/mock";
@@ -53,7 +53,7 @@ function useDocFilters(docs: SkladDoc[], onChange: () => void) {
   const { statusDicts } = useApp();
   const [type, setType] = useState(ALL_TYPES);
   const [number, setNumber] = useState("");
-  const [status, setStatus] = useState(ALL_STATUSES);
+  const [status, setStatus] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   // При изменении фильтра — на первую страницу
@@ -62,7 +62,7 @@ function useDocFilters(docs: SkladDoc[], onChange: () => void) {
   const types = [ALL_TYPES, ...Array.from(new Set(docs.map(d => d.type))).sort()];
   // Статусы — из справочника «Статусы складских документов»
   const dictStatuses = statusDicts.find(d => d.group === "dokumenty")?.items.map(i => i.name) ?? [];
-  const statuses = [ALL_STATUSES, ...dictStatuses, ...docs.map(d => d.status).filter(st => !dictStatuses.includes(st))]
+  const statuses = [...dictStatuses, ...docs.map(d => d.status).filter(st => !dictStatuses.includes(st))]
     .filter((v, i, a) => a.indexOf(v) === i);
 
   const q = number.trim().toLowerCase();
@@ -72,11 +72,11 @@ function useDocFilters(docs: SkladDoc[], onChange: () => void) {
     const dt = parseRuDate(d.date);
     return (type === ALL_TYPES || d.type === type)
       && (!q || d.number.toLowerCase().includes(q))
-      && (status === ALL_STATUSES || d.status === status)
+      && (status.length === 0 || status.includes(d.status))
       && dt >= from && dt <= to;
   });
 
-  const reset = () => { setType(ALL_TYPES); setNumber(""); setStatus(ALL_STATUSES); setDateFrom(""); setDateTo(""); onChange(); };
+  const reset = () => { setType(ALL_TYPES); setNumber(""); setStatus([]); setDateFrom(""); setDateTo(""); onChange(); };
 
   const bar = (
     <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 grid grid-cols-6 gap-3 items-end">
@@ -93,7 +93,7 @@ function useDocFilters(docs: SkladDoc[], onChange: () => void) {
         <label className="block text-xs font-medium text-gray-500 mb-1">Номер</label>
         <SearchInput value={number} onChange={upd(setNumber)} placeholder="Поиск по номеру..." />
       </div>
-      <Field label="Статус"><Select value={status} options={statuses} onChange={upd(setStatus)} /></Field>
+      <Field label="Статус"><MultiSelect values={status} options={statuses} onChange={upd(setStatus)} allLabel={ALL_STATUSES} /></Field>
       <button onClick={reset} className="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
     </div>
   );

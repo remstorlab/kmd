@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, ProbaChem,
+  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, ProbaChem,
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
@@ -34,7 +34,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
   const [klass, setKlass] = useState(ALL_KLASS);
   const [metal, setMetal] = useState(ALL_METALS);
   const [loc, setLoc] = useState(ALL_LOCS);
-  const [status, setStatus] = useState(ALL_STATUSES);
+  const [status, setStatus] = useState<string[]>([]);
   const [onlySelected, setOnlySelected] = useState(false);
 
   type Item = (typeof dmItems)[number];
@@ -55,7 +55,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
       && (klass === ALL_KLASS || i.klass === klass)
       && (metal === ALL_METALS || i.metal === metal)
       && (loc === ALL_LOCS || i.location === loc)
-      && (status === ALL_STATUSES || i.status === status)
+      && (status.length === 0 || status.includes(i.status))
       && (!onlySelected || selected.has(i.id));
   });
 
@@ -83,7 +83,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
     return next;
   });
 
-  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setStatus(ALL_STATUSES); setOnlySelected(false); };
+  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setStatus([]); setOnlySelected(false); };
 
   const add = () => {
     const chosen = availableItems.filter(i => selected.has(i.id));
@@ -112,7 +112,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
         <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
         <Field label="Код материала"><Select value={metal} options={metals} onChange={setMetal} optionLabel={v => (v === ALL_METALS ? v : codeLabel(v))} /></Field>
         <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
-        <Field label="Статус"><Select value={status} options={[ALL_STATUSES, "На складе", "Резерв"]} onChange={setStatus} /></Field>
+        <Field label="Статус"><MultiSelect values={status} options={["На складе", "Резерв"]} onChange={setStatus} allLabel={ALL_STATUSES} /></Field>
         <label className="flex items-center gap-2 text-sm text-gray-700 h-9 cursor-pointer">
           <input type="checkbox" checked={onlySelected} onChange={e => setOnlySelected(e.target.checked)} className="w-4 h-4 accent-blue-600" />
           Только выбранные
