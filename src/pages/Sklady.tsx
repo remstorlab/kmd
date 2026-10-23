@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
+  Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, usePaged, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
 } from "../components/ui";
@@ -141,11 +141,8 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
 
   const codeLabel = useMaterialCodeLabel();
   const th = "px-3 py-1.5 text-left font-medium";
-  // Позиции объединения — по 10 на странице; пустые строки сохраняют высоту таблицы
-  const PER_PAGE = 10;
-  const [page, setPage] = useState(1);
-  const pageItems = items.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-  const fillers = items.length > PER_PAGE ? PER_PAGE - pageItems.length : 0;
+  // Позиции объединения — постранично (по умолчанию 10); пустые строки сохраняют высоту таблицы
+  const { pageItems, fill: fillers, pager } = usePaged(items, "merge-items", 10);
   const header = (
     <div className="mb-4 border border-gray-200 rounded-lg overflow-hidden">
       <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
@@ -188,7 +185,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
           <td colSpan={2}></td>
         </tr></tfoot>
       </table>
-      {items.length > PER_PAGE && <Pagination page={page} total={items.length} perPage={PER_PAGE} onPage={setPage} />}
+      {pager}
     </div>
   );
 
@@ -243,7 +240,7 @@ export function OstatokDM() {
     show(location !== it.location ? `Место хранения изменено: ${location}` : `Наименование изменено: ${name}`);
   };
 
-  const perPage = 8;
+  const [perPage, setPerPage] = usePerPage("sklad-dm", 8);
   const filtered = skladItems.filter(it => {
     const matchSearch = !search || it.name.toLowerCase().includes(search.toLowerCase());
     const matchKlass = filterKlass === "Все классы" || it.klass === filterKlass;
@@ -386,9 +383,10 @@ export function OstatokDM() {
                 </td>
               </tr>
             ))}
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={12} />
           </tbody>
         </table>
-        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {viewItem && (

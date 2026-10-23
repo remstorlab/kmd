@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Plus } from "lucide-react";
 import { initialMaterialClasses, MaterialCode, StatusColor, StatusGroup, ChemComposition } from "../data/mock";
@@ -385,32 +385,114 @@ export function Breadcrumb({ parts }: { parts: string[] }) {
 
 // ── Pagination ───────────────────────────────────────────────────────────────
 
+// Варианты «Строк на странице»
+export const PER_PAGE_OPTIONS = [5, 10, 20, 50, 100];
+
+// Номера страниц с многоточиями: 1 … 4 5 6 … 20
+function pageList(page: number, pages: number): (number | "…")[] {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const set = new Set([1, pages, page - 1, page, page + 1].filter(p => p >= 1 && p <= pages));
+  const sorted = [...set].sort((a, b) => a - b);
+  return sorted.flatMap((p, i) => (i > 0 && p - sorted[i - 1] > 1 ? ["…" as const, p] : [p]));
+}
+
 export function Pagination({
   page,
   total,
   perPage,
   onPage,
+  onPerPage,
 }: {
   page: number;
   total: number;
   perPage: number;
   onPage: (p: number) => void;
+  // Если задан — выводится выбор «Строк на странице»; при смене — переход на первую страницу
+  onPerPage?: (n: number) => void;
 }) {
-  const pages = Math.ceil(total / perPage);
-  const from = (page - 1) * perPage + 1;
-  const to = Math.min(page * perPage, total);
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const cur = Math.min(Math.max(page, 1), pages);
+  const from = total ? (cur - 1) * perPage + 1 : 0;
+  const to = Math.min(cur * perPage, total);
+  const navBtn = "w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-blue-400 disabled:opacity-40 disabled:cursor-not-allowed";
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-      <span className="text-sm text-gray-500">Показано {from}–{to} из {total} позиций</span>
+    <div className="flex items-center justify-between gap-4 px-4 py-3 border-t border-gray-200">
+      <div className="flex items-center gap-4 text-sm text-gray-500">
+        <span>Показано {from}–{to} из {total} записей</span>
+        {onPerPage && (
+          <label className="flex items-center gap-2">
+            Строк на странице
+            <select
+              value={perPage}
+              onChange={e => { onPerPage(Number(e.target.value)); onPage(1); }}
+              className="px-2 py-1 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {[...new Set([...PER_PAGE_OPTIONS, perPage])].sort((a, b) => a - b).map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
       <div className="flex items-center gap-1">
-        <button onClick={() => onPage(page - 1)} disabled={page === 1} className="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-blue-400 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronLeft className="w-4 h-4" /></button>
-        {Array.from({ length: pages }, (_, i) => i + 1).map(p => (
-          <button key={p} onClick={() => onPage(p)} className={`w-8 h-8 flex items-center justify-center rounded border text-sm font-medium transition-colors ${p === page ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 text-gray-600 hover:border-blue-400"}`}>{p}</button>
+        <button onClick={() => onPage(cur - 1)} disabled={cur === 1} className={navBtn}><ChevronLeft className="w-4 h-4" /></button>
+        {pageList(cur, pages).map((p, i) => p === "…" ? (
+          <span key={`e${i}`} className="w-8 text-center text-gray-400">…</span>
+        ) : (
+          <button key={p} onClick={() => onPage(p)} className={`w-8 h-8 flex items-center justify-center rounded border text-sm font-medium transition-colors ${p === cur ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 text-gray-600 hover:border-blue-400"}`}>{p}</button>
         ))}
-        <button onClick={() => onPage(page + 1)} disabled={page === pages} className="w-8 h-8 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-blue-400 disabled:opacity-40 disabled:cursor-not-allowed"><ChevronRight className="w-4 h-4" /></button>
+        <button onClick={() => onPage(cur + 1)} disabled={cur === pages} className={navBtn}><ChevronRight className="w-4 h-4" /></button>
       </div>
     </div>
   );
+}
+
+// «Строк на странице» — запоминается для каждой таблицы (key) в браузере
+export function usePerPage(key: string, def = 10) {
+  const storageKey = `perPage:${key}`;
+  const [perPage, setPerPageState] = useState(() => {
+    try { return Number(localStorage.getItem(storageKey)) || def; } catch { return def; }
+  });
+  const setPerPage = (n: number) => {
+    setPerPageState(n);
+    try { localStorage.setItem(storageKey, String(n)); } catch { /* недоступно — только в памяти */ }
+  };
+  return [perPage, setPerPage] as const;
+}
+
+// Пагинация списка: текущая страница, строки страницы, число пустых строк-заполнителей и панель пагинации.
+// Номер страницы ограничивается числом страниц (после фильтрации или удаления строк).
+export function usePaged<T>(items: T[], key: string, def = 10) {
+  const [perPage, setPerPage] = usePerPage(key, def);
+  const [rawPage, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(items.length / perPage));
+  const page = Math.min(rawPage, pages);
+  const pageItems = items.slice((page - 1) * perPage, page * perPage);
+  const fill = items.length > perPage ? perPage - pageItems.length : 0;
+  const pager = <Pagination page={page} total={items.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />;
+  return { page, setPage, perPage, pageItems, fill, pager, offset: (page - 1) * perPage };
+}
+
+// Сколько пустых строк добавить на странице page, чтобы она была полной (только если страниц больше одной)
+export const fillerCount = (total: number, page: number, perPage: number) => {
+  if (total <= perPage) return 0;
+  const cur = Math.min(Math.max(page, 1), Math.ceil(total / perPage));
+  return perPage - Math.min(perPage, total - (cur - 1) * perPage);
+};
+
+// Пустые строки до полной страницы — высота таблицы не меняется при переходе между страницами.
+// Высота строки берётся с первой строки той же таблицы.
+export function FillerRows({ count, cols }: { count: number; cols: number }) {
+  const ref = useRef<HTMLTableRowElement>(null);
+  const [h, setH] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const first = ref.current?.parentElement?.firstElementChild;
+    if (!first || first === ref.current) return;
+    const rh = Math.round(first.getBoundingClientRect().height);
+    if (rh && rh !== h) setH(rh);
+  });
+  if (count <= 0) return null;
+  return <>{Array.from({ length: count }, (_, i) => (
+    <tr key={`filler-${i}`} ref={i === 0 ? ref : undefined} aria-hidden="true" style={{ height: h ?? 41 }}><td colSpan={cols}></td></tr>
+  ))}</>;
 }
 
 // ── Table sorting ────────────────────────────────────────────────────────────

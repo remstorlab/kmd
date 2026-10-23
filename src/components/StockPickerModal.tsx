@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort, useMaterialCodeLabel, ProbaChem,
+import { Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort, useMaterialCodeLabel, ProbaChem, usePaged, FillerRows,
 } from "./ui";
 import { VydachaDocPosition } from "../data/mock";
 
@@ -102,6 +102,7 @@ export default function StockPickerModal({
     if (picked.length) onAdd(picked);
   };
 
+  const pg11 = usePaged(sorted, "stock-picker");
   return (
     <Modal
       title={title}
@@ -157,7 +158,7 @@ export default function StockPickerModal({
               {anyInput && <th className="px-3 py-2 text-left w-28">{qtyLabel}</th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {sorted.map(r => {
+              {pg11.pageItems.map(r => {
                 const checked = r.id in selectedQty;
                 return (
                   <tr key={r.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
@@ -177,8 +178,10 @@ export default function StockPickerModal({
                   </tr>
                 );
               })}
+              <FillerRows count={pg11.fill} cols={11} />
             </tbody>
           </table>
+          {pg11.pager}
         </div>
       )}
     </Modal>

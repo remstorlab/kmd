@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
+  Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   useToast, Toast, Field, Input, Select, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
-  SortTh, useSort, parseRuDate, formatDateTime,
+  SortTh, useSort, parseRuDate, formatDateTime, usePaged,
 } from "../components/ui";
 import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass } from "../data/mock";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
@@ -199,6 +199,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     onSave(k);
   };
 
+  const pg9 = usePaged(sortedMaterials, "shihta-materials");
   return (
     <Modal
       title="Конструктор шихтовой карты"
@@ -280,7 +281,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {sortedMaterials.map(m => (
+              {pg9.pageItems.map(m => (
                 <tr key={m.key} className="hover:bg-gray-50">
                   <td className="px-3 py-2">
                     <div className="font-medium">{m.mat}</div>
@@ -299,6 +300,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                   </td>}
                 </tr>
               ))}
+              <FillerRows count={pg9.fill} cols={11} />
             </tbody>
             <tfoot className="border-t-2 border-gray-200 bg-gray-50 text-sm divide-y divide-gray-200">
               <tr className="font-medium">
@@ -326,6 +328,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
               </tr>
             </tfoot>
           </table>
+          {pg9.pager}
           </div>
         )}
 
@@ -412,7 +415,7 @@ export function ShihtovyeKarty() {
   const setViewKarta = (k: ShihtovayaKarta | null) => (k ? screen.openTop("view", k.id) : screen.close("view"));
   const setEditKarta = (k: ShihtovayaKarta | null) => (k ? screen.openTop("edit", k.id) : screen.close("edit"));
   const setShowNew = (open: boolean) => (open ? screen.openTop("new") : screen.close("new"));
-  const perPage = 8;
+  const [perPage, setPerPage] = usePerPage("shihtovye-karty", 8);
 
   // Удаление невыполненной карты снимает резерв с её позиций ДМ
   const removeKarta = (karta: ShihtovayaKarta) => {
@@ -472,9 +475,10 @@ export function ShihtovyeKarty() {
                 </td>
               </tr>
             ))}
+            <FillerRows count={fillerCount(shihtovyeKarty.length, page, perPage)} cols={6} />
           </tbody>
         </table>
-        <Pagination page={page} total={shihtovyeKarty.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={shihtovyeKarty.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {viewKarta && <ShihtaConstructor key={viewKarta.id} karta={viewKarta} onClose={() => setViewKarta(null)} onSave={() => setViewKarta(null)} readOnly />}

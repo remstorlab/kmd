@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   Badge, Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode,
-  MultiFileUpload, SortTh, useSort, useMaterialCodeLabel,
+  MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravochniki, spravValues, MAIN_SKLAD, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -194,6 +194,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
   const receivers = Array.from(new Set([head.receiver, ...RECEIVERS]));
 
+  const pg12 = usePaged(sorted, "vydacha-positions");
   return (
     <Modal
       title={`Накладная${doc ? ` ${doc.number}` : ""}`}
@@ -257,7 +258,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
           <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
             Список позиций для выдачи пуст
           </div>
-        ) : (
+        ) : (<>
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл. №</SortTh>
@@ -271,7 +272,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               {!lockPos && <th className="w-12"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {sorted.map(p => (
+              {pg12.pageItems.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -284,6 +285,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                   {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
                 </tr>
               ))}
+              <FillerRows count={pg12.fill} cols={9} />
             </tbody>
             <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
@@ -293,7 +295,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               <td colSpan={lockPos ? 1 : 2}></td>
             </tr></tfoot>
           </table>
-        )}
+          {pg12.pager}
+        </>)}
       </div>
 
       {showPick && (

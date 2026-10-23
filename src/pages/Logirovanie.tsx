@@ -1,12 +1,37 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
-import { Badge, PageHeader, Modal, useToast, Toast, SortTh, useSort, parseRuDate } from "../components/ui";
+import { Badge, PageHeader, Modal, useToast, Toast, SortTh, useSort, parseRuDate, usePaged, FillerRows } from "../components/ui";
 import { LogEntry, LogSnapshotItem } from "../data/mock";
 import { Eye } from "lucide-react";
 import { useScreen } from "../router";
 
+// Ключ позиции в снимке — номенкл. № (или иной идентификатор) до « · » в заголовке
+const snapKey = (i: LogSnapshotItem) => i.title.split(" · ")[0];
+
+// Действие над несколькими позициями (пакетное создание, объединение и т.п.) раскладывается на отдельные
+// записи журнала: в каждой — одна позиция «Было» и одна «Стало». Пары — по ключу позиции; при объединении
+// (несколько → одна) каждая исходная позиция образует запись с итоговой; остальные — записи без пары.
+function splitLog(log: LogEntry): LogEntry[] {
+  const before = log.before ?? [];
+  const after = log.after ?? [];
+  if (before.length <= 1 && after.length <= 1) return [log];
+  const pairs: [LogSnapshotItem | undefined, LogSnapshotItem | undefined][] = [];
+  const usedAfter = new Set<LogSnapshotItem>();
+  for (const b of before) {
+    const a = after.find(x => !usedAfter.has(x) && snapKey(x) === snapKey(b)) ?? (after.length === 1 ? after[0] : undefined);
+    if (a) usedAfter.add(a);
+    pairs.push([b, a]);
+  }
+  for (const a of after) if (!usedAfter.has(a)) pairs.push([before.length === 1 ? before[0] : undefined, a]);
+  return pairs.map(([b, a], i) => ({ ...log, id: `${log.id}-${i + 1}`, before: b ? [b] : [], after: a ? [a] : [] }));
+}
+
+// Объект записи — позиция «Стало» (или «Было», если позиция удалена)
+const logObject = (l: LogEntry) => (l.after?.[0] ?? l.before?.[0])?.title ?? "—";
+
 export function Logirovanie() {
-  const { logs } = useApp();
+  const { logs: rawLogs } = useApp();
+  const logs = rawLogs.flatMap(splitLog);
   // Детали события — /logirovanie/view/:id
   const screen = useScreen();
   const detailLog = logs.find(l => l.id === screen.after("view")) ?? null;
@@ -28,7 +53,9 @@ export function Logirovanie() {
     user: l => l.user,
     section: l => l.section,
     type: l => l.type,
+    object: l => logObject(l),
   });
+  const { pageItems, fill, pager } = usePaged(sorted, "logirovanie", 10);
 
   const sections = ["Все разделы", "Склады", "Складские операции", "Движение материала", "Шихтовые карты", "Администрирование"];
   const users = ["Все пользователи", "Ковалева Е.", "Нурланов А.Б.", "Петров С.В.", "Иванова М.С.", "Ким А.Ю."];
@@ -72,18 +99,20 @@ export function Logirovanie() {
               <SortTh sortKey="datetime" sort={sort} onSort={toggleSort}>Дата и время</SortTh>
               <SortTh sortKey="user" sort={sort} onSort={toggleSort}>Пользователь</SortTh>
               <SortTh sortKey="section" sort={sort} onSort={toggleSort}>Раздел</SortTh>
+              <SortTh sortKey="object" sort={sort} onSort={toggleSort}>Объект</SortTh>
               <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Статус действия</SortTh>
               <th className="w-12"></th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map(log => {
+            {pageItems.map(log => {
               const hasDetails = (log.before && log.before.length > 0) || (log.after && log.after.length > 0);
               return (
                 <tr key={log.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{log.datetime}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{log.user}</td>
                   <td className="px-4 py-3 text-gray-600">{log.section}</td>
+                  <td className="px-4 py-3 text-gray-700">{logObject(log)}</td>
                   <td className="px-4 py-3"><Badge label={log.type} /></td>
                   <td className="px-4 py-3">
                     <button
@@ -97,8 +126,11 @@ export function Logirovanie() {
                 </tr>
               );
             })}
+            {sorted.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-400">Записи не найдены</td></tr>}
+            <FillerRows count={fill} cols={6} />
           </tbody>
         </table>
+        {pager}
       </div>
       {detailLog && <LogDetailModal log={detailLog} onClose={() => setDetailLog(null)} />}
       {toast && <Toast message={toast} onDone={clear} />}

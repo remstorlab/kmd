@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useApp } from "../store/AppContext";
-import { Badge, PosStatusBadge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, MultiSelect, KlassSelect, ProbaChem,
+import { Badge, PosStatusBadge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, MultiSelect, KlassSelect, ProbaChem, usePaged, FillerRows,
 } from "../components/ui";
 import { Podotchetnik, PodotchetPosition, Operation, OperPosition, StatusDM, spravValues, opVydacha, opVozvrat } from "../data/mock";
 import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, Lightbulb, LucideIcon } from "lucide-react";
@@ -86,6 +86,7 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
     status: r => r.status,
   });
   const th = "px-3 py-2";
+  const pg3 = usePaged(sorted, "podotchet-positions");
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -103,7 +104,7 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
           <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
-          {sorted.map(r => (
+          {pg3.pageItems.map(r => (
             <tr key={r.key} className="hover:bg-gray-50">
               {showOperation && (
                 <td className="px-3 py-2 whitespace-nowrap">
@@ -127,8 +128,10 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
           {sorted.length === 0 && (
             <tr><td colSpan={showOperation ? 11 : 10} className="px-3 py-4 text-center text-gray-400 text-xs">Позиции отсутствуют</td></tr>
           )}
+          <FillerRows count={pg3.fill} cols={11} />
         </tbody>
       </table>
+      {pg3.pager}
     </div>
   );
 }
@@ -300,6 +303,7 @@ export function Podotchetniki() {
     tabelNo: p => p.tabelNo,
     balance: p => (p.materials.length > 0 ? 1 : 0),
   });
+  const pg4 = usePaged(sorted, "podotchetniki");
 
   if (selected) {
     return <PodotchetnikCard person={selected} onBack={() => setSelected(null)} />;
@@ -336,7 +340,7 @@ export function Podotchetniki() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {sorted.map(p => (
+            {pg4.pageItems.map(p => (
               <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                 <td className="px-4 py-3 text-blue-600">{p.tabelNo}</td>
@@ -352,8 +356,10 @@ export function Podotchetniki() {
             {sorted.length === 0 && (
               <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-400">Подотчётное лицо не найдено</td></tr>
             )}
+            <FillerRows count={pg4.fill} cols={4} />
           </tbody>
         </table>
+        {pg4.pager}
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PageHeader,
   useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, Toggle, SearchInput, SortTh, useSort, Pagination, formatDateTime,
+  Field, Input, Select, Toggle, SearchInput, SortTh, useSort, Pagination, usePerPage, FillerRows, fillerCount, formatDateTime,
 } from "../components/ui";
 import { AppUser, Role } from "../data/mock";
 import { ArrowLeft, Plus, ChevronRight } from "lucide-react";
@@ -320,7 +320,7 @@ function RolesPage({ onBack }: { onBack: () => void }) {
   const setViewRole = (r: Role | null) => (r ? screen.openTop("view", r.id) : screen.close("view"));
   const setEditRole = (r: Role | null) => (r ? screen.openTop("edit", r.id) : screen.close("edit"));
   const [page, setPage] = useState(1);
-  const perPage = 20;
+  const [perPage, setPerPage] = usePerPage("admin-roles", 20);
 
   const filtered = roles.filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase()));
   const pageItems = filtered.slice((page - 1) * perPage, page * perPage);
@@ -388,9 +388,10 @@ function RolesPage({ onBack }: { onBack: () => void }) {
             {filtered.length === 0 && (
               <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">Роли не найдены</td></tr>
             )}
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={4} />
           </tbody>
         </table>
-        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {showNew && (
@@ -520,7 +521,7 @@ export function PanelAdmin() {
   const setEditUser = (u: AppUser | null) => (u ? screen.openTop("edit", u.id) : screen.close("edit"));
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const perPage = 20;
+  const [perPage, setPerPage] = usePerPage("admin-users", 20);
 
   const filtered = users.filter(u => {
     const q = search.trim().toLowerCase();
@@ -598,9 +599,10 @@ export function PanelAdmin() {
             {sorted.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">Пользователи не найдены</td></tr>
             )}
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={7} />
           </tbody>
         </table>
-        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {showNewUser && (

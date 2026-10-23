@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
+  Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, ProbaChem,
+  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, ProbaChem, usePaged,
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
@@ -94,6 +94,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
     })));
   };
 
+  const pg5 = usePaged(sorted, "dm-add-pick");
   return (
     <Modal
       title="Добавить позицию ДМ со склада"
@@ -144,7 +145,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {sorted.map(i => {
+              {pg5.pageItems.map(i => {
                 const checked = selected.has(i.id);
                 const karta = i.status === "Резерв" ? reservedBy(i.nomenkl) : undefined;
                 return (
@@ -164,8 +165,10 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                   </tr>
                 );
               })}
+              <FillerRows count={pg5.fill} cols={9} />
             </tbody>
           </table>
+          {pg5.pager}
         </div>
       )}
       {affectedKarty.length > 0 && (
@@ -286,6 +289,7 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
   const th = "px-3 py-2";
   const dash = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v);
 
+  const pg6 = usePaged(sorted, "dm-vozvrat-pick");
   return (
     <Modal
       title="Добавить позицию возврата"
@@ -343,7 +347,7 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
               <th className="w-20"></th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {sorted.map(p => {
+              {pg6.pageItems.map(p => {
                 const v = view(p);
                 const checked = selected.has(p.n);
                 return (
@@ -368,8 +372,10 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
                   </tr>
                 );
               })}
+              <FillerRows count={pg6.fill} cols={12} />
             </tbody>
           </table>
+          {pg6.pager}
         </div>
       )}
 
@@ -644,6 +650,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
   });
   const th = "px-3 py-2";
   const dash = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v);
+  const pg7 = usePaged(sorted, "oper-positions");
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -661,7 +668,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
           <th className={readOnly ? "w-10" : "w-20"}></th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
-          {sorted.map(p => {
+          {pg7.pageItems.map(p => {
             const v = view(p);
             return (
               <tr key={p.n} className="hover:bg-gray-50">
@@ -687,8 +694,10 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
           {sorted.length === 0 && (
             <tr><td colSpan={11} className="px-3 py-6 text-center text-sm text-gray-400">Позиции не добавлены</td></tr>
           )}
+          <FillerRows count={pg7.fill} cols={11} />
         </tbody>
       </table>
+      {pg7.pager}
     </div>
   );
 }
@@ -1484,7 +1493,7 @@ export function DvizhenieMateriаla() {
   const setViewOp = (o: Operation | null) => (o ? screen.openTop("view", o.id) : screen.close("view"));
   const setEditOp = (o: Operation | null) => (o ? screen.openTop("edit", o.id) : screen.close("edit"));
   const setShowNew = (open: boolean) => (open ? screen.openTop("new") : screen.close("new"));
-  const perPage = 8;
+  const [perPage, setPerPage] = usePerPage("dvizhenie", 8);
 
   const from = dateFrom ? isoToNum(dateFrom) : 0;
   const to = dateTo ? isoToNum(dateTo) + 9999 : Infinity;
@@ -1596,9 +1605,10 @@ export function DvizhenieMateriаla() {
               </tr>
               );
             })}
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={8} />
           </tbody>
         </table>
-        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {viewOp && <OperModal key={viewOp.id} op={viewOp} onClose={() => setViewOp(null)} onSave={() => setViewOp(null)} readOnly />}

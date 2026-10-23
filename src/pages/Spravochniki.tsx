@@ -3,7 +3,7 @@ import { useLocation } from "react-router";
 import {
   PageHeader, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Badge, Toggle,
   useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, SortTh, useSort, SearchInput, Pagination, statusColorClass,
+  Field, Input, Select, SortTh, useSort, SearchInput, Pagination, usePerPage, FillerRows, fillerCount, statusColorClass, usePaged,
 } from "../components/ui";
 import { spravochniki, techOpLossNorms, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -127,6 +127,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
     show("Запись сохранена");
   };
 
+  const pg1 = usePaged(sorted, "sprav-dict");
   return (
     <div>
       <button onClick={onBack} className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium mb-4">
@@ -156,7 +157,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
             <th className="w-12"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
-            {sorted.map((item, i) => (
+            {pg1.pageItems.map((item, i) => (
               <tr key={i} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-gray-900">{item.value}</td>
@@ -169,8 +170,10 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                 <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
               </tr>
             ))}
+            <FillerRows count={pg1.fill} cols={7} />
           </tbody>
         </table>
+        {pg1.pager}
       </div>
 
       {(showAdd || editItem) && (
@@ -239,6 +242,7 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
   };
   const remove = (item: StatusItem) => confirm(`Удалить статус «${item.name}»?`, () => { setItems(items.filter(i => i.id !== item.id)); show("Статус удалён"); });
 
+  const pg2 = usePaged(sorted, "sprav-status");
   return (
     <div>
       <button onClick={onBack} className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium mb-4">
@@ -262,7 +266,7 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
             <th className="w-20"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
-            {sorted.map(item => (
+            {pg2.pageItems.map(item => (
               <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3"><Badge label={item.name} group={dict.group} /></td>
                 <td className="px-4 py-3 text-gray-700">
@@ -282,8 +286,10 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
             {sorted.length === 0 && (
               <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">Нет записей</td></tr>
             )}
+            <FillerRows count={pg2.fill} cols={3} />
           </tbody>
         </table>
+        {pg2.pager}
       </div>
 
       {(showAdd || editItem) && (
@@ -327,7 +333,7 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
     else if (showAdd) setForm({ code: "", name: "", shortName: "" });
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
-  const perPage = 10;
+  const [perPage, setPerPage] = usePerPage("sprav-codes", 10);
 
   const filtered = items.filter(i => {
     const q = search.trim().toLowerCase();
@@ -396,9 +402,10 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
             {pageItems.length === 0 && (
               <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={4} />
           </tbody>
         </table>
-        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {(showAdd || editItem) && (
@@ -439,7 +446,7 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
-  const perPage = 10;
+  const [perPage, setPerPage] = usePerPage("sprav-classes", 10);
 
   const filtered = items.filter(i => {
     const q = search.trim().toLowerCase();
@@ -511,9 +518,10 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
             {pageItems.length === 0 && (
               <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={3} />
           </tbody>
         </table>
-        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {(showAdd || editItem) && (
@@ -573,7 +581,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
-  const perPage = 10;
+  const [perPage, setPerPage] = usePerPage("sprav-locations", 10);
 
   const filtered = items.filter(loc => {
     const q = search.trim().toLowerCase();
@@ -666,9 +674,10 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
             {pageItems.length === 0 && (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={5} />
           </tbody>
         </table>
-        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {showAdd && (
@@ -744,7 +753,7 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
-  const perPage = 10;
+  const [perPage, setPerPage] = usePerPage("sprav-chem", 10);
 
   // № — порядковый номер в справочнике (в этом порядке поля выводятся в формах)
   const numOf = (e: ChemElement) => items.indexOf(e) + 1;
@@ -839,9 +848,10 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
             {pageItems.length === 0 && (
               <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={6} />
           </tbody>
         </table>
-        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {(showAdd || editItem) && (
@@ -905,7 +915,7 @@ function MassTolerancesPage({ onBack }: { onBack: () => void }) {
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
-  const perPage = 10;
+  const [perPage, setPerPage] = usePerPage("sprav-tolerances", 10);
 
   const usedMetals = Array.from(new Set(items.map(i => i.metal)));
   const filtered = items.filter(i => {
@@ -997,9 +1007,10 @@ function MassTolerancesPage({ onBack }: { onBack: () => void }) {
             {pageItems.length === 0 && (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
+            <FillerRows count={fillerCount(ordered.length, page, perPage)} cols={5} />
           </tbody>
         </table>
-        <Pagination page={page} total={ordered.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={ordered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {(showAdd || editItem) && (

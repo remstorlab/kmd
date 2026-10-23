@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, PageHeader,
+  Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, MultiSelect, KlassSelect, MaterialCodeSelect, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, Badge,
 } from "../components/ui";
@@ -135,7 +135,7 @@ function DocList({
     receiver: d => d.receiver,
     status: d => d.status,
   });
-  const perPage = 8;
+  const [perPage, setPerPage] = usePerPage("prihod", 8);
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
 
   return (
@@ -190,9 +190,10 @@ function DocList({
             {pageItems.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
             )}
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={7} />
           </tbody>
         </table>
-        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {viewDoc && <PrihodDocModal key={viewDoc.id} doc={viewDoc} onClose={() => screen.close("view")} onSave={() => screen.close("view")} readOnly />}
@@ -242,7 +243,7 @@ export function VydachaList() {
   const viewDoc = vydachaDocs.find(d => d.id === screen.after("view")) ?? null;
   const editDoc = vydachaDocs.find(d => d.id === screen.after("edit")) ?? null;
   const showNew = screen.has("new");
-  const perPage = 8;
+  const [perPage, setPerPage] = usePerPage("vydacha", 8);
   const { filtered, bar } = useDocFilters(vydachaDocs, () => setPage(1));
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
@@ -301,9 +302,10 @@ export function VydachaList() {
             {sorted.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
             )}
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={7} />
           </tbody>
         </table>
-        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} />
+        <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {viewDoc && <VydachaDocModal key={viewDoc.id} doc={viewDoc} onClose={() => screen.close("view")} onSave={() => screen.close("view")} readOnly />}

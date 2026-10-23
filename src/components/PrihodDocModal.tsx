@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
-  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem,
+  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem, usePaged, FillerRows,
 } from "./ui";
 import { SkladDoc, DocStatus, ChemComposition, spravValues, MAIN_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD } from "../data/mock";
 import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
@@ -146,6 +146,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
     </Field>
   );
 
+  const pg10 = usePaged(sorted, "prihod-positions");
   return (
     <Modal
       title={title}
@@ -240,7 +241,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
         </div>
         {positions.length === 0 ? (
           <div className="text-center py-6 text-gray-400 text-sm">Нет позиций. Нажмите «+ Добавить позицию»</div>
-        ) : (
+        ) : (<>
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл. №</SortTh>
@@ -257,7 +258,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
               <th className="w-24"></th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {sorted.map(p => (
+              {pg10.pageItems.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -279,9 +280,11 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
                   </td>
                 </tr>
               ))}
+              <FillerRows count={pg10.fill} cols={10} />
             </tbody>
           </table>
-        )}
+          {pg10.pager}
+        </>)}
       </div>
 
       {posModal && (

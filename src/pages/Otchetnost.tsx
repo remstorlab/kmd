@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
-import { PageHeader, Btn, Modal, Field, Input, Select, useToast, Toast, SortTh, useSort } from "../components/ui";
+import { PageHeader, Btn, Modal, Field, Input, Select, useToast, Toast, SortTh, useSort, usePaged, FillerRows,
+} from "../components/ui";
 import { Metal, baseMetal, MAIN_SKLAD, spravValues } from "../data/mock";
 import { ClipboardCheck, Coins, Gem, FileText, Scale, LucideIcon } from "lucide-react";
 import { useScreen } from "../router";
@@ -250,6 +251,7 @@ export function Otchetnost() {
     status: r => r.status,
   });
 
+  const pg8 = usePaged(sortedReportRows, "report-rows");
   return (
     <div>
       <PageHeader
@@ -300,7 +302,7 @@ export function Otchetnost() {
               <SortTh sortKey="status" sort={reportSort} onSort={toggleReportSort} className="px-3 py-2">Результат</SortTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {sortedReportRows.map((row, i) => (
+              {pg8.pageItems.map((row, i) => (
                 <tr key={i} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-blue-600 font-medium">{row.nom}</td>
                   <td className="px-3 py-2 font-medium">{row.name}</td>
@@ -317,8 +319,10 @@ export function Otchetnost() {
                   </td>
                 </tr>
               ))}
+              <FillerRows count={pg8.fill} cols={5} />
             </tbody>
           </table>
+          {pg8.pager}
         </Modal>
       )}
       {showInvOpis && <InventarizationOpisModal onClose={() => setShowInvOpis(false)} />}
