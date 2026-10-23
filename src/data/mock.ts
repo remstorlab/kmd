@@ -2,7 +2,7 @@ import type { PrihodPosition } from "../components/DMPositionFormModal";
 // «Закрыта» — позиция выдана со склада наружу по оформленной накладной на отгрузку.
 export type StatusGP = "На складе" | "Резерв" | "В подотчёте" | "Закрыта";
 export type StatusDM = "На складе" | "Резерв" | "В подотчёте" | "Закрыта";
-export type DocStatus = "Оформлено" | "Редактирование";
+export type DocStatus = "Оформлено" | "В работе";
 export type OpType = "Выдача" | "Возврат" | "Выдача-Возврат";
 export type OpVid = "Отбор пробы" | "Анализ в ЛКИ" | "Плавка" | "Гальванопокрытие" | "Производство ГП" | "НИОКР";
 export type UserStatus = "Активен" | "Заблокирован";
@@ -27,6 +27,8 @@ export interface GPItem {
   ligWeight?: number;
   netWeight?: number;
   chem?: ChemComposition;
+  // Исходная запись, из которой выделена эта часть при частичной выдаче / резерве (см. data/stock.ts)
+  parentId?: string;
 }
 
 export type Metal = "Au" | "Ag" | "Pt" | "Pd";
@@ -51,6 +53,8 @@ export interface DMItem {
   location: string;
   status: StatusDM;
   chem?: ChemComposition;
+  // Исходная запись, из которой выделена эта часть при частичной выдаче / резерве (см. data/stock.ts)
+  parentId?: string;
 }
 
 export interface SkladDoc {
@@ -104,7 +108,9 @@ export const lossWeight = (l: OperLoss) =>
   (l.type === SPISANIE_PRIROST ? -1 : 1) * (parseFloat(String(l.ves).replace(",", ".")) || 0);
 
 // ves — вес позиции для расчётов операции; metal (код материала), lig / net (лигатурный / чистый вес, г) — для отображения как на складе ДМ
-export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string; metal?: string; lig?: number; net?: number };
+export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string; metal?: string; lig?: number; net?: number;
+  // id записи склада ДМ, из которой выдана позиция (при частичной выдаче — выделенная часть)
+  srcId?: string };
 
 export interface Operation {
   id: string;
@@ -380,8 +386,8 @@ export const DOC_OTGRUZKA_DM = "Накладная на отгрузку ДМ";
 export const DOC_PEREDACHA_GP = "Накладная на передачу ГП";
 
 export const initialSkladDocs: SkladDoc[] = [
-  { id: "sd1", date: "19.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0342", status: "Редактирование", sender: "ОО «АурумПоставка»", receiver: MAIN_SKLAD },
-  { id: "sd2", date: "18.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0118", status: "Редактирование", sender: "Производственный цех", receiver: MAIN_SKLAD },
+  { id: "sd1", date: "19.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0342", status: "В работе", sender: "ОО «АурумПоставка»", receiver: MAIN_SKLAD },
+  { id: "sd2", date: "18.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0118", status: "В работе", sender: "Производственный цех", receiver: MAIN_SKLAD },
   { id: "sd3", date: "17.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0341", status: "Оформлено", sender: "АО «Металл Инвест»", receiver: MAIN_SKLAD },
   { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "СДМ", receiver: MAIN_SKLAD },
   { id: "sd5", date: "15.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0340", status: "Оформлено", sender: "ОО «СереброТрейд»", receiver: MAIN_SKLAD },
@@ -399,7 +405,7 @@ const vpos = (src: "gp" | "dm", id: string): VydachaDocPosition => {
 };
 
 export const initialVydachaDocs: SkladDoc[] = [
-  { id: "vd1", date: "19.08.2026", type: DOC_PEREDACHA_GP, number: "НО-0205", status: "Редактирование", sender: MAIN_SKLAD, receiver: "АО «МонетаДМ»", positions: [vpos("gp", "gp2"), vpos("gp", "gp9")] },
+  { id: "vd1", date: "19.08.2026", type: DOC_PEREDACHA_GP, number: "НО-0205", status: "В работе", sender: MAIN_SKLAD, receiver: "АО «МонетаДМ»", positions: [vpos("gp", "gp2"), vpos("gp", "gp9")] },
   { id: "vd2", date: "17.08.2026", type: DOC_PEREDACHA_GP, number: "НО-0204", status: "Оформлено", sender: MAIN_SKLAD, receiver: "ТД «Золото Казахстана»", positions: [vpos("gp", "gp35"), vpos("gp", "gp36")] },
   { id: "vd3", date: "15.08.2026", type: DOC_OTGRUZKA_DM, number: "НО-0203", status: "Оформлено", sender: MAIN_SKLAD, receiver: "АО «Металл Инвест»", positions: [vpos("dm", "dm19")] },
 ];
@@ -896,7 +902,7 @@ export const initialStatusDicts: StatusDict[] = [
   { group: "pozicii", name: "Статусы позиций", sections: "Склады ДМ и ГП, Движение материала, Подотчётники, Шихтовые карты",
     items: st("pozicii", [["На складе", "green"], ["Резерв", "yellow"], ["В подотчёте", "blue"], ["Закрыта", "gray"]]) },
   { group: "dokumenty", name: "Статусы складских документов", sections: "Складские операции (приход, выдача)",
-    items: st("dokumenty", [["Редактирование", "blue"], ["Оформлено", "green"]]) },
+    items: st("dokumenty", [["В работе", "yellow"], ["Оформлено", "green"]]) },
   { group: "operacii", name: "Статусы операций движения материала", sections: "Движение материала",
     items: st("operacii", [["В работе", "blue"], ["Завершено", "green"]]) },
   { group: "shihta", name: "Статусы шихтовых карт", sections: "Шихтовые карты, Движение материала (выдача по шихтовой карте)",

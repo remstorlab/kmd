@@ -6,6 +6,7 @@ import {
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravochniki, spravValues, MAIN_SKLAD, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
+import { takeFromStock } from "../data/stock";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
@@ -18,39 +19,14 @@ const RECEIVERS = spravochniki["Организации"].items.map(i => i.value)
 
 type VydachaPosition = VydachaDocPosition;
 
-const round2 = (v: number) => Math.round(v * 100) / 100;
-
-// Списание выдаваемого количества — только при оформлении накладной. Пока накладная «Редактирование»,
+// Списание выдаваемого количества — только при оформлении накладной. Пока накладная «В работе»,
 // позиции склада не меняются (статус и место хранения прежние). При оформлении полностью выданная позиция
 // закрывается и снимается с места хранения («-»); при частичной выдаче остаток остаётся на складе на своём
-// месте, а выданная часть выделяется в отдельную позицию «Закрыта» без места хранения.
+// месте с уменьшенным количеством, а выданная часть выделяется в отдельную запись «Закрыта» (data/stock.ts).
 const NO_LOC = "-";
 // Выдать можно позицию на складе или в резерве; «В подотчёте» и «Закрыта» — нет
 const canIssue = (status: string) => status === "На складе" || status === "Резерв";
-function issueGp(items: GPItem[], issue: Map<string, number>, stamp: number): GPItem[] {
-  return items.flatMap(it => {
-    const q = issue.get(it.id);
-    if (!q) return [it];
-    if (q >= it.qty) return [{ ...it, status: "Закрыта" as const, location: NO_LOC }];
-    return [{ ...it, qty: it.qty - q }, { ...it, id: `${it.id}-v${stamp}`, qty: q, status: "Закрыта" as const, location: NO_LOC }];
-  });
-}
-
-function issueDm(items: DMItem[], issue: Map<string, number>, stamp: number): DMItem[] {
-  return items.flatMap(it => {
-    const q = issue.get(it.id);
-    if (q === undefined) return [it];
-    // Позиция без количества изделий выдаётся целиком
-    if (q >= it.qty) return [{ ...it, status: "Закрыта" as const, location: NO_LOC }];
-    const k = q / it.qty;
-    const issuedLig = round2(it.ligWeight * k);
-    const issuedNet = round2(it.netWeight * k);
-    return [
-      { ...it, qty: it.qty - q, ligWeight: round2(it.ligWeight - issuedLig), netWeight: round2(it.netWeight - issuedNet) },
-      { ...it, id: `${it.id}-v${stamp}`, qty: q, ligWeight: issuedLig, netWeight: issuedNet, status: "Закрыта" as const, location: NO_LOC },
-    ];
-  });
-}
+const closeItem = <T extends GPItem | DMItem>(it: T): T => ({ ...it, status: "Закрыта", location: NO_LOC });
 
 // ── Накладная на отгрузку ────────────────────────────────────────────────────
 
@@ -102,7 +78,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     return [...fromGp, ...fromDm].filter(r => available.includes(r.id) && (r.src === "dm" || r.qty > 0));
   }, [gpItems, dmItems]);
 
-  // Новая накладная: отмеченные позиции склада добавляются целиком (всё доступное количество)
+  // Новая накладная: отмеченные позиции склада добавляются на всё доступное количество — его можно уменьшить
   const [positions, setPositions] = useState<VydachaPosition[]>(() =>
     doc?.positions ?? stock.filter(r => preselectIds.includes(r.id)).map(r => ({ ...r, issue: r.qty })));
 
@@ -132,7 +108,13 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
 
   const changeType = (t: string) => screen.toggle("gp", t === DOC_PEREDACHA_GP);
-  // Позиции выдаются целиком — количество изделий не редактируется
+  // Количество к выдаче — от 1 до количества изделий позиции; без количества изделий позиция выдаётся целиком
+  const setIssue = (id: string, v: string) => setPositions(prev => prev.map(p => {
+    if (p.id !== id) return p;
+    const n = parseInt(v.replace(/[^\d]/g, ""), 10);
+    return { ...p, issue: Number.isFinite(n) ? Math.min(Math.max(n, 0), p.qty) : 0 };
+  }));
+  const badIssue = positions.filter(p => p.qty > 0 && (p.issue < 1 || p.issue > p.qty));
 
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(positions, {
@@ -147,14 +129,14 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   });
 
   const totalQty = positions.reduce((s, p) => s + p.issue, 0);
-  // Для ДМ массы пересчитываем пропорционально выдаваемому количеству
-  // ДМ выдаётся целиком — весь вес позиции; ГП — пропорционально количеству
-  const share = (p: VydachaPosition, v: number | null) => (v == null ? 0 : p.src === "dm" ? v : (v * p.issue) / (p.qty || 1));
+  // Массы выдаваемой части — пропорционально количеству (без количества изделий — вся масса позиции)
+  const share = (p: VydachaPosition, v: number | null) => (v == null ? 0 : p.qty > 0 ? (v * p.issue) / p.qty : v);
   const totalLig = positions.reduce((s, p) => s + share(p, p.lig), 0);
   const totalNet = positions.reduce((s, p) => s + share(p, p.net), 0);
 
   const save = (status: DocStatus) => {
     // Списание выполняется один раз — при первом оформлении документа
+    if (badIssue.length) { show(`Укажите количество к выдаче: ${badIssue.map(p => p.name).join(", ")}`); return; }
     if (status === "Оформлено" && !issued) {
       if (positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
       const lacking = positions.filter(p => {
@@ -168,8 +150,9 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       const stamp = Date.now();
       const gpIssue = new Map(positions.filter(p => p.src === "gp").map(p => [p.id, p.issue]));
       const dmIssue = new Map(positions.filter(p => p.src === "dm").map(p => [p.id, p.issue]));
-      if (gpIssue.size) setGpItems(prev => issueGp(prev, gpIssue, stamp));
-      if (dmIssue.size) setDmItems(prev => issueDm(prev, dmIssue, stamp));
+      const partId = (it: { id: string }) => `${it.id}-v${stamp}`;
+      if (gpIssue.size) setGpItems(prev => takeFromStock(prev, gpIssue, closeItem, partId).items);
+      if (dmIssue.size) setDmItems(prev => takeFromStock(prev, dmIssue, closeItem, partId).items);
       // Выданные позиции из резерва: шихтовая карта, которая их резервировала, возвращается в «Редактирование»
       if (affectedKarty.length) {
         const ids = new Set(affectedKarty.map(k => k.id));
@@ -206,7 +189,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       </> : <>
         <div className="mr-auto"><Btn variant="success" onClick={() => save("Оформлено")}>Оформить</Btn></div>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={() => save("Редактирование")}>Сохранить</Btn>
+        <Btn onClick={() => save("В работе")}>Сохранить</Btn>
       </>}
     >
       {!issued && !ro && affectedKarty.length > 0 && (
@@ -278,7 +261,16 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
-                  <td className="px-3 py-2">{p.issue || "—"}</td>
+                  <td className="px-3 py-2">
+                    {!lockPos && p.qty > 1 ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-20 ${p.issue < 1 ? "rounded-lg ring-1 ring-red-400" : ""}`}>
+                          <Input value={p.issue ? String(p.issue) : ""} onChange={v => setIssue(p.id, v)} placeholder="1" />
+                        </div>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">из {p.qty}</span>
+                      </div>
+                    ) : (p.issue || "—")}
+                  </td>
                   <td className="px-3 py-2">{p.lig == null ? "—" : share(p, p.lig).toFixed(2)}</td>
                   <td className="px-3 py-2 text-blue-600">{p.net == null ? "—" : share(p, p.net).toFixed(2)}</td>
                   <td className="px-3 py-2 text-gray-500">{p.location}</td>
@@ -301,7 +293,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
       {showPick && (
         <StockPickerModal
-          qtyInput={false}
+          qtyInput={r => r.qty > 1}
           title={`Добавить позиции со склада «${MAIN_SKLAD}»`}
           rows={stock}
           already={already}

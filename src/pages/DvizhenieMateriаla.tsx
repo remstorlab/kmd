@@ -7,6 +7,7 @@ import {
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
+import { takeFromStock, returnToStock } from "../data/stock";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
@@ -22,14 +23,20 @@ const ALL_LOCS = "Все места хранения";
 const ALL_STATUSES = "Все статусы";
 
 function AddDMPositionModal({ already = [], onClose, onAdd }: {
-  // Номенклатурные номера, уже добавленные в выдачу — повторно не предлагаются
+  // Уже добавленные в выдачу: id записей склада (srcId) или номенкл. № (позиции без ссылки) — повторно не предлагаются
   already?: string[];
   onClose: () => void;
   onAdd: (rows: Omit<OperPosition, "n">[]) => void;
 }) {
   const { dmItems, shihtovyeKarty } = useApp();
-  // Выбранные позиции (id); позиция выдаётся целиком
+  // Выбранные позиции (id) и количество к выдаче; без ввода — всё количество позиции
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [qtyById, setQtyById] = useState<Record<string, string>>({});
+  const issueQty = (i: { id: string; qty: number }) => {
+    if (i.qty <= 1) return i.qty;
+    const n = parseInt(qtyById[i.id] ?? "", 10);
+    return Number.isFinite(n) ? Math.min(Math.max(n, 1), i.qty) : i.qty;
+  };
   const [search, setSearch] = useState("");
   const [klass, setKlass] = useState(ALL_KLASS);
   const [metal, setMetal] = useState(ALL_METALS);
@@ -39,7 +46,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
 
   type Item = (typeof dmItems)[number];
   // Позиции в резерве тоже можно выдать — тогда шихтовая карта, которая их резервирует, вернётся в «Редактирование».
-  const availableItems = dmItems.filter(i => !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв") && !already.includes(i.nomenkl));
+  const availableItems = dmItems.filter(i => !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв") && !already.includes(i.id) && !already.includes(i.nomenkl));
   const reservedBy = (nomenkl: string) => shihtovyeKarty.find(k => k.status !== "Выполнена" && k.materials.some(m => m.nomenkl === nomenkl));
   const affectedKarty = [...new Set(
     availableItems.filter(i => selected.has(i.id) && i.status === "Резерв").map(i => reservedBy(i.nomenkl)?.name).filter(Boolean),
@@ -88,10 +95,23 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
   const add = () => {
     const chosen = availableItems.filter(i => selected.has(i.id));
     if (chosen.length === 0) return;
-    onAdd(chosen.map(i => ({
-      name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: i.qty || undefined, ves: i.ligWeight,
-      ag: i.chem?.ag || "-", cu: i.chem?.cu || "-", chem: i.chem, loc: i.location, metal: i.metal, lig: i.ligWeight, net: i.netWeight,
-    })));
+    // Частичная выдача: массы и хим. состав — пропорционально выдаваемому количеству;
+    // запись склада делится при сохранении операции (applyVydacha)
+    onAdd(chosen.map(i => {
+      const q = issueQty(i);
+      const k = i.qty > 0 ? q / i.qty : 1;
+      const r2 = (v: number) => Math.round(v * k * 100) / 100;
+      const chem = k === 1 || !i.chem ? i.chem
+        : Object.fromEntries(Object.entries(i.chem).map(([el, v]) => {
+          const n = parseFloat(String(v).replace(",", "."));
+          return [el, Number.isFinite(n) ? r2(n).toFixed(2) : v];
+        }));
+      return {
+        name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: q || undefined, ves: r2(i.ligWeight),
+        ag: chem?.ag || "-", cu: chem?.cu || "-", chem, loc: i.location, metal: i.metal, lig: r2(i.ligWeight), net: r2(i.netWeight),
+        srcId: i.id,
+      };
+    }));
   };
 
   const pg5 = usePaged(sorted, "dm-add-pick");
@@ -161,7 +181,16 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                       <PosStatusBadge status={i.status} nomenkl={i.nomenkl} />
                       {karta && <div className="text-xs text-gray-400 mt-0.5" title={karta.name}>ШК {karta.plavkaNo}</div>}
                     </td>
-                    <td className="px-3 py-2 text-gray-700">{i.qty || "—"}</td>
+                    <td className="px-3 py-2 text-gray-700">
+                      {checked && i.qty > 1 ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-20">
+                            <Input value={qtyById[i.id] ?? String(i.qty)} onChange={v => setQtyById(prev => ({ ...prev, [i.id]: v.replace(/[^\d]/g, "") }))} placeholder={String(i.qty)} />
+                          </div>
+                          <span className="text-xs text-gray-400 whitespace-nowrap">из {i.qty}</span>
+                        </div>
+                      ) : (i.qty || "—")}
+                    </td>
                   </tr>
                 );
               })}
@@ -1137,9 +1166,16 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     });
   };
 
-  // Позиция операции в виде позиции склада ДМ: недостающие поля — из позиции склада с тем же номенклатурным №
+  // Запись склада ДМ, на которую ссылается позиция выдачи (srcId). У позиций без ссылки (демо-данные) —
+  // по номенкл. №: сначала выданная в подотчёт запись, затем запись на складе / в резерве.
+  const srcOf = (p: OperPosition) =>
+    (p.srcId ? dmItems.find(i => i.id === p.srcId) : undefined)
+    ?? dmItems.find(i => i.nomenkl === p.nomenkl && i.status === "В подотчёте")
+    ?? dmItems.find(i => i.nomenkl === p.nomenkl && (i.status === "На складе" || i.status === "Резерв"));
+
+  // Позиция операции в виде позиции склада ДМ: недостающие поля — из связанной записи склада
   const posView = (p: OperPosition): DMPositionView => {
-    const dm = dmItems.find(i => i.nomenkl === p.nomenkl);
+    const dm = srcOf(p) ?? dmItems.find(i => i.nomenkl === p.nomenkl);
     return {
       name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.metal ?? dm?.metal ?? "",
       qty: p.qty ?? null, proba: p.proba, ligWeight: p.lig ?? null, netWeight: p.net ?? null,
@@ -1211,15 +1247,39 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
   // эта карта возвращается в «Редактирование» и пропадает из выбора ШК для плавки (там только «Новая»).
   // Выдача проводится при каждом сохранении: позиции, убранные из выдачи, возвращаются на склад.
-  const applyVydacha = () => {
-    const vydanoNomenkl = new Set(vydacha.filter(p => !isGPKlass(p.klass)).map(p => p.nomenkl));
-    const ubrano = new Set((op ? opVydacha(op) : []).map(p => p.nomenkl).filter(n => !vydanoNomenkl.has(n)));
-    const izRezerva = dmItems.filter(i => i.status === "Резерв" && vydanoNomenkl.has(i.nomenkl));
-    setDmItems(prev => prev.map(i =>
-      vydanoNomenkl.has(i.nomenkl) && i.status !== "В подотчёте" ? { ...i, status: "В подотчёте", location: NO_LOC }
-        : ubrano.has(i.nomenkl) && i.status === "В подотчёте" ? { ...i, status: "На складе" }
-        : i));
-    if (izRezerva.length === 0) return;
+  // При выдаче части количества запись склада делится (data/stock.ts): остаток остаётся на складе,
+  // выданная часть — отдельная запись «В подотчёте»; позиция операции ссылается на неё (srcId).
+  // Возвращает позиции выдачи с проставленными ссылками на записи склада.
+  const applyVydacha = (): OperPosition[] => {
+    const rows = vydacha.filter(p => !isGPKlass(p.klass));
+    const prevIds = new Set((op ? opVydacha(op) : []).filter(p => !isGPKlass(p.klass)).map(p => srcOf(p)?.id).filter((id): id is string => !!id));
+    const linked = new Map<number, string>();
+    const pending = new Map<number, string>();
+    const take = new Map<string, number>();
+    for (const p of rows) {
+      const it = srcOf(p);
+      if (!it) continue;
+      if (it.status === "В подотчёте") { linked.set(p.n, it.id); continue; }
+      if (it.status !== "На складе" && it.status !== "Резерв") continue;
+      take.set(it.id, (take.get(it.id) ?? 0) + (p.qty && it.qty > 0 ? p.qty : it.qty));
+      pending.set(p.n, it.id);
+    }
+    const keep = new Set(linked.values());
+    const ubrano = new Set([...prevIds].filter(id => !keep.has(id) && dmItems.find(i => i.id === id)?.status === "В подотчёте"));
+    const izRezerva = dmItems.filter(i => i.status === "Резерв" && take.has(i.id));
+    const stamp = Date.now();
+    const { items, taken } = takeFromStock(
+      returnToStock(dmItems, ubrano, "На складе"),
+      take,
+      i => ({ ...i, status: "В подотчёте" as const, location: NO_LOC }),
+      i => `${i.id}-p${stamp}`,
+    );
+    setDmItems(items);
+    const withSrc = vydacha.map(p => {
+      const id = linked.get(p.n) ?? (pending.has(p.n) ? taken.get(pending.get(p.n)!) : undefined);
+      return id ? { ...p, srcId: id } : p;
+    });
+    if (izRezerva.length === 0) return withSrc;
     const rezNomenkl = new Set(izRezerva.map(i => i.nomenkl));
     const zatronuty: string[] = [];
     setShihtovyeKarty(prev => prev.map(k => {
@@ -1230,14 +1290,15 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       return { ...k, status: "Редактирование", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
     }));
     if (zatronuty.length) show(`Шихтовая карта ${zatronuty.map(n => `«${n}»`).join(", ")} переведена в «Редактирование»`);
+    return withSrc;
   };
 
-  const buildOp = (next: OperStage): Operation => ({
+  const buildOp = (next: OperStage, vydachaPos = vydacha): Operation => ({
     id: op?.id || `op-${Date.now()}`,
     date: head.date,
     type: type as any,
     vid: vid as any,
-    positions: vydacha.length,
+    positions: vydachaPos.length,
     document: head.document,
     responsible: head.responsible,
     stage: next,
@@ -1245,7 +1306,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     statusVydacha: "Выдано",
     statusVozvrat: next === "Завершено" ? "Полностью" : vozvrat.length > 0 ? "Частично" : "Не начат",
     statusClose: next !== "Завершено" ? "Не закрыто" : "Закрыто",
-    vydachaPos: vydacha,
+    vydachaPos,
     vozvratPos: vozvrat,
     vydachaFiles,
     vozvratFiles,
@@ -1261,8 +1322,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   // «Сохранить» — операция «В работе», «Оформить» — «Завершено»
   const save = (oformit = false) => {
     const next: OperStage = oformit ? "Завершено" : "В работе";
-    applyVydacha();
-    onSave(buildOp(next));
+    onSave(buildOp(next, applyVydacha()));
   };
 
   // Печать доступна для сохранённой операции — печатается текущее состояние формы.
@@ -1418,7 +1478,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
       {showAddDM && (
         <AddDMPositionModal
-          already={vydacha.map(p => p.nomenkl)}
+          already={vydacha.map(p => p.srcId ?? p.nomenkl)}
           onClose={() => setShowAddDM(false)}
           onAdd={rows => { appendPositions("vydacha", rows); setShowAddDM(false); show("Позиции добавлены"); }}
         />
@@ -1437,9 +1497,11 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           onClose={() => setShowShihtaPick(false)}
           onPick={k => {
             appendPositions("vydacha", k.materials.map(m => {
-              const dm = dmItems.find(i => i.nomenkl === m.nomenkl);
-              const part = dm && dm.qty > 0 ? (m.qty ?? 1) / dm.qty : 1;
-              return { ...m, ag: "-", cu: "-", metal: dm?.metal, lig: m.ves, net: dm ? +(dm.netWeight * part).toFixed(2) : undefined, chem: m.chem ?? dm?.chem };
+              // Выдаётся запись склада, зарезервированная под карту (при частичном резерве — выделенная часть)
+              const rez = m.nomenkl ? dmItems.find(i => i.nomenkl === m.nomenkl && i.status === "Резерв") : undefined;
+              const dm = rez ?? dmItems.find(i => i.nomenkl === m.nomenkl);
+              const part = rez ? 1 : dm && dm.qty > 0 ? (m.qty ?? 1) / dm.qty : 1;
+              return { ...m, ag: "-", cu: "-", metal: dm?.metal, lig: m.ves, net: dm ? +(dm.netWeight * part).toFixed(2) : undefined, chem: m.chem ?? dm?.chem, srcId: rez?.id };
             }));
             setHead(h => ({ ...h, plavkaNo: k.plavkaNo }));
             setPickedShihtaId(k.id);

@@ -6,6 +6,7 @@ import {
   SortTh, useSort, parseRuDate, formatDateTime, usePaged,
 } from "../components/ui";
 import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass } from "../data/mock";
+import { takeFromStock, returnToStock } from "../data/stock";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
 import { Plus, X, Calculator } from "lucide-react";
@@ -51,22 +52,12 @@ const toRow = (m: ShihtaMaterial, dm: DMItem[]): MatRow => {
 };
 
 // Резерв позиций ДМ под шихтовую карту: полностью взятая позиция переводится в «Резерв»,
-// при частичном выборе зарезервированная часть выделяется в отдельную позицию.
-// Позиции, убранные из карты (release), возвращаются в «На складе».
+// при частичном выборе зарезервированная часть выделяется в отдельную запись (data/stock.ts).
+// Позиции, убранные из карты (release), возвращаются на склад — часть объединяется с исходной записью.
 function reserveDm(items: DMItem[], reserve: Map<string, number>, release: Set<string>, stamp: number): DMItem[] {
-  return items.flatMap(it => {
-    if (it.status === "Резерв" && release.has(it.nomenkl)) return [{ ...it, status: "На складе" as const }];
-    const q = reserve.get(it.id);
-    if (!q) return [it];
-    if (q >= it.qty) return [{ ...it, status: "Резерв" as const }];
-    const k = q / it.qty;
-    const lig = round2(it.ligWeight * k);
-    const net = round2(it.netWeight * k);
-    return [
-      { ...it, qty: it.qty - q, ligWeight: round2(it.ligWeight - lig), netWeight: round2(it.netWeight - net) },
-      { ...it, id: `${it.id}-r${stamp}`, qty: q, ligWeight: lig, netWeight: net, status: "Резерв" as const },
-    ];
-  });
+  const released = new Set(items.filter(it => it.status === "Резерв" && release.has(it.nomenkl)).map(it => it.id));
+  const back = returnToStock(items, released, "На складе");
+  return takeFromStock(back, reserve, it => ({ ...it, status: "Резерв" as const }), it => `${it.id}-r${stamp}`).items;
 }
 
 function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta?: ShihtovayaKarta | null; onClose: () => void; onSave: (k: ShihtovayaKarta) => void; readOnly?: boolean }) {
@@ -421,7 +412,7 @@ export function ShihtovyeKarty() {
   const removeKarta = (karta: ShihtovayaKarta) => {
     if (karta.status !== "Выполнена") {
       const release = new Set(karta.materials.map(m => m.nomenkl).filter(Boolean));
-      setDmItems(prev => prev.map(it => it.status === "Резерв" && release.has(it.nomenkl) ? { ...it, status: "На складе" as const } : it));
+      setDmItems(prev => reserveDm(prev, new Map(), release, Date.now()));
     }
     setShihtovyeKarty(prev => prev.filter(s => s.id !== karta.id));
     show(`Шихтовая карта «${karta.name}» удалена`);

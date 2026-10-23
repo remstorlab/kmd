@@ -156,7 +156,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
         <>
           <div className="mr-auto"><Btn variant="success" onClick={() => save("Оформлено")}>Оформить</Btn></div>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn onClick={() => save("Редактирование")}>Сохранить</Btn>
+          <Btn onClick={() => save("В работе")}>Сохранить</Btn>
         </>
       )}
     >
