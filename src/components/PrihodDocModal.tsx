@@ -209,13 +209,13 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
           : <MultiFileUpload files={nakladFiles} onChange={setNakladFiles} disabled={ro} />}
       </div>
 
-      {/* Хим. состав на партию: подставляется в каждую новую позицию документа (в позиции его можно изменить) */}
+      {/* Хим. состав позиции: подставляется в каждую новую позицию документа (в позиции его можно изменить) */}
       {(!ro || partyChemOn) && (
         <div className="mb-4">
           {!ro && (
             <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer mb-2">
               <input type="checkbox" checked={partyChemOn} onChange={e => setPartyChemOn(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-              Задать хим. состав на партию
+              Задать хим. состав позиции
             </label>
           )}
           {partyChemOn && (
