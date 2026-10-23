@@ -40,7 +40,7 @@ export function SkladyHub() {
 // ── Смена места хранения позиции ──────────────────────────────────────────────
 
 
-function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: () => void; onSave: (location: string) => void }) {
+function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: () => void; onSave: (location: string, name: string) => void }) {
   const { storageLocations: locs } = useApp();
   const codeLabel = useMaterialCodeLabel();
   const cur = parseLoc(item.location);
@@ -52,10 +52,13 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
   const changeSeyf = (s: string) => { setSeyf(s); setPolka(polkasOf(locs, MAIN_SKLAD, s)[0] ?? NO_LOC); };
   const next = seyf !== NO_LOC ? formatLoc(seyf, polka) : "";
   const same = cur.seyf !== NO_LOC && cur.seyf === seyf && cur.polka === polka;
+  const [name, setName] = useState(item.name);
+  const nameChanged = name.trim() !== item.name;
+  // Сохранить можно, если изменено место хранения и/или наименование
+  const canSave = !!name.trim() && (nameChanged || (!!next && !same));
 
   const attrs: [string, React.ReactNode][] = [
     ["Номенкл. №", item.nomenkl],
-    ["Наименование", item.name],
     ["Класс", <KlassCode value={item.klass} />],
     ["Код материала", codeLabel(item.metal)],
     ["Проба", item.proba || "—"],
@@ -68,7 +71,7 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
       onClose={onClose}
       footer={<>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={() => onSave(next)} disabled={!next || same}>Сохранить</Btn>
+        <Btn onClick={() => onSave(same || !next ? item.location : next, name.trim())} disabled={!canSave}>Сохранить</Btn>
       </>}
     >
       {/* Позиция, у которой меняется место хранения */}
@@ -79,6 +82,10 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
             <div className="font-medium text-gray-900 truncate">{value}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mb-5">
+        <Field label="Наименование" required><Input value={name} onChange={setName} placeholder="Наименование позиции" /></Field>
       </div>
 
       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Текущее место хранения</h4>
@@ -102,7 +109,7 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
           {polkas.length ? <Select value={polka} options={polkas} onChange={setPolka} /> : <Input value="—" disabled />}
         </Field>
       </div>
-      {same && <div className="mt-3 text-xs text-gray-500">Выберите место хранения, отличное от текущего</div>}
+      {same && !nameChanged && <div className="mt-3 text-xs text-gray-500">Измените наименование или выберите место хранения, отличное от текущего</div>}
     </Modal>
   );
 }
@@ -228,12 +235,12 @@ export function OstatokDM() {
   const moveItem = skladItems.find(it => it.id === screen.after("mesto")) ?? null;
   // Позиция физически на складе — место хранения можно изменить
   const canMove = (it: DMItem) => it.status === "На складе" || it.status === "Резерв";
-  const saveLocation = (it: DMItem, location: string) => {
+  const saveLocation = (it: DMItem, location: string, name: string) => {
     // Позиция хранится в учёте ДМ или ГП — меняем там, где она есть
-    if (dmItems.some(d => d.id === it.id)) setDmItems(prev => prev.map(d => (d.id === it.id ? { ...d, location } : d)));
-    else setGpItems(prev => prev.map(g => (g.id === it.id ? { ...g, location } : g)));
+    if (dmItems.some(d => d.id === it.id)) setDmItems(prev => prev.map(d => (d.id === it.id ? { ...d, location, name } : d)));
+    else setGpItems(prev => prev.map(g => (g.id === it.id ? { ...g, location, name } : g)));
     screen.close("mesto");
-    show(`Место хранения изменено: ${location}`);
+    show(location !== it.location ? `Место хранения изменено: ${location}` : `Наименование изменено: ${name}`);
   };
 
   const perPage = 8;
@@ -388,7 +395,7 @@ export function OstatokDM() {
         <DMPositionViewModal item={viewItem} onClose={() => screen.close("view")} />
       )}
       {moveItem && (
-        <MoveLocationModal key={moveItem.id} item={moveItem} onClose={() => screen.close("mesto")} onSave={loc => saveLocation(moveItem, loc)} />
+        <MoveLocationModal key={moveItem.id} item={moveItem} onClose={() => screen.close("mesto")} onSave={(loc, name) => saveLocation(moveItem, loc, name)} />
       )}
       {showMerge && mergeItems.length >= 2 && <MergeModal items={mergeItems} onClose={() => screen.close("merge")} onConfirm={doMerge} />}
       {showPrihod && (
