@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
+  Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
 } from "../components/ui";
@@ -176,7 +176,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
               <td className="px-3 py-1.5 text-right">{it.ligWeight.toFixed(2)}</td>
               <td className="px-3 py-1.5 text-right">{it.netWeight.toFixed(2)}</td>
               <td className="px-3 py-1.5 text-gray-500">{it.location}</td>
-              <td className="px-3 py-1.5"><Badge label={it.status} group="pozicii" /></td>
+              <td className="px-3 py-1.5"><PosStatusBadge status={it.status} nomenkl={it.nomenkl} /></td>
             </tr>
           ))}
           {Array.from({ length: fillers }, (_, i) => <tr key={`f${i}`} className="h-8"><td colSpan={10}></td></tr>)}
@@ -373,7 +373,7 @@ export function OstatokDM() {
                 <td className="px-4 py-3">{item.ligWeight}</td>
                 <td className="px-4 py-3">{item.netWeight}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
-                <td className="px-4 py-3"><Badge label={item.status} group="pozicii" /></td>
+                <td className="px-4 py-3"><PosStatusBadge status={item.status} nomenkl={item.nomenkl} /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => screen.openTop("view", item.id)} />

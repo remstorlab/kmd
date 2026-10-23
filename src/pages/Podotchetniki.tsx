@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useApp } from "../store/AppContext";
-import { Badge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, MultiSelect, KlassSelect, ProbaChem,
+import { Badge, PosStatusBadge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, MultiSelect, KlassSelect, ProbaChem,
 } from "../components/ui";
 import { Podotchetnik, PodotchetPosition, Operation, OperPosition, StatusDM, spravValues, opVydacha, opVozvrat } from "../data/mock";
-import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, LucideIcon } from "lucide-react";
+import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, Lightbulb, LucideIcon } from "lucide-react";
 import { matchPage, useTabParam, PAGE_PATHS } from "../router";
 
 const vidIcon: Record<string, LucideIcon> = {
@@ -13,6 +13,7 @@ const vidIcon: Record<string, LucideIcon> = {
   "Отбор пробы": Microscope,
   "Гальванопокрытие": Zap,
   "Производство ГП": Factory,
+  "НИОКР": Lightbulb,
 };
 
 // ── Фильтры позиций (как в подборе позиций ДМ) ────────────────────────────────
@@ -120,7 +121,7 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
               <td className="px-3 py-2">{r.ligWeight.toFixed(2)}</td>
               <td className="px-3 py-2">{r.netWeight.toFixed(2)}</td>
               <td className="px-3 py-2 text-gray-500">{r.location}</td>
-              <td className="px-3 py-2"><Badge label={r.status} group="pozicii" /></td>
+              <td className="px-3 py-2"><PosStatusBadge status={r.status} nomenkl={r.nomenkl} /></td>
             </tr>
           ))}
           {sorted.length === 0 && (

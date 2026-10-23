@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
+  Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, PageHeader,
   PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, ProbaChem,
 } from "../components/ui";
-import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, initialMaterialClasses } from "../data/mock";
+import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
@@ -157,7 +157,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                     <td className="px-3 py-2">{i.netWeight}</td>
                     <td className="px-3 py-2 text-gray-500">{i.location}</td>
                     <td className="px-3 py-2">
-                      <Badge label={i.status} group="pozicii" />
+                      <PosStatusBadge status={i.status} nomenkl={i.nomenkl} />
                       {karta && <div className="text-xs text-gray-400 mt-0.5" title={karta.name}>ШК {karta.plavkaNo}</div>}
                     </td>
                     <td className="px-3 py-2 text-gray-700">{i.qty || "—"}</td>
@@ -358,7 +358,7 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
                     <td className="px-3 py-2">{dash(v.ligWeight)}</td>
                     <td className="px-3 py-2">{dash(v.netWeight)}</td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                    <td className="px-3 py-2">{v.status ? <Badge label={v.status} group="pozicii" /> : <span className="text-gray-400">—</span>}</td>
+                    <td className="px-3 py-2">{v.status ? <PosStatusBadge status={v.status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1">
                         <EyeIcon onClick={() => setViewing(p)} />
@@ -674,7 +674,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
                 <td className="px-3 py-2">{dash(v.ligWeight)}</td>
                 <td className="px-3 py-2">{dash(v.netWeight)}</td>
                 <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                <td className="px-3 py-2">{v.status ? <Badge label={v.status} group="pozicii" /> : <span className="text-gray-400">—</span>}</td>
+                <td className="px-3 py-2">{v.status ? <PosStatusBadge status={v.status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => onView(p)} />
@@ -805,6 +805,10 @@ function ItogoLosses({ losses, total }: { losses: LossRow[]; total: number }) {
 type TabName = "Выдача" | "Возврат" | "Списание" | "Итого";
 
 const VID_LKI = "Анализ в ЛКИ";
+const VID_NIOKR = "НИОКР";
+// Типы документов, закреплённые за видом операции (только для него)
+const VID_DOC_TYPE: Record<string, string> = { [VID_LKI]: DOC_TYPE_LKI, [VID_NIOKR]: DOC_TYPE_NIOKR };
+const FIXED_DOC_TYPES = Object.values(VID_DOC_TYPE);
 
 // Номер документа — сквозной целочисленный счётчик по всем операциям.
 const nextDocNo = (ops: Operation[]) =>
@@ -833,7 +837,7 @@ function posTable(title: string, rows: OperPosition[]) {
 
 // Печатная форма зависит от типа документа операции
 function printOperation(o: Operation, spisano = 0) {
-  const docType = o.docType ?? (o.vid === VID_LKI ? DOC_TYPE_LKI : undefined);
+  const docType = o.docType ?? VID_DOC_TYPE[o.vid];
   printHtml(
     docType === DOC_TYPE_MSL ? mslHtml(o, spisano)
       : docType === DOC_TYPE_LKI ? lkiNakladnayaHtml(o)
@@ -1142,7 +1146,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   })();
 
   const [head, setHead] = useState(() => ({
-    docType: op ? (op.docType ?? (op.vid === VID_LKI ? DOC_TYPE_LKI : "Приказ")) : "",
+    docType: op ? (op.docType ?? VID_DOC_TYPE[op.vid] ?? "Приказ") : "",
     // Номер присваивается автоматически при создании — следующий по счёту среди всех операций.
     document: op?.document || nextDocNo(operations),
     date: op?.date || new Date().toLocaleDateString("ru-RU"),
@@ -1157,15 +1161,26 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   // Blank options list for a brand-new operation so pickers start unselected.
   const withBlank = (opts: string[]) => (op ? opts : ["", ...opts]);
 
-  // «Накладная в ЛКИ» — единственный тип документа для «Анализ в ЛКИ» и только для него.
-  const docTypeOptions = vid === VID_LKI
-    ? [DOC_TYPE_LKI]
-    : withBlank(withCurrent(spravValues("Типы документов движения материала").filter(t => t !== DOC_TYPE_LKI), head.docType));
+  // «Накладная в ЛКИ» — единственный тип документа для «Анализ в ЛКИ», «Накладная на выдачу ДМ» — для «НИОКР»;
+  // другим видам операций эти типы недоступны. «НИОКР» — всегда тип операции «Выдача».
+  const fixedDocType = VID_DOC_TYPE[vid];
+  const docTypeOptions = fixedDocType
+    ? [fixedDocType]
+    : withBlank(withCurrent(spravValues("Типы документов движения материала").filter(t => !FIXED_DOC_TYPES.includes(t)), head.docType));
   const changeVid = (v: string) => {
     setVid(v);
-    if (v === VID_LKI) setHead(h => ({ ...h, docType: DOC_TYPE_LKI }));
-    else if (head.docType === DOC_TYPE_LKI) setHead(h => ({ ...h, docType: "" }));
+    if (VID_DOC_TYPE[v]) setHead(h => ({ ...h, docType: VID_DOC_TYPE[v] }));
+    else if (FIXED_DOC_TYPES.includes(head.docType)) setHead(h => ({ ...h, docType: "" }));
+    if (v === VID_NIOKR) changeType("Выдача");
   };
+  // Тип «Выдача» — без возврата, «Возврат» — без выдачи: недоступная вкладка блокируется, её позиции очищаются.
+  const changeType = (t: string) => {
+    setType(t);
+    if (t === "Выдача") setVozvrat([]);
+    if (t === "Возврат") setVydacha([]);
+  };
+  const disabledTabs: TabName[] = type === "Выдача" ? ["Возврат"] : type === "Возврат" ? ["Выдача"] : [];
+  const activeTab: TabName = disabledTabs.includes(tab) ? (type === "Возврат" ? "Возврат" : "Выдача") : tab;
 
   const vesVydacha = vydacha.reduce((a, p) => a + p.ves, 0);
   const vesVozvrat = vozvrat.reduce((a, p) => a + p.ves, 0);
@@ -1175,13 +1190,14 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const inNorm = Math.abs(delta) <= 5;
 
 
+  // Позиции требуются только во вкладках, доступных для типа операции
   const oformitBlock =
-    vydacha.length === 0 ? "Добавьте хотя бы одну позицию во вкладке «Выдача»"
-      : vozvrat.length === 0 ? "Добавьте позиции во вкладке «Возврат»"
+    type !== "Возврат" && vydacha.length === 0 ? "Добавьте хотя бы одну позицию во вкладке «Выдача»"
+      : type !== "Выдача" && vozvrat.length === 0 ? "Добавьте позиции во вкладке «Возврат»"
       : null;
-  // Дельта вне допуска не запрещает оформление — только требует подтверждения
+  // Дельта вне допуска не запрещает оформление — только требует подтверждения (только для «Выдача-Возврат»)
   const [confirmOformit, setConfirmOformit] = useState(false);
-  const oformit = () => (inNorm ? save(true) : setConfirmOformit(true));
+  const oformit = () => (inNorm || type === "Выдача" || type === "Возврат" ? save(true) : setConfirmOformit(true));
 
   // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
   // эта карта возвращается в «Редактирование» и пропадает из выбора ШК для плавки (там только «Новая»).
@@ -1280,13 +1296,13 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       {/* Fields */}
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Field label="Тип операции" required={!headRo}>
-          <Select value={type} options={withCurrent(spravValues("Типы операций"), type)} onChange={setType} disabled={headRo || !!op} />
+          <Select value={type} options={withCurrent(spravValues("Типы операций"), type)} onChange={changeType} disabled={headRo || !!op || vid === VID_NIOKR} />
         </Field>
         <Field label="Вид операции" required={!headRo}>
           <Select value={vid} options={withCurrent(spravValues("Виды операций"), vid)} onChange={changeVid} disabled={headRo || !!op} />
         </Field>
         <Field label="Наименование изделия" full><Input value={description} onChange={setDescription} placeholder="Краткое описание операции" disabled={headRo} /></Field>
-        <Field label="Тип документа" required={!headRo}><Select value={head.docType} options={docTypeOptions} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={headRo || vid === VID_LKI} /></Field>
+        <Field label="Тип документа" required={!headRo}><Select value={head.docType} options={docTypeOptions} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={headRo || !!fixedDocType} /></Field>
         <Field label="Номер документа"><Input value={head.document} disabled /></Field>
         <Field label="Дата операции" required={!headRo}><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
         <Field label="Заказчик"><Select value={head.zakazchik} options={withBlank(["Монетный двор"])} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={headRo} /></Field>
@@ -1299,9 +1315,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       </div>
 
       {/* Tabs */}
-      <Tabs tabs={["Выдача", "Возврат", "Списание", "Итого"]} active={tab} onChange={t => setTab(t as TabName)} />
+      <Tabs tabs={["Выдача", "Возврат", "Списание", "Итого"]} active={activeTab} onChange={t => setTab(t as TabName)} disabled={disabledTabs} />
 
-      {tab === "Выдача" && (
+      {activeTab === "Выдача" && (
         <>
           {!ro && (
             <div className="flex gap-2 mb-3">
@@ -1327,7 +1343,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         </>
       )}
 
-      {tab === "Возврат" && (
+      {activeTab === "Возврат" && (
         <>
           {!ro && (
             <div className="flex gap-2 mb-3">
@@ -1348,7 +1364,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         </>
       )}
 
-      {tab === "Списание" && (
+      {activeTab === "Списание" && (
         <SpisanieTab
           losses={losses}
           setLosses={setLosses}
@@ -1361,7 +1377,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         />
       )}
 
-      {tab === "Итого" && (
+      {activeTab === "Итого" && (
         <>
           <div className={`flex items-center justify-between rounded-lg px-4 py-3 mb-5 border ${inNorm ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}>
             <div className="flex items-center gap-2">

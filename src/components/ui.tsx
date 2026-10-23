@@ -142,6 +142,54 @@ export function ProbaChem({ proba, chem }: { proba: React.ReactNode; chem?: Chem
   );
 }
 
+// ── Статус позиции с подсказкой ──────────────────────────────────────────────
+// «В подотчёте» — у кого и по какому документу (операция движения материала, в выдаче которой позиция);
+// «Резерв» — по какой шихтовой карте. Подсказка выводится поверх всего (в body).
+
+export function PosStatusBadge({ status, nomenkl }: { status: string; nomenkl?: string }) {
+  const { operations, shihtovyeKarty } = useApp();
+  const [pos, setPos] = useState<{ x: number; y: number; up: boolean } | null>(null);
+  let rows: [string, string][] = [];
+  if (nomenkl && status === "В подотчёте") {
+    const has = (o: (typeof operations)[number]) => (o.vydachaPos ?? []).some(p => p.nomenkl === nomenkl);
+    const op = operations.find(o => o.stage !== "Завершено" && has(o)) ?? operations.find(has);
+    if (op) rows = [["Подотчётник", op.responsible || "—"], ["Документ", `№ ${op.document}${op.docType ? ` (${op.docType})` : ""}`]];
+  } else if (nomenkl && status === "Резерв") {
+    const k = shihtovyeKarty.find(k => k.status !== "Выполнена" && k.materials.some(m => m.nomenkl === nomenkl));
+    if (k) rows = [["Шихтовая карта", `ШК № ${k.plavkaNo}`], ["Наименование", k.name]];
+  }
+  if (rows.length === 0) return <Badge label={status} group="pozicii" />;
+
+  const open = (e: React.MouseEvent<HTMLSpanElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const up = r.bottom + 90 > window.innerHeight;
+    setPos({ x: r.left, y: up ? r.top - 6 : r.bottom + 6, up });
+  };
+  return (
+    <>
+      <span onMouseEnter={open} onMouseLeave={() => setPos(null)} className="cursor-help inline-flex">
+        <Badge label={status} group="pozicii" />
+      </span>
+      {pos && createPortal(
+        <div
+          className="fixed z-[80] pointer-events-none bg-slate-900 text-white rounded-lg shadow-lg px-3 py-2 text-xs"
+          style={{ left: pos.x, top: pos.y, transform: pos.up ? "translateY(-100%)" : undefined }}
+        >
+          <div className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
+            {rows.map(([k, v]) => (
+              <React.Fragment key={k}>
+                <span className="text-slate-400">{k}</span>
+                <span className="font-medium">{v}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 // ── Modal ────────────────────────────────────────────────────────────────────
 
 export function Modal({
