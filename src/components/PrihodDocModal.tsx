@@ -3,8 +3,9 @@ import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
   Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem,
 } from "./ui";
-import { SkladDoc, DocStatus, spravValues, MAIN_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD } from "../data/mock";
+import { SkladDoc, DocStatus, ChemComposition, spravValues, MAIN_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD } from "../data/mock";
 import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
+import ChemCompositionBlock from "./ChemCompositionBlock";
 import { useApp } from "../store/AppContext";
 import { Plus } from "lucide-react";
 import { useScreen } from "../router";
@@ -15,6 +16,16 @@ import { useScreen } from "../router";
 type PrihodDocType = string;
 // Отправители приходного ордера — из справочника «Организации»
 const ORGS = spravValues("Организации");
+
+// Демо-позиции для документов из демо-данных (без сохранённых позиций)
+const DEMO_ORDER: PrihodPosition[] = [
+  { id: "po-1", nomenkl: "5015301", name: "Слиток золотой стандартный", klass: "Слиток", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "1000.00", net: "999.90", seyf: "1", polka: "1", chem: { au: "999.90" } },
+  { id: "po-2", nomenkl: "5015302", name: "Слиток серебряный", klass: "Слиток", code: "2000", kol: "1", unit: "шт", proba: "925", lig: "318.60", net: "294.71", seyf: "2", polka: "1", chem: { ag: "294.71" } },
+];
+const DEMO_NAKLAD: PrihodPosition[] = [
+  { id: "pn-1", nomenkl: "5015303", name: "Монета «Атамекен» Ag 925", klass: "Готовая продукция", code: "2000", kol: "200", unit: "шт", proba: "925", lig: "6220.00", net: "5753.50", seyf: "1", polka: "1", chem: { ag: "5753.50" } },
+  { id: "pn-2", nomenkl: "5015304", name: "Орден «Алтын алка»", klass: "Готовая продукция", code: "0300", kol: "30", unit: "шт", proba: "750", lig: "672.00", net: "504.00", seyf: "1", polka: "2", chem: { au: "504.00", ag: "100.80", cu: "67.20" } },
+];
 
 // ── Документ прихода ─────────────────────────────────────────────────────────
 
@@ -69,22 +80,26 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
   const [orderFiles, setOrderFiles] = useState<File[]>(() => [new File([], `Приходный ордер ${doc?.number || "ПО-0342"}.pdf`)]);
   const [nakladFiles, setNakladFiles] = useState<File[]>(() => [new File([], `Накладная_${doc?.number || "НП-001234"}.pdf`)]);
 
-  // Позиции
-  const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>([
-    { id: "po-1", nomenkl: "5015301", name: "Слиток золотой стандартный", klass: "Слиток", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "1000.00", net: "999.90", seyf: "1", polka: "1", chem: { au: "999.90" } },
-    { id: "po-2", nomenkl: "5015302", name: "Слиток серебряный", klass: "Слиток", code: "2000", kol: "1", unit: "шт", proba: "925", lig: "318.60", net: "294.71", seyf: "2", polka: "1", chem: { ag: "294.71" } },
-  ]);
-  const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>([
-    { id: "pn-1", nomenkl: "5015303", name: "Монета «Атамекен» Ag 925", klass: "Готовая продукция", code: "2000", kol: "200", unit: "шт", proba: "925", lig: "6220.00", net: "5753.50", seyf: "1", polka: "1", chem: { ag: "5753.50" } },
-    { id: "pn-2", nomenkl: "5015304", name: "Орден «Алтын алка»", klass: "Готовая продукция", code: "0300", kol: "30", unit: "шт", proba: "750", lig: "672.00", net: "504.00", seyf: "1", polka: "2", chem: { au: "504.00", ag: "100.80", cu: "67.20" } },
-  ]);
+  // Позиции: новый документ — без позиций (сохранить можно и пустым); сохранённый — свои позиции,
+  // у демо-документов без сохранённых позиций — демо-набор.
+  const initialPositions = (type: string, demo: PrihodPosition[]) =>
+    !doc ? [] : doc.type !== type ? [] : doc.prihodPositions ?? demo;
+  const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>(() => initialPositions(DOC_PRIHOD_ORDER, DEMO_ORDER));
+  const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>(() => initialPositions(DOC_PRIHOD_NAKLAD, DEMO_NAKLAD));
+
+  // Хим. состав на партию — задаётся в документе и подставляется в каждую новую позицию
+  const [partyChemOn, setPartyChemOn] = useState(!!doc?.partyChem);
+  const [partyChem, setPartyChem] = useState<ChemComposition>(() => doc?.partyChem ?? {});
 
   const positions = isOrder ? orderPositions : nakladPositions;
   const setPositions = isOrder ? setOrderPositions : setNakladPositions;
   const sklad = isOrder ? head.poluchatel : head.skladPoluch;
 
   const posModal: { mode: "add" | "edit" | "view"; pos: PrihodPosition } | null = (() => {
-    if (screen.has("position-new")) return { mode: "add", pos: emptyPosition(storageLocations, sklad, isOrder ? "Слиток" : "Готовая продукция", "1000") };
+    if (screen.has("position-new")) {
+      const pos = emptyPosition(storageLocations, sklad, isOrder ? "Слиток" : "Готовая продукция", "1000");
+      return { mode: "add", pos: partyChemOn ? { ...pos, chem: { ...partyChem } } : pos };
+    }
     const view = positions.find(x => x.id === screen.after("position"));
     if (view) return { mode: "view", pos: view };
     const edit = positions.find(x => x.id === screen.after("position-edit"));
@@ -113,10 +128,12 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
     loc: p => locOf(p),
   });
 
+  // Документ сохраняется и оформляется в том числе без позиций
   const save = (status: DocStatus) => {
+    const base = { id: doc?.id ?? `sd-${Date.now()}`, status, receiver: MAIN_SKLAD, prihodPositions: positions, partyChem: partyChemOn ? partyChem : undefined };
     const d: SkladDoc = isOrder
-      ? { id: doc?.id ?? `sd-${Date.now()}`, date: head.date, type: DOC_PRIHOD_ORDER, number: head.number, status, sender: head.otpravitel, receiver: MAIN_SKLAD }
-      : { id: doc?.id ?? `sd-${Date.now()}`, date: head.nakladDate, type: DOC_PRIHOD_NAKLAD, number: head.nakladNumber, status, sender: head.skladOtpr, receiver: MAIN_SKLAD };
+      ? { ...base, date: head.date, type: DOC_PRIHOD_ORDER, number: head.number, sender: head.otpravitel }
+      : { ...base, date: head.nakladDate, type: DOC_PRIHOD_NAKLAD, number: head.nakladNumber, sender: head.skladOtpr };
     onSave(d);
   };
 
@@ -190,6 +207,24 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
           ? <MultiFileUpload files={orderFiles} onChange={setOrderFiles} disabled={ro} />
           : <MultiFileUpload files={nakladFiles} onChange={setNakladFiles} disabled={ro} />}
       </div>
+
+      {/* Хим. состав на партию: подставляется в каждую новую позицию документа (в позиции его можно изменить) */}
+      {(!ro || partyChemOn) && (
+        <div className="mb-4">
+          {!ro && (
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer mb-2">
+              <input type="checkbox" checked={partyChemOn} onChange={e => setPartyChemOn(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+              Задать хим. состав на партию
+            </label>
+          )}
+          {partyChemOn && (
+            <>
+              <ChemCompositionBlock value={partyChem} onChange={setPartyChem} disabled={ro} />
+              {!ro && <div className="text-xs text-gray-500 mt-1">Хим. состав партии автоматически заполняется в новых позициях документа</div>}
+            </>
+          )}
+        </div>
+      )}
 
       <div className="border-t border-gray-200 pt-4">
         <div className="flex items-center justify-between mb-3">

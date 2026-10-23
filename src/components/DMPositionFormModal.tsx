@@ -113,7 +113,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   const [manyCount, setManyCount] = useState("2");
   const canMany = mode === "add" && !!onSaveMany;
   const count = parseInt(manyCount, 10) || 0;
-  const badCount = canMany && many && (count < 2 || count > 100);
+  const badCount = canMany && many && (count < 2 || count > 999);
   const canSave = !!form.name.trim() && !!form.nomenkl.trim() && !badCount;
 
   const save = () => {
@@ -176,7 +176,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
           {many && (
             <div className={`text-xs mt-2 ${badCount ? "text-red-600" : "text-gray-500"}`}>
               {badCount
-                ? "Укажите количество позиций от 2 до 100"
+                ? "Укажите количество позиций от 2 до 999"
                 : `Будет создано ${count} позиций с одинаковыми атрибутами, номенкл. номера ${form.nomenkl} – ${lastNomenkl}`}
             </div>
           )}

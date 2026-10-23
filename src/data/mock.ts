@@ -1,3 +1,4 @@
+import type { PrihodPosition } from "../components/DMPositionFormModal";
 // «Закрыта» — позиция выдана со склада наружу по оформленной накладной на отгрузку.
 export type StatusGP = "На складе" | "Резерв" | "В подотчёте" | "Закрыта";
 export type StatusDM = "На складе" | "Резерв" | "В подотчёте" | "Закрыта";
@@ -63,6 +64,10 @@ export interface SkladDoc {
   receiver: string;
   // Позиции накладной на отгрузку (выдача со склада)
   positions?: VydachaDocPosition[];
+  // Позиции приходного ордера / накладной (приём на склад)
+  prihodPositions?: PrihodPosition[];
+  // Хим. состав на партию: задан на уровне документа и подставляется в новые позиции
+  partyChem?: ChemComposition;
 }
 
 // Позиция выдачи: ссылка на позицию склада (id + учёт ГП/ДМ) и количество к выдаче.
