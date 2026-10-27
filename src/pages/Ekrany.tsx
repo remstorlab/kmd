@@ -18,7 +18,8 @@ export function useScreenGroups(): Group[] {
   const opVozvrat = operations.find(o => o.stage === "В работе" && o.statusVozvrat !== "Не начат") ?? operations[0];
   const opDone = operations.find(o => o.stage === "Завершено") ?? operations[0];
   const prihodOrder = skladDocs.find(d => d.type === "Приходный ордер") ?? skladDocs[0];
-  const prihodNaklad = skladDocs.find(d => d.type !== "Приходный ордер") ?? skladDocs[0];
+  const prihodNaklad = skladDocs.find(d => d.type === "Накладная") ?? skladDocs[0];
+  const trebovanie = skladDocs.find(d => d.type === "Требование");
   const gp = gpItems[0];
   const dm = dmItems[0];
   const karta = shihtovyeKarty.find(k => k.status === "Новая") ?? shihtovyeKarty[0];
@@ -56,6 +57,10 @@ export function useScreenGroups(): Group[] {
       prihodOrder && { title: "Приход: просмотр ордера", path: `${P["prihod-list"]}/view/${prihodOrder.id}` },
       prihodOrder && { title: "Приход: редактирование ордера", path: `${P["prihod-list"]}/edit/${prihodOrder.id}` },
       prihodNaklad && prihodNaklad !== prihodOrder && { title: "Приход: просмотр накладной", path: `${P["prihod-list"]}/view/${prihodNaklad.id}` },
+      { title: "Приход: новое требование", path: `${P["prihod-list"]}/new/trebovanie` },
+      { title: "Требование: подбор позиций", path: `${P["prihod-list"]}/new/trebovanie/pick` },
+      trebovanie && { title: "Приход: просмотр требования", path: `${P["prihod-list"]}/view/${trebovanie.id}` },
+      trebovanie && { title: "Приход: редактирование требования", path: `${P["prihod-list"]}/edit/${trebovanie.id}` },
       { title: "Выдача со склада", path: P["vydacha-list"] },
       { title: "Выдача: накладная на отгрузку ДМ", path: `${P["vydacha-list"]}/new` },
       { title: "Выдача: накладная на передачу ГП", path: `${P["vydacha-list"]}/new/gp` },

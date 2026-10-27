@@ -102,6 +102,13 @@ export function useScreen() {
       if (on === rest.includes(name)) return;
       navigate(joinPath(base, on ? [...rest, name] : rest.filter(s => s !== name)) + search, { replace: true });
     },
+    /** Взаимоисключающие сегменты-флаги: оставить только on (или ни одного) из names */
+    choose: (names: string[], on?: string) => {
+      const kept = rest.filter(s => !names.includes(s));
+      const next = on ? [...kept, on] : kept;
+      if (next.join("/") === rest.join("/")) return;
+      navigate(joinPath(base, next) + search, { replace: true });
+    },
   };
 }
 

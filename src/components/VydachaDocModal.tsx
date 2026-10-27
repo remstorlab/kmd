@@ -11,7 +11,7 @@ import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
 // ── Выдача со склада наружу (получателю): «Накладная» ─────────────────────────
-// Не связана с «Движением материала»: это отгрузка стороннему получателю со склада системы.
+// Не связана с «Движением материала»: это отгрузка стороннему получателю со склада выдачи (СДМ2) — в обоих типах документа.
 // Тип документа — из справочника «Типы документов отгрузки»; набор полей общий, отличается печатная форма.
 // Выдать можно любую позицию склада, независимо от класса.
 
@@ -53,7 +53,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const [head, setHead] = useState(() => ({
     number: doc?.number || `НО-${Math.floor(Math.random() * 900 + 100)}`,
     date: doc?.date || today,
-    // Отправитель — всегда склад системы
+    // Отправитель — всегда склад выдачи (СДМ2)
     sender: MAIN_SKLAD,
     receiver: doc?.receiver || RECEIVERS[0],
     schetFaktura: "",
@@ -67,10 +67,11 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const showPick = screen.has("pick");
   const setShowPick = (open: boolean) => (open ? screen.open("pick") : screen.close("pick"));
 
-  // Остатки склада — все позиции «На складе» из обоих учётов, любого класса
+  // Остатки склада выдачи (СДМ2) — позиции «На складе» и «Резерв» из обоих учётов, любого класса.
+  // Выдача формируется только со СДМ2: позиции склада приёмки сначала перемещаются по требованию.
   const stock = useMemo<StockRow[]>(() => {
-    const fromGp: StockRow[] = gpItems.map(i => ({ id: i.id, src: "gp", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: i.qty, unit: i.unit, proba: i.proba ?? null, lig: i.ligWeight ?? null, net: i.netWeight ?? null, location: i.location, chem: i.chem }));
-    const fromDm: StockRow[] = dmItems.map(i => ({ id: i.id, src: "dm", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, chem: i.chem }));
+    const fromGp: StockRow[] = gpItems.filter(i => i.sklad === MAIN_SKLAD).map(i => ({ id: i.id, src: "gp", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: i.qty, unit: i.unit, proba: i.proba ?? null, lig: i.ligWeight ?? null, net: i.netWeight ?? null, location: i.location, sklad: i.sklad, chem: i.chem }));
+    const fromDm: StockRow[] = dmItems.filter(i => i.sklad === MAIN_SKLAD).map(i => ({ id: i.id, src: "dm", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem }));
     const available = [
       ...gpItems.filter(i => canIssue(i.status)).map(i => i.id),
       ...dmItems.filter(i => canIssue(i.status)).map(i => i.id),
@@ -141,7 +142,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       if (positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
       const lacking = positions.filter(p => {
         const it = p.src === "gp" ? gpItems.find(i => i.id === p.id) : dmItems.find(i => i.id === p.id);
-        return !it || !canIssue(it.status) || it.qty < p.issue;
+        return !it || it.sklad !== MAIN_SKLAD || !canIssue(it.status) || it.qty < p.issue;
       });
       if (lacking.length) {
         show(`Недостаточно остатка на складе: ${lacking.map(p => p.name).join(", ")}`);
@@ -213,7 +214,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
         </Field>
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
         <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-        <Field label="Склад-отправитель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
+        <Field label="Отправитель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
         <Field label="Получатель" required={!ro}><Select value={head.receiver} options={receivers} onChange={h("receiver")} disabled={ro} /></Field>
         <Field label="Доверенность получателя"><Input value={head.doverennost} onChange={h("doverennost")} placeholder="№ и дата доверенности" disabled={ro} /></Field>
         <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={h("schetFaktura")} placeholder="СФ-XXXX" disabled={ro} /></Field>

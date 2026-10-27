@@ -23,6 +23,8 @@ export interface StockRecord {
   chem?: ChemComposition;
   parentId?: string;
   status: string;
+  // Склад записи: возвращаемая часть объединяется с исходной записью только на том же складе
+  sklad?: string;
   location: string;
 }
 
@@ -109,7 +111,7 @@ export function returnToStock<T extends StockRecord>(items: T[], ids: Set<string
   for (const id of ids) {
     const part = out.find(i => i.id === id);
     if (!part) continue;
-    const parent = part.parentId ? out.find(i => i.id === part.parentId && i.status === stockStatus) : undefined;
+    const parent = part.parentId ? out.find(i => i.id === part.parentId && i.status === stockStatus && i.sklad === part.sklad) : undefined;
     if (parent) {
       const merged = {
         ...parent,

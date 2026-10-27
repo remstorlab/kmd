@@ -5,7 +5,7 @@ import {
   ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, MultiSelect, KlassSelect, MaterialCodeSelect, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, Badge,
 } from "../components/ui";
-import { SkladDoc, GPItem, DocStatus } from "../data/mock";
+import { SkladDoc, docSklady, spravValues } from "../data/mock";
 import { Inbox, Send, Repeat, Plus, X, LucideIcon } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
@@ -16,7 +16,7 @@ import { useScreen } from "../router";
 export function SkladskieOperHub() {
   const { navigate } = useApp();
   const cards: { title: string; sub: string; icon: LucideIcon; page: "prihod-list" | "vydacha-list" | "dvizhenie-mat" }[] = [
-    { title: "Приход на склад", sub: "Приходные ордера и накладные", icon: Inbox, page: "prihod-list" },
+    { title: "Приход на склад", sub: "Приходные ордера, накладные и требования", icon: Inbox, page: "prihod-list" },
     { title: "Выдача со склада", sub: "Документы отгрузки", icon: Send, page: "vydacha-list" },
     { title: "Движение материала (операции)", sub: "Журнал внутренних операций", icon: Repeat, page: "dvizhenie-mat" },
   ];
@@ -49,13 +49,16 @@ const isoToNum = (iso: string) => {
 };
 const dateCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
 
-function useDocFilters(docs: SkladDoc[], onChange: () => void) {
+// withSklad — фильтр «Склад» (множественный выбор из справочника «Склады»): документ подходит, если склад
+// выбран отправителем или получателем документа
+function useDocFilters(docs: SkladDoc[], onChange: () => void, withSklad = false) {
   const { statusDicts } = useApp();
   const [type, setType] = useState(ALL_TYPES);
   const [number, setNumber] = useState("");
   const [status, setStatus] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [sklad, setSklad] = useState<string[]>([]);
   // При изменении фильтра — на первую страницу
   const upd = <T,>(set: (v: T) => void) => (v: T) => { set(v); onChange(); };
 
@@ -73,13 +76,14 @@ function useDocFilters(docs: SkladDoc[], onChange: () => void) {
     return (type === ALL_TYPES || d.type === type)
       && (!q || d.number.toLowerCase().includes(q))
       && (status.length === 0 || status.includes(d.status))
+      && (sklad.length === 0 || docSklady(d).some(s => sklad.includes(s)))
       && dt >= from && dt <= to;
   });
 
-  const reset = () => { setType(ALL_TYPES); setNumber(""); setStatus([]); setDateFrom(""); setDateTo(""); onChange(); };
+  const reset = () => { setType(ALL_TYPES); setNumber(""); setStatus([]); setDateFrom(""); setDateTo(""); setSklad([]); onChange(); };
 
   const bar = (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 grid grid-cols-6 gap-3 items-end">
+    <div className={`bg-white rounded-xl border border-gray-200 p-4 mb-4 grid ${withSklad ? "grid-cols-7" : "grid-cols-6"} gap-3 items-end`}>
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1">Дата с</label>
         <input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => upd(setDateFrom)(e.target.value)} className={dateCls} />
@@ -94,6 +98,7 @@ function useDocFilters(docs: SkladDoc[], onChange: () => void) {
         <SearchInput value={number} onChange={upd(setNumber)} placeholder="Поиск по номеру..." />
       </div>
       <Field label="Статус"><MultiSelect values={status} options={statuses} onChange={upd(setStatus)} allLabel={ALL_STATUSES} /></Field>
+      {withSklad && <Field label="Склад"><MultiSelect values={sklad} options={spravValues("Склады")} onChange={upd(setSklad)} allLabel="Все склады" /></Field>}
       <button onClick={reset} className="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
     </div>
   );
@@ -120,7 +125,7 @@ function DocList({
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
-  const { filtered, bar } = useDocFilters(docs, () => setPage(1));
+  const { filtered, bar } = useDocFilters(docs, () => setPage(1), true);
   // Экраны: …/new, …/view/:id, …/edit/:id
   const screen = useScreen();
   const viewDoc = docs.find(d => d.id === screen.after("view")) ?? null;
@@ -133,6 +138,7 @@ function DocList({
     number: d => d.number,
     sender: d => d.sender,
     receiver: d => d.receiver,
+    sklad: d => docSklady(d).join(" → "),
     status: d => d.status,
   });
   const [perPage, setPerPage] = usePerPage("prihod", 8);
@@ -166,6 +172,7 @@ function DocList({
               <SortTh sortKey="number" sort={sort} onSort={toggleSort}>Номер</SortTh>
               <SortTh sortKey="sender" sort={sort} onSort={toggleSort}>Отправитель</SortTh>
               <SortTh sortKey="receiver" sort={sort} onSort={toggleSort}>Получатель</SortTh>
+              <SortTh sortKey="sklad" sort={sort} onSort={toggleSort}>Склад</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <th className="w-32"></th>
             </tr>
@@ -178,6 +185,7 @@ function DocList({
                 <td className="px-4 py-3 text-blue-600 font-medium">{doc.number}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.sender}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
+                <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{docSklady(doc).join(" → ") || "—"}</td>
                 <td className="px-4 py-3"><Badge label={doc.status} group="dokumenty" /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
@@ -188,9 +196,9 @@ function DocList({
               </tr>
             ))}
             {pageItems.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
+              <tr><td colSpan={8} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
             )}
-            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={7} />
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={8} />
           </tbody>
         </table>
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
@@ -252,6 +260,7 @@ export function VydachaList() {
     number: d => d.number,
     sender: d => d.sender,
     receiver: d => d.receiver,
+    sklad: d => docSklady(d).join(" → "),
     status: d => d.status,
   });
 
@@ -278,6 +287,7 @@ export function VydachaList() {
               <SortTh sortKey="number" sort={sort} onSort={toggleSort}>Номер</SortTh>
               <SortTh sortKey="sender" sort={sort} onSort={toggleSort}>Отправитель</SortTh>
               <SortTh sortKey="receiver" sort={sort} onSort={toggleSort}>Получатель</SortTh>
+              <SortTh sortKey="sklad" sort={sort} onSort={toggleSort}>Склад</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <th className="w-28"></th>
             </tr>
@@ -290,6 +300,7 @@ export function VydachaList() {
                 <td className="px-4 py-3 text-blue-600 font-medium">{doc.number}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.sender}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
+                <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{docSklady(doc).join(" → ") || "—"}</td>
                 <td className="px-4 py-3"><Badge label={doc.status} group="dokumenty" /></td>
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
@@ -300,9 +311,9 @@ export function VydachaList() {
               </tr>
             ))}
             {sorted.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
+              <tr><td colSpan={8} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
             )}
-            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={7} />
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={8} />
           </tbody>
         </table>
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />

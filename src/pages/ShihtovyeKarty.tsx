@@ -5,7 +5,7 @@ import {
   useToast, Toast, Field, Input, Select, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, formatDateTime, usePaged,
 } from "../components/ui";
-import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass } from "../data/mock";
+import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass, PRIHOD_SKLAD } from "../data/mock";
 import { takeFromStock, returnToStock } from "../data/stock";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
@@ -83,12 +83,17 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const { toast, show, clear } = useToast();
   const ro = readOnly;
 
-  // Доступные позиции склада ДМ для шихты
+  // Доступные позиции для шихты — на складе приёмки (СДМ1): резервируются под карту, затем по требованию
+  // перемещаются на СДМ2 (резерв сохраняется) и выдаются на плавку
   const skladChem = (id: string) => dmItems.find(i => i.id === id)?.chem;
   const skladRows = useMemo<StockRow[]>(() => dmItems
-    .filter(i => i.status === "На складе" && i.qty > 0 && !isGPKlass(i.klass))
-    .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, chem: i.chem })),
+    .filter(i => i.sklad === PRIHOD_SKLAD && i.status === "На складе" && i.qty > 0 && !isGPKlass(i.klass))
+    .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem })),
   [dmItems]);
+  // Склад, на котором сейчас находится зарезервированная позиция карты (СДМ1 — до требования, СДМ2 — после)
+  const rezSklad = (m: MatRow) =>
+    (m.srcId ? dmItems.find(i => i.id === m.srcId) : undefined)?.sklad
+    ?? dmItems.find(i => i.nomenkl === m.nomenkl && i.status === "Резерв")?.sklad;
 
   // Уже взято в карту из каждой позиции склада (в этой сессии)
   const already = materials.reduce<Record<string, number>>((acc, m) => {
@@ -285,7 +290,12 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                     <td key={e.id} className="px-3 py-2 text-right text-gray-600">{num(m.chem[e.id]) > 0 ? m.chem[e.id] : "—"}</td>
                   ))}
                   <td className="px-3 py-2 text-right text-blue-600">{dola(m)}%</td>
-                  <td className="px-3 py-2">{m.nomenkl ? <Badge label="Резерв" group="pozicii" /> : <span className="text-xs text-gray-400">Доп. материал</span>}</td>
+                  <td className="px-3 py-2">{m.nomenkl ? (
+                    <div>
+                      <Badge label="Резерв" group="pozicii" />
+                      {rezSklad(m) && <div className="text-xs text-gray-400 mt-0.5 whitespace-nowrap">{rezSklad(m)}</div>}
+                    </div>
+                  ) : <span className="text-xs text-gray-400">Доп. материал</span>}</td>
                   {!ro && <td className="px-3 py-2 text-center">
                     <button onClick={() => setMaterials(prev => prev.filter(x => x.key !== m.key))} className="text-gray-400 hover:text-red-500 transition-colors" title="Убрать из карты"><X className="w-3.5 h-3.5" /></button>
                   </td>}
@@ -352,12 +362,12 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
       {showFromSklad && (
         <StockPickerModal
-          title="Добавить материал со склада ДМ"
+          title={`Добавить материал со склада «${PRIHOD_SKLAD}»`}
           rows={skladRows}
           already={already}
           showWeights
           qtyLabel="Количество изделий"
-          emptyText="Нет доступных позиций на складе ДМ"
+          emptyText={`Нет доступных позиций на складе «${PRIHOD_SKLAD}»`}
           addLabel="Добавить выбранные"
           onClose={() => setShowFromSklad(false)}
           onAdd={addFromSklad}

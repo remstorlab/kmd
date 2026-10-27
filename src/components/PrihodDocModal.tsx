@@ -1,19 +1,51 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
   Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem, usePaged, FillerRows,
 } from "./ui";
-import { SkladDoc, DocStatus, ChemComposition, spravValues, MAIN_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD } from "../data/mock";
+import { SkladDoc, DocStatus, ChemComposition, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_TREBOVANIE } from "../data/mock";
 import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
 import ChemCompositionBlock from "./ChemCompositionBlock";
+import TrebovanieDocModal from "./TrebovanieDocModal";
 import { useApp } from "../store/AppContext";
 import { Plus } from "lucide-react";
 import { useScreen } from "../router";
 
-// ── Приём на склад: Приходный ордер / Накладная ──────────────────────────────
-// Общая модалка для «Остатки на складе ДМ → Принять на склад» и «Приход на склад». Получатель — склад системы.
+// ── Приём на склад: Приходный ордер / Накладная / Требование ─────────────────
+// Общая модалка для «Остатки на складе ДМ → Принять на склад» и «Приход на склад».
+// Приходный ордер и накладная: получатель — склад из справочника «Склады», по умолчанию склад приёмки СДМ1;
+// при оформлении позиции документа ставятся на склад-получатель. Требование — перемещение позиций
+// со склада на склад (СДМ1 → СДМ2), см. TrebovanieDocModal.
 
 type PrihodDocType = string;
+type Props = {
+  onClose: () => void;
+  onSave: (d: SkladDoc) => void;
+  doc?: SkladDoc | null;
+  readOnly?: boolean;
+};
+
+// Вложенные экраны типа документа: …/nakladnaya, …/trebovanie (без сегмента — приходный ордер)
+const TYPE_FLAGS: Record<string, string> = { [DOC_PRIHOD_NAKLAD]: "nakladnaya", [DOC_TREBOVANIE]: "trebovanie" };
+
+export default function PrihodDocModal(props: Props) {
+  const { doc, readOnly: ro = false } = props;
+  const screen = useScreen();
+  // Тип документа — из справочника «Типы документов приёмки»
+  const docType: PrihodDocType = doc
+    ? (doc.type === DOC_PRIHOD_ORDER || doc.type === DOC_TREBOVANIE ? doc.type : DOC_PRIHOD_NAKLAD)
+    : screen.has("trebovanie") ? DOC_TREBOVANIE : screen.has("nakladnaya") ? DOC_PRIHOD_NAKLAD : DOC_PRIHOD_ORDER;
+  const setDocType = (t: PrihodDocType) => screen.choose(Object.values(TYPE_FLAGS), TYPE_FLAGS[t]);
+  const typeOptions = spravValues("Типы документов приёмки");
+  const typeSelect = (
+    <Field label="Тип документа" required={!ro}>
+      <Select value={docType} options={typeOptions.includes(docType) ? typeOptions : [docType, ...typeOptions]} onChange={setDocType} disabled={ro || !!doc} />
+    </Field>
+  );
+  return docType === DOC_TREBOVANIE
+    ? <TrebovanieDocModal {...props} typeSelect={typeSelect} />
+    : <PrihodForm {...props} docType={docType} typeSelect={typeSelect} />;
+}
 // Отправители приходного ордера — из справочника «Организации»
 const ORGS = spravValues("Организации");
 
@@ -27,31 +59,27 @@ const DEMO_NAKLAD: PrihodPosition[] = [
   { id: "pn-2", nomenkl: "5015304", name: "Орден «Алтын алка»", klass: "Готовая продукция", code: "0300", kol: "30", unit: "шт", proba: "750", lig: "672.00", net: "504.00", seyf: "1", polka: "2", chem: { au: "504.00", ag: "100.80", cu: "67.20" } },
 ];
 
-// ── Документ прихода ─────────────────────────────────────────────────────────
+// ── Документ прихода (приходный ордер / накладная) ───────────────────────────
 
-export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false }: {
-  onClose: () => void;
-  onSave: (d: SkladDoc) => void;
-  doc?: SkladDoc | null;
-  readOnly?: boolean;
-}) {
+function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelect }: Props & { docType: PrihodDocType; typeSelect: React.ReactNode }) {
   const ro = readOnly;
-  const { storageLocations } = useApp();
-  // Вложенные экраны: …/nakladnaya (тип документа), …/position-new, …/position/:id, …/position-edit/:id
+  const { storageLocations, setDmItems, setGpItems } = useApp();
+  // Вложенные экраны: …/position-new, …/position/:id, …/position-edit/:id
   const screen = useScreen();
-  // Тип документа — из справочника «Типы документов приёмки»: «Приходный ордер» или «Накладная»
-  const docType: PrihodDocType = (doc ? doc.type !== DOC_PRIHOD_ORDER : screen.has("nakladnaya")) ? DOC_PRIHOD_NAKLAD : DOC_PRIHOD_ORDER;
-  const setDocType = (t: PrihodDocType) => screen.toggle("nakladnaya", t !== DOC_PRIHOD_ORDER);
   const isOrder = docType === DOC_PRIHOD_ORDER;
+  // Оформленный документ: позиции уже поставлены на склад — состав и склад-получатель не меняются
+  const posted = doc?.status === "Оформлено";
+  const lockPos = ro || posted;
   const { toast, show, clear } = useToast();
   const today = new Date().toLocaleDateString("ru-RU");
+  const sklady = spravValues("Склады");
 
   const [head, setHead] = useState(() => ({
     number: doc?.number || "ПО-0342",
     date: doc?.date || today,
     otpravitel: doc?.sender || ORGS[0],
-    // Получатель — всегда склад системы
-    poluchatel: MAIN_SKLAD,
+    // Получатель — склад из справочника «Склады»; по умолчанию склад приёмки (СДМ1)
+    poluchatel: doc && sklady.includes(doc.receiver) ? doc.receiver : PRIHOD_SKLAD,
     schetFaktura: "СФ-0091",
     schetFakturaData: today,
     dogovor: "ДОГ-2026-045",
@@ -70,10 +98,13 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
     nakladDate: doc?.date || today,
     zakazchik: "Национальный банк",
     skladOtpr: doc?.sender || "СДМ",
-    skladPoluch: MAIN_SKLAD,
     sotrudnik: "Ким Александр Юрьевич",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
+  // При выборе типа «Приходный ордер» / «Накладная» получатель автоматически — склад приёмки (СДМ1)
+  useEffect(() => {
+    if (!doc) setHead(x => ({ ...x, poluchatel: PRIHOD_SKLAD }));
+  }, [docType, doc]);
   const [ownProperty, setOwnProperty] = useState(true);
 
   // Документы (несколько файлов, отдельно для ордера и накладной)
@@ -93,7 +124,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
 
   const positions = isOrder ? orderPositions : nakladPositions;
   const setPositions = isOrder ? setOrderPositions : setNakladPositions;
-  const sklad = isOrder ? head.poluchatel : head.skladPoluch;
+  const sklad = head.poluchatel;
 
   const posModal: { mode: "add" | "edit" | "view"; pos: PrihodPosition } | null = (() => {
     if (screen.has("position-new")) {
@@ -128,9 +159,27 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
     loc: p => locOf(p),
   });
 
+  // Постановка на склад-получатель при первом оформлении: позиции класса «Готовая продукция» — в учёт ГП,
+  // остальные — в учёт ДМ; статус «На складе», место хранения — из позиции документа
+  const postToStock = () => {
+    const kol = (p: PrihodPosition) => parseInt(p.kol, 10) || 0;
+    const n = (v: string) => parseFloat(String(v).replace(",", ".")) || 0;
+    const gp: GPItem[] = positions.filter(p => isGPKlass(p.klass)).map(p => ({
+      id: `gp-${p.id}`, name: p.name, nomenkl: p.nomenkl, qty: kol(p), unit: p.unit || "шт", klass: p.klass, code: p.code,
+      location: locOf(p), sklad, status: "На складе", proba: n(p.proba), ligWeight: n(p.lig), netWeight: n(p.net), chem: p.chem,
+    }));
+    const dm: DMItem[] = positions.filter(p => !isGPKlass(p.klass)).map(p => ({
+      id: `dm-${p.id}`, name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.code, qty: kol(p), proba: n(p.proba),
+      ligWeight: n(p.lig), netWeight: n(p.net), location: locOf(p), sklad, status: "На складе", chem: p.chem,
+    }));
+    if (gp.length) setGpItems(prev => [...prev.filter(i => !gp.some(x => x.id === i.id)), ...gp]);
+    if (dm.length) setDmItems(prev => [...prev.filter(i => !dm.some(x => x.id === i.id)), ...dm]);
+  };
+
   // Документ сохраняется и оформляется в том числе без позиций
   const save = (status: DocStatus) => {
-    const base = { id: doc?.id ?? `sd-${Date.now()}`, status, receiver: MAIN_SKLAD, prihodPositions: positions, partyChem: partyChemOn ? partyChem : undefined };
+    if (status === "Оформлено" && !posted) postToStock();
+    const base = { id: doc?.id ?? `sd-${Date.now()}`, status, receiver: sklad, prihodPositions: positions, partyChem: partyChemOn ? partyChem : undefined };
     const d: SkladDoc = isOrder
       ? { ...base, date: head.date, type: DOC_PRIHOD_ORDER, number: head.number, sender: head.otpravitel }
       : { ...base, date: head.nakladDate, type: DOC_PRIHOD_NAKLAD, number: head.nakladNumber, sender: head.skladOtpr };
@@ -138,11 +187,9 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
   };
 
   const title = doc ? `${docType} ${doc.number}` : docType;
-  const typeOptions = spravValues("Типы документов приёмки");
-
-  const typeSelect = (
-    <Field label="Тип документа" required={!ro}>
-      <Select value={docType} options={typeOptions.includes(docType) ? typeOptions : [docType, ...typeOptions]} onChange={setDocType} disabled={ro || !!doc} />
+  const poluchatelSelect = (label: string) => (
+    <Field label={label} required={!ro}>
+      <Select value={head.poluchatel} options={sklady.includes(head.poluchatel) ? sklady : [head.poluchatel, ...sklady]} onChange={h("poluchatel")} disabled={lockPos} />
     </Field>
   );
 
@@ -152,7 +199,12 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
       title={title}
       onClose={onClose}
       extraWide
-      footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
+      footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : posted ? (
+        <>
+          <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+          <Btn onClick={() => save("Оформлено")}>Сохранить</Btn>
+        </>
+      ) : (
         <>
           <div className="mr-auto"><Btn variant="success" onClick={() => save("Оформлено")}>Оформить</Btn></div>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
@@ -160,13 +212,18 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
         </>
       )}
     >
+      {posted && (
+        <div className="mb-4 text-sm bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5">
+          Документ оформлен: позиции приняты на склад «{sklad}». Состав позиций и склад-получатель изменить нельзя.
+        </div>
+      )}
       {isOrder ? (
         <div className="grid grid-cols-4 gap-4 mb-5">
           {typeSelect}
           <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
           <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
           <Field label="Отправитель" required={!ro}><Select value={head.otpravitel} options={Array.from(new Set([head.otpravitel, ...ORGS]))} onChange={h("otpravitel")} disabled={ro} /></Field>
-          <Field label="Получатель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
+          {poluchatelSelect("Получатель")}
           <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={h("schetFaktura")} disabled={ro} /></Field>
           <Field label="Дата счёт-фактуры"><Input value={head.schetFakturaData} onChange={h("schetFakturaData")} disabled={ro} /></Field>
           <Field label="Номер договора"><Input value={head.dogovor} onChange={h("dogovor")} disabled={ro} /></Field>
@@ -193,7 +250,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
           <Field label="Дата" required={!ro}><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>
           <Field label="Заказчик" required={!ro}><Select value={head.zakazchik} options={["Национальный банк", "Монетный двор"]} onChange={h("zakazchik")} disabled={ro} /></Field>
           <Field label="Склад-отправитель" required={!ro}><Select value={head.skladOtpr} options={Array.from(new Set([head.skladOtpr, "СДМ", "Производственный цех"]))} onChange={h("skladOtpr")} disabled={ro} /></Field>
-          <Field label="Склад-получатель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
+          {poluchatelSelect("Склад-получатель")}
           <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные сотрудники")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
@@ -231,7 +288,7 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">{isOrder ? "Позиции прихода" : "Позиции приёма"}</h3>
           <div className="flex gap-2">
-            {!ro && (
+            {!lockPos && (
               <Btn size="sm" onClick={() => screen.open("position-new")}>
                 <Plus className="w-4 h-4" />Добавить позицию
               </Btn>
@@ -274,8 +331,8 @@ export default function PrihodDocModal({ onClose, onSave, doc, readOnly = false 
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
                       <EyeIcon onClick={() => screen.open("position", p.id)} />
-                      {!ro && <EditIcon onClick={() => screen.open("position-edit", p.id)} />}
-                      {!ro && <DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} />}
+                      {!lockPos && <EditIcon onClick={() => screen.open("position-edit", p.id)} />}
+                      {!lockPos && <DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} />}
                     </div>
                   </td>
                 </tr>

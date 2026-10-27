@@ -46,7 +46,8 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
 
   type Item = (typeof dmItems)[number];
   // Позиции в резерве тоже можно выдать — тогда шихтовая карта, которая их резервирует, вернётся в «Редактирование».
-  const availableItems = dmItems.filter(i => !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв") && !already.includes(i.id) && !already.includes(i.nomenkl));
+  // Выдача — только со склада выдачи (СДМ2); позиции склада приёмки (СДМ1) сначала перемещаются по требованию
+  const availableItems = dmItems.filter(i => i.sklad === MAIN_SKLAD && !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв") && !already.includes(i.id) && !already.includes(i.nomenkl));
   const reservedBy = (nomenkl: string) => shihtovyeKarty.find(k => k.status !== "Выполнена" && k.materials.some(m => m.nomenkl === nomenkl));
   const affectedKarty = [...new Set(
     availableItems.filter(i => selected.has(i.id) && i.status === "Резерв").map(i => reservedBy(i.nomenkl)?.name).filter(Boolean),
@@ -117,7 +118,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
   const pg5 = usePaged(sorted, "dm-add-pick");
   return (
     <Modal
-      title="Добавить позицию ДМ со склада"
+      title={`Добавить позицию ДМ со склада «${MAIN_SKLAD}»`}
       onClose={onClose}
       largeWide
       footer={<>
@@ -426,9 +427,12 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
 
 // ── Выдача по шихтовой карте ──────────────────────────────────────────────────
 
+// Карта выдаётся на плавку со склада выдачи (СДМ2): её позиции в резерве на складе приёмки (СДМ1)
+// нужно сначала переместить требованием — до этого карта недоступна для выбора.
 function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k: ShihtovayaKarta) => void }) {
-  const { shihtovyeKarty } = useApp();
+  const { shihtovyeKarty, dmItems } = useApp();
   const available = shihtovyeKarty.filter(k => k.status === "Новая");
+  const notMoved = (k: ShihtovayaKarta) => k.materials.filter(m => m.nomenkl && dmItems.some(i => i.nomenkl === m.nomenkl && i.status === "Резерв" && i.sklad !== MAIN_SKLAD));
 
   return (
     <Modal title="Выдача по шихтовой карте" wide onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Отмена</Btn>}>
@@ -438,19 +442,28 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k:
         </div>
       ) : (
         <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
-          {available.map(k => (
-            <button
-              key={k.id}
-              onClick={() => onPick(k)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-blue-50 transition-colors text-left"
-            >
-              <div>
-                <div className="text-sm font-medium text-gray-900">{k.name}</div>
-                <div className="text-xs text-gray-400">{k.plavkaNo} · {k.date}</div>
-              </div>
-              <Badge label={k.status} group="shihta" />
-            </button>
-          ))}
+          {available.map(k => {
+            const wait = notMoved(k);
+            return (
+              <button
+                key={k.id}
+                onClick={() => onPick(k)}
+                disabled={wait.length > 0}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-blue-50 transition-colors text-left disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              >
+                <div>
+                  <div className={`text-sm font-medium ${wait.length ? "text-gray-400" : "text-gray-900"}`}>{k.name}</div>
+                  <div className="text-xs text-gray-400">{k.plavkaNo} · {k.date}</div>
+                  {wait.length > 0 && (
+                    <div className="text-xs text-orange-600 mt-0.5">
+                      Позиции не перемещены на «{MAIN_SKLAD}» ({wait.map(m => m.name).join(", ")}) — оформите требование
+                    </div>
+                  )}
+                </div>
+                <Badge label={k.status} group="shihta" />
+              </button>
+            );
+          })}
         </div>
       )}
     </Modal>

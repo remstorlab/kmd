@@ -5,7 +5,7 @@ import {
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
 } from "../components/ui";
-import { GPItem, DMItem, MAIN_SKLAD } from "../data/mock";
+import { GPItem, DMItem, MAIN_SKLAD, spravValues } from "../data/mock";
 import { Coins } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
@@ -14,7 +14,7 @@ import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, pars
 import { useScreen } from "../router";
 
 // Позиции учёта ГП в виде позиций склада ДМ — склад один, показываются все классы.
-const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, status: i.status, chem: i.chem });
+const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, sklad: i.sklad, status: i.status, chem: i.chem });
 
 // ── Склады ХАБ ───────────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ export function SkladyHub() {
             <Coins className="w-5 h-5 text-blue-600" />
           </div>
           <h3 className="font-semibold text-gray-900 mb-1">Остатки материалов на складе ДМ</h3>
-          <p className="text-sm text-gray-500">{MAIN_SKLAD} — все позиции, включая готовую продукцию</p>
+          <p className="text-sm text-gray-500">{spravValues("Склады").join(", ")} — все позиции, включая готовую продукцию</p>
         </div>
       </div>
     </div>
@@ -45,11 +45,11 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
   const codeLabel = useMaterialCodeLabel();
   const cur = parseLoc(item.location);
   // Ячейки склада системы из справочника «Места хранения» (только доступные)
-  const seyfs = seyfsOf(locs, MAIN_SKLAD);
+  const seyfs = seyfsOf(locs, item.sklad);
   const [seyf, setSeyf] = useState(seyfs.includes(cur.seyf) ? cur.seyf : seyfs[0] ?? NO_LOC);
-  const polkas = polkasOf(locs, MAIN_SKLAD, seyf);
+  const polkas = polkasOf(locs, item.sklad, seyf);
   const [polka, setPolka] = useState(polkas.includes(cur.polka) ? cur.polka : polkas[0] ?? NO_LOC);
-  const changeSeyf = (s: string) => { setSeyf(s); setPolka(polkasOf(locs, MAIN_SKLAD, s)[0] ?? NO_LOC); };
+  const changeSeyf = (s: string) => { setSeyf(s); setPolka(polkasOf(locs, item.sklad, s)[0] ?? NO_LOC); };
   const next = seyf !== NO_LOC ? formatLoc(seyf, polka) : "";
   const same = cur.seyf !== NO_LOC && cur.seyf === seyf && cur.polka === polka;
   const [name, setName] = useState(item.name);
@@ -90,7 +90,7 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
 
       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Текущее место хранения</h4>
       <div className="grid grid-cols-3 gap-4 mb-5">
-        <Field label="Склад"><Input value={MAIN_SKLAD} disabled /></Field>
+        <Field label="Склад"><Input value={item.sklad} disabled /></Field>
         {cur.seyf !== NO_LOC || !item.location || item.location === NO_LOC ? <>
           <Field label="Сейф"><Input value={cur.seyf} disabled /></Field>
           <Field label="Полка"><Input value={cur.polka} disabled /></Field>
@@ -101,7 +101,7 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
 
       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Новое место хранения</h4>
       <div className="grid grid-cols-3 gap-4">
-        <Field label="Склад"><Input value={MAIN_SKLAD} disabled /></Field>
+        <Field label="Склад"><Input value={item.sklad} disabled /></Field>
         <Field label="Сейф" required>
           {seyfs.length ? <Select value={seyf} options={seyfs} onChange={changeSeyf} /> : <Input value="Нет свободных мест" disabled />}
         </Field>
@@ -192,7 +192,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
   return (
     <DMPositionFormModal
       mode="add"
-      sklad={MAIN_SKLAD}
+      sklad={items[0].sklad}
       initial={initial}
       title="Объединение позиций"
       saveLabel="Подтвердить объединение"
@@ -217,6 +217,9 @@ export function OstatokDM() {
   const [search, setSearch] = useState("");
   const [filterKlass, setFilterKlass] = useState("Все классы");
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  // Склады — из справочника «Склады» (множественный выбор)
+  const [filterSklad, setFilterSklad] = useState<string[]>([]);
+  const sklady = spravValues("Склады");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Экраны: /sklady/dm/view/:id, /sklady/dm/merge, /sklady/dm/prihod, /sklady/dm/vydacha
@@ -227,7 +230,8 @@ export function OstatokDM() {
   const showVydacha = screen.has("vydacha");
   // Отмеченные позиции (кроме «Закрыта» и «В подотчёте») — сразу попадают в накладную;
   // позиция из резерва при оформлении возвращает свою шихтовую карту в «Редактирование»
-  const vydachaIds = skladItems.filter(it => selected.has(it.id) && (it.status === "На складе" || it.status === "Резерв")).map(it => it.id);
+  // Выдача формируется только со склада выдачи (СДМ2) — позиции других складов в накладную не попадают
+  const vydachaIds = skladItems.filter(it => selected.has(it.id) && it.sklad === MAIN_SKLAD && (it.status === "На складе" || it.status === "Резерв")).map(it => it.id);
   // Смена места хранения: …/mesto/:id
   const moveItem = skladItems.find(it => it.id === screen.after("mesto")) ?? null;
   // Позиция физически на складе — место хранения можно изменить
@@ -245,7 +249,8 @@ export function OstatokDM() {
     const matchSearch = !search || it.name.toLowerCase().includes(search.toLowerCase());
     const matchKlass = filterKlass === "Все классы" || it.klass === filterKlass;
     const matchStatus = filterStatus.length === 0 || filterStatus.includes(it.status);
-    return matchSearch && matchKlass && matchStatus;
+    const matchSklad = filterSklad.length === 0 || filterSklad.includes(it.sklad);
+    return matchSearch && matchKlass && matchStatus && matchSklad;
   });
   const { sorted, sort, toggleSort } = useSort(filtered, {
     name: it => it.name,
@@ -257,6 +262,7 @@ export function OstatokDM() {
     ligWeight: it => it.ligWeight,
     netWeight: it => it.netWeight,
     location: it => it.location,
+    sklad: it => it.sklad,
     status: it => it.status,
   });
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
@@ -273,8 +279,11 @@ export function OstatokDM() {
   // В объединении участвуют только позиции на складе: закрытые и выданные в подотчёт — нет
   const canMerge = (it: DMItem) => it.status !== "Закрыта" && it.status !== "В подотчёте";
   const selectedItems = skladItems.filter(it => selected.has(it.id) && canMerge(it));
-  // Экран объединения, открытый по прямой ссылке без выбора, показывает первые две доступные позиции
-  const mergeItems = selectedItems.length >= 2 ? selectedItems : skladItems.filter(canMerge).slice(0, 2);
+  // Объединяются только позиции одного склада
+  const oneSklad = new Set(selectedItems.map(it => it.sklad)).size <= 1;
+  // Экран объединения, открытый по прямой ссылке без выбора, показывает первые две доступные позиции одного склада
+  const mergeItems = selectedItems.length >= 2 && oneSklad ? selectedItems
+    : (() => { const free = skladItems.filter(canMerge); return free.filter(it => it.sklad === free[0]?.sklad).slice(0, 2); })();
 
   const doMerge = (p: PrihodPosition) => {
     const ids = new Set(mergeItems.map(it => it.id));
@@ -289,6 +298,7 @@ export function OstatokDM() {
       ligWeight: parseFloat(p.lig) || 0,
       netWeight: parseFloat(p.net) || 0,
       location: formatLoc(p.seyf, p.polka),
+      sklad: mergeItems[0].sklad,
       status: "На складе",
       chem: p.chem,
     };
@@ -303,13 +313,15 @@ export function OstatokDM() {
     <div>
       <PageHeader
         title="Остатки материалов на складе ДМ"
-        subtitle={`${MAIN_SKLAD}: актуальные позиции по сейфам и полкам`}
+        subtitle="Актуальные позиции по складам, сейфам и полкам"
         breadcrumb={["Склады", "Остатки на складе ДМ"]}
         actions={
           <>
             <Btn onClick={() => screen.openTop("prihod")}>Принять на склад</Btn>
             <Btn variant="secondary" onClick={() => screen.openTop("vydacha")}>Выдать со склада{vydachaIds.length ? ` (${vydachaIds.length})` : ""}</Btn>
-            <Btn variant="secondary" disabled={selectedItems.length < 2} onClick={() => screen.openTop("merge")}>Объединить позиции{selectedItems.length ? ` (${selectedItems.length})` : ""}</Btn>
+            <span title={oneSklad ? undefined : "Объединяются только позиции одного склада"}>
+              <Btn variant="secondary" disabled={selectedItems.length < 2 || !oneSklad} onClick={() => screen.openTop("merge")}>Объединить позиции{selectedItems.length ? ` (${selectedItems.length})` : ""}</Btn>
+            </span>
             <ExportBtn onToast={show} />
           </>
         }
@@ -329,7 +341,11 @@ export function OstatokDM() {
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
           <MultiSelect values={filterStatus} options={["На складе", "Резерв", "В подотчёте", "Закрыта"]} onChange={setFilterStatus} allLabel="Все статусы" />
         </div>
-        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus([]); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+        <div className="min-w-36">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Склад</label>
+          <MultiSelect values={filterSklad} options={sklady} onChange={v => { setFilterSklad(v); setPage(1); }} allLabel="Все склады" />
+        </div>
+        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus([]); setFilterSklad([]); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
           Сбросить фильтры
         </button>
       </div>
@@ -352,6 +368,7 @@ export function OstatokDM() {
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort}>Проба</SortTh>
               <SortTh sortKey="ligWeight" sort={sort} onSort={toggleSort}>Вес лигат.</SortTh>
               <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort}>Вес чист.</SortTh>
+              <SortTh sortKey="sklad" sort={sort} onSort={toggleSort}>Склад</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <th className="w-20"></th>
@@ -369,6 +386,7 @@ export function OstatokDM() {
                 <td className="px-4 py-3"><ProbaChem proba={item.proba} chem={item.chem} /></td>
                 <td className="px-4 py-3">{item.ligWeight}</td>
                 <td className="px-4 py-3">{item.netWeight}</td>
+                <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{item.sklad}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><PosStatusBadge status={item.status} nomenkl={item.nomenkl} /></td>
                 <td className="px-4 py-3">
@@ -383,7 +401,7 @@ export function OstatokDM() {
                 </td>
               </tr>
             ))}
-            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={12} />
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={13} />
           </tbody>
         </table>
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />

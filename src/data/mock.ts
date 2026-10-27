@@ -21,6 +21,8 @@ export interface GPItem {
   klass: string;
   code: string;
   location: string;
+  // Склад — значение справочника «Склады»
+  sklad: string;
   status: StatusGP;
   // Проба, веса и химический состав изделий
   proba?: number;
@@ -51,6 +53,8 @@ export interface DMItem {
   ligWeight: number;
   netWeight: number;
   location: string;
+  // Склад — значение справочника «Склады»
+  sklad: string;
   status: StatusDM;
   chem?: ChemComposition;
   // Исходная запись, из которой выделена эта часть при частичной выдаче / резерве (см. data/stock.ts)
@@ -66,8 +70,10 @@ export interface SkladDoc {
   status: DocStatus;
   sender: string;
   receiver: string;
-  // Позиции накладной на отгрузку (выдача со склада)
+  // Позиции накладной на отгрузку (выдача со склада) / требования (перемещение со склада на склад)
   positions?: VydachaDocPosition[];
+  // Требование: шихтовая карта, под которую перемещаются позиции
+  shihtaId?: string;
   // Позиции приходного ордера / накладной (приём на склад)
   prihodPositions?: PrihodPosition[];
   // Хим. состав на партию: задан на уровне документа и подставляется в новые позиции
@@ -88,6 +94,8 @@ export interface VydachaDocPosition {
   lig: number | null;
   net: number | null;
   location: string;
+  // Склад позиции (справочник «Склады»)
+  sklad?: string;
   // Химический состав (для подсказки у пробы)
   chem?: ChemComposition;
   issue: number;
@@ -286,12 +294,20 @@ function chemOf(code: string, lig: number, net: number): ChemComposition {
   }
 }
 
+// --- Склады (справочник «Склады») ---
+// Склад ДМ №1 (СДМ1) — склад приёмки: на него принимаются позиции по приходному ордеру и накладной, с него
+// позиции резервируются под шихтовые карты. По «Требованию» позиции перемещаются со СДМ1 на СДМ2 (место хранения,
+// статус и остальные атрибуты сохраняются). Склад ДМ №2 (СДМ2) — склад выдачи: накладные на отгрузку / передачу
+// и операции движения материала (в т. ч. плавка по шихтовой карте) формируются только с него.
+export const SDM1 = "Склад ДМ №1";
+export const SDM2 = "Склад ДМ №2";
+
 // --- GP Items ---
 // qty — количество изделий, unitG — лигатурная масса одного изделия, г
-const gp = (id: string, name: string, nomenkl: string, qty: number, code: string, proba: number, unitG: number, location: string, status: StatusGP = "На складе"): GPItem => {
+const gp = (id: string, name: string, nomenkl: string, qty: number, code: string, proba: number, unitG: number, location: string, status: StatusGP = "На складе", sklad = SDM2): GPItem => {
   const ligWeight = r2(qty * unitG);
   const netWeight = r2(ligWeight * proba / 1000);
-  return { id, name, nomenkl, qty, unit: "шт", klass: "Готовая продукция", code, location, status, proba, ligWeight, netWeight, chem: chemOf(code, ligWeight, netWeight) };
+  return { id, name, nomenkl, qty, unit: "шт", klass: "Готовая продукция", code, location, sklad, status, proba, ligWeight, netWeight, chem: chemOf(code, ligWeight, netWeight) };
 };
 const L = (s: number, p: number) => `Сейф №${s}, Полка ${p}`;
 
@@ -328,38 +344,44 @@ export const initialGPItems: GPItem[] = [
   gp("gp30", "Кольцо платиновое обручальное", "5015342", 17, "4000", 900, 6.90, L(4, 2)),
   gp("gp31", "Браслет серебряный шармы", "5015343", 21, "2000", 925, 15.80, L(3, 1)),
   gp("gp32", "Серьги золотые капли", "5015344", 14, "0100", 585, 2.90, L(3, 2)),
-  gp("gp33", "Колье платиновое с бриллиантом", "5015345", 1, "4000", 900, 21.30, L(4, 2)),
-  gp("gp34", "Кулон золотой infinity", "5015346", 16, "0100", 585, 2.40, L(1, 2)),
+  // Приняты на склад приёмки СДМ1, ещё не перемещены на СДМ2
+  gp("gp33", "Колье платиновое с бриллиантом", "5015345", 1, "4000", 900, 21.30, L(3, 1), "На складе", SDM1),
+  gp("gp34", "Кулон золотой infinity", "5015346", 16, "0100", 585, 2.40, L(1, 2), "На складе", SDM1),
   // Выданы по оформленной накладной НО-0204 — закрыты, без места хранения
   gp("gp35", "Монета «Атамекен» Ag 925", "5015347", 50, "2000", 925, 31.10, "-", "Закрыта"),
   gp("gp36", "Орден «Алтын алка»", "5015348", 10, "0300", 750, 22.40, "-", "Закрыта"),
 ];
 
 // --- DM Items ---
-const dm = (id: string, name: string, nomenkl: string, klass: string, metal: string, proba: number, ligWeight: number, location: string, status: StatusDM = "На складе", qty = 1, net?: number): DMItem => {
+const dm = (id: string, name: string, nomenkl: string, klass: string, metal: string, proba: number, ligWeight: number, location: string, status: StatusDM = "На складе", qty = 1, net?: number, sklad = SDM2): DMItem => {
   const netWeight = net ?? r2(ligWeight * proba / 1000);
-  return { id, name, nomenkl, klass, metal, qty, proba, ligWeight, netWeight, location, status, chem: chemOf(metal, ligWeight, netWeight) };
+  return { id, name, nomenkl, klass, metal, qty, proba, ligWeight, netWeight, location, sklad, status, chem: chemOf(metal, ligWeight, netWeight) };
 };
+// Позиция на складе приёмки СДМ1
+const dm1 = (id: string, name: string, nomenkl: string, klass: string, metal: string, proba: number, ligWeight: number, location: string, status: StatusDM = "На складе") =>
+  dm(id, name, nomenkl, klass, metal, proba, ligWeight, location, status, 1, undefined, SDM1);
 
 export const initialDMItems: DMItem[] = [
-  // Резерв — в шихтовых картах «Новая» (П-2026-0089, П-2026-0088)
+  // Резерв шихтовой карты П-2026-0089: перемещены требованием ТР-0012 со СДМ1 на СДМ2 — резерв сохранён
   dm("dm1", "Слиток золота ЗлА-1", "5015371", "Слиток", "1000", 999, 500.25, L(1, 1), "Резерв"),
   dm("dm3", "Стружка золотая 585", "5015373", "Стружка", "0100", 585, 45.80, L(2, 1), "Резерв"),
-  dm("dm4", "Проба золота Au-750", "5015374", "Основная проба", "0300", 750, 12.30, L(2, 1), "Резерв"),
-  dm("dm8", "Золотой порошок Au", "5015378", "Гранулы", "1000", 999.9, 25.00, L(3, 1), "Резерв"),
-  // На складе
-  dm("dm2", "Слиток серебра СрА-2", "5015372", "Слиток", "2000", 999, 1000.50, L(1, 2)),
-  dm("dm6", "Слиток платины ПлА-1", "5015376", "Слиток", "4000", 999, 300.00, L(1, 1)),
-  dm("dm7", "Лом золота 585", "5015377", "Скрап", "0100", 585, 88.40, L(3, 2)),
+  // Резерв шихтовой карты П-2026-0088: ещё на СДМ1 (требование ТР-0013 в работе)
+  dm1("dm4", "Проба золота Au-750", "5015374", "Основная проба", "0300", 750, 12.30, L(2, 1), "Резерв"),
+  dm1("dm8", "Золотой порошок Au", "5015378", "Гранулы", "1000", 999.9, 25.00, L(3, 1), "Резерв"),
+  // На складе приёмки СДМ1
+  dm1("dm2", "Слиток серебра СрА-2", "5015372", "Слиток", "2000", 999, 1000.50, L(1, 2)),
+  dm1("dm6", "Слиток платины ПлА-1", "5015376", "Слиток", "4000", 999, 300.00, L(1, 1)),
+  dm1("dm7", "Лом золота 585", "5015377", "Скрап", "0100", 585, 88.40, L(3, 2)),
+  dm1("dm20", "Проволока золотая 585", "5015390", "Проволока", "0100", 585, 35.00, L(2, 1)),
+  // На складе выдачи СДМ2
   dm("dm14", "Слиток серебра СрА-4", "5015384", "Слиток", "2000", 999, 791.40, L(1, 2)),
   dm("dm15", "Проба серебра Ag-999", "5015385", "Основная проба", "2000", 999, 8.50, L(3, 1)),
   dm("dm17", "Отходы после анализа Au-585", "5015387", "Отходы", "0100", 585, 5.90, L(4, 2)),
-  dm("dm20", "Проволока золотая 585", "5015390", "Проволока", "0100", 585, 35.00, L(2, 1)),
   dm("dm21", "Припой серебряный ПСр-72", "5015391", "Припой", "2000", 750, 18.00, L(3, 2)),
   dm("dm22", "Хлорид серебра", "5015392", "Хлорид серебра", "2000", 750, 40.00, L(4, 2)),
   // Драгоценные камни: qty — штук, ligWeight — масса камней, г (1 кар = 0,2 г), металлов в чистоте нет
-  { id: "dm9", name: "Бриллиант Кр57 0,05 кар", nomenkl: "5015379", klass: "Драгоценные камни", metal: "0050", qty: 120, proba: 0, ligWeight: 1.20, netWeight: 0, location: L(4, 1), status: "На складе" },
-  { id: "dm10", name: "Изумруд огранённый 1 кар", nomenkl: "5015380", klass: "Драгоценные камни", metal: "0050", qty: 3, proba: 0, ligWeight: 0.60, netWeight: 0, location: L(4, 1), status: "На складе" },
+  { id: "dm9", name: "Бриллиант Кр57 0,05 кар", nomenkl: "5015379", klass: "Драгоценные камни", metal: "0050", qty: 120, proba: 0, ligWeight: 1.20, netWeight: 0, location: L(1, 1), sklad: SDM1, status: "На складе" },
+  { id: "dm10", name: "Изумруд огранённый 1 кар", nomenkl: "5015380", klass: "Драгоценные камни", metal: "0050", qty: 3, proba: 0, ligWeight: 0.60, netWeight: 0, location: L(4, 1), sklad: SDM2, status: "На складе" },
   // В подотчёте — выданы в операциях «В работе» (место хранения снято)
   dm("dm11", "Слиток золота ЗлА-2", "5015381", "Слиток", "1000", 999, 300.00, "-", "В подотчёте"),
   dm("dm12", "Стружка золотая 750", "5015382", "Стружка", "0300", 750, 62.40, "-", "В подотчёте"),
@@ -376,33 +398,49 @@ export const STONE_KLASS = "Драгоценные камни";
 export const isStoneKlass = (klass: string) => klass === STONE_KLASS;
 
 // --- Складские документы ---
-// Система ведёт один склад: он получатель при приёме и отправитель при выдаче.
-export const MAIN_SKLAD = "Склад ДМ №2";
+// Склад выдачи: отправитель накладных на отгрузку / передачу и склад операций движения материала.
+export const MAIN_SKLAD = SDM2;
+// Склад приёмки: получатель по умолчанию в приходном ордере и накладной, отправитель по умолчанию в требовании.
+export const PRIHOD_SKLAD = SDM1;
 
 // Типы документов приёмки / отгрузки — значения справочников
 export const DOC_PRIHOD_ORDER = "Приходный ордер";
 export const DOC_PRIHOD_NAKLAD = "Накладная";
+// Требование — перемещение позиций со склада на склад (СДМ1 → СДМ2) без смены места хранения и статуса
+export const DOC_TREBOVANIE = "Требование";
+
+// Склады документа (отправитель и/или получатель — значения справочника «Склады»)
+export const docSklady = (d: { sender: string; receiver: string }) =>
+  [d.sender, d.receiver].filter((v, i, a) => spravValues("Склады").includes(v) && a.indexOf(v) === i);
 export const DOC_OTGRUZKA_DM = "Накладная на отгрузку ДМ";
 export const DOC_PEREDACHA_GP = "Накладная на передачу ГП";
 
 export const initialSkladDocs: SkladDoc[] = [
-  { id: "sd1", date: "19.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0342", status: "В работе", sender: "ОО «АурумПоставка»", receiver: MAIN_SKLAD },
-  { id: "sd2", date: "18.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0118", status: "В работе", sender: "Производственный цех", receiver: MAIN_SKLAD },
-  { id: "sd3", date: "17.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0341", status: "Оформлено", sender: "АО «Металл Инвест»", receiver: MAIN_SKLAD },
-  { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "СДМ", receiver: MAIN_SKLAD },
-  { id: "sd5", date: "15.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0340", status: "Оформлено", sender: "ОО «СереброТрейд»", receiver: MAIN_SKLAD },
-  { id: "sd6", date: "14.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0116", status: "Оформлено", sender: "Производственный цех", receiver: MAIN_SKLAD },
+  { id: "sd1", date: "19.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0342", status: "В работе", sender: "ОО «АурумПоставка»", receiver: PRIHOD_SKLAD },
+  { id: "sd2", date: "18.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0118", status: "В работе", sender: "Производственный цех", receiver: PRIHOD_SKLAD },
+  { id: "sd3", date: "17.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0341", status: "Оформлено", sender: "АО «Металл Инвест»", receiver: PRIHOD_SKLAD },
+  { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "СДМ", receiver: PRIHOD_SKLAD },
+  { id: "sd5", date: "15.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0340", status: "Оформлено", sender: "ОО «СереброТрейд»", receiver: PRIHOD_SKLAD },
+  { id: "sd6", date: "14.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0116", status: "Оформлено", sender: "Производственный цех", receiver: PRIHOD_SKLAD },
 ];
 
 // Позиция накладной на выдачу из позиции склада (выдаётся целиком)
 const vpos = (src: "gp" | "dm", id: string): VydachaDocPosition => {
   if (src === "gp") {
     const i = initialGPItems.find(x => x.id === id)!;
-    return { id, src, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: i.qty, unit: i.unit, proba: i.proba ?? null, lig: i.ligWeight ?? null, net: i.netWeight ?? null, location: i.location, chem: i.chem, issue: i.qty };
+    return { id, src, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: i.qty, unit: i.unit, proba: i.proba ?? null, lig: i.ligWeight ?? null, net: i.netWeight ?? null, location: i.location, sklad: i.sklad, chem: i.chem, issue: i.qty };
   }
   const i = initialDMItems.find(x => x.id === id)!;
-  return { id, src, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, chem: i.chem, issue: i.qty };
+  return { id, src, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem, issue: i.qty };
 };
+
+// Требования: ТР-0012 (оформлено) переместило резерв карты П-2026-0089 со СДМ1 на СДМ2,
+// ТР-0013 (в работе) — резерв карты П-2026-0088, позиции ещё на СДМ1
+const trebPos = (id: string) => ({ ...vpos("dm", id), sklad: SDM1 });
+initialSkladDocs.unshift(
+  { id: "sd7", date: "20.08.2026", type: DOC_TREBOVANIE, number: "ТР-0013", status: "В работе", sender: SDM1, receiver: SDM2, shihtaId: "sk2", positions: [vpos("dm", "dm4"), vpos("dm", "dm8")] },
+  { id: "sd8", date: "19.08.2026", type: DOC_TREBOVANIE, number: "ТР-0012", status: "Оформлено", sender: SDM1, receiver: SDM2, shihtaId: "sk1", positions: [trebPos("dm1"), trebPos("dm3")] },
+);
 
 export const initialVydachaDocs: SkladDoc[] = [
   { id: "vd1", date: "19.08.2026", type: DOC_PEREDACHA_GP, number: "НО-0205", status: "В работе", sender: MAIN_SKLAD, receiver: "АО «МонетаДМ»", positions: [vpos("gp", "gp2"), vpos("gp", "gp9")] },
@@ -714,10 +752,11 @@ export const spravochniki = {
     ]
   },
   "Типы документов приёмки": {
-    count: 2,
+    count: 3,
     items: [
       { code: "ПО", value: "Приходный ордер", status: "Активно" },
       { code: "НП", value: "Накладная", status: "Активно" },
+      { code: "ТР", value: "Требование", status: "Активно" },
     ]
   },
   "Типы документов отгрузки": {
@@ -1001,6 +1040,12 @@ export interface StorageLocation {
 }
 
 export const initialStorageLocations: StorageLocation[] = [
+  { id: "sl-9", sklad: "Склад ДМ №1", seyfNum: "1", polkaNum: "1", code: "СДМ1-С1-П1", available: true },
+  { id: "sl-10", sklad: "Склад ДМ №1", seyfNum: "1", polkaNum: "2", code: "СДМ1-С1-П2", available: true },
+  { id: "sl-11", sklad: "Склад ДМ №1", seyfNum: "2", polkaNum: "1", code: "СДМ1-С2-П1", available: true },
+  { id: "sl-12", sklad: "Склад ДМ №1", seyfNum: "2", polkaNum: "2", code: "СДМ1-С2-П2", available: true },
+  { id: "sl-13", sklad: "Склад ДМ №1", seyfNum: "3", polkaNum: "1", code: "СДМ1-С3-П1", available: true },
+  { id: "sl-14", sklad: "Склад ДМ №1", seyfNum: "3", polkaNum: "2", code: "СДМ1-С3-П2", available: true },
   { id: "sl-1", sklad: "Склад ДМ №2", seyfNum: "1", polkaNum: "1", code: "СДМ2-С1-П1", available: true },
   { id: "sl-2", sklad: "Склад ДМ №2", seyfNum: "1", polkaNum: "2", code: "СДМ2-С1-П2", available: true },
   { id: "sl-3", sklad: "Склад ДМ №2", seyfNum: "2", polkaNum: "1", code: "СДМ2-С2-П1", available: true },
