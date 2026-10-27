@@ -22,6 +22,7 @@ export default function StockPickerModal({
   qtyInput = true,
   emptyText = "Нет доступных позиций на складе",
   addLabel = "Добавить",
+  toolbar,
   onClose,
   onAdd,
 }: {
@@ -37,6 +38,8 @@ export default function StockPickerModal({
   qtyInput?: boolean | ((r: StockRow) => boolean);
   emptyText?: string;
   addLabel?: string;
+  // Дополнительные поля над фильтрами (например, выбор склада)
+  toolbar?: React.ReactNode;
   onClose: () => void;
   onAdd: (picked: { row: StockRow; qty: number }[]) => void;
 }) {
@@ -113,6 +116,7 @@ export default function StockPickerModal({
         <Btn onClick={add} disabled={selectedCount === 0}>{addLabel}{selectedCount > 0 ? ` (${selectedCount})` : ""}</Btn>
       </>}
     >
+      {toolbar && <div className="mb-3">{toolbar}</div>}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 grid grid-cols-4 gap-3 items-end">
         <div className="col-span-2">
           <label className="block text-xs font-medium text-gray-500 mb-1">Наименование / Номенкл. №</label>

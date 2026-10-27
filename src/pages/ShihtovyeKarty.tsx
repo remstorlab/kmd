@@ -5,7 +5,7 @@ import {
   useToast, Toast, Field, Input, Select, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, formatDateTime, usePaged,
 } from "../components/ui";
-import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass, PRIHOD_SKLAD } from "../data/mock";
+import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass, PRIHOD_SKLAD, spravValues } from "../data/mock";
 import { takeFromStock, returnToStock } from "../data/stock";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
@@ -83,13 +83,15 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const { toast, show, clear } = useToast();
   const ro = readOnly;
 
-  // Доступные позиции для шихты — на складе приёмки (СДМ1): резервируются под карту, затем по требованию
-  // перемещаются на СДМ2 (резерв сохраняется) и выдаются на плавку
+  // Доступные позиции для шихты — на выбранном складе (по умолчанию склад приёмки СДМ1). Позиции СДМ1
+  // по требованию перемещаются на СДМ2 (резерв сохраняется); с СДМ2 карта выдаётся на плавку
+  const sklady = spravValues("Склады");
+  const [pickSklad, setPickSklad] = useState(PRIHOD_SKLAD);
   const skladChem = (id: string) => dmItems.find(i => i.id === id)?.chem;
   const skladRows = useMemo<StockRow[]>(() => dmItems
-    .filter(i => i.sklad === PRIHOD_SKLAD && i.status === "На складе" && i.qty > 0 && !isGPKlass(i.klass))
+    .filter(i => i.sklad === pickSklad && i.status === "На складе" && i.qty > 0 && !isGPKlass(i.klass))
     .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem })),
-  [dmItems]);
+  [dmItems, pickSklad]);
   // Склад, на котором сейчас находится зарезервированная позиция карты (СДМ1 — до требования, СДМ2 — после)
   const rezSklad = (m: MatRow) =>
     (m.srcId ? dmItems.find(i => i.id === m.srcId) : undefined)?.sklad
@@ -362,12 +364,18 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
       {showFromSklad && (
         <StockPickerModal
-          title={`Добавить материал со склада «${PRIHOD_SKLAD}»`}
+          key={pickSklad}
+          title="Добавить материал со склада"
+          toolbar={
+            <div className="w-64">
+              <Field label="Склад" required><Select value={pickSklad} options={sklady} onChange={setPickSklad} /></Field>
+            </div>
+          }
           rows={skladRows}
           already={already}
           showWeights
           qtyLabel="Количество изделий"
-          emptyText={`Нет доступных позиций на складе «${PRIHOD_SKLAD}»`}
+          emptyText={`Нет доступных позиций на складе «${pickSklad}»`}
           addLabel="Добавить выбранные"
           onClose={() => setShowFromSklad(false)}
           onAdd={addFromSklad}
