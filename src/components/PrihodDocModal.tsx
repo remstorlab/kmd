@@ -47,7 +47,10 @@ export default function PrihodDocModal(props: Props) {
     : <PrihodForm {...props} docType={docType} typeSelect={typeSelect} />;
 }
 // Отправители приходного ордера — из справочника «Организации»
+// Источник поля «Отправитель» зависит от типа документа: приходный ордер — справочник «Организации»,
+// накладная — «Заказчики» (отправитель = заказчик), требование — «Склады» (см. TrebovanieDocModal)
 const ORGS = spravValues("Организации");
+const ZAKAZCHIKI = spravValues("Заказчики");
 
 // Демо-позиции для документов из демо-данных (без сохранённых позиций)
 const DEMO_ORDER: PrihodPosition[] = [
@@ -96,8 +99,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     planPos: "План-2026/Q3-AU",
     nakladNumber: doc?.number || "НП-001234",
     nakladDate: doc?.date || today,
-    zakazchik: "Национальный банк",
-    skladOtpr: doc?.sender || "СДМ",
+    zakazchik: doc?.sender || ZAKAZCHIKI[0],
     sotrudnik: "Ким Александр Юрьевич",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
@@ -182,7 +184,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     const base = { id: doc?.id ?? `sd-${Date.now()}`, status, receiver: sklad, prihodPositions: positions, partyChem: partyChemOn ? partyChem : undefined };
     const d: SkladDoc = isOrder
       ? { ...base, date: head.date, type: DOC_PRIHOD_ORDER, number: head.number, sender: head.otpravitel }
-      : { ...base, date: head.nakladDate, type: DOC_PRIHOD_NAKLAD, number: head.nakladNumber, sender: head.skladOtpr };
+      : { ...base, date: head.nakladDate, type: DOC_PRIHOD_NAKLAD, number: head.nakladNumber, sender: head.zakazchik };
     onSave(d);
   };
 
@@ -248,9 +250,8 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
           {typeSelect}
           <Field label="Номер" required={!ro}><Input value={head.nakladNumber} onChange={h("nakladNumber")} disabled={ro} /></Field>
           <Field label="Дата" required={!ro}><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>
-          <Field label="Заказчик" required={!ro}><Select value={head.zakazchik} options={["Национальный банк", "Монетный двор"]} onChange={h("zakazchik")} disabled={ro} /></Field>
-          <Field label="Склад-отправитель" required={!ro}><Select value={head.skladOtpr} options={Array.from(new Set([head.skladOtpr, "СДМ", "Производственный цех"]))} onChange={h("skladOtpr")} disabled={ro} /></Field>
-          {poluchatelSelect("Склад-получатель")}
+          <Field label="Отправитель" required={!ro}><Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...ZAKAZCHIKI]))} onChange={h("zakazchik")} disabled={ro} /></Field>
+          {poluchatelSelect("Получатель")}
           <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные сотрудники")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>

@@ -274,7 +274,7 @@ export interface LogEntry {
 
 // --- Демо-данные ---
 // Все значения атрибутов — из справочников: «Классы материалов», «Коды материалов», «Пробы», «Места хранения»
-// (Склад ДМ №2), «Организации», «Подотчётные сотрудники», «Типы операций», «Виды операций», типы документов,
+// (СДМ №1, СДМ №2), «Организации», «Подотчётные сотрудники», «Типы операций», «Виды операций», типы документов,
 // «Технологические операции», «Тип списания», статусы. Данные согласованы между разделами: позиции в подотчёте
 // выданы в операциях движения, резерв — в шихтовых картах, закрытые — по оформленным накладным.
 
@@ -295,12 +295,12 @@ function chemOf(code: string, lig: number, net: number): ChemComposition {
 }
 
 // --- Склады (справочник «Склады») ---
-// Склад ДМ №1 (СДМ1) — склад приёмки: на него принимаются позиции по приходному ордеру и накладной, с него
+// СДМ №1 — склад приёмки: на него принимаются позиции по приходному ордеру и накладной, с него
 // позиции резервируются под шихтовые карты. По «Требованию» позиции перемещаются со СДМ1 на СДМ2 (место хранения,
-// статус и остальные атрибуты сохраняются). Склад ДМ №2 (СДМ2) — склад выдачи: накладные на отгрузку / передачу
+// статус и остальные атрибуты сохраняются). СДМ №2 — склад выдачи: накладные на отгрузку / передачу
 // и операции движения материала (в т. ч. плавка по шихтовой карте) формируются только с него.
-export const SDM1 = "Склад ДМ №1";
-export const SDM2 = "Склад ДМ №2";
+export const SDM1 = "СДМ №1";
+export const SDM2 = "СДМ №2";
 
 // --- GP Items ---
 // qty — количество изделий, unitG — лигатурная масса одного изделия, г
@@ -417,11 +417,11 @@ export const DOC_PEREDACHA_GP = "Накладная на передачу ГП";
 
 export const initialSkladDocs: SkladDoc[] = [
   { id: "sd1", date: "19.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0342", status: "В работе", sender: "ОО «АурумПоставка»", receiver: PRIHOD_SKLAD },
-  { id: "sd2", date: "18.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0118", status: "В работе", sender: "Производственный цех", receiver: PRIHOD_SKLAD },
+  { id: "sd2", date: "18.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0118", status: "В работе", sender: "Монетный двор", receiver: PRIHOD_SKLAD },
   { id: "sd3", date: "17.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0341", status: "Оформлено", sender: "АО «Металл Инвест»", receiver: PRIHOD_SKLAD },
-  { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "СДМ", receiver: PRIHOD_SKLAD },
+  { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "Национальный банк", receiver: PRIHOD_SKLAD },
   { id: "sd5", date: "15.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0340", status: "Оформлено", sender: "ОО «СереброТрейд»", receiver: PRIHOD_SKLAD },
-  { id: "sd6", date: "14.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0116", status: "Оформлено", sender: "Производственный цех", receiver: PRIHOD_SKLAD },
+  { id: "sd6", date: "14.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0116", status: "Оформлено", sender: "Монетный двор", receiver: PRIHOD_SKLAD },
 ];
 
 // Позиция накладной на выдачу из позиции склада (выдаётся целиком)
@@ -790,6 +790,14 @@ export const spravochniki = {
       { code: "ОРГ-005", value: "ОО «СереброТрейд»", status: "Активно" },
     ]
   },
+  // Заказчики — отправители по накладной приёма
+  "Заказчики": {
+    count: 2,
+    items: [
+      { code: "ЗК-001", value: "Национальный банк", status: "Активно" },
+      { code: "ЗК-002", value: "Монетный двор", status: "Активно" },
+    ]
+  },
   "Подотчётные сотрудники": {
     count: 8,
     items: [
@@ -822,8 +830,8 @@ export const spravochniki = {
   "Склады": {
     count: 2,
     items: [
-      { code: "СДМ1", value: "Склад ДМ №1", status: "Активно" },
-      { code: "СДМ2", value: "Склад ДМ №2", status: "Активно" },
+      { code: "СДМ1", value: "СДМ №1", status: "Активно" },
+      { code: "СДМ2", value: "СДМ №2", status: "Активно" },
     ]
   },
   "Технологические операции": {
@@ -1039,22 +1047,17 @@ export interface StorageLocation {
   available: boolean;
 }
 
-export const initialStorageLocations: StorageLocation[] = [
-  { id: "sl-9", sklad: "Склад ДМ №1", seyfNum: "1", polkaNum: "1", code: "СДМ1-С1-П1", available: true },
-  { id: "sl-10", sklad: "Склад ДМ №1", seyfNum: "1", polkaNum: "2", code: "СДМ1-С1-П2", available: true },
-  { id: "sl-11", sklad: "Склад ДМ №1", seyfNum: "2", polkaNum: "1", code: "СДМ1-С2-П1", available: true },
-  { id: "sl-12", sklad: "Склад ДМ №1", seyfNum: "2", polkaNum: "2", code: "СДМ1-С2-П2", available: true },
-  { id: "sl-13", sklad: "Склад ДМ №1", seyfNum: "3", polkaNum: "1", code: "СДМ1-С3-П1", available: true },
-  { id: "sl-14", sklad: "Склад ДМ №1", seyfNum: "3", polkaNum: "2", code: "СДМ1-С3-П2", available: true },
-  { id: "sl-1", sklad: "Склад ДМ №2", seyfNum: "1", polkaNum: "1", code: "СДМ2-С1-П1", available: true },
-  { id: "sl-2", sklad: "Склад ДМ №2", seyfNum: "1", polkaNum: "2", code: "СДМ2-С1-П2", available: true },
-  { id: "sl-3", sklad: "Склад ДМ №2", seyfNum: "2", polkaNum: "1", code: "СДМ2-С2-П1", available: true },
-  { id: "sl-4", sklad: "Склад ДМ №2", seyfNum: "2", polkaNum: "2", code: "СДМ2-С2-П2", available: false },
-  { id: "sl-5", sklad: "Склад ДМ №2", seyfNum: "3", polkaNum: "1", code: "СДМ2-С3-П1", available: true },
-  { id: "sl-6", sklad: "Склад ДМ №2", seyfNum: "3", polkaNum: "2", code: "СДМ2-С3-П2", available: true },
-  { id: "sl-7", sklad: "Склад ДМ №2", seyfNum: "4", polkaNum: "1", code: "СДМ2-С4-П1", available: true },
-  { id: "sl-8", sklad: "Склад ДМ №2", seyfNum: "4", polkaNum: "2", code: "СДМ2-С4-П2", available: true },
+// У складов одинаковая сетка ячеек: Сейф №1–4, Полка 1–2 (код — <код склада>-С<сейф>-П<полка>)
+const CELLS: [string, string, boolean][] = [
+  ["1", "1", true], ["1", "2", true], ["2", "1", true], ["2", "2", false],
+  ["3", "1", true], ["3", "2", true], ["4", "1", true], ["4", "2", true],
 ];
+export const initialStorageLocations: StorageLocation[] = (["СДМ1", "СДМ2"] as const).flatMap((code, si) => {
+  const sklad = si === 0 ? SDM1 : SDM2;
+  return CELLS.map(([seyfNum, polkaNum, available], ci) => ({
+    id: `sl-${si * CELLS.length + ci + 1}`, sklad, seyfNum, polkaNum, code: `${code}-С${seyfNum}-П${polkaNum}`, available,
+  }));
+});
 
 // Класс, по которому позиция относится к складу ГП; все остальные классы — склад ДМ.
 export const GP_KLASS = "Готовая продукция";
