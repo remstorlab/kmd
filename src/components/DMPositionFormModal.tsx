@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Btn, Modal, Field, Input, Select, KlassSelect, MaterialCodeSelect } from "./ui";
-import { StorageLocation, ChemComposition, spravValues } from "../data/mock";
+import { StorageLocation, ChemComposition, spravValues, isStoneKlass } from "../data/mock";
 import ChemCompositionBlock from "./ChemCompositionBlock";
 import { useApp } from "../store/AppContext";
 
@@ -109,6 +109,12 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   const probas = spravValues("Пробы");
   const probaOptions = ["", ...(form.proba && !probas.includes(form.proba) ? [form.proba] : []), ...probas];
 
+  // Драгоценные камни: веса металла подставляются 0.00 (можно сохранить как введённый вес),
+  // количество изделий обязательно
+  const isStone = isStoneKlass(form.klass);
+  const changeKlass = (klass: string) => setForm(f => (isStoneKlass(klass) ? { ...f, klass, lig: "0.00", net: "0.00" } : { ...f, klass }));
+  const noKol = isStone && !(parseInt(form.kol, 10) > 0);
+
   const changeSeyf = (seyf: string) => setForm(f => ({ ...f, seyf, polka: isSet(seyf) ? polkasOf(locs, sklad, seyf)[0] ?? NO_LOC : NO_LOC }));
 
   const [many, setMany] = useState(false);
@@ -116,7 +122,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   const canMany = mode === "add" && !!onSaveMany;
   const count = parseInt(manyCount, 10) || 0;
   const badCount = canMany && many && (count < 2 || count > 999);
-  const canSave = !!form.name.trim() && !!form.nomenkl.trim() && !badCount && (!isSet(form.seyf) || isSet(form.polka));
+  const canSave = !!form.name.trim() && !!form.nomenkl.trim() && !badCount && !noKol && (!isSet(form.seyf) || isSet(form.polka));
 
   const save = () => {
     if (!canSave) return;
@@ -145,14 +151,19 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
       {header}
       <div className="grid grid-cols-4 gap-4 mb-4">
         <Field label="Номенкл. номер"><Input value={form.nomenkl} disabled /></Field>
-        <Field label="Класс" required={!ro}><KlassSelect value={form.klass} onChange={set("klass")} disabled={ro} /></Field>
+        <Field label="Класс" required={!ro}><KlassSelect value={form.klass} onChange={changeKlass} disabled={ro} /></Field>
         <Field label="Код материала" required={!ro}><MaterialCodeSelect value={form.code} onChange={set("code")} disabled={ro} /></Field>
         <Field label="Наименование" required={!ro} full><Input value={form.name} onChange={set("name")} placeholder="Наименование позиции" disabled={ro} /></Field>
-        {/* Необязательное: сколько изделий входит в одну позицию */}
-        <Field label="Количество изделий, шт"><Input value={form.kol} onChange={v => set("kol")(v.replace(/[^\d]/g, ""))} placeholder="количество в пределах одной позиции" disabled={ro} /></Field>
+        {/* Сколько изделий входит в одну позицию; для драгоценных камней — обязательно */}
+        <Field label="Количество изделий, шт" required={!ro && isStone}>
+          <div className={!ro && noKol ? "rounded-lg ring-1 ring-red-400" : ""}>
+            <Input value={form.kol} onChange={v => set("kol")(v.replace(/[^\d]/g, ""))} placeholder="количество в пределах одной позиции" disabled={ro} />
+          </div>
+          {!ro && noKol && <div className="text-xs text-red-600 mt-1">Для класса «Драгоценные камни» необходимо указать количество изделий</div>}
+        </Field>
         <Field label="Проба" required={!ro}><Select value={form.proba} options={probaOptions} onChange={set("proba")} optionLabel={v => v || "Выберите пробу"} disabled={ro} /></Field>
-        <Field label="Масса лигатурная, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={set("lig")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
-        <Field label="Масса чистая, г" required={!ro && !lockWeights}><Input value={form.net} onChange={set("net")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
+        <Field label="Вес лигатурный, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={set("lig")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
+        <Field label="Вес чистый, г" required={!ro && !lockWeights}><Input value={form.net} onChange={set("net")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
         <Field label="Склад"><Input value={sklad} disabled /></Field>
         {/* Необязательные: «-» — место хранения не задано */}
         <Field label="Сейф"><Select value={form.seyf || NO_LOC} options={seyfOptions} onChange={changeSeyf} disabled={ro} /></Field>
