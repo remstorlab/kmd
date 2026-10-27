@@ -44,7 +44,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const [head, setHead] = useState(() => ({
     number: doc?.number || `ТР-${String(Math.floor(Math.random() * 900 + 100)).padStart(4, "0")}`,
     date: doc?.date || today,
-    zakazchik: "Монетный двор",
+    zakazchik: doc?.zakazchik ?? "Монетный двор",
     // Отправитель — склад приёмки (СДМ1), получатель — склад выдачи (СДМ2)
     sender: doc?.sender || SDM1,
     receiver: doc?.receiver || SDM2,
@@ -52,7 +52,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     shihtaId: doc?.shihtaId ?? "",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
-  const [ownProperty, setOwnProperty] = useState(true);
+  const [ownProperty, setOwnProperty] = useState(doc?.ownProperty ?? true);
   const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Требование_${doc.number}.pdf`)] : []));
   const [positions, setPositions] = useState<TrebPosition[]>(() => doc?.positions ?? []);
 
@@ -76,16 +76,25 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     const nomenkl = new Set((k?.materials ?? []).map(m => m.nomenkl).filter(Boolean));
     return stock.filter(r => nomenkl.has(r.nomenkl) && itemOf({ ...r, issue: 0 })?.status === "Резерв");
   };
-  // Выбор шихтовой карты подставляет в требование её зарезервированные позиции со склада-отправителя
+  // Выбор шихтовой карты заполняет требование её зарезервированными позициями со склада-отправителя
+  // (позиции ранее выбранной карты заменяются)
   const chooseKarta = (id: string) => {
     setHead(x => ({ ...x, shihtaId: id }));
     if (!id) return;
-    const rows = rezervOf(id).filter(r => !positions.some(p => p.id === r.id));
+    const rows = rezervOf(id);
     if (rows.length) {
-      setPositions(prev => [...prev, ...rows.map(r => ({ ...r, issue: r.qty }))]);
+      setPositions(rows.map(r => ({ ...r, issue: r.qty })));
       show(`Добавлены позиции резерва шихтовой карты: ${rows.length}`);
     } else show(`У шихтовой карты нет позиций в резерве на складе «${head.sender}»`);
   };
+
+  // Заказчик и «Собственность заказчика» после выбора позиций берутся из них (из документов приёма)
+  // и только для чтения; до выбора позиций — вводятся вручную
+  const posItems = positions.map(itemOf).filter((i): i is GPItem | DMItem => !!i?.zakazchik);
+  const fromPositions = !posted && posItems.length > 0;
+  const zakazchik = fromPositions ? Array.from(new Set(posItems.map(i => i.zakazchik!))).join(", ") : head.zakazchik;
+  const isOwn = fromPositions ? posItems.every(i => i.ownProperty) : ownProperty;
+  const lockZakazchik = ro || posted || fromPositions;
 
   // Смена склада-отправителя: позиции другого склада убираются из требования
   const changeSender = (v: string) => {
@@ -161,6 +170,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       sender: head.sender,
       receiver: head.receiver,
       shihtaId: head.shihtaId || undefined,
+      zakazchik,
+      ownProperty: isOwn,
       positions,
     });
   };
@@ -194,7 +205,11 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         {typeSelect}
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
         <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-        <Field label="Заказчик" required={!ro}><Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...spravValues("Заказчики / Организации")]))} onChange={h("zakazchik")} disabled={ro} /></Field>
+        <Field label="Заказчик" required={!ro}>
+          {lockZakazchik
+            ? <Input value={zakazchik} disabled />
+            : <Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...spravValues("Заказчики / Организации")]))} onChange={h("zakazchik")} />}
+        </Field>
         <Field label="Отправитель" required={!ro}><Select value={head.sender} options={skladOptions(head.sender)} onChange={changeSender} disabled={lockPos} /></Field>
         <Field label="Получатель" required={!ro}><Select value={head.receiver} options={skladOptions(head.receiver)} onChange={h("receiver")} disabled={lockPos} /></Field>
         <Field label="Шихтовая карта" full>
@@ -209,7 +224,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные сотрудники")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
-          <Toggle checked={ownProperty} onChange={setOwnProperty} disabled={ro} label={ownProperty ? "Да" : "Нет"} />
+          <Toggle checked={isOwn} onChange={setOwnProperty} disabled={lockZakazchik} label={isOwn ? "Да" : "Нет"} />
         </div>
       </div>
       {!lockPos && head.sender === head.receiver && (

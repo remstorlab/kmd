@@ -165,13 +165,15 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
   const postToStock = () => {
     const kol = (p: PrihodPosition) => parseInt(p.kol, 10) || 0;
     const n = (v: string) => parseFloat(String(v).replace(",", ".")) || 0;
+    // Заказчик — отправитель документа; признак «Собственность заказчика» — из шапки
+    const zakazchik = isOrder ? head.otpravitel : head.zakazchik;
     const gp: GPItem[] = positions.filter(p => isGPKlass(p.klass)).map(p => ({
       id: `gp-${p.id}`, name: p.name, nomenkl: p.nomenkl, qty: kol(p), unit: p.unit || "шт", klass: p.klass, code: p.code,
-      location: locOf(p), sklad, status: "На складе", proba: n(p.proba), ligWeight: n(p.lig), netWeight: n(p.net), chem: p.chem,
+      location: locOf(p), sklad, status: "На складе", proba: n(p.proba), ligWeight: n(p.lig), netWeight: n(p.net), chem: p.chem, zakazchik, ownProperty,
     }));
     const dm: DMItem[] = positions.filter(p => !isGPKlass(p.klass)).map(p => ({
       id: `dm-${p.id}`, name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.code, qty: kol(p), proba: n(p.proba),
-      ligWeight: n(p.lig), netWeight: n(p.net), location: locOf(p), sklad, status: "На складе", chem: p.chem,
+      ligWeight: n(p.lig), netWeight: n(p.net), location: locOf(p), sklad, status: "На складе", chem: p.chem, zakazchik, ownProperty,
     }));
     if (gp.length) setGpItems(prev => [...prev.filter(i => !gp.some(x => x.id === i.id)), ...gp]);
     if (dm.length) setDmItems(prev => [...prev.filter(i => !dm.some(x => x.id === i.id)), ...dm]);
