@@ -5,10 +5,8 @@ import {
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
 } from "../components/ui";
-import { GPItem, DMItem, MAIN_SKLAD, spravValues } from "../data/mock";
+import { GPItem, DMItem, SDM1, SDM2 } from "../data/mock";
 import { Coins } from "lucide-react";
-import PrihodDocModal from "../components/PrihodDocModal";
-import VydachaDocModal from "../components/VydachaDocModal";
 import DMPositionViewModal from "../components/DMPositionViewModal";
 import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, parseLoc, NO_LOC } from "../components/DMPositionFormModal";
 import { useScreen } from "../router";
@@ -18,6 +16,12 @@ const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nome
 
 // ── Склады ХАБ ───────────────────────────────────────────────────────────────
 
+// Подразделы «Склады»: у каждого склада свой экран остатков (сотрудник склада видит только позиции своего склада)
+export const SKLAD_PAGES: { page: "ostatok-sdm1" | "ostatok-sdm2"; sklad: string; sub: string }[] = [
+  { page: "ostatok-sdm1", sklad: SDM1, sub: "Склад приёмки: принятые позиции и резерв под шихтовые карты" },
+  { page: "ostatok-sdm2", sklad: SDM2, sub: "Склад выдачи: позиции для отгрузки и операций движения материала" },
+];
+
 export function SkladyHub() {
   const { navigate } = useApp();
 
@@ -25,13 +29,15 @@ export function SkladyHub() {
     <div>
       <PageHeader title="Склады" subtitle="Выберите раздел" breadcrumb={["Склады"]} />
       <div className="grid grid-cols-2 gap-6 max-w-2xl">
-        <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("ostatok-dm")}>
-          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-4">
-            <Coins className="w-5 h-5 text-blue-600" />
+        {SKLAD_PAGES.map(s => (
+          <div key={s.page} className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(s.page)}>
+            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-4">
+              <Coins className="w-5 h-5 text-blue-600" />
+            </div>
+            <h3 className="font-semibold text-gray-900 mb-1">Остатки материалов на {s.sklad}</h3>
+            <p className="text-sm text-gray-500">{s.sub}</p>
           </div>
-          <h3 className="font-semibold text-gray-900 mb-1">Остатки материалов на складе ДМ</h3>
-          <p className="text-sm text-gray-500">{spravValues("Склады").join(", ")} — все позиции, включая готовую продукцию</p>
-        </div>
+        ))}
       </div>
     </div>
   );
@@ -206,32 +212,25 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
   );
 }
 
-// ── Остатки на складе ДМ ──────────────────────────────────────────────────────
+// ── Остатки на складе (СДМ №1 / СДМ №2) ─────────────────────────────────────
+// Экран одного склада: только позиции со значением «Склад» = sklad. Приём и выдача здесь не оформляются —
+// только в «Складских операциях» (Приход / Выдача); на экране — просмотр, смена места хранения и объединение.
 
-export function OstatokDM() {
-  const { dmItems, setDmItems, gpItems, setGpItems, setSkladDocs, setVydachaDocs } = useApp();
-  // Все позиции склада, любого класса (в том числе «Готовая продукция»), из учётов ДМ и ГП.
-  const skladItems = [...dmItems, ...gpItems.map(gpToDm)];
+export function OstatokSklad({ sklad }: { sklad: string }) {
+  const { dmItems, setDmItems, gpItems, setGpItems } = useApp();
+  // Позиции склада любого класса (в том числе «Готовая продукция») из учётов ДМ и ГП
+  const skladItems = [...dmItems, ...gpItems.map(gpToDm)].filter(it => it.sklad === sklad);
   const codeLabel = useMaterialCodeLabel();
   const { toast, show, clear } = useToast();
   const [search, setSearch] = useState("");
   const [filterKlass, setFilterKlass] = useState("Все классы");
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
-  // Склады — из справочника «Склады» (множественный выбор)
-  const [filterSklad, setFilterSklad] = useState<string[]>([]);
-  const sklady = spravValues("Склады");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // Экраны: /sklady/dm/view/:id, /sklady/dm/merge, /sklady/dm/prihod, /sklady/dm/vydacha
+  // Экраны: /sklady/sdmN/view/:id, /sklady/sdmN/merge, /sklady/sdmN/mesto/:id
   const screen = useScreen();
   const viewItem = skladItems.find(it => it.id === screen.after("view")) ?? null;
   const showMerge = screen.has("merge");
-  const showPrihod = screen.has("prihod");
-  const showVydacha = screen.has("vydacha");
-  // Отмеченные позиции (кроме «Закрыта» и «В подотчёте») — сразу попадают в накладную;
-  // позиция из резерва при оформлении возвращает свою шихтовую карту в «Редактирование»
-  // Выдача формируется только со склада выдачи (СДМ2) — позиции других складов в накладную не попадают
-  const vydachaIds = skladItems.filter(it => selected.has(it.id) && it.sklad === MAIN_SKLAD && (it.status === "На складе" || it.status === "Резерв")).map(it => it.id);
   // Смена места хранения: …/mesto/:id
   const moveItem = skladItems.find(it => it.id === screen.after("mesto")) ?? null;
   // Позиция физически на складе — место хранения можно изменить
@@ -249,8 +248,7 @@ export function OstatokDM() {
     const matchSearch = !search || it.name.toLowerCase().includes(search.toLowerCase());
     const matchKlass = filterKlass === "Все классы" || it.klass === filterKlass;
     const matchStatus = filterStatus.length === 0 || filterStatus.includes(it.status);
-    const matchSklad = filterSklad.length === 0 || filterSklad.includes(it.sklad);
-    return matchSearch && matchKlass && matchStatus && matchSklad;
+    return matchSearch && matchKlass && matchStatus;
   });
   const { sorted, sort, toggleSort } = useSort(filtered, {
     name: it => it.name,
@@ -278,12 +276,10 @@ export function OstatokDM() {
   // Закрытые (выданные) позиции в объединении не участвуют
   // В объединении участвуют только позиции на складе: закрытые и выданные в подотчёт — нет
   const canMerge = (it: DMItem) => it.status !== "Закрыта" && it.status !== "В подотчёте";
+  // На экране только позиции одного склада — объединяются позиции этого склада
   const selectedItems = skladItems.filter(it => selected.has(it.id) && canMerge(it));
-  // Объединяются только позиции одного склада
-  const oneSklad = new Set(selectedItems.map(it => it.sklad)).size <= 1;
-  // Экран объединения, открытый по прямой ссылке без выбора, показывает первые две доступные позиции одного склада
-  const mergeItems = selectedItems.length >= 2 && oneSklad ? selectedItems
-    : (() => { const free = skladItems.filter(canMerge); return free.filter(it => it.sklad === free[0]?.sklad).slice(0, 2); })();
+  // Экран объединения, открытый по прямой ссылке без выбора, показывает первые две доступные позиции
+  const mergeItems = selectedItems.length >= 2 ? selectedItems : skladItems.filter(canMerge).slice(0, 2);
 
   const doMerge = (p: PrihodPosition) => {
     const ids = new Set(mergeItems.map(it => it.id));
@@ -298,7 +294,7 @@ export function OstatokDM() {
       ligWeight: parseFloat(p.lig) || 0,
       netWeight: parseFloat(p.net) || 0,
       location: formatLoc(p.seyf, p.polka),
-      sklad: mergeItems[0].sklad,
+      sklad,
       status: "На складе",
       chem: p.chem,
     };
@@ -312,16 +308,12 @@ export function OstatokDM() {
   return (
     <div>
       <PageHeader
-        title="Остатки материалов на складах"
-        subtitle="Актуальные позиции по складам, сейфам и полкам"
-        breadcrumb={["Склады", "Остатки на складах"]}
+        title={`Остатки материалов на ${sklad}`}
+        subtitle={`${sklad}: актуальные позиции по сейфам и полкам`}
+        breadcrumb={["Склады", `Остатки на ${sklad}`]}
         actions={
           <>
-            <Btn onClick={() => screen.openTop("prihod")}>Принять на склад</Btn>
-            <Btn variant="secondary" onClick={() => screen.openTop("vydacha")}>Выдать со склада{vydachaIds.length ? ` (${vydachaIds.length})` : ""}</Btn>
-            <span title={oneSklad ? undefined : "Объединяются только позиции одного склада"}>
-              <Btn variant="secondary" disabled={selectedItems.length < 2 || !oneSklad} onClick={() => screen.openTop("merge")}>Объединить позиции{selectedItems.length ? ` (${selectedItems.length})` : ""}</Btn>
-            </span>
+            <Btn variant="secondary" disabled={selectedItems.length < 2} onClick={() => screen.openTop("merge")}>Объединить позиции{selectedItems.length ? ` (${selectedItems.length})` : ""}</Btn>
             <ExportBtn onToast={show} />
           </>
         }
@@ -341,11 +333,7 @@ export function OstatokDM() {
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
           <MultiSelect values={filterStatus} options={["На складе", "Резерв", "В подотчёте", "Закрыта"]} onChange={setFilterStatus} allLabel="Все статусы" />
         </div>
-        <div className="min-w-36">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Склад</label>
-          <MultiSelect values={filterSklad} options={sklady} onChange={v => { setFilterSklad(v); setPage(1); }} allLabel="Все склады" />
-        </div>
-        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus([]); setFilterSklad([]); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus([]); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
           Сбросить фильтры
         </button>
       </div>
@@ -414,20 +402,15 @@ export function OstatokDM() {
         <MoveLocationModal key={moveItem.id} item={moveItem} onClose={() => screen.close("mesto")} onSave={(loc, name) => saveLocation(moveItem, loc, name)} />
       )}
       {showMerge && mergeItems.length >= 2 && <MergeModal items={mergeItems} onClose={() => screen.close("merge")} onConfirm={doMerge} />}
-      {showPrihod && (
-        <PrihodDocModal
-          onClose={() => screen.close("prihod")}
-          onSave={d => { setSkladDocs(prev => [d, ...prev]); screen.close("prihod"); show(`Документ ${d.number} сохранён`); }}
-        />
-      )}
-      {showVydacha && (
-        <VydachaDocModal
-          preselectIds={vydachaIds}
-          onClose={() => screen.close("vydacha")}
-          onSave={d => { setVydachaDocs(prev => [d, ...prev]); setSelected(new Set()); screen.close("vydacha"); show(`Накладная ${d.number} сохранена`); }}
-        />
-      )}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );
+}
+
+export function OstatokSdm1() {
+  return <OstatokSklad key={SDM1} sklad={SDM1} />;
+}
+
+export function OstatokSdm2() {
+  return <OstatokSklad key={SDM2} sklad={SDM2} />;
 }

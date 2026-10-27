@@ -113,7 +113,7 @@ export function Dashboard() {
           label="Всего на складе (ДМ)"
           value={`${fmt(totalDM)} г`}
           sub={dmMetals.map(m => `${metalName[m]} ${fmt(dmByMetal[m])} г`).join(" · ")}
-          onClick={() => navigate("ostatok-dm")}
+          onClick={() => navigate("sklady-hub")}
         />
         <StatCard
           icon={<Repeat className="w-5 h-5" />}

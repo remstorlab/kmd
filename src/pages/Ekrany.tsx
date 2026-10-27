@@ -4,6 +4,7 @@ import { useApp } from "../store/AppContext";
 import { PageHeader } from "../components/ui";
 import { LOGIN_PATH, PAGE_PATHS as P } from "../router";
 import { SPRAV_SLUGS, STATUS_SPRAV_SLUGS } from "./Spravochniki";
+import { SDM1, SDM2 } from "../data/mock";
 
 // ── Карта экранов ─────────────────────────────────────────────────────────────
 // Все экраны приложения с прямыми ссылками — для импорта страниц сайта в Figma.
@@ -21,7 +22,8 @@ export function useScreenGroups(): Group[] {
   const prihodNaklad = skladDocs.find(d => d.type === "Накладная") ?? skladDocs[0];
   const trebovanie = skladDocs.find(d => d.type === "Требование");
   const gp = gpItems[0];
-  const dm = dmItems[0];
+  const dm1 = dmItems.find(i => i.sklad === SDM1 && i.status !== "Закрыта");
+  const dm2 = dmItems.find(i => i.sklad === SDM2 && i.status !== "Закрыта");
   const karta = shihtovyeKarty.find(k => k.status === "Новая") ?? shihtovyeKarty[0];
   const kartaRed = shihtovyeKarty.find(k => k.status === "Редактирование");
   const person = podotchetniki[0];
@@ -37,23 +39,21 @@ export function useScreenGroups(): Group[] {
     ] },
     { title: "Склады", screens: [
       { title: "Склады", path: P["sklady-hub"] },
-      { title: "Остатки материалов на складе ДМ", path: P["ostatok-dm"] },
-      { title: "ДМ: выдача со склада — накладная", path: `${P["ostatok-dm"]}/vydacha` },
-      dm && { title: "Просмотр позиции ДМ", path: `${P["ostatok-dm"]}/view/${dm.id}` },
-      { title: "ДМ: объединение позиций", path: `${P["ostatok-dm"]}/merge` },
-      { title: "ДМ: приём — приходный ордер", path: `${P["ostatok-dm"]}/prihod` },
-      { title: "ДМ: приём — накладная", path: `${P["ostatok-dm"]}/prihod/nakladnaya` },
-      { title: "ДМ: приём — добавить позицию", path: `${P["ostatok-dm"]}/prihod/position-new` },
-      { title: "ДМ: приём — просмотр позиции", path: `${P["ostatok-dm"]}/prihod/position/po-1` },
-      { title: "ДМ: приём — редактирование позиции", path: `${P["ostatok-dm"]}/prihod/position-edit/po-1` },
-      { title: "ДМ: выдача со склада", path: `${P["ostatok-dm"]}/vydacha` },
-      { title: "ДМ: выдача — подбор позиций", path: `${P["ostatok-dm"]}/vydacha/pick` },
+      { title: "Остатки материалов на СДМ №1", path: P["ostatok-sdm1"] },
+      dm1 && { title: "СДМ №1: просмотр позиции", path: `${P["ostatok-sdm1"]}/view/${dm1.id}` },
+      dm1 && { title: "СДМ №1: смена места хранения", path: `${P["ostatok-sdm1"]}/mesto/${dm1.id}` },
+      { title: "СДМ №1: объединение позиций", path: `${P["ostatok-sdm1"]}/merge` },
+      { title: "Остатки материалов на СДМ №2", path: P["ostatok-sdm2"] },
+      dm2 && { title: "СДМ №2: просмотр позиции", path: `${P["ostatok-sdm2"]}/view/${dm2.id}` },
+      dm2 && { title: "СДМ №2: смена места хранения", path: `${P["ostatok-sdm2"]}/mesto/${dm2.id}` },
+      { title: "СДМ №2: объединение позиций", path: `${P["ostatok-sdm2"]}/merge` },
     ].filter(Boolean) as Screen[] },
     { title: "Складские операции", screens: [
       { title: "Складские операции", path: P["sklad-oper-hub"] },
       { title: "Приход на склад", path: P["prihod-list"] },
       { title: "Приход: новый документ", path: `${P["prihod-list"]}/new` },
       { title: "Приход: новая накладная", path: `${P["prihod-list"]}/new/nakladnaya` },
+      { title: "Приход: добавить позицию", path: `${P["prihod-list"]}/new/position-new` },
       prihodOrder && { title: "Приход: просмотр ордера", path: `${P["prihod-list"]}/view/${prihodOrder.id}` },
       prihodOrder && { title: "Приход: редактирование ордера", path: `${P["prihod-list"]}/edit/${prihodOrder.id}` },
       prihodNaklad && prihodNaklad !== prihodOrder && { title: "Приход: просмотр накладной", path: `${P["prihod-list"]}/view/${prihodNaklad.id}` },

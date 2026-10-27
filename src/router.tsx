@@ -12,7 +12,8 @@ import type { Page } from "./store/AppContext";
 export const PAGE_PATHS: Record<Page, string> = {
   "dashboard": "/",
   "sklady-hub": "/sklady",
-  "ostatok-dm": "/sklady/dm",
+  "ostatok-sdm1": "/sklady/sdm1",
+  "ostatok-sdm2": "/sklady/sdm2",
   "sklad-oper-hub": "/skladskie-operacii",
   "prihod-list": "/skladskie-operacii/prihod",
   "vydacha-list": "/skladskie-operacii/vydacha",
@@ -32,7 +33,7 @@ export const PAGE_PATHS: Record<Page, string> = {
 export const LOGIN_PATH = "/login";
 export const SCREENS_PATH = "/ekrany";
 
-// Разделы с вложенными сегментами; более длинные пути — раньше, чтобы /sklady/dm не съел /sklady.
+// Разделы с вложенными сегментами; более длинные пути — раньше, чтобы /sklady/sdm1 не съел /sklady.
 const SECTION_PAGES: Page[] = (Object.keys(PAGE_PATHS) as Page[])
   .filter(p => p !== "dashboard" && p !== "podotchetnik-card" && p !== "spravochnik-detail")
   .sort((a, b) => PAGE_PATHS[b].length - PAGE_PATHS[a].length);

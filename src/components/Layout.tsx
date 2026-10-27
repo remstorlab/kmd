@@ -19,7 +19,7 @@ const menuItems: { key: string; page: Page; icon: React.ReactNode }[] = [
 
 function isActive(menuPage: Page, currentPage: Page): boolean {
   if (menuPage === currentPage) return true;
-  if (menuPage === "sklady-hub" && currentPage === "ostatok-dm") return true;
+  if (menuPage === "sklady-hub" && (currentPage === "ostatok-sdm1" || currentPage === "ostatok-sdm2")) return true;
   if (menuPage === "sklad-oper-hub" && ["prihod-list", "vydacha-list"].includes(currentPage)) return true;
   if (menuPage === "admin-users" && (currentPage === "admin-roles" || currentPage === "admin-settings")) return true;
   if (menuPage === "podotchetniki" && currentPage === "podotchetnik-card") return true;

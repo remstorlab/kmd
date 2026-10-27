@@ -5,7 +5,7 @@ import { LOGIN_PATH, PAGE_PATHS, SCREENS_PATH } from "./router";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
-import { SkladyHub, OstatokDM } from "./pages/Sklady";
+import { SkladyHub, OstatokSdm1, OstatokSdm2 } from "./pages/Sklady";
 import { SkladskieOperHub, PrihodList, VydachaList } from "./pages/SkladskieOper";
 import { DvizhenieMateriаla } from "./pages/DvizhenieMateriаla";
 import { ShihtovyeKarty } from "./pages/ShihtovyeKarty";
@@ -32,7 +32,8 @@ function AppShell() {
       <Routes>
         <Route path={P["dashboard"]} element={<Dashboard />} />
         <Route path={P["sklady-hub"]} element={<SkladyHub />} />
-        <Route path={`${P["ostatok-dm"]}/*`} element={<OstatokDM />} />
+        <Route path={`${P["ostatok-sdm1"]}/*`} element={<OstatokSdm1 />} />
+        <Route path={`${P["ostatok-sdm2"]}/*`} element={<OstatokSdm2 />} />
         <Route path={P["sklad-oper-hub"]} element={<SkladskieOperHub />} />
         <Route path={`${P["prihod-list"]}/*`} element={<PrihodList />} />
         <Route path={`${P["vydacha-list"]}/*`} element={<VydachaList />} />
