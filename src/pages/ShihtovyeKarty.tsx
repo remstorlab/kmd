@@ -89,9 +89,9 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const [pickSklad, setPickSklad] = useState(PRIHOD_SKLAD);
   const skladChem = (id: string) => dmItems.find(i => i.id === id)?.chem;
   const skladRows = useMemo<StockRow[]>(() => dmItems
-    .filter(i => i.sklad === pickSklad && i.status === "На складе" && i.qty > 0 && !isGPKlass(i.klass))
+    .filter(i => i.status === "На складе" && i.qty > 0 && !isGPKlass(i.klass))
     .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem })),
-  [dmItems, pickSklad]);
+  [dmItems]);
   // Склад, на котором сейчас находится зарезервированная позиция карты (СДМ1 — до требования, СДМ2 — после)
   const rezSklad = (m: MatRow) =>
     (m.srcId ? dmItems.find(i => i.id === m.srcId) : undefined)?.sklad
@@ -364,7 +364,6 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
       {showFromSklad && (
         <StockPickerModal
-          key={pickSklad}
           title="Добавить материал со склада"
           toolbar={
             <div className="w-64">
@@ -372,6 +371,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
             </div>
           }
           rows={skladRows}
+          skladFilter={pickSklad}
           already={already}
           showWeights
           qtyLabel="Количество изделий"

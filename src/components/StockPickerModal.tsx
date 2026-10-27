@@ -23,6 +23,7 @@ export default function StockPickerModal({
   emptyText = "Нет доступных позиций на складе",
   addLabel = "Добавить",
   toolbar,
+  skladFilter,
   onClose,
   onAdd,
 }: {
@@ -40,6 +41,8 @@ export default function StockPickerModal({
   addLabel?: string;
   // Дополнительные поля над фильтрами (например, выбор склада)
   toolbar?: React.ReactNode;
+  // Показывать только позиции этого склада; отмеченные позиции других складов сохраняются и тоже добавляются
+  skladFilter?: string;
   onClose: () => void;
   onAdd: (picked: { row: StockRow; qty: number }[]) => void;
 }) {
@@ -65,6 +68,7 @@ export default function StockPickerModal({
       && (klass === ALL_KLASS || r.klass === klass)
       && (code === ALL_CODES || r.code === code)
       && (loc === ALL_LOCS || r.location === loc)
+      && (!skladFilter || onlySelected || r.sklad === skladFilter)
       && (!onlySelected || r.id in selectedQty);
   });
 
@@ -135,7 +139,7 @@ export default function StockPickerModal({
       </div>
 
       <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-        <span>Найдено: {filtered.length} из {available.length}</span>
+        <span>Найдено: {filtered.length} из {skladFilter && !onlySelected ? available.filter(r => r.sklad === skladFilter).length : available.length}</span>
         <span>Выбрано: {selectedCount}</span>
       </div>
 

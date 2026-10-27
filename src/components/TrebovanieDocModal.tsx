@@ -3,7 +3,7 @@ import {
   Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, PosStatusBadge,
 } from "./ui";
-import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, ShihtaMaterial, spravValues, isGPKlass, SDM1, SDM2, DOC_TREBOVANIE } from "../data/mock";
+import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, SDM1, SDM2, DOC_TREBOVANIE } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
 import { takeFromStock } from "../data/stock";
@@ -32,7 +32,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   // Оформленное требование: позиции уже перемещены — состав и склады менять нельзя
   const posted = doc?.status === "Оформлено";
   const lockPos = ro || posted;
-  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty } = useApp();
+  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty } = useApp();
   const { toast, show, clear } = useToast();
   // Вложенный экран: …/pick (подбор со склада-отправителя)
   const screen = useScreen();
@@ -152,35 +152,16 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         return !it || it.sklad !== head.sender || !canMove(it.status) || it.qty < p.issue;
       });
       if (lacking.length) { show(`Позиции недоступны на складе «${head.sender}»: ${lacking.map(p => p.name).join(", ")}`); return; }
-      // Перемещение: меняется только склад — место хранения, статус («Резерв») и прочие атрибуты сохраняются.
-      // Если выбрана шихтовая карта, дополнительные позиции (не из её резерва, «На складе») перемещаются
-      // под эту карту: переходят в «Резерв» и добавляются в её материалы — чтобы выдать их на плавку по той же карте.
-      // Статус карты не меняется.
+      // Перемещение: меняется только склад — место хранения, статус и прочие атрибуты сохраняются.
+      // Резерв шихтовой карты остаётся резервом этой карты; дополнительно добавленные позиции (не из резерва карты)
+      // просто встают на склад-получатель «На складе». Шихтовая карта документом не меняется.
       const stamp = Date.now();
+      const move = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: head.receiver });
       const partId = (it: { id: string }) => `${it.id}-t${stamp}`;
-      const karta = shihtovyeKarty.find(k => k.id === head.shihtaId && k.status !== "Выполнена");
-      const extra = karta ? positions.filter(p => p.src === "dm" && !isGPKlass(p.klass) && itemOf(p)?.status === "На складе") : [];
-      const extraIds = new Set(extra.map(p => p.id));
-      // Перемещаемая запись: целиком — с прежним id, частично — выделенная часть (parentId = исходная)
-      const isExtra = (it: { id: string; parentId?: string }) =>
-        extraIds.has(it.id) || (!!it.parentId && extraIds.has(it.parentId) && it.id === partId({ id: it.parentId }));
-      const move = <T extends GPItem | DMItem>(it: T): T =>
-        ({ ...it, sklad: head.receiver, ...(isExtra(it) ? { status: "Резерв" as const } : {}) });
       const gpTake = new Map(positions.filter(p => p.src === "gp").map(p => [p.id, p.issue]));
       const dmTake = new Map(positions.filter(p => p.src === "dm").map(p => [p.id, p.issue]));
       if (gpTake.size) setGpItems(prev => takeFromStock(prev, gpTake, move, partId).items);
       if (dmTake.size) setDmItems(prev => takeFromStock(prev, dmTake, move, partId).items);
-      if (karta && extra.length) {
-        const mats: ShihtaMaterial[] = extra.map(p => {
-          const k = p.qty > 0 ? p.issue / p.qty : 1;
-          const chem = Object.fromEntries(Object.entries(p.chem ?? {}).map(([el, v]) => {
-            const n = parseFloat(String(v).replace(",", "."));
-            return [el, Number.isFinite(n) ? (Math.round(n * k * 100) / 100).toFixed(2) : v];
-          }));
-          return { name: p.name, nomenkl: p.nomenkl, klass: p.klass, proba: p.proba ?? 0, ves: Math.round(share(p, p.lig) * 100) / 100, loc: p.location, qty: p.issue || 1, chem };
-        });
-        setShihtovyeKarty(prev => prev.map(k => (k.id === karta.id ? { ...k, materials: [...k.materials, ...mats] } : k)));
-      }
     }
     onSave({
       id: doc?.id ?? `sd-${Date.now()}`,
@@ -219,7 +200,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         </div>
       ) : !ro && (
         <div className="mb-4 text-sm bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5">
-          При оформлении позиции перемещаются на склад-получатель: место хранения, статус (в т. ч. «Резерв» под шихтовую карту) и остальные атрибуты не меняются. Если выбрана шихтовая карта, дополнительно добавленные позиции встают в резерв под неё и выдаются на плавку по этой карте.
+          При оформлении позиции перемещаются на склад-получатель: место хранения, статус (в т. ч. «Резерв» под шихтовую карту) и остальные атрибуты не меняются. Резерв шихтовой карты остаётся резервом карты; дополнительно добавленные позиции встают на склад-получатель «На складе» — шихтовая карта не меняется.
         </div>
       )}
       <div className="grid grid-cols-4 gap-4 mb-5">
