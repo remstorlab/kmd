@@ -101,20 +101,22 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   // «-» — не выбрано; значение не из справочника сохраняется в списке
   const withNone = (list: string[], v: string) => [NO_LOC, ...(isSet(v) && !list.includes(v) ? [v] : []), ...list];
   const seyfOptions = withNone(seyfs, form.seyf);
-  const polkaOptions = isSet(form.seyf) ? withNone(polkasOf(locs, sklad, form.seyf), form.polka) : [NO_LOC];
+  // Полка — конечное место хранения: при выбранном сейфе выбирается обязательно (без «-»)
+  const sefPolkas = isSet(form.seyf) ? polkasOf(locs, sklad, form.seyf) : [];
+  const polkaOptions = isSet(form.seyf) ? [...(isSet(form.polka) && !sefPolkas.includes(form.polka) ? [form.polka] : []), ...sefPolkas] : [NO_LOC];
 
   // Проба — из справочника «Пробы»; значение не из справочника сохраняется в списке
   const probas = spravValues("Пробы");
   const probaOptions = ["", ...(form.proba && !probas.includes(form.proba) ? [form.proba] : []), ...probas];
 
-  const changeSeyf = (seyf: string) => setForm(f => ({ ...f, seyf, polka: NO_LOC }));
+  const changeSeyf = (seyf: string) => setForm(f => ({ ...f, seyf, polka: isSet(seyf) ? polkasOf(locs, sklad, seyf)[0] ?? NO_LOC : NO_LOC }));
 
   const [many, setMany] = useState(false);
   const [manyCount, setManyCount] = useState("2");
   const canMany = mode === "add" && !!onSaveMany;
   const count = parseInt(manyCount, 10) || 0;
   const badCount = canMany && many && (count < 2 || count > 999);
-  const canSave = !!form.name.trim() && !!form.nomenkl.trim() && !badCount;
+  const canSave = !!form.name.trim() && !!form.nomenkl.trim() && !badCount && (!isSet(form.seyf) || isSet(form.polka));
 
   const save = () => {
     if (!canSave) return;
@@ -154,7 +156,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         <Field label="Склад"><Input value={sklad} disabled /></Field>
         {/* Необязательные: «-» — место хранения не задано */}
         <Field label="Сейф"><Select value={form.seyf || NO_LOC} options={seyfOptions} onChange={changeSeyf} disabled={ro} /></Field>
-        <Field label="Полка"><Select value={form.polka || NO_LOC} options={polkaOptions} onChange={set("polka")} disabled={ro || !isSet(form.seyf)} /></Field>
+        <Field label="Полка" required={!ro && isSet(form.seyf)}><Select value={form.polka || NO_LOC} options={polkaOptions} onChange={set("polka")} disabled={ro || !isSet(form.seyf)} /></Field>
       </div>
       <ChemCompositionBlock value={form.chem} onChange={chem => setForm(f => ({ ...f, chem }))} disabled={ro} />
       {canMany && (

@@ -18,8 +18,7 @@ const DICT_SLUG: Record<SpravKey, string> = {
   "Типы документов приёмки": "tipy-dokumentov-priemki",
   "Типы документов отгрузки": "tipy-dokumentov-otgruzki",
   "Типы документов движения материала": "tipy-dokumentov-dvizheniya",
-  "Организации": "organizacii",
-  "Заказчики": "zakazchiki",
+  "Заказчики / Организации": "zakazchiki-organizacii",
   "Подотчётные сотрудники": "podotchetnye-sotrudniki",
   "Типы операций": "tipy-operaciy",
   "Виды операций": "vidy-operaciy",
@@ -61,8 +60,7 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Типы документов приёмки": FileText,
   "Типы документов отгрузки": FileText,
   "Типы документов движения материала": FileText,
-  "Организации": Building2,
-  "Заказчики": Building2,
+  "Заказчики / Организации": Building2,
   "Подотчётные сотрудники": UserRound,
   "Типы операций": Settings2,
   "Виды операций": Layers,
@@ -387,7 +385,6 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
-            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
             <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
             <SortTh sortKey="shortName" sort={sort} onSort={toggleSort}>Краткое наименование</SortTh>
             <th className="w-12"></th>
@@ -499,7 +496,6 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
-            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
             <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
             <th className="w-24"></th>
           </tr></thead>
@@ -561,10 +557,9 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
 // ── Места хранения (Сейф/Полка, принадлежат складу из справочника «Склады») ──
 
 const SKLAD_OPTIONS = spravochniki["Склады"].items.map(i => i.value);
-const SKLAD_CODE: Record<string, string> = Object.fromEntries(spravochniki["Склады"].items.map(i => [i.value, i.code]));
 
 function placeOf(loc: StorageLocation): string {
-  return loc.polkaNum ? `Сейф № ${loc.seyfNum} / Полка № ${loc.polkaNum}` : `Сейф № ${loc.seyfNum}`;
+  return loc.polkaNum ? `Сейф №${loc.seyfNum}, Полка ${loc.polkaNum}` : `Сейф №${loc.seyfNum}`;
 }
 
 function StorageLocationsPage({ onBack }: { onBack: () => void }) {
@@ -587,13 +582,12 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
 
   const filtered = items.filter(loc => {
     const q = search.trim().toLowerCase();
-    return !q || loc.sklad.toLowerCase().includes(q) || placeOf(loc).toLowerCase().includes(q) || loc.code.toLowerCase().includes(q);
+    return !q || loc.sklad.toLowerCase().includes(q) || placeOf(loc).toLowerCase().includes(q);
   });
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
     sklad: loc => loc.sklad,
     place: loc => placeOf(loc),
-    code: loc => loc.code,
     available: loc => (loc.available ? 1 : 0),
   });
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
@@ -612,15 +606,14 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
     const seyfNum = form.seyfNum.trim();
     if (!seyfNum) { show("Укажите номер сейфа"); return; }
     const polkaNum = form.polkaNum.trim();
+    if (!polkaNum) { show("Укажите номер полки — полка является конечным местом хранения"); return; }
 
     if (items.some(l => l.sklad === form.sklad && l.seyfNum === seyfNum && l.polkaNum === polkaNum)) {
       show("Такое место хранения уже существует");
       return;
     }
 
-    const skladCode = SKLAD_CODE[form.sklad] ?? form.sklad;
-    const code = polkaNum ? `${skladCode}-С${seyfNum}-П${polkaNum}` : `${skladCode}-С${seyfNum}`;
-    const loc: StorageLocation = { id: `sl-${Date.now()}`, sklad: form.sklad, seyfNum, polkaNum, code, available: form.available };
+    const loc: StorageLocation = { id: `sl-${Date.now()}`, sklad: form.sklad, seyfNum, polkaNum, available: form.available };
     setItems(prev => [...prev, loc]);
     setShowAdd(false);
     show("Место хранения добавлено");
@@ -644,7 +637,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <div className="max-w-xs">
           <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
-          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Склад, место, код..." />
+          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Склад, сейф, полка..." />
         </div>
       </div>
 
@@ -653,7 +646,6 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
           <thead><tr className="bg-gray-50 border-b border-gray-200">
             <SortTh sortKey="sklad" sort={sort} onSort={toggleSort}>Склад</SortTh>
             <SortTh sortKey="place" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
-            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
             <SortTh sortKey="available" sort={sort} onSort={toggleSort}>Статус</SortTh>
             <th className="w-20"></th>
           </tr></thead>
@@ -662,7 +654,6 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
               <tr key={loc.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-900">{loc.sklad}</td>
                 <td className="px-4 py-3 text-gray-700">{placeOf(loc)}</td>
-                <td className="px-4 py-3 font-mono text-blue-600 font-medium">{loc.code}</td>
                 <td className="px-4 py-3"><Badge label={loc.available ? "Доступно" : "Заблокировано"} group="mesta-hraneniya" /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
@@ -674,9 +665,9 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
               </tr>
             ))}
             {pageItems.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
-            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={5} />
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={4} />
           </tbody>
         </table>
         <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
@@ -696,7 +687,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
           <div className="space-y-4">
             <Field label="Склад" required><Select value={form.sklad} options={SKLAD_OPTIONS} onChange={v => setForm(f => ({ ...f, sklad: v }))} /></Field>
             <Field label="Номер сейфа" required><Input value={form.seyfNum} onChange={v => setForm(f => ({ ...f, seyfNum: v }))} placeholder="2" /></Field>
-            <Field label="Номер полки"><Input value={form.polkaNum} onChange={v => setForm(f => ({ ...f, polkaNum: v }))} placeholder="5" /></Field>
+            <Field label="Номер полки" required><Input value={form.polkaNum} onChange={v => setForm(f => ({ ...f, polkaNum: v }))} placeholder="5" /></Field>
             <Toggle checked={form.available} onChange={v => setForm(f => ({ ...f, available: v }))} label="Доступно для использования" />
           </div>
         </Modal>
@@ -707,7 +698,6 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
           <div className="space-y-4">
             <Field label="Склад"><Input value={viewItem.sklad} disabled /></Field>
             <Field label="Место хранения"><Input value={placeOf(viewItem)} disabled /></Field>
-            <Field label="Код"><Input value={viewItem.code} disabled /></Field>
             <Toggle checked={viewItem.available} onChange={() => {}} label="Доступно для использования" disabled />
           </div>
         </Modal>
@@ -727,7 +717,6 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
           <div className="space-y-4">
             <Field label="Склад"><Input value={editItem.sklad} disabled /></Field>
             <Field label="Место хранения"><Input value={placeOf(editItem)} disabled /></Field>
-            <Field label="Код"><Input value={editItem.code} disabled /></Field>
             <Toggle checked={editAvailable} onChange={setEditAvailable} label="Доступно для использования" />
           </div>
         </Modal>

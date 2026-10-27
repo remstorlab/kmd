@@ -15,7 +15,7 @@ import { Plus } from "lucide-react";
 // Тип документа — из справочника «Типы документов отгрузки»; набор полей общий, отличается печатная форма.
 // Выдать можно любую позицию склада, независимо от класса.
 
-const RECEIVERS = spravochniki["Организации"].items.map(i => i.value);
+const RECEIVERS = spravochniki["Заказчики / Организации"].items.map(i => i.value);
 
 type VydachaPosition = VydachaDocPosition;
 

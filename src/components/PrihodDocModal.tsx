@@ -46,11 +46,10 @@ export default function PrihodDocModal(props: Props) {
     ? <TrebovanieDocModal {...props} typeSelect={typeSelect} />
     : <PrihodForm {...props} docType={docType} typeSelect={typeSelect} />;
 }
-// Отправители приходного ордера — из справочника «Организации»
-// Источник поля «Отправитель» зависит от типа документа: приходный ордер — справочник «Организации»,
-// накладная — «Заказчики» (отправитель = заказчик), требование — «Склады» (см. TrebovanieDocModal)
-const ORGS = spravValues("Организации");
-const ZAKAZCHIKI = spravValues("Заказчики");
+
+// Источник поля «Отправитель» зависит от типа документа: приходный ордер и накладная — общий справочник
+// «Заказчики / Организации», требование — «Склады» (см. TrebovanieDocModal)
+const ORGS = spravValues("Заказчики / Организации");
 
 // Демо-позиции для документов из демо-данных (без сохранённых позиций)
 const DEMO_ORDER: PrihodPosition[] = [
@@ -99,7 +98,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     planPos: "План-2026/Q3-AU",
     nakladNumber: doc?.number || "НП-001234",
     nakladDate: doc?.date || today,
-    zakazchik: doc?.sender || ZAKAZCHIKI[0],
+    zakazchik: doc?.sender || ORGS[0],
     sotrudnik: "Ким Александр Юрьевич",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
@@ -250,7 +249,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
           {typeSelect}
           <Field label="Номер" required={!ro}><Input value={head.nakladNumber} onChange={h("nakladNumber")} disabled={ro} /></Field>
           <Field label="Дата" required={!ro}><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>
-          <Field label="Отправитель" required={!ro}><Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...ZAKAZCHIKI]))} onChange={h("zakazchik")} disabled={ro} /></Field>
+          <Field label="Отправитель" required={!ro}><Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...ORGS]))} onChange={h("zakazchik")} disabled={ro} /></Field>
           {poluchatelSelect("Получатель")}
           <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные сотрудники")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
           <div>

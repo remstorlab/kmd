@@ -194,7 +194,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         {typeSelect}
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
         <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-        <Field label="Заказчик" required={!ro}><Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...spravValues("Заказчики")]))} onChange={h("zakazchik")} disabled={ro} /></Field>
+        <Field label="Заказчик" required={!ro}><Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...spravValues("Заказчики / Организации")]))} onChange={h("zakazchik")} disabled={ro} /></Field>
         <Field label="Отправитель" required={!ro}><Select value={head.sender} options={skladOptions(head.sender)} onChange={changeSender} disabled={lockPos} /></Field>
         <Field label="Получатель" required={!ro}><Select value={head.receiver} options={skladOptions(head.receiver)} onChange={h("receiver")} disabled={lockPos} /></Field>
         <Field label="Шихтовая карта" full>
