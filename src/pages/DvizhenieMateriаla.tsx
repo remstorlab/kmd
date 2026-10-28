@@ -12,7 +12,7 @@ import { takeFromStock, returnToStock } from "../data/stock";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
-import DMPositionFormModal, { PrihodPosition, emptyPosition, locOf, NO_LOC } from "../components/DMPositionFormModal";
+import DMPositionFormModal, { PrihodPosition, emptyPosition, locOf, parseLoc, NO_LOC } from "../components/DMPositionFormModal";
 
 // ── Добавить позицию ДМ со склада ─────────────────────────────────────────────
 
@@ -211,45 +211,72 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
   );
 }
 
-// ── Добавить позицию возврата: новые позиции, созданные кнопкой «Добавить позицию» ──
+// ── Возврат: позиции ДМ из формы «Добавить позицию ДМ» и из вкладки «Выдача» ──
 
 const DM_SKLAD = MAIN_SKLAD;
 
-function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
-  // Номенклатурные номера позиций операции — новая позиция получает следующий свободный
-  reservedNomenkl: string[];
-  // Позиция операции в виде позиции склада ДМ (код материала, веса, статус)
+// Позиция формы ДМ → позиция операции (n — номер строки во вкладке)
+const operFromForm = (p: PrihodPosition, n: number, srcId?: string): OperPosition => {
+  const lig = num(p.lig);
+  const net = num(p.net);
+  return {
+    n,
+    name: p.name,
+    nomenkl: p.nomenkl,
+    klass: p.klass,
+    proba: num(p.proba),
+    qty: parseInt(p.kol, 10) || undefined,
+    ves: net || lig,
+    lig,
+    net,
+    metal: p.code,
+    ag: p.chem.ag || "-",
+    cu: p.chem.cu || "-",
+    chem: p.chem,
+    loc: locOf(p),
+    ...(srcId ? { srcId } : {}),
+  };
+};
+
+// Позиция операции → позиция формы ДМ (для редактирования); недостающее — из вида позиции склада
+const formFromOper = (p: OperPosition, v: DMPositionView): PrihodPosition => {
+  const { seyf, polka } = parseLoc(p.loc);
+  const w = (x: number | null | undefined) => (x === null || x === undefined ? "" : String(x));
+  return {
+    id: `op-${p.n}`,
+    nomenkl: p.nomenkl,
+    name: p.name,
+    klass: p.klass,
+    code: v.metal ?? "",
+    kol: p.qty ? String(p.qty) : "",
+    unit: "шт",
+    proba: p.proba ? String(p.proba) : "",
+    lig: w(v.ligWeight),
+    net: w(v.netWeight),
+    seyf,
+    polka,
+    chem: { ...(v.chem ?? {}) },
+  };
+};
+
+// Выбор позиций вкладки «Выдача» для возврата
+function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
+  rows: OperPosition[];
+  // Номенкл. номера, уже добавленные во вкладку «Возврат»
+  already: string[];
   view: (p: OperPosition) => DMPositionView;
   onClose: () => void;
   onAdd: (rows: Omit<OperPosition, "n">[]) => void;
 }) {
-  const { storageLocations } = useApp();
-  // Позиции, созданные в этой модалке; n — локальный номер строки
-  const [created, setCreated] = useState<OperPosition[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [viewing, setViewing] = useState<OperPosition | null>(null);
   const [search, setSearch] = useState("");
-  const [klass, setKlass] = useState(ALL_KLASS);
-  const [metal, setMetal] = useState(ALL_METALS);
-  const [loc, setLoc] = useState(ALL_LOCS);
-  const [onlySelected, setOnlySelected] = useState(false);
-  const screen = useScreen();
-  const showAddNew = screen.has("new-position");
-  const setShowAddNew = (open: boolean) => (open ? screen.open("new-position") : screen.close("new-position"));
-
   const codeLabel = useMaterialCodeLabel();
-  const metals = [ALL_METALS, ...Array.from(new Set(created.map(p => view(p).metal).filter(Boolean))).sort()];
-  const locations = [ALL_LOCS, ...Array.from(new Set(created.map(p => p.loc))).sort()];
-
-  const filtered = created.filter(p => {
+  const added = new Set(already);
+  const available = rows.filter(p => !added.has(p.nomenkl));
+  const filtered = available.filter(p => {
     const q = search.trim().toLowerCase();
-    return (!q || p.name.toLowerCase().includes(q) || p.nomenkl.toLowerCase().includes(q))
-      && (klass === ALL_KLASS || p.klass === klass)
-      && (metal === ALL_METALS || view(p).metal === metal)
-      && (loc === ALL_LOCS || p.loc === loc)
-      && (!onlySelected || selected.has(p.n));
+    return !q || p.name.toLowerCase().includes(q) || p.nomenkl.toLowerCase().includes(q);
   });
-
   const { sorted, sort, toggleSort } = useSort(filtered, {
     nomenkl: p => p.nomenkl,
     name: p => p.name,
@@ -260,9 +287,7 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
     lig: p => view(p).ligWeight ?? 0,
     net: p => view(p).netWeight ?? 0,
     loc: p => p.loc,
-    status: p => view(p).status ?? "",
   });
-
   const allChecked = filtered.length > 0 && filtered.every(p => selected.has(p.n));
   const toggle = (n: number) => setSelected(prev => {
     const s = new Set(prev);
@@ -275,90 +300,42 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
     else filtered.forEach(p => s.add(p.n));
     return s;
   });
-
-  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setOnlySelected(false); };
-
   const addSelected = () => {
-    const chosen = created.filter(p => selected.has(p.n));
+    const chosen = available.filter(p => selected.has(p.n));
     if (chosen.length === 0) return;
-    onAdd(chosen.map(({ n, ...rest }) => rest));
+    // Копия позиции выдачи: код материала, веса и хим. состав фиксируются — их можно изменить во вкладке «Возврат»
+    onAdd(chosen.map(p => {
+      const v = view(p);
+      const { n: _n, ...rest } = p;
+      return { ...rest, metal: v.metal || rest.metal, lig: v.ligWeight ?? rest.lig, net: v.netWeight ?? rest.net, chem: v.chem ?? rest.chem };
+    }));
   };
-
-  // Новая позиция — та же форма, что при приёме на склад ДМ; добавленные позиции сразу отмечены
-  const toOper = (p: PrihodPosition, n: number): OperPosition => {
-    const lig = num(p.lig);
-    const net = num(p.net);
-    return {
-      n,
-      name: p.name,
-      nomenkl: p.nomenkl,
-      klass: p.klass,
-      proba: num(p.proba),
-      qty: parseInt(p.kol, 10) || undefined,
-      ves: net || lig,
-      lig,
-      net,
-      metal: p.code,
-      ag: p.chem.ag || "-",
-      cu: p.chem.cu || "-",
-      chem: p.chem,
-      loc: locOf(p),
-    };
-  };
-  const addNew = (ps: PrihodPosition[]) => {
-    const maxN = created.reduce((m, p) => Math.max(m, p.n), 0);
-    const rows = ps.map((p, i) => toOper(p, maxN + i + 1));
-    setCreated(prev => [...prev, ...rows]);
-    setSelected(prev => new Set([...prev, ...rows.map(r => r.n)]));
-    setShowAddNew(false);
-  };
-  const removeCreated = (n: number) => {
-    setCreated(prev => prev.filter(p => p.n !== n));
-    setSelected(prev => { const s = new Set(prev); s.delete(n); return s; });
-  };
-
   const th = "px-3 py-2";
   const dash = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v);
-
-  const pg6 = usePaged(sorted, "dm-vozvrat-pick");
+  const pg = usePaged(sorted, "dm-vozvrat-from-vydacha");
   return (
     <Modal
-      title="Добавить позицию возврата"
+      title="Добавить позиции возврата из выдачи"
       onClose={onClose}
       largeWide
       footer={<>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={addSelected} disabled={selected.size === 0}>Добавить{selected.size > 0 ? ` (${selected.size})` : ""}</Btn>
+        <Btn onClick={addSelected} disabled={selected.size === 0}>Добавить позиции{selected.size > 0 ? ` (${selected.size})` : ""}</Btn>
       </>}
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Новые позиции возврата</h3>
-        <Btn size="sm" onClick={() => setShowAddNew(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
-      </div>
-
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 grid grid-cols-4 gap-3 items-end">
         <div className="col-span-2">
           <label className="block text-xs font-medium text-gray-500 mb-1">Наименование / Номенкл. №</label>
           <SearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
         </div>
-        <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
-        <Field label="Код материала"><Select value={metal} options={metals} onChange={setMetal} optionLabel={v => (v === ALL_METALS ? v : codeLabel(v))} /></Field>
-        <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
-        <label className="flex items-center gap-2 text-sm text-gray-700 h-9 cursor-pointer">
-          <input type="checkbox" checked={onlySelected} onChange={e => setOnlySelected(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-          Только выбранные
-        </label>
-        <button onClick={reset} className="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
       </div>
-
       <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-        <span>Найдено: {filtered.length} из {created.length}</span>
+        <span>Найдено: {filtered.length} из {available.length}</span>
         <span>Выбрано: {selected.size}</span>
       </div>
-
       {filtered.length === 0 ? (
         <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-          {created.length === 0 ? "Позиции не добавлены. Нажмите «+ Добавить позицию»" : "Нет позиций по заданным фильтрам"}
+          {rows.length === 0 ? "Во вкладке «Выдача» нет позиций" : available.length === 0 ? "Все позиции выдачи уже добавлены в возврат" : "Нет позиций по заданным фильтрам"}
         </div>
       ) : (
         <div className="max-h-96 overflow-auto border border-gray-200 rounded-lg">
@@ -374,16 +351,14 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
               <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Вес чист.</SortTh>
               <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
-              <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
-              <th className="w-20"></th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {pg6.pageItems.map(p => {
+              {pg.pageItems.map(p => {
                 const v = view(p);
                 const checked = selected.has(p.n);
                 return (
-                  <tr key={p.n} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
-                    <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(p.n)} className="w-4 h-4 accent-blue-600" /></td>
+                  <tr key={p.n} onClick={() => toggle(p.n)} className={`cursor-pointer hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
+                    <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(p.n)} onClick={e => e.stopPropagation()} className="w-4 h-4 accent-blue-600" /></td>
                     <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                     <td className="px-3 py-2 font-medium">{p.name}</td>
                     <td className="px-3 py-2">{p.qty ?? "—"}</td>
@@ -393,34 +368,14 @@ function VozvratPickModal({ reservedNomenkl, view, onClose, onAdd }: {
                     <td className="px-3 py-2">{dash(v.ligWeight)}</td>
                     <td className="px-3 py-2">{dash(v.netWeight)}</td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                    <td className="px-3 py-2">{v.status ? <PosStatusBadge status={v.status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-1">
-                        <EyeIcon onClick={() => setViewing(p)} />
-                        <DeleteIcon onClick={() => removeCreated(p.n)} />
-                      </div>
-                    </td>
                   </tr>
                 );
               })}
-              <FillerRows count={pg6.fill} cols={12} />
+              <FillerRows count={pg.fill} cols={10} />
             </tbody>
           </table>
-          {pg6.pager}
+          {pg.pager}
         </div>
-      )}
-
-      {viewing && <DMPositionViewModal item={view(viewing)} onClose={() => setViewing(null)} />}
-      {showAddNew && (
-        <DMPositionFormModal
-          mode="add"
-          sklad={DM_SKLAD}
-          initial={emptyPosition(storageLocations, DM_SKLAD, "Слиток", "1000")}
-          reservedNomenkl={[...reservedNomenkl, ...created.map(p => p.nomenkl)]}
-          onClose={() => setShowAddNew(false)}
-          onSave={p => addNew([p])}
-          onSaveMany={addNew}
-        />
       )}
     </Modal>
   );
@@ -671,11 +626,13 @@ function SpisanieTab({ losses, setLosses, files, setFiles, vydacha, vozvrat, cod
 
 // ── Таблица позиций операции: те же столбцы и порядок, что на складе ДМ ───────
 
-function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
+function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: {
   rows: OperPosition[];
   view: (p: OperPosition) => DMPositionView;
   readOnly: boolean;
   onView: (p: OperPosition) => void;
+  // Если передан — у позиции есть иконка редактирования
+  onEdit?: (p: OperPosition) => void;
   onDelete: (p: OperPosition) => void;
 }) {
   const codeLabel = useMaterialCodeLabel();
@@ -708,7 +665,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
           <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Вес чист.</SortTh>
           <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
           <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
-          <th className={readOnly ? "w-10" : "w-20"}></th>
+          <th className={readOnly ? "w-10" : onEdit ? "w-28" : "w-20"}></th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {pg7.pageItems.map(p => {
@@ -728,6 +685,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onDelete }: {
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => onView(p)} />
+                    {!readOnly && onEdit && <EditIcon onClick={() => onEdit(p)} />}
                     {!readOnly && <DeleteIcon onClick={() => onDelete(p)} />}
                   </div>
                 </td>
@@ -1157,14 +1115,15 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     return saved.length ? saved : [newLoss()];
   });
   const [spisanieFiles, setSpisanieFiles] = useState<File[]>(() => op?.spisanieFiles ?? (op?.vid === "Производство ГП" ? seedSpisanieFiles() : []));
-  // Вложенные экраны: …/add-position, …/vozvrat-pick, …/shihta-pick
+  // Вложенные экраны: …/add-position, …/vozvrat-new, …/vozvrat-from-vydacha, …/vozvrat-edit/<n>, …/shihta-pick
   const screen = useScreen();
   const nested = (name: string) => [screen.has(name), (open: boolean) => (open ? screen.open(name) : screen.close(name))] as const;
   const [showAddDM, setShowAddDM] = nested("add-position");
-  const [showVozvratPick, setShowVozvratPick] = nested("vozvrat-pick");
+  const [showVozvratNew, setShowVozvratNew] = nested("vozvrat-new");
+  const [showVozvratFromVyd, setShowVozvratFromVyd] = nested("vozvrat-from-vydacha");
   const [showShihtaPick, setShowShihtaPick] = nested("shihta-pick");
   const [pickedShihtaId, setPickedShihtaId] = useState<string | null>(null);
-  const { dmItems, setDmItems, setShihtovyeKarty, operations, currentUser } = useApp();
+  const { dmItems, setDmItems, setShihtovyeKarty, operations, currentUser, storageLocations } = useApp();
   const createdStamp = useCreatedStamp();
   // Документы вкладок «Выдача» / «Возврат»
   const [vydachaFiles, setVydachaFiles] = useState<File[]>(() =>
@@ -1204,6 +1163,24 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     const [list, n] = posKey.split("-");
     return (list === "vozvrat" ? vozvrat : vydacha).find(p => String(p.n) === n) ?? null;
   })();
+
+  // Редактирование позиции возврата: …/vozvrat-edit/<n>
+  const editKey = screen.after("vozvrat-edit");
+  const editVozvrat = editKey ? vozvrat.find(p => String(p.n) === editKey) ?? null : null;
+  const addVozvratNew = (ps: PrihodPosition[]) => {
+    setVozvrat(prev => {
+      const maxN = prev.reduce((m, p) => Math.max(m, p.n), 0);
+      return [...prev, ...ps.map((p, i) => operFromForm(p, maxN + i + 1))];
+    });
+    setShowVozvratNew(false);
+    show(ps.length > 1 ? `Добавлено позиций возврата: ${ps.length}` : "Позиция возврата добавлена");
+  };
+  const saveVozvratEdit = (p: PrihodPosition) => {
+    if (!editVozvrat) return;
+    setVozvrat(prev => prev.map(x => (x.n === editVozvrat.n ? operFromForm(p, x.n, x.srcId) : x)));
+    screen.close("vozvrat-edit");
+    show("Позиция возврата изменена");
+  };
 
   const [head, setHead] = useState(() => ({
     docType: op ? (op.docType ?? VID_DOC_TYPE[op.vid] ?? "Приказ") : "",
@@ -1433,7 +1410,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <>
           {!ro && (
             <div className="flex gap-2 mb-3">
-              <Btn size="sm" onClick={() => setShowVozvratPick(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+              <Btn size="sm" onClick={() => setShowVozvratNew(true)}><Plus className="w-4 h-4" />Добавить новую</Btn>
+              <Btn size="sm" variant="secondary" onClick={() => setShowVozvratFromVyd(true)} disabled={vydacha.length === 0}><Plus className="w-4 h-4" />Добавить из Выдачи</Btn>
             </div>
           )}
           <OperPositionsTable
@@ -1441,6 +1419,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
             view={posView}
             readOnly={ro}
             onView={p => screen.open("position", `vozvrat-${p.n}`)}
+            onEdit={p => screen.open("vozvrat-edit", String(p.n))}
             onDelete={p => setVozvrat(prev => prev.filter(x => x.n !== p.n))}
           />
           <div className="mt-4">
@@ -1500,12 +1479,34 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           onAdd={rows => { appendPositions("vydacha", rows); setShowAddDM(false); show("Позиции добавлены"); }}
         />
       )}
-      {showVozvratPick && (
-        <VozvratPickModal
+      {showVozvratNew && (
+        <DMPositionFormModal
+          mode="add"
+          sklad={DM_SKLAD}
+          initial={emptyPosition(storageLocations, DM_SKLAD, "Слиток", "1000")}
           reservedNomenkl={[...vydacha, ...vozvrat].map(p => p.nomenkl)}
+          onClose={() => setShowVozvratNew(false)}
+          onSave={p => addVozvratNew([p])}
+          onSaveMany={addVozvratNew}
+        />
+      )}
+      {showVozvratFromVyd && (
+        <VozvratFromVydachaModal
+          rows={vydacha}
+          already={vozvrat.map(p => p.nomenkl)}
           view={posView}
-          onClose={() => setShowVozvratPick(false)}
-          onAdd={rows => { appendPositions("vozvrat", rows); setShowVozvratPick(false); show("Позиции возврата добавлены"); }}
+          onClose={() => setShowVozvratFromVyd(false)}
+          onAdd={rows => { appendPositions("vozvrat", rows); setShowVozvratFromVyd(false); show(`Добавлено позиций из выдачи: ${rows.length}`); }}
+        />
+      )}
+      {editVozvrat && (
+        <DMPositionFormModal
+          key={editVozvrat.n}
+          mode="edit"
+          sklad={DM_SKLAD}
+          initial={formFromOper(editVozvrat, posView(editVozvrat))}
+          onClose={() => screen.close("vozvrat-edit")}
+          onSave={saveVozvratEdit}
         />
       )}
       {viewPos && <DMPositionViewModal item={posView(viewPos)} onClose={() => screen.close("position")} />}
