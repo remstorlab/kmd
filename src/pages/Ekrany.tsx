@@ -53,6 +53,7 @@ export function useScreenGroups(): Group[] {
       { title: "Приход на склад", path: P["prihod-list"] },
       { title: "Приход: новый документ", path: `${P["prihod-list"]}/new` },
       { title: "Приход: новая накладная", path: `${P["prihod-list"]}/new/nakladnaya` },
+      { title: "Приход: новый акт", path: `${P["prihod-list"]}/new/akt` },
       { title: "Приход: добавить позицию", path: `${P["prihod-list"]}/new/position-new` },
       prihodOrder && { title: "Приход: просмотр ордера", path: `${P["prihod-list"]}/view/${prihodOrder.id}` },
       prihodOrder && { title: "Приход: редактирование ордера", path: `${P["prihod-list"]}/edit/${prihodOrder.id}` },

@@ -440,6 +440,8 @@ export const PRIHOD_SKLAD = SDM1;
 // Типы документов приёмки / отгрузки — значения справочников
 export const DOC_PRIHOD_ORDER = "Приходный ордер";
 export const DOC_PRIHOD_NAKLAD = "Накладная";
+// Акт — приёмка с теми же полями, что и накладная (получатель по умолчанию СДМ1, отправитель — «Заказчики / Организации»)
+export const DOC_PRIHOD_AKT = "Акт";
 // Требование — перемещение позиций со склада на склад (СДМ1 → СДМ2) без смены места хранения и статуса
 export const DOC_TREBOVANIE = "Требование";
 
@@ -456,6 +458,7 @@ export const initialSkladDocs: SkladDoc[] = [
   { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "Национальный банк", receiver: PRIHOD_SKLAD },
   { id: "sd5", date: "15.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0340", status: "Оформлено", sender: "ОО «СереброТрейд»", receiver: PRIHOD_SKLAD },
   { id: "sd6", date: "14.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0116", status: "Оформлено", sender: "Монетный двор", receiver: PRIHOD_SKLAD },
+  { id: "sd9", date: "13.08.2026", type: DOC_PRIHOD_AKT, number: "АКТ-0042", status: "В работе", sender: "Национальный банк", receiver: PRIHOD_SKLAD },
 ];
 
 // Позиция накладной на выдачу из позиции склада (выдаётся целиком)
@@ -783,10 +786,11 @@ export const spravochniki = {
     ]
   },
   "Типы документов приёмки": {
-    count: 3,
+    count: 4,
     items: [
       { code: "ПО", value: "Приходный ордер", status: "Активно" },
       { code: "НП", value: "Накладная", status: "Активно" },
+      { code: "АКТ", value: "Акт", status: "Активно" },
       { code: "ТР", value: "Требование", status: "Активно" },
     ]
   },

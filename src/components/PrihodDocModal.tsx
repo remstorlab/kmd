@@ -3,7 +3,7 @@ import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
   Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem, usePaged, FillerRows, useCreatedStamp,
 } from "./ui";
-import { SkladDoc, DocStatus, ChemComposition, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_TREBOVANIE } from "../data/mock";
+import { SkladDoc, DocStatus, ChemComposition, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_PRIHOD_AKT, DOC_TREBOVANIE } from "../data/mock";
 import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
 import ChemCompositionBlock from "./ChemCompositionBlock";
 import TrebovanieDocModal from "./TrebovanieDocModal";
@@ -26,15 +26,15 @@ type Props = {
 };
 
 // Вложенные экраны типа документа: …/nakladnaya, …/trebovanie (без сегмента — приходный ордер)
-const TYPE_FLAGS: Record<string, string> = { [DOC_PRIHOD_NAKLAD]: "nakladnaya", [DOC_TREBOVANIE]: "trebovanie" };
+const TYPE_FLAGS: Record<string, string> = { [DOC_PRIHOD_NAKLAD]: "nakladnaya", [DOC_PRIHOD_AKT]: "akt", [DOC_TREBOVANIE]: "trebovanie" };
 
 export default function PrihodDocModal(props: Props) {
   const { doc, readOnly: ro = false } = props;
   const screen = useScreen();
   // Тип документа — из справочника «Типы документов приёмки»
   const docType: PrihodDocType = doc
-    ? (doc.type === DOC_PRIHOD_ORDER || doc.type === DOC_TREBOVANIE ? doc.type : DOC_PRIHOD_NAKLAD)
-    : screen.has("trebovanie") ? DOC_TREBOVANIE : screen.has("nakladnaya") ? DOC_PRIHOD_NAKLAD : DOC_PRIHOD_ORDER;
+    ? ([DOC_PRIHOD_ORDER, DOC_PRIHOD_AKT, DOC_TREBOVANIE].includes(doc.type) ? doc.type : DOC_PRIHOD_NAKLAD)
+    : screen.has("trebovanie") ? DOC_TREBOVANIE : screen.has("akt") ? DOC_PRIHOD_AKT : screen.has("nakladnaya") ? DOC_PRIHOD_NAKLAD : DOC_PRIHOD_ORDER;
   const setDocType = (t: PrihodDocType) => screen.choose(Object.values(TYPE_FLAGS), TYPE_FLAGS[t]);
   const typeOptions = spravValues("Типы документов приёмки");
   const typeSelect = (
@@ -70,6 +70,8 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
   // Вложенные экраны: …/position-new, …/position/:id, …/position-edit/:id
   const screen = useScreen();
   const isOrder = docType === DOC_PRIHOD_ORDER;
+  // Акт — те же поля и позиции, что у накладной; отличаются тип и номер документа
+  const isAkt = docType === DOC_PRIHOD_AKT;
   // Оформленный документ: позиции уже поставлены на склад — состав и склад-получатель не меняются
   const posted = doc?.status === "Оформлено";
   const lockPos = ro || posted;
@@ -98,6 +100,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     sum: "32 467 500.00",
     planPos: "План-2026/Q3-AU",
     nakladNumber: doc?.number || "НП-001234",
+    aktNumber: doc?.number || "АКТ-0043",
     nakladDate: doc?.date || today,
     zakazchik: doc?.sender || ORGS[0],
     sotrudnik: "Ким Александр Юрьевич",
@@ -111,14 +114,16 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
 
   // Документы (несколько файлов, отдельно для ордера и накладной)
   const [orderFiles, setOrderFiles] = useState<File[]>(() => [new File([], `Приходный ордер ${doc?.number || "ПО-0342"}.pdf`)]);
-  const [nakladFiles, setNakladFiles] = useState<File[]>(() => [new File([], `Накладная_${doc?.number || "НП-001234"}.pdf`)]);
+  const [nakladFiles, setNakladFiles] = useState<File[]>(() =>
+    [new File([], doc?.type === DOC_PRIHOD_AKT ? `Акт_${doc.number}.pdf` : `Накладная_${doc?.number || "НП-001234"}.pdf`)]);
 
   // Позиции: новый документ — без позиций (сохранить можно и пустым); сохранённый — свои позиции,
   // у демо-документов без сохранённых позиций — демо-набор.
   const initialPositions = (type: string, demo: PrihodPosition[]) =>
     !doc ? [] : doc.type !== type ? [] : doc.prihodPositions ?? demo;
   const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>(() => initialPositions(DOC_PRIHOD_ORDER, DEMO_ORDER));
-  const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>(() => initialPositions(DOC_PRIHOD_NAKLAD, DEMO_NAKLAD));
+  const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>(() =>
+    doc?.type === DOC_PRIHOD_AKT ? doc.prihodPositions ?? [] : initialPositions(DOC_PRIHOD_NAKLAD, DEMO_NAKLAD));
 
   // Хим. состав на партию — задаётся в документе и подставляется в каждую новую позицию
   const [partyChemOn, setPartyChemOn] = useState(!!doc?.partyChem);
@@ -189,7 +194,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     const base = { id: doc?.id ?? `sd-${Date.now()}`, ...created, status, receiver: sklad, prihodPositions: positions, partyChem: partyChemOn ? partyChem : undefined };
     const d: SkladDoc = isOrder
       ? { ...base, date: head.date, type: DOC_PRIHOD_ORDER, number: head.number, sender: head.otpravitel }
-      : { ...base, date: head.nakladDate, type: DOC_PRIHOD_NAKLAD, number: head.nakladNumber, sender: head.zakazchik };
+      : { ...base, date: head.nakladDate, type: isAkt ? DOC_PRIHOD_AKT : DOC_PRIHOD_NAKLAD, number: isAkt ? head.aktNumber : head.nakladNumber, sender: head.zakazchik };
     onSave(d);
   };
 
@@ -253,7 +258,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
       ) : (
         <div className="grid grid-cols-4 gap-4 mb-5">
           {typeSelect}
-          <Field label="Номер" required={!ro}><Input value={head.nakladNumber} onChange={h("nakladNumber")} disabled={ro} /></Field>
+          <Field label="Номер" required={!ro}><Input value={isAkt ? head.aktNumber : head.nakladNumber} onChange={h(isAkt ? "aktNumber" : "nakladNumber")} disabled={ro} /></Field>
           <Field label="Дата" required={!ro}><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>
           <Field label="Отправитель" required={!ro}><Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...ORGS]))} onChange={h("zakazchik")} disabled={ro} /></Field>
           {poluchatelSelect("Получатель")}
