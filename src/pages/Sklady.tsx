@@ -227,6 +227,9 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
   const [search, setSearch] = useState("");
   const [filterKlass, setFilterKlass] = useState("Все классы");
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  // Код материала (по подписи из справочника) и проба — множественный выбор
+  const [filterCode, setFilterCode] = useState<string[]>([]);
+  const [filterProba, setFilterProba] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Экраны: /sklady/sdmN/view/:id, /sklady/sdmN/merge, /sklady/sdmN/mesto/:id
@@ -250,8 +253,13 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
     const matchSearch = !search || it.name.toLowerCase().includes(search.toLowerCase());
     const matchKlass = filterKlass === "Все классы" || it.klass === filterKlass;
     const matchStatus = filterStatus.length === 0 || filterStatus.includes(it.status);
-    return matchSearch && matchKlass && matchStatus;
+    const matchCode = filterCode.length === 0 || filterCode.includes(codeLabel(it.metal));
+    const matchProba = filterProba.length === 0 || filterProba.includes(String(it.proba));
+    return matchSearch && matchKlass && matchStatus && matchCode && matchProba;
   });
+  // Варианты фильтров — из позиций этого склада
+  const codeOptions = Array.from(new Set(skladItems.filter(it => it.metal).map(it => codeLabel(it.metal)))).sort();
+  const probaOptions = Array.from(new Set(skladItems.filter(it => it.proba).map(it => String(it.proba)))).sort((a, b) => Number(a) - Number(b));
   const { sorted, sort, toggleSort } = useSort(filtered, {
     name: it => it.name,
     nomenkl: it => it.nomenkl,
@@ -335,10 +343,18 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
           <KlassSelect value={filterKlass} onChange={setFilterKlass} allLabel="Все классы" />
         </div>
         <div className="min-w-36">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Код материала</label>
+          <MultiSelect values={filterCode} options={codeOptions} onChange={setFilterCode} allLabel="Все коды" />
+        </div>
+        <div className="min-w-32">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Проба</label>
+          <MultiSelect values={filterProba} options={probaOptions} onChange={setFilterProba} allLabel="Все пробы" />
+        </div>
+        <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
           <MultiSelect values={filterStatus} options={["На складе", "Резерв", "В подотчёте", "Закрыта"]} onChange={setFilterStatus} allLabel="Все статусы" />
         </div>
-        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus([]); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus([]); setFilterCode([]); setFilterProba([]); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
           Сбросить фильтры
         </button>
       </div>
