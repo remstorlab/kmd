@@ -180,7 +180,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     }));
     const dm: DMItem[] = positions.filter(p => !isGPKlass(p.klass)).map(p => ({
       id: `dm-${p.id}`, name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.code, qty: kol(p), proba: n(p.proba),
-      ligWeight: n(p.lig), netWeight: n(p.net), location: locOf(p), sklad, status: "На складе", chem: p.chem, zakazchik, ownProperty, ...created,
+      ligWeight: n(p.lig), netWeight: n(p.net), location: locOf(p), sklad, status: "На складе", chem: p.chem, info: p.info || undefined, zakazchik, ownProperty, ...created,
     }));
     if (gp.length) setGpItems(prev => [...prev.filter(i => !gp.some(x => x.id === i.id)), ...gp]);
     if (dm.length) setDmItems(prev => [...prev.filter(i => !dm.some(x => x.id === i.id)), ...dm]);

@@ -234,6 +234,7 @@ const operFromForm = (p: PrihodPosition, n: number, srcId?: string): OperPositio
     cu: p.chem.cu || "-",
     chem: p.chem,
     loc: locOf(p),
+    info: p.info || undefined,
     ...(srcId ? { srcId } : {}),
   };
 };
@@ -256,6 +257,7 @@ const formFromOper = (p: OperPosition, v: DMPositionView): PrihodPosition => {
     seyf,
     polka,
     chem: { ...(v.chem ?? {}) },
+    info: v.info ?? "",
   };
 };
 
@@ -1153,7 +1155,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     return {
       name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.metal ?? dm?.metal ?? "",
       qty: p.qty ?? null, proba: p.proba, ligWeight: p.lig ?? null, netWeight: p.net ?? null,
-      location: p.loc, status: dm?.status, chem: p.chem ?? dm?.chem,
+      location: p.loc, status: dm?.status, chem: p.chem ?? dm?.chem, info: p.info ?? dm?.info,
     };
   };
   // Просмотр позиции: …/position/<вкладка>-<n>

@@ -300,6 +300,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
       sklad,
       status: "На складе",
       chem: p.chem,
+      info: p.info || undefined,
       ...createdStamp(),
     };
     setDmItems(prev => [...prev.filter(it => !ids.has(it.id)), merged]);

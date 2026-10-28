@@ -16,6 +16,7 @@ export interface DMPositionView {
   location: string;
   status?: string;
   chem?: ChemComposition;
+  info?: string;
 }
 
 const val = (v: number | null | undefined) => (v === null || v === undefined ? "—" : String(v));
@@ -35,6 +36,7 @@ export default function DMPositionViewModal({ item, onClose }: { item: DMPositio
         <Field label="Лигатурный вес г"><Input value={val(item.ligWeight)} disabled /></Field>
         <Field label="Чистый вес г"><Input value={val(item.netWeight)} disabled /></Field>
         <Field label="Место хранения" full><Input value={item.location || "—"} disabled /></Field>
+        <Field label="Доп. информация" full><Input value={item.info || "—"} disabled /></Field>
         <Field label="Статус">{item.status ? <PosStatusBadge status={item.status} nomenkl={item.nomenkl} /> : <Input value="—" disabled />}</Field>
       </div>
       <ChemCompositionBlock value={item.chem} disabled />

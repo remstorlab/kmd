@@ -69,6 +69,8 @@ export interface DMItem {
   ownProperty?: boolean;
   status: StatusDM;
   chem?: ChemComposition;
+  // Доп. информация из формы позиции ДМ
+  info?: string;
   // Исходная запись, из которой выделена эта часть при частичной выдаче / резерве (см. data/stock.ts)
   parentId?: string;
 }
@@ -136,7 +138,9 @@ export const lossWeight = (l: OperLoss) =>
 // ves — вес позиции для расчётов операции; metal (код материала), lig / net (лигатурный / чистый вес, г) — для отображения как на складе ДМ
 export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string; metal?: string; lig?: number; net?: number;
   // id записи склада ДМ, из которой выдана позиция (при частичной выдаче — выделенная часть)
-  srcId?: string };
+  srcId?: string;
+  // Доп. информация из формы позиции ДМ
+  info?: string };
 
 export interface Operation {
   // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
