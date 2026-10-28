@@ -515,18 +515,25 @@ export function formatDateTime(iso: string): string {
 }
 
 // ── «Дата, время - Пользователь»: кто и когда создал запись реестра ──────────
-export const CREATED_LABEL = "Дата, время - Пользователь";
+// В ячейке — дата и время создания, ФИО создавшего — во всплывающей подсказке
+export const CREATED_LABEL = "Дата, время создания";
 export interface Created { createdAt?: string; createdBy?: string }
 // Отметка создания новой записи: текущие дата/время и ФИО авторизованного пользователя
 export function useCreatedStamp() {
   const { currentUser } = useApp();
   return (): Required<Created> => ({ createdAt: new Date().toISOString(), createdBy: currentUser?.fullName || currentUser?.name || "—" });
 }
-export const createdText = (r: Created) => `${r.createdAt ? formatDateTime(r.createdAt) : "—"} - ${r.createdBy || "—"}`;
+export const createdText = (r: Created) => (r.createdAt ? formatDateTime(r.createdAt) : "—");
 // Ключ сортировки по дате создания
 export const createdSortKey = (r: Created) => (r.createdAt ? new Date(r.createdAt).getTime() : 0);
 export function CreatedCell({ row, className = "px-4 py-3" }: { row: Created; className?: string }) {
-  return <td className={`${className} text-gray-500 whitespace-nowrap`}>{createdText(row)}</td>;
+  return (
+    <td className={`${className} text-gray-500 whitespace-nowrap`}>
+      <span title={row.createdBy ? `Создал: ${row.createdBy}` : undefined} className={row.createdBy ? "cursor-help border-b border-dotted border-gray-300" : undefined}>
+        {createdText(row)}
+      </span>
+    </td>
+  );
 }
 
 export function useSort<T>(rows: T[], accessors: Record<string, (row: T) => string | number>) {

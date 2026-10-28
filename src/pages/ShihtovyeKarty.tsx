@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   useToast, Toast, Field, Input, Select, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
-  SortTh, useSort, parseRuDate, formatDateTime, usePaged, CREATED_LABEL,
+  SortTh, useSort, parseRuDate, formatDateTime, usePaged, CREATED_LABEL, CreatedCell,
 } from "../components/ui";
 import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass, PRIHOD_SKLAD, spravValues } from "../data/mock";
 import { takeFromStock, returnToStock } from "../data/stock";
@@ -472,7 +472,7 @@ export function ShihtovyeKarty() {
                 <td className="px-4 py-3 font-medium text-gray-900">{karta.name}</td>
                 <td className="px-4 py-3 text-blue-600">{karta.plavkaNo}</td>
                 <td className="px-4 py-3"><Badge label={karta.status} group="shihta" /></td>
-                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(karta.createdAt)} - {karta.createdBy}</td>
+                <CreatedCell row={karta} />
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewKarta(karta)} />
                   <EditIcon
