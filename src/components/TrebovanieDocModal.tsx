@@ -208,7 +208,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       <div className="grid grid-cols-4 gap-4 mb-5">
         {typeSelect}
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
-        <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
+        <Field label="Дата документа" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
         <Field label="Заказчик" required={!ro}>
           {lockZakazchik
             ? <Input value={zakazchik} disabled />

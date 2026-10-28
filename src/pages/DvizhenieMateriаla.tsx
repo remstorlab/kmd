@@ -867,7 +867,7 @@ function operationHtml(o: Operation, spisano: number) {
     ["Вид операции", o.vid],
     ["Наименование изделия", o.description],
     ["Тип документа", o.docType],
-    ["Дата операции", o.date],
+    ["Дата документа", o.date],
     ["Заказчик", o.zakazchik],
     ["Подотчётное лицо", o.responsible],
     ...(o.vid === "Плавка" ? [["Номер плавки", o.plavkaNo] as [string, string | undefined]] : []),
@@ -1367,7 +1367,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <Field label="Наименование изделия" full><Input value={description} onChange={setDescription} placeholder="Краткое описание операции" disabled={headRo} /></Field>
         <Field label="Тип документа" required={!headRo}><Select value={head.docType} options={docTypeOptions} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={headRo || !!fixedDocType} /></Field>
         <Field label="Номер документа"><Input value={head.document} disabled /></Field>
-        <Field label="Дата операции" required={!headRo}><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
+        <Field label="Дата документа" required={!headRo}><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
         <Field label="Заказчик"><Select value={head.zakazchik} options={withBlank(["Монетный двор"])} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={headRo} /></Field>
         <Field label="Подотчётное лицо" required={!headRo} full><Select value={head.responsible} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"])} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={headRo} /></Field>
         {vid === "Плавка" && (
@@ -1654,7 +1654,7 @@ export function DvizhenieMateriаla() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
+              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата документа</SortTh>
               <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип</SortTh>
               <SortTh sortKey="vid" sort={sort} onSort={toggleSort}>Вид операции</SortTh>
               <SortTh sortKey="description" sort={sort} onSort={toggleSort}>Наименование изделия</SortTh>

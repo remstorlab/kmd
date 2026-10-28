@@ -233,7 +233,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
         <div className="grid grid-cols-4 gap-4 mb-5">
           {typeSelect}
           <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
-          <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
+          <Field label="Дата документа" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
           <Field label="Отправитель" required={!ro}><Select value={head.otpravitel} options={Array.from(new Set([head.otpravitel, ...ORGS]))} onChange={h("otpravitel")} disabled={ro} /></Field>
           {poluchatelSelect("Получатель")}
           <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={h("schetFaktura")} disabled={ro} /></Field>
@@ -259,7 +259,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
         <div className="grid grid-cols-4 gap-4 mb-5">
           {typeSelect}
           <Field label="Номер" required={!ro}><Input value={isAkt ? head.aktNumber : head.nakladNumber} onChange={h(isAkt ? "aktNumber" : "nakladNumber")} disabled={ro} /></Field>
-          <Field label="Дата" required={!ro}><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>
+          <Field label="Дата документа" required={!ro}><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>
           <Field label="Отправитель" required={!ro}><Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...ORGS]))} onChange={h("zakazchik")} disabled={ro} /></Field>
           {poluchatelSelect("Получатель")}
           <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные сотрудники")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>

@@ -215,7 +215,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
           />
         </Field>
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
-        <Field label="Дата" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
+        <Field label="Дата документа" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
         <Field label="Отправитель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
         <Field label="Получатель" required={!ro}><Select value={head.receiver} options={receivers} onChange={h("receiver")} disabled={ro} /></Field>
         <Field label="Доверенность получателя"><Input value={head.doverennost} onChange={h("doverennost")} placeholder="№ и дата доверенности" disabled={ro} /></Field>

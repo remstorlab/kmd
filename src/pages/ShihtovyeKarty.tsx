@@ -67,6 +67,8 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const [name, setName] = useState(karta?.name || "");
   const [plavkaNo, setPlavkaNo] = useState(karta?.plavkaNo || "");
   const [oborotNo, setOborotNo] = useState("О-2026-001");
+  // Дата документа — задаётся вручную, по умолчанию сегодняшняя
+  const [docDate, setDocDate] = useState(karta?.date || new Date().toLocaleDateString("ru-RU"));
   const [naznachenie, setNaznachenie] = useState("Слитки для реализации");
   const [osnovanie, setOsnovanie] = useState(`Приказ №234-П от ${new Date().toLocaleDateString("ru-RU")}`);
   const [files, setFiles] = useState<File[]>(() => karta?.files ?? []);
@@ -179,13 +181,14 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       ...karta,
       name: name || karta.name,
       plavkaNo: plavkaNo || karta.plavkaNo,
+      date: docDate.trim() || karta.date,
       materials: mats,
       files,
       status,
       ...(oformit ? { vydannyePozicii: undefined } : {}),
     } : {
       id: `sk-${Date.now()}`,
-      date: new Date().toLocaleDateString("ru-RU"),
+      date: docDate.trim() || new Date().toLocaleDateString("ru-RU"),
       name: name || "Новая шихтовая карта",
       plavkaNo: plavkaNo || `П-2026-${Math.floor(Math.random() * 9000 + 1000)}`,
       status,
@@ -229,6 +232,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Field label="Наименование" required={!ro} full><Input value={name} onChange={setName} placeholder="Наименование шихты" disabled={ro} /></Field>
         <Field label="Номер плавки" required={!ro}><Input value={plavkaNo} onChange={setPlavkaNo} placeholder="П-2026-XXXX" disabled={ro} /></Field>
+        <Field label="Дата документа" required={!ro}><Input value={docDate} onChange={setDocDate} placeholder="дд.мм.гггг" disabled={ro} /></Field>
         <Field label="Номер оборота"><Input value={oborotNo} onChange={setOborotNo} disabled={ro} /></Field>
         <Field label="Назначение слитков" required={!ro}><Select value={naznachenie} options={["Слитки для реализации", "Производство ГП"]} onChange={setNaznachenie} disabled={ro} /></Field>
         <Field label="Основание" full><Input value={osnovanie} onChange={setOsnovanie} disabled={ro} /></Field>
@@ -457,7 +461,7 @@ export function ShihtovyeKarty() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
+              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата документа</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="plavkaNo" sort={sort} onSort={toggleSort}>№ плавки</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>

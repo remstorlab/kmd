@@ -173,7 +173,7 @@ function DocList({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
+              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата документа</SortTh>
               <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип документа</SortTh>
               <SortTh sortKey="number" sort={sort} onSort={toggleSort}>Номер</SortTh>
               <SortTh sortKey="sender" sort={sort} onSort={toggleSort}>Отправитель</SortTh>
@@ -289,7 +289,7 @@ export function VydachaList() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата</SortTh>
+              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата документа</SortTh>
               <SortTh sortKey="type" sort={sort} onSort={toggleSort}>Тип документа</SortTh>
               <SortTh sortKey="number" sort={sort} onSort={toggleSort}>Номер</SortTh>
               <SortTh sortKey="sender" sort={sort} onSort={toggleSort}>Отправитель</SortTh>
