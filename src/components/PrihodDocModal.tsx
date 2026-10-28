@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
-  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem, usePaged, FillerRows,
+  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem, usePaged, FillerRows, useCreatedStamp,
 } from "./ui";
 import { SkladDoc, DocStatus, ChemComposition, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_TREBOVANIE } from "../data/mock";
 import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
@@ -66,6 +66,7 @@ const DEMO_NAKLAD: PrihodPosition[] = [
 function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelect }: Props & { docType: PrihodDocType; typeSelect: React.ReactNode }) {
   const ro = readOnly;
   const { storageLocations, setDmItems, setGpItems } = useApp();
+  const stamp = useCreatedStamp();
   // Вложенные экраны: …/position-new, …/position/:id, …/position-edit/:id
   const screen = useScreen();
   const isOrder = docType === DOC_PRIHOD_ORDER;
@@ -167,13 +168,14 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     const n = (v: string) => parseFloat(String(v).replace(",", ".")) || 0;
     // Заказчик — отправитель документа; признак «Собственность заказчика» — из шапки
     const zakazchik = isOrder ? head.otpravitel : head.zakazchik;
+    const created = stamp();
     const gp: GPItem[] = positions.filter(p => isGPKlass(p.klass)).map(p => ({
       id: `gp-${p.id}`, name: p.name, nomenkl: p.nomenkl, qty: kol(p), unit: p.unit || "шт", klass: p.klass, code: p.code,
-      location: locOf(p), sklad, status: "На складе", proba: n(p.proba), ligWeight: n(p.lig), netWeight: n(p.net), chem: p.chem, zakazchik, ownProperty,
+      location: locOf(p), sklad, status: "На складе", proba: n(p.proba), ligWeight: n(p.lig), netWeight: n(p.net), chem: p.chem, zakazchik, ownProperty, ...created,
     }));
     const dm: DMItem[] = positions.filter(p => !isGPKlass(p.klass)).map(p => ({
       id: `dm-${p.id}`, name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.code, qty: kol(p), proba: n(p.proba),
-      ligWeight: n(p.lig), netWeight: n(p.net), location: locOf(p), sklad, status: "На складе", chem: p.chem, zakazchik, ownProperty,
+      ligWeight: n(p.lig), netWeight: n(p.net), location: locOf(p), sklad, status: "На складе", chem: p.chem, zakazchik, ownProperty, ...created,
     }));
     if (gp.length) setGpItems(prev => [...prev.filter(i => !gp.some(x => x.id === i.id)), ...gp]);
     if (dm.length) setDmItems(prev => [...prev.filter(i => !dm.some(x => x.id === i.id)), ...dm]);
@@ -182,7 +184,9 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
   // Документ сохраняется и оформляется в том числе без позиций
   const save = (status: DocStatus) => {
     if (status === "Оформлено" && !posted) postToStock();
-    const base = { id: doc?.id ?? `sd-${Date.now()}`, status, receiver: sklad, prihodPositions: positions, partyChem: partyChemOn ? partyChem : undefined };
+    // Отметка создания — при первом сохранении документа, при редактировании сохраняется прежняя
+    const created = doc?.createdAt ? { createdAt: doc.createdAt, createdBy: doc.createdBy } : stamp();
+    const base = { id: doc?.id ?? `sd-${Date.now()}`, ...created, status, receiver: sklad, prihodPositions: positions, partyChem: partyChemOn ? partyChem : undefined };
     const d: SkladDoc = isOrder
       ? { ...base, date: head.date, type: DOC_PRIHOD_ORDER, number: head.number, sender: head.otpravitel }
       : { ...base, date: head.nakladDate, type: DOC_PRIHOD_NAKLAD, number: head.nakladNumber, sender: head.zakazchik };

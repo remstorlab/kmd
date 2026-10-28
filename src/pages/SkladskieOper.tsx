@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, Field, Input, Select, MultiSelect, KlassSelect, MaterialCodeSelect, FileChip, MultiFileUpload, useConfirm, ConfirmDialog,
-  SortTh, useSort, parseRuDate, Badge,
+  SortTh, useSort, parseRuDate, Badge, CREATED_LABEL, CreatedCell, createdSortKey,
 } from "../components/ui";
 import { SkladDoc, docSklady } from "../data/mock";
 import { Inbox, Send, Repeat, Plus, X, LucideIcon } from "lucide-react";
@@ -145,6 +145,7 @@ function DocList({
     sender: d => d.sender,
     receiver: d => d.receiver,
     status: d => d.status,
+    created: d => createdSortKey(d),
   });
   const [perPage, setPerPage] = usePerPage("prihod", 8);
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
@@ -178,6 +179,7 @@ function DocList({
               <SortTh sortKey="sender" sort={sort} onSort={toggleSort}>Отправитель</SortTh>
               <SortTh sortKey="receiver" sort={sort} onSort={toggleSort}>Получатель</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
+              <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
               <th className="w-32"></th>
             </tr>
           </thead>
@@ -190,6 +192,7 @@ function DocList({
                 <td className="px-4 py-3 text-gray-600">{doc.sender}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
                 <td className="px-4 py-3"><Badge label={doc.status} group="dokumenty" /></td>
+                <CreatedCell row={doc} />
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
                   <EditIcon onClick={() => screen.openTop("edit", doc.id)} />
@@ -199,9 +202,9 @@ function DocList({
               </tr>
             ))}
             {pageItems.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
+              <tr><td colSpan={8} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
             )}
-            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={7} />
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={8} />
           </tbody>
         </table>
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
@@ -265,6 +268,7 @@ export function VydachaList() {
     receiver: d => d.receiver,
     sklad: d => docSklady(d).join(" → "),
     status: d => d.status,
+    created: d => createdSortKey(d),
   });
 
   return (
@@ -292,6 +296,7 @@ export function VydachaList() {
               <SortTh sortKey="receiver" sort={sort} onSort={toggleSort}>Получатель</SortTh>
               <SortTh sortKey="sklad" sort={sort} onSort={toggleSort}>Склад</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
+              <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
               <th className="w-28"></th>
             </tr>
           </thead>
@@ -305,6 +310,7 @@ export function VydachaList() {
                 <td className="px-4 py-3 text-gray-600">{doc.receiver}</td>
                 <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{docSklady(doc).join(" → ") || "—"}</td>
                 <td className="px-4 py-3"><Badge label={doc.status} group="dokumenty" /></td>
+                <CreatedCell row={doc} />
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
                   <EditIcon onClick={() => screen.openTop("edit", doc.id)} />
@@ -314,9 +320,9 @@ export function VydachaList() {
               </tr>
             ))}
             {sorted.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
+              <tr><td colSpan={9} className="px-4 py-6 text-center text-sm text-gray-400">Документы не найдены</td></tr>
             )}
-            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={8} />
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={9} />
           </tbody>
         </table>
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />

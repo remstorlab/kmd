@@ -4,6 +4,7 @@ import {
   Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, usePaged, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
+  CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp,
 } from "../components/ui";
 import { GPItem, DMItem, SDM1, SDM2 } from "../data/mock";
 import { Coins } from "lucide-react";
@@ -12,7 +13,7 @@ import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, pars
 import { useScreen } from "../router";
 
 // Позиции учёта ГП в виде позиций склада ДМ — склад один, показываются все классы.
-const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, sklad: i.sklad, status: i.status, chem: i.chem });
+const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, sklad: i.sklad, status: i.status, chem: i.chem, createdAt: i.createdAt, createdBy: i.createdBy });
 
 // ── Склады ХАБ ───────────────────────────────────────────────────────────────
 
@@ -218,6 +219,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
 
 export function OstatokSklad({ sklad }: { sklad: string }) {
   const { dmItems, setDmItems, gpItems, setGpItems } = useApp();
+  const createdStamp = useCreatedStamp();
   // Позиции склада любого класса (в том числе «Готовая продукция») из учётов ДМ и ГП
   const skladItems = [...dmItems, ...gpItems.map(gpToDm)].filter(it => it.sklad === sklad);
   const codeLabel = useMaterialCodeLabel();
@@ -262,6 +264,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
     location: it => it.location,
     sklad: it => it.sklad,
     status: it => it.status,
+    created: it => createdSortKey(it),
   });
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
 
@@ -297,6 +300,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
       sklad,
       status: "На складе",
       chem: p.chem,
+      ...createdStamp(),
     };
     setDmItems(prev => [...prev.filter(it => !ids.has(it.id)), merged]);
     setGpItems(prev => prev.filter(it => !ids.has(it.id)));
@@ -359,6 +363,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
               <SortTh sortKey="sklad" sort={sort} onSort={toggleSort}>Склад</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
+              <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
               <th className="w-20"></th>
             </tr>
           </thead>
@@ -377,6 +382,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
                 <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{item.sklad}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><PosStatusBadge status={item.status} nomenkl={item.nomenkl} /></td>
+                <CreatedCell row={item} />
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => screen.openTop("view", item.id)} />
@@ -389,7 +395,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
                 </td>
               </tr>
             ))}
-            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={13} />
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={14} />
           </tbody>
         </table>
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />

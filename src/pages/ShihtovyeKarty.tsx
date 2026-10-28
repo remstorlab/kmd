@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   useToast, Toast, Field, Input, Select, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
-  SortTh, useSort, parseRuDate, formatDateTime, usePaged,
+  SortTh, useSort, parseRuDate, formatDateTime, usePaged, CREATED_LABEL,
 } from "../components/ui";
 import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass, PRIHOD_SKLAD, spravValues } from "../data/mock";
 import { takeFromStock, returnToStock } from "../data/stock";
@@ -192,7 +192,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       materials: mats,
       files,
       createdAt: new Date().toISOString(),
-      createdBy: currentUser?.name || "—",
+      createdBy: currentUser?.fullName || currentUser?.name || "—",
     };
     onSave(k);
   };
@@ -461,7 +461,7 @@ export function ShihtovyeKarty() {
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="plavkaNo" sort={sort} onSort={toggleSort}>№ плавки</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
-              <SortTh sortKey="createdAt" sort={sort} onSort={toggleSort}>Дата создания - пользователь</SortTh>
+              <SortTh sortKey="createdAt" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
               <th className="w-28"></th>
             </tr>
           </thead>

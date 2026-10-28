@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
-  MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, PosStatusBadge,
+  MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp, PosStatusBadge,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, SDM1, SDM2, DOC_TREBOVANIE } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -33,6 +33,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const posted = doc?.status === "Оформлено";
   const lockPos = ro || posted;
   const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty } = useApp();
+  const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
   // Вложенный экран: …/pick (подбор со склада-отправителя)
   const screen = useScreen();
@@ -165,6 +166,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     }
     onSave({
       id: doc?.id ?? `sd-${Date.now()}`,
+      ...(doc?.createdAt ? { createdAt: doc.createdAt, createdBy: doc.createdBy } : createdStamp()),
       date: head.date,
       type: DOC_TREBOVANIE,
       number: head.number,

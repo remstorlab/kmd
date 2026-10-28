@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   Badge, Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode,
-  MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows,
+  MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravochniki, spravValues, MAIN_SKLAD, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -43,6 +43,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const issued = doc?.status === "Оформлено";
   const lockPos = ro || issued;
   const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty } = useApp();
+  const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
   // Вложенные экраны: …/gp («Накладная на передачу ГП» в «Тип документа»), …/pick (подбор со склада)
   const screen = useScreen();
@@ -166,6 +167,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     }
     onSave({
       id: doc?.id ?? `vd-${Date.now()}`,
+      ...(doc?.createdAt ? { createdAt: doc.createdAt, createdBy: doc.createdBy } : createdStamp()),
       date: head.date,
       type: docType,
       number: head.number,

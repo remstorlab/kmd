@@ -514,6 +514,21 @@ export function formatDateTime(iso: string): string {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// ── «Дата, время - Пользователь»: кто и когда создал запись реестра ──────────
+export const CREATED_LABEL = "Дата, время - Пользователь";
+export interface Created { createdAt?: string; createdBy?: string }
+// Отметка создания новой записи: текущие дата/время и ФИО авторизованного пользователя
+export function useCreatedStamp() {
+  const { currentUser } = useApp();
+  return (): Required<Created> => ({ createdAt: new Date().toISOString(), createdBy: currentUser?.fullName || currentUser?.name || "—" });
+}
+export const createdText = (r: Created) => `${r.createdAt ? formatDateTime(r.createdAt) : "—"} - ${r.createdBy || "—"}`;
+// Ключ сортировки по дате создания
+export const createdSortKey = (r: Created) => (r.createdAt ? new Date(r.createdAt).getTime() : 0);
+export function CreatedCell({ row, className = "px-4 py-3" }: { row: Created; className?: string }) {
+  return <td className={`${className} text-gray-500 whitespace-nowrap`}>{createdText(row)}</td>;
+}
+
 export function useSort<T>(rows: T[], accessors: Record<string, (row: T) => string | number>) {
   const [sort, setSort] = useState<SortState>(null);
   const sorted = useMemo(() => {

@@ -4,6 +4,7 @@ import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PageHeader,
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, Toggle, SearchInput, SortTh, useSort, Pagination, usePerPage, FillerRows, fillerCount, formatDateTime,
+  CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp,
 } from "../components/ui";
 import { AppUser, Role } from "../data/mock";
 import { ArrowLeft, Plus, ChevronRight } from "lucide-react";
@@ -200,7 +201,7 @@ function NewRoleModal({ role, readOnly = false, onClose, onSave }: { role?: Role
       active: role?.active ?? true,
       permissions: { base, actions },
       createdAt: role?.createdAt || new Date().toISOString(),
-      createdBy: role?.createdBy || currentUser?.name || "—",
+      createdBy: role?.createdBy || currentUser?.fullName || currentUser?.name || "—",
     });
   };
 
@@ -356,8 +357,8 @@ function RolesPage({ onBack }: { onBack: () => void }) {
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="px-4 py-3 text-left font-medium text-gray-600 text-xs">Наименование роли</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600 text-xs">Статус</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600 text-xs">{CREATED_LABEL}</th>
               <th className="w-28"></th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600 text-xs">Дата создания и пользователь</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -377,6 +378,7 @@ function RolesPage({ onBack }: { onBack: () => void }) {
                     </span>
                   )}
                 </td>
+                <CreatedCell row={role} />
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => setViewRole(role)} />
@@ -384,7 +386,6 @@ function RolesPage({ onBack }: { onBack: () => void }) {
                     <DeleteIcon onClick={() => confirm(`Удалить роль «${role.name}»?`, () => setRoles(prev => prev.filter(r => r.id !== role.id)))} />
                   </div>
                 </td>
-                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(role.createdAt)} - {role.createdBy}</td>
               </tr>
             ))}
             {filtered.length === 0 && (
@@ -509,6 +510,7 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
 
 export function PanelAdmin() {
   const { users, setUsers, page: currentPage, navigate } = useApp();
+  const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   // Разделы: /admin/users, /admin/roles, /admin/settings; модалки пользователей — /admin/users/new, /edit/:id
@@ -537,6 +539,7 @@ export function PanelAdmin() {
     role: u => u.role,
     email: u => u.email,
     status: u => u.status,
+    created: u => createdSortKey(u),
   });
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
 
@@ -579,6 +582,7 @@ export function PanelAdmin() {
               <SortTh sortKey="role" sort={sort} onSort={toggleSort}>Роль</SortTh>
               <SortTh sortKey="email" sort={sort} onSort={toggleSort}>Email</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус доступа</SortTh>
+              <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
               <th className="w-24"></th>
             </tr>
           </thead>
@@ -591,6 +595,7 @@ export function PanelAdmin() {
                 <td className="px-4 py-3 text-gray-600">{user.role}</td>
                 <td className="px-4 py-3 text-gray-500">{user.email}</td>
                 <td className="px-4 py-3"><Badge label={user.status} group="polzovateli" /></td>
+                <CreatedCell row={user} />
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => show(`Пользователь: ${user.name}`)} />
                   <EditIcon onClick={() => setEditUser(user)} />
@@ -599,9 +604,9 @@ export function PanelAdmin() {
               </tr>
             ))}
             {sorted.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">Пользователи не найдены</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">Пользователи не найдены</td></tr>
             )}
-            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={7} />
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={8} />
           </tbody>
         </table>
         <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
@@ -610,7 +615,7 @@ export function PanelAdmin() {
       {showNewUser && (
         <NewUserModal
           onClose={() => setShowNewUser(false)}
-          onSave={u => { setUsers(prev => [...prev, u]); setShowNewUser(false); show("Пользователь добавлен"); }}
+          onSave={u => { setUsers(prev => [...prev, { ...u, ...createdStamp() }]); setShowNewUser(false); show("Пользователь добавлен"); }}
         />
       )}
       {editUser && (

@@ -4,13 +4,17 @@ import {
   PageHeader, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Badge, Toggle,
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination, usePerPage, FillerRows, fillerCount, statusColorClass, usePaged,
+  CREATED_LABEL, CreatedCell, Created, createdSortKey, useCreatedStamp,
 } from "../components/ui";
-import { spravochniki, techOpLossNorms, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
+import { spravochniki, DEMO_DICT_CREATED, techOpLossNorms, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
 import { ArrowLeft, ArrowDownUp, Gem, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
+// Кто и когда создал запись простого справочника: «<справочник>|<код>» → отметка (демо-записи — при настройке системы)
+const dictCreated: Record<string, Created> = {};
+const dictCreatedOf = (name: string, code: string): Created => dictCreated[`${name}|${code}`] ?? DEMO_DICT_CREATED;
 
 // Адреса справочников: /spravochniki/<slug>
 const DICT_SLUG: Record<SpravKey, string> = {
@@ -90,6 +94,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const numbered = NUMBERED.includes(name);
   const [items, setItems] = useState(dict.items);
   const [norms, setNorms] = useState(techOpLossNorms);
+  const createdStamp = useCreatedStamp();
   const [form, setForm] = useState({ code: "", value: "", status: "Активно" });
   const [normForm, setNormForm] = useState(emptyNorm);
   const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.code);
@@ -107,6 +112,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
     code: i => i.code,
     value: i => i.value,
     status: i => i.status,
+    created: i => createdSortKey(dictCreatedOf(name, i.code)),
   });
 
   const openAdd = goAdd;
@@ -114,6 +120,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
 
   const save = () => {
     const next = editItem ? items.map(i => i.code === editItem.code ? form : i) : [...items, form];
+    if (!editItem) dictCreated[`${name}|${form.code}`] = createdStamp();
     setItems(next);
     // Справочник — общий источник вариантов для полей форм, поэтому изменения пишем в него.
     if (!editItem) dict.count += 1;
@@ -154,6 +161,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
               <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Потери Ag, %</th>
             </>}
             {!numbered && <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>}
+            <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
             <th className="w-12"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
@@ -167,10 +175,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                   <td className="px-4 py-3 text-right tabular-nums">{normCell(norms[item.code]?.ag ?? "")}</td>
                 </>}
                 {!numbered && <td className="px-4 py-3"><Badge label={item.status} group="zapisi-spravochnikov" /></td>}
+                <CreatedCell row={dictCreatedOf(name, item.code)} />
                 <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
               </tr>
             ))}
-            <FillerRows count={pg1.fill} cols={7} />
+            <FillerRows count={pg1.fill} cols={8} />
           </tbody>
         </table>
         {pg1.pager}
@@ -564,6 +573,7 @@ function placeOf(loc: StorageLocation): string {
 
 function StorageLocationsPage({ onBack }: { onBack: () => void }) {
   const { storageLocations: items, setStorageLocations: setItems } = useApp();
+  const createdStamp = useCreatedStamp();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [editAvailable, setEditAvailable] = useState(true);
@@ -589,6 +599,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
     sklad: loc => loc.sklad,
     place: loc => placeOf(loc),
     available: loc => (loc.available ? 1 : 0),
+    created: loc => createdSortKey(loc),
   });
   const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
 
@@ -613,7 +624,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    const loc: StorageLocation = { id: `sl-${Date.now()}`, sklad: form.sklad, seyfNum, polkaNum, available: form.available };
+    const loc: StorageLocation = { id: `sl-${Date.now()}`, sklad: form.sklad, seyfNum, polkaNum, available: form.available, ...createdStamp() };
     setItems(prev => [...prev, loc]);
     setShowAdd(false);
     show("Место хранения добавлено");
@@ -647,6 +658,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
             <SortTh sortKey="sklad" sort={sort} onSort={toggleSort}>Склад</SortTh>
             <SortTh sortKey="place" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
             <SortTh sortKey="available" sort={sort} onSort={toggleSort}>Статус</SortTh>
+            <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
             <th className="w-20"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
@@ -655,6 +667,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
                 <td className="px-4 py-3 text-gray-900">{loc.sklad}</td>
                 <td className="px-4 py-3 text-gray-700">{placeOf(loc)}</td>
                 <td className="px-4 py-3"><Badge label={loc.available ? "Доступно" : "Заблокировано"} group="mesta-hraneniya" /></td>
+                <CreatedCell row={loc} />
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => setViewItem(loc)} />
@@ -665,9 +678,9 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
               </tr>
             ))}
             {pageItems.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
-            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={4} />
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={5} />
           </tbody>
         </table>
         <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />

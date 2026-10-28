@@ -4,6 +4,7 @@ import {
   Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, ProbaChem, usePaged,
+  CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp,
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
@@ -1164,6 +1165,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [showShihtaPick, setShowShihtaPick] = nested("shihta-pick");
   const [pickedShihtaId, setPickedShihtaId] = useState<string | null>(null);
   const { dmItems, setDmItems, setShihtovyeKarty, operations, currentUser } = useApp();
+  const createdStamp = useCreatedStamp();
   // Документы вкладок «Выдача» / «Возврат»
   const [vydachaFiles, setVydachaFiles] = useState<File[]>(() =>
     op?.vydachaFiles ?? (op?.vid === "Плавка" ? [new File([], `Приказ-${op.document}.pdf`)] : []));
@@ -1308,6 +1310,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
   const buildOp = (next: OperStage, vydachaPos = vydacha): Operation => ({
     id: op?.id || `op-${Date.now()}`,
+    // Отметка создания — при первом сохранении операции
+    ...(op?.createdAt ? { createdAt: op.createdAt, createdBy: op.createdBy } : createdStamp()),
     date: head.date,
     type: type as any,
     vid: vid as any,
@@ -1593,6 +1597,7 @@ export function DvizhenieMateriаla() {
     document: o => o.document,
     responsible: o => o.responsible,
     stage: o => o.stage,
+    created: o => createdSortKey(o),
   });
 
   const typeColor: Record<string, string> = {
@@ -1655,6 +1660,7 @@ export function DvizhenieMateriаla() {
               <SortTh sortKey="document" sort={sort} onSort={toggleSort}>Документ</SortTh>
               <SortTh sortKey="responsible" sort={sort} onSort={toggleSort}>Подотчётник</SortTh>
               <SortTh sortKey="stage" sort={sort} onSort={toggleSort}>Статус</SortTh>
+              <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
               <th className="w-32"></th>
             </tr>
           </thead>
@@ -1671,6 +1677,7 @@ export function DvizhenieMateriаla() {
                 <td className="px-4 py-3 text-blue-600">{op.document}</td>
                 <td className="px-4 py-3 text-gray-700">{op.responsible}</td>
                 <td className="px-4 py-3 whitespace-nowrap"><Badge label={op.stage} group="operacii" /></td>
+                <CreatedCell row={op} />
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewOp(op)} />
                   <EditIcon onClick={() => setEditOp(op)} />
@@ -1680,7 +1687,7 @@ export function DvizhenieMateriаla() {
               </tr>
               );
             })}
-            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={8} />
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={9} />
           </tbody>
         </table>
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />

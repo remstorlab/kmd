@@ -13,6 +13,9 @@ export type LogType = "Создание" | "Изменение" | "Удален�
 export type ShihtaStatus = "Редактирование" | "Новая" | "Выполнена";
 
 export interface GPItem {
+  // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
+  createdAt?: string;
+  createdBy?: string;
   id: string;
   name: string;
   nomenkl: string;
@@ -46,6 +49,9 @@ export function baseMetal(code: string, codes: MaterialCode[] = initialMaterialC
 }
 
 export interface DMItem {
+  // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
+  createdAt?: string;
+  createdBy?: string;
   id: string;
   name: string;
   nomenkl: string;
@@ -68,6 +74,9 @@ export interface DMItem {
 }
 
 export interface SkladDoc {
+  // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
+  createdAt?: string;
+  createdBy?: string;
   id: string;
   date: string;
   // Значение справочника «Типы документов приёмки» / «Типы документов отгрузки»
@@ -130,6 +139,9 @@ export type OperPosition = { n: number; name: string; nomenkl: string; klass: st
   srcId?: string };
 
 export interface Operation {
+  // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
+  createdAt?: string;
+  createdBy?: string;
   id: string;
   date: string;
   type: OpType;
@@ -222,6 +234,9 @@ export interface Podotchetnik {
 }
 
 export interface AppUser {
+  // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
+  createdAt?: string;
+  createdBy?: string;
   id: string;
   name: string;
   role: string;
@@ -1051,6 +1066,9 @@ export const initialMaterialClasses: MaterialClass[] = [
 
 // --- Места хранения (Склад → Сейф → Полка; склад — из справочника «Склады») ---
 export interface StorageLocation {
+  // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
+  createdAt?: string;
+  createdBy?: string;
   id: string;
   sklad: string;
   seyfNum: string;
@@ -1137,3 +1155,38 @@ export const initialChemElements: ChemElement[] = [
   { id: "as", name: "Мышьяк", shortName: "As", showDm: false, showShk: false },
   { id: "se", name: "Селен", shortName: "Se", showDm: false, showShk: false },
 ];
+
+// --- Демо: кто и когда создал записи реестров («Дата, время - Пользователь») ---
+// Документы и операции — в день документа, позиции склада — при приёмке, справочные записи — при настройке системы.
+const isoOfRu = (ru: string, time: string) => {
+  const [d, m, y] = ru.split(".");
+  return `${y}-${m}-${d}T${time}:00`;
+};
+const DEMO_ADMIN = "Ковалева Елена Викторовна";
+const DEMO_SKLAD_USER = "Ким Александр Юрьевич";
+for (const d of [...initialSkladDocs, ...initialVydachaDocs]) {
+  d.createdAt ??= isoOfRu(d.date, "10:15");
+  d.createdBy ??= DEMO_SKLAD_USER;
+}
+for (const o of initialOperations) {
+  o.createdAt ??= isoOfRu(o.date, "09:30");
+  o.createdBy ??= o.vydal ?? DEMO_SKLAD_USER;
+}
+initialDMItems.forEach((it, i) => {
+  it.createdAt ??= `2026-08-${String(1 + (i % 14)).padStart(2, "0")}T11:${String(10 + i).padStart(2, "0")}:00`;
+  it.createdBy ??= DEMO_SKLAD_USER;
+});
+initialGPItems.forEach((it, i) => {
+  it.createdAt ??= `2026-08-${String(1 + (i % 14)).padStart(2, "0")}T14:${String(10 + (i % 50)).padStart(2, "0")}:00`;
+  it.createdBy ??= DEMO_SKLAD_USER;
+});
+initialUsers.forEach((u, i) => {
+  u.createdAt ??= `2026-01-${String(12 + i).padStart(2, "0")}T09:${String(20 + i).padStart(2, "0")}:00`;
+  u.createdBy ??= DEMO_ADMIN;
+});
+for (const l of initialStorageLocations) {
+  l.createdAt ??= "2026-01-12T09:00:00";
+  l.createdBy ??= DEMO_ADMIN;
+}
+// Записи простых справочников (значения задаются при настройке системы)
+export const DEMO_DICT_CREATED = { createdAt: "2026-01-12T09:00:00", createdBy: DEMO_ADMIN };
