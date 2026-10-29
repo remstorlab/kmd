@@ -3,11 +3,11 @@ import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
   Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem, usePaged, FillerRows, useCreatedStamp,
 } from "./ui";
-import { SkladDoc, DocStatus, ChemComposition, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_PRIHOD_AKT, DOC_TREBOVANIE, DOC_VOZVRAT_SOGP, SOGP } from "../data/mock";
+import { SkladDoc, DocStatus, ChemComposition, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_PRIHOD_AKT, DOC_TREBOVANIE, DOC_VOZVRAT_SGP, SGP } from "../data/mock";
 import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
 import ChemCompositionBlock from "./ChemCompositionBlock";
 import TrebovanieDocModal from "./TrebovanieDocModal";
-import VozvratSogpDocModal from "./VozvratSogpDocModal";
+import VozvratSgpDocModal from "./VozvratSgpDocModal";
 import { useApp } from "../store/AppContext";
 import { Plus } from "lucide-react";
 import { useScreen } from "../router";
@@ -27,15 +27,15 @@ type Props = {
 };
 
 // Вложенные экраны типа документа: …/nakladnaya, …/trebovanie (без сегмента — приходный ордер)
-const TYPE_FLAGS: Record<string, string> = { [DOC_PRIHOD_NAKLAD]: "nakladnaya", [DOC_PRIHOD_AKT]: "akt", [DOC_TREBOVANIE]: "trebovanie", [DOC_VOZVRAT_SOGP]: "vozvrat-sogp" };
+const TYPE_FLAGS: Record<string, string> = { [DOC_PRIHOD_NAKLAD]: "nakladnaya", [DOC_PRIHOD_AKT]: "akt", [DOC_TREBOVANIE]: "trebovanie", [DOC_VOZVRAT_SGP]: "vozvrat-sgp" };
 
 export default function PrihodDocModal(props: Props) {
   const { doc, readOnly: ro = false } = props;
   const screen = useScreen();
   // Тип документа — из справочника «Типы документов приёмки»
   const docType: PrihodDocType = doc
-    ? ([DOC_PRIHOD_ORDER, DOC_PRIHOD_AKT, DOC_TREBOVANIE, DOC_VOZVRAT_SOGP].includes(doc.type) ? doc.type : DOC_PRIHOD_NAKLAD)
-    : screen.has("vozvrat-sogp") ? DOC_VOZVRAT_SOGP : screen.has("trebovanie") ? DOC_TREBOVANIE : screen.has("akt") ? DOC_PRIHOD_AKT : screen.has("nakladnaya") ? DOC_PRIHOD_NAKLAD : DOC_PRIHOD_ORDER;
+    ? ([DOC_PRIHOD_ORDER, DOC_PRIHOD_AKT, DOC_TREBOVANIE, DOC_VOZVRAT_SGP].includes(doc.type) ? doc.type : DOC_PRIHOD_NAKLAD)
+    : screen.has("vozvrat-sgp") ? DOC_VOZVRAT_SGP : screen.has("trebovanie") ? DOC_TREBOVANIE : screen.has("akt") ? DOC_PRIHOD_AKT : screen.has("nakladnaya") ? DOC_PRIHOD_NAKLAD : DOC_PRIHOD_ORDER;
   const setDocType = (t: PrihodDocType) => screen.choose(Object.values(TYPE_FLAGS), TYPE_FLAGS[t]);
   const typeOptions = spravValues("Типы документов приёмки");
   const typeSelect = (
@@ -45,8 +45,8 @@ export default function PrihodDocModal(props: Props) {
   );
   return docType === DOC_TREBOVANIE
     ? <TrebovanieDocModal {...props} typeSelect={typeSelect} />
-    : docType === DOC_VOZVRAT_SOGP
-      ? <VozvratSogpDocModal {...props} typeSelect={typeSelect} />
+    : docType === DOC_VOZVRAT_SGP
+      ? <VozvratSgpDocModal {...props} typeSelect={typeSelect} />
       : <PrihodForm {...props} docType={docType} typeSelect={typeSelect} />;
 }
 
@@ -80,8 +80,8 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
   const lockPos = ro || posted;
   const { toast, show, clear } = useToast();
   const today = new Date().toLocaleDateString("ru-RU");
-  // Склады СДМ (СОГП — только через выдачу со склада и «Возврат СОГП»)
-  const sklady = spravValues("Склады").filter(s => s !== SOGP);
+  // Склады СДМ (СГП — только через выдачу со склада и «Возврат СГП»)
+  const sklady = spravValues("Склады").filter(s => s !== SGP);
 
   const [head, setHead] = useState(() => ({
     number: doc?.number || "ПО-0342",

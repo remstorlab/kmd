@@ -3,7 +3,7 @@ import {
   Badge, Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
 } from "./ui";
-import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, MAIN_SKLAD, SOGP, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
+import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, MAIN_SKLAD, SGP, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
 import { takeFromStock } from "../data/stock";
@@ -11,7 +11,7 @@ import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
 // ── Выдача со склада: «Накладная» ─────────────────────────────────────────────
-// Не связана с «Движением материала»: выдача со склада выдачи (СДМ2) на склад СОГП — в обоих типах документа.
+// Не связана с «Движением материала»: выдача со склада выдачи (СДМ2) на склад СГП — в обоих типах документа.
 // Тип документа — из справочника «Типы документов отгрузки»; набор полей общий, отличается печатная форма.
 // Выдать можно любую позицию склада, независимо от класса. Заказчик / Организация — отдельное поле: по умолчанию
 // заказчик выдаваемых позиций (из документа приёма на СДМ1, сохраняется через требование и объединение).
@@ -22,8 +22,8 @@ type VydachaPosition = VydachaDocPosition;
 
 // Перемещение выдаваемого количества — только при оформлении накладной. Пока накладная «В работе»,
 // позиции склада не меняются (статус и место хранения прежние). При оформлении выданная позиция встаёт на склад
-// СОГП «На складе» без места хранения («-»); при частичной выдаче остаток остаётся на СДМ2 на своём месте
-// с уменьшенным количеством, а выданная часть выделяется в отдельную запись на СОГП (data/stock.ts).
+// СГП «На складе» без места хранения («-»); при частичной выдаче остаток остаётся на СДМ2 на своём месте
+// с уменьшенным количеством, а выданная часть выделяется в отдельную запись на СГП (data/stock.ts).
 const NO_LOC = "-";
 // Выдать можно позицию на складе или в резерве; «В подотчёте» и «Закрыта» — нет
 const canIssue = (status: string) => status === "На складе" || status === "Резерв";
@@ -54,7 +54,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const [head, setHead] = useState(() => ({
     number: doc?.number || `НО-${Math.floor(Math.random() * 900 + 100)}`,
     date: doc?.date || today,
-    // Отправитель — всегда склад выдачи (СДМ2), получатель — склад СОГП
+    // Отправитель — всегда склад выдачи (СДМ2), получатель — склад СГП
     sender: MAIN_SKLAD,
     schetFaktura: "",
     schetFakturaDate: today,
@@ -161,10 +161,10 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       const gpIssue = new Map(positions.filter(p => p.src === "gp").map(p => [p.id, p.issue]));
       const dmIssue = new Map(positions.filter(p => p.src === "dm").map(p => [p.id, p.issue]));
       const partId = (it: { id: string }) => `${it.id}-v${stamp}`;
-      // Выданная позиция — на склад СОГП без места хранения; заказчик позиции сохраняется (без него — из документа)
-      const toSogp = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: SOGP, status: "На складе", location: NO_LOC, zakazchik: it.zakazchik ?? zakazchik });
-      if (gpIssue.size) setGpItems(prev => takeFromStock(prev, gpIssue, toSogp, partId).items);
-      if (dmIssue.size) setDmItems(prev => takeFromStock(prev, dmIssue, toSogp, partId).items);
+      // Выданная позиция — на склад СГП без места хранения; заказчик позиции сохраняется (без него — из документа)
+      const toSgp = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: SGP, status: "На складе", location: NO_LOC, zakazchik: it.zakazchik ?? zakazchik });
+      if (gpIssue.size) setGpItems(prev => takeFromStock(prev, gpIssue, toSgp, partId).items);
+      if (dmIssue.size) setDmItems(prev => takeFromStock(prev, dmIssue, toSgp, partId).items);
       // Выданные позиции из резерва: шихтовая карта, которая их резервировала, возвращается в «Редактирование»
       if (affectedKarty.length) {
         const ids = new Set(affectedKarty.map(k => k.id));
@@ -183,7 +183,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       number: head.number,
       status,
       sender: MAIN_SKLAD,
-      receiver: SOGP,
+      receiver: SGP,
       zakazchik,
       positions,
     });
@@ -211,7 +211,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       )}
       {issued && (
         <div className="mb-4 text-sm bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5">
-          Накладная оформлена: позиции выданы со склада «{MAIN_SKLAD}» на склад «{SOGP}» (без места хранения). Состав позиций изменить нельзя.
+          Накладная оформлена: позиции выданы со склада «{MAIN_SKLAD}» на склад «{SGP}» (без места хранения). Состав позиций изменить нельзя.
         </div>
       )}
       <div className="grid grid-cols-4 gap-4 mb-5">
@@ -226,7 +226,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
         <Field label="Дата документа" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
         <Field label="Отправитель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
-        <Field label="Получатель" required={!ro}><Input value={SOGP} disabled /></Field>
+        <Field label="Получатель" required={!ro}><Input value={SGP} disabled /></Field>
         <Field label="Заказчик / Организация" required={!ro}>
           <Select value={zakazchik} options={zakazchikOptions} optionLabel={v => v || "Выберите заказчика"} onChange={v => setZakazchikManual(v)} disabled={ro} />
         </Field>

@@ -6,7 +6,7 @@ import {
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp,
 } from "../components/ui";
-import { GPItem, DMItem, SDM1, SDM2, SOGP } from "../data/mock";
+import { GPItem, DMItem, SDM1, SDM2, SGP } from "../data/mock";
 import { Coins } from "lucide-react";
 import DMPositionViewModal from "../components/DMPositionViewModal";
 import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, parseLoc, NO_LOC } from "../components/DMPositionFormModal";
@@ -18,10 +18,10 @@ const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nome
 // ── Склады ХАБ ───────────────────────────────────────────────────────────────
 
 // Подразделы «Склады»: у каждого склада свой экран остатков (сотрудник склада видит только позиции своего склада)
-export const SKLAD_PAGES: { page: "ostatok-sdm1" | "ostatok-sdm2" | "ostatok-sogp"; sklad: string; title: string; sub: string }[] = [
+export const SKLAD_PAGES: { page: "ostatok-sdm1" | "ostatok-sdm2" | "ostatok-sgp"; sklad: string; title: string; sub: string }[] = [
   { page: "ostatok-sdm1", sklad: SDM1, title: `Остатки материалов на ${SDM1}`, sub: "Склад приёмки: принятые позиции и резерв под шихтовые карты" },
   { page: "ostatok-sdm2", sklad: SDM2, title: `Остатки материалов на ${SDM2}`, sub: "Производственный склад: позиции для отгрузки и операций движения материала" },
-  { page: "ostatok-sogp", sklad: SOGP, title: `Остатки на ${SOGP}`, sub: "Позиции, выданные с СДМ №2 по документам Выдачи" },
+  { page: "ostatok-sgp", sklad: SGP, title: `Остатки на ${SGP}`, sub: "Позиции, выданные с СДМ №2 по документам Выдачи" },
 ];
 
 export function SkladyHub() {
@@ -240,8 +240,8 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
   // Смена места хранения: …/mesto/:id
   const moveItem = skladItems.find(it => it.id === screen.after("mesto")) ?? null;
   // Позиция физически на складе — место хранения можно изменить
-  // На СОГП мест хранения нет — позиции хранятся без места («-»)
-  const noLocations = sklad === SOGP;
+  // На СГП мест хранения нет — позиции хранятся без места («-»)
+  const noLocations = sklad === SGP;
   const canMove = (it: DMItem) => !noLocations && (it.status === "На складе" || it.status === "Резерв");
   const saveLocation = (it: DMItem, location: string, name: string) => {
     // Позиция хранится в учёте ДМ или ГП — меняем там, где она есть
@@ -412,7 +412,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
                     <EditIcon
                       onClick={() => screen.openTop("mesto", item.id)}
                       disabled={!canMove(item)}
-                      title={canMove(item) ? "Изменить место хранения" : noLocations ? `На складе «${SOGP}» места хранения не ведутся` : "Позиция не на складе — место хранения не меняется"}
+                      title={canMove(item) ? "Изменить место хранения" : noLocations ? `На складе «${SGP}» места хранения не ведутся` : "Позиция не на складе — место хранения не меняется"}
                     />
                   </div>
                 </td>
@@ -444,6 +444,6 @@ export function OstatokSdm2() {
   return <OstatokSklad key={SDM2} sklad={SDM2} />;
 }
 
-export function OstatokSogp() {
-  return <OstatokSklad key={SOGP} sklad={SOGP} />;
+export function OstatokSgp() {
+  return <OstatokSklad key={SGP} sklad={SGP} />;
 }

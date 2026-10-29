@@ -3,7 +3,7 @@ import {
   Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp, PosStatusBadge,
 } from "./ui";
-import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, SDM1, SDM2, SOGP, DOC_TREBOVANIE } from "../data/mock";
+import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, SDM1, SDM2, SGP, DOC_TREBOVANIE } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
 import { takeFromStock } from "../data/stock";
@@ -40,8 +40,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const showPick = screen.has("pick");
   const setShowPick = (open: boolean) => (open ? screen.open("pick") : screen.close("pick"));
   const today = new Date().toLocaleDateString("ru-RU");
-  // Склады СДМ (СОГП — только через выдачу со склада и «Возврат СОГП»)
-  const sklady = spravValues("Склады").filter(s => s !== SOGP);
+  // Склады СДМ (СГП — только через выдачу со склада и «Возврат СГП»)
+  const sklady = spravValues("Склады").filter(s => s !== SGP);
 
   const [head, setHead] = useState(() => ({
     number: doc?.number || `ТР-${String(Math.floor(Math.random() * 900 + 100)).padStart(4, "0")}`,

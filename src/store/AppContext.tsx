@@ -11,7 +11,7 @@ import {
 
 export type Page =
   | "dashboard"
-  | "sklady-hub" | "ostatok-sdm1" | "ostatok-sdm2" | "ostatok-sogp"
+  | "sklady-hub" | "ostatok-sdm1" | "ostatok-sdm2" | "ostatok-sgp"
   | "sklad-oper-hub" | "prihod-list" | "vydacha-list"
   | "dvizhenie-mat"
   | "shihtovye-karty"

@@ -3,16 +3,16 @@ import {
   Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
 } from "./ui";
-import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, SOGP, PRIHOD_SKLAD, DOC_VOZVRAT_SOGP } from "../data/mock";
+import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, SGP, PRIHOD_SKLAD, DOC_VOZVRAT_SGP } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
 import { takeFromStock } from "../data/stock";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
-// ── Возврат СОГП: возврат позиций со склада СОГП на склад СДМ ────────────────
-// Поля — как у накладной прихода; отправитель — всегда склад СОГП, получатель — склад из справочника «Склады»
-// (по умолчанию склад приёмки СДМ1). Позиции подбираются со склада СОГП с количеством к перемещению.
+// ── Возврат СГП: возврат позиций со склада СГП на склад СДМ ────────────────
+// Поля — как у накладной прихода; отправитель — всегда склад СГП, получатель — склад из справочника «Склады»
+// (по умолчанию склад приёмки СДМ1). Позиции подбираются со склада СГП с количеством к перемещению.
 // При оформлении позиции встают на склад-получатель «На складе» без места хранения («-») — размещаются потом
 // через «Изменить место хранения»; заказчик и признак собственности позиций сохраняются.
 
@@ -20,7 +20,7 @@ type VsPosition = VydachaDocPosition;
 const NO_LOC = "-";
 const ORGS = spravValues("Заказчики / Организации");
 
-export default function VozvratSogpDocModal({ onClose, onSave, doc, readOnly = false, typeSelect }: {
+export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = false, typeSelect }: {
   onClose: () => void;
   onSave: (d: SkladDoc) => void;
   doc?: SkladDoc | null;
@@ -33,12 +33,12 @@ export default function VozvratSogpDocModal({ onClose, onSave, doc, readOnly = f
   const { gpItems, dmItems, setGpItems, setDmItems } = useApp();
   const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
-  // Вложенный экран: …/pick (подбор со склада СОГП)
+  // Вложенный экран: …/pick (подбор со склада СГП)
   const screen = useScreen();
   const showPick = screen.has("pick");
   const setShowPick = (open: boolean) => (open ? screen.open("pick") : screen.close("pick"));
   const today = new Date().toLocaleDateString("ru-RU");
-  const receivers = spravValues("Склады").filter(s => s !== SOGP);
+  const receivers = spravValues("Склады").filter(s => s !== SGP);
 
   const [head, setHead] = useState(() => ({
     number: doc?.number || `ВС-${String(Math.floor(Math.random() * 900 + 100)).padStart(4, "0")}`,
@@ -49,14 +49,14 @@ export default function VozvratSogpDocModal({ onClose, onSave, doc, readOnly = f
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
   const [ownProperty, setOwnProperty] = useState(doc?.ownProperty ?? true);
-  const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Возврат СОГП_${doc.number}.pdf`)] : []));
+  const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Возврат СГП_${doc.number}.pdf`)] : []));
   const [positions, setPositions] = useState<VsPosition[]>(() => doc?.positions ?? []);
 
-  // Остатки склада СОГП. Количество к перемещению вводится всегда: позиция без количества изделий
+  // Остатки склада СГП. Количество к перемещению вводится всегда: позиция без количества изделий
   // (или из одного изделия) — 1 шт.
   const stock = useMemo<StockRow[]>(() => [
-    ...gpItems.filter(i => i.sklad === SOGP && i.status === "На складе").map(i => ({ id: i.id, src: "gp" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: Math.max(i.qty, 1), unit: i.unit, proba: i.proba ?? null, lig: i.ligWeight ?? null, net: i.netWeight ?? null, location: i.location, sklad: i.sklad, chem: i.chem })),
-    ...dmItems.filter(i => i.sklad === SOGP && i.status === "На складе").map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: Math.max(i.qty, 1), unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem })),
+    ...gpItems.filter(i => i.sklad === SGP && i.status === "На складе").map(i => ({ id: i.id, src: "gp" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: Math.max(i.qty, 1), unit: i.unit, proba: i.proba ?? null, lig: i.ligWeight ?? null, net: i.netWeight ?? null, location: i.location, sklad: i.sklad, chem: i.chem })),
+    ...dmItems.filter(i => i.sklad === SGP && i.status === "На складе").map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: Math.max(i.qty, 1), unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem })),
   ], [gpItems, dmItems]);
 
   const itemOf = (p: VsPosition): GPItem | DMItem | undefined =>
@@ -114,9 +114,9 @@ export default function VozvratSogpDocModal({ onClose, onSave, doc, readOnly = f
       if (positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
       const lacking = positions.filter(p => {
         const it = itemOf(p);
-        return !it || it.sklad !== SOGP || it.status !== "На складе" || Math.max(it.qty, 1) < p.issue;
+        return !it || it.sklad !== SGP || it.status !== "На складе" || Math.max(it.qty, 1) < p.issue;
       });
-      if (lacking.length) { show(`Позиции недоступны на складе «${SOGP}»: ${lacking.map(p => p.name).join(", ")}`); return; }
+      if (lacking.length) { show(`Позиции недоступны на складе «${SGP}»: ${lacking.map(p => p.name).join(", ")}`); return; }
       const stamp = Date.now();
       const move = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: head.receiver, status: "На складе", location: NO_LOC });
       const partId = (it: { id: string }) => `${it.id}-vs${stamp}`;
@@ -129,10 +129,10 @@ export default function VozvratSogpDocModal({ onClose, onSave, doc, readOnly = f
       id: doc?.id ?? `sd-${Date.now()}`,
       ...(doc?.createdAt ? { createdAt: doc.createdAt, createdBy: doc.createdBy } : createdStamp()),
       date: head.date,
-      type: DOC_VOZVRAT_SOGP,
+      type: DOC_VOZVRAT_SGP,
       number: head.number,
       status,
-      sender: SOGP,
+      sender: SGP,
       receiver: head.receiver,
       zakazchik,
       ownProperty: isOwn,
@@ -140,10 +140,10 @@ export default function VozvratSogpDocModal({ onClose, onSave, doc, readOnly = f
     });
   };
 
-  const pg = usePaged(sorted, "vozvrat-sogp-positions");
+  const pg = usePaged(sorted, "vozvrat-sgp-positions");
   return (
     <Modal
-      title={`${DOC_VOZVRAT_SOGP}${doc ? ` ${doc.number}` : ""}`}
+      title={`${DOC_VOZVRAT_SGP}${doc ? ` ${doc.number}` : ""}`}
       onClose={onClose}
       extraWide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : posted ? <>
@@ -157,14 +157,14 @@ export default function VozvratSogpDocModal({ onClose, onSave, doc, readOnly = f
     >
       {posted && (
         <div className="mb-4 text-sm bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5">
-          Документ оформлен: позиции возвращены со склада «{SOGP}» на склад «{head.receiver}» без места хранения. Состав позиций изменить нельзя.
+          Документ оформлен: позиции возвращены со склада «{SGP}» на склад «{head.receiver}» без места хранения. Состав позиций изменить нельзя.
         </div>
       )}
       <div className="grid grid-cols-4 gap-4 mb-5">
         {typeSelect}
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
         <Field label="Дата документа" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-        <Field label="Отправитель" required={!ro}><Input value={SOGP} disabled /></Field>
+        <Field label="Отправитель" required={!ro}><Input value={SGP} disabled /></Field>
         <Field label="Получатель" required={!ro}>
           <Select value={head.receiver} options={receivers.includes(head.receiver) ? receivers : [head.receiver, ...receivers]} onChange={h("receiver")} disabled={lockPos} />
         </Field>
@@ -195,7 +195,7 @@ export default function VozvratSogpDocModal({ onClose, onSave, doc, readOnly = f
         </div>
         {positions.length === 0 ? (
           <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-            Нет позиций. Нажмите «+ Добавить позицию» и выберите позиции со склада «{SOGP}»
+            Нет позиций. Нажмите «+ Добавить позицию» и выберите позиции со склада «{SGP}»
           </div>
         ) : (<>
           <table className="w-full text-sm">
@@ -248,11 +248,11 @@ export default function VozvratSogpDocModal({ onClose, onSave, doc, readOnly = f
       {showPick && (
         <StockPickerModal
           qtyLabel="Кол-во к перемещению"
-          title={`Добавить позиции со склада «${SOGP}»`}
+          title={`Добавить позиции со склада «${SGP}»`}
           rows={stock}
           already={already}
           showWeights
-          emptyText={`Нет позиций на складе «${SOGP}»`}
+          emptyText={`Нет позиций на складе «${SGP}»`}
           onClose={() => setShowPick(false)}
           onAdd={addPicked}
         />
