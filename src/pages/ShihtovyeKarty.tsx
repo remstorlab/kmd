@@ -5,7 +5,7 @@ import {
   useToast, Toast, Field, Input, Select, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, formatDateTime, usePaged, CREATED_LABEL, CreatedCell,
 } from "../components/ui";
-import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass, PRIHOD_SKLAD, spravValues } from "../data/mock";
+import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass, PRIHOD_SKLAD, SOGP, spravValues } from "../data/mock";
 import { takeFromStock, returnToStock } from "../data/stock";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
@@ -87,7 +87,8 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
   // Доступные позиции для шихты — на выбранном складе (по умолчанию склад приёмки СДМ1). Позиции СДМ1
   // по требованию перемещаются на СДМ2 (резерв сохраняется); с СДМ2 карта выдаётся на плавку
-  const sklady = spravValues("Склады");
+  // Склады СДМ (СОГП — только через выдачу со склада и «Возврат СОГП»)
+  const sklady = spravValues("Склады").filter(s => s !== SOGP);
   const [pickSklad, setPickSklad] = useState(PRIHOD_SKLAD);
   const skladChem = (id: string) => dmItems.find(i => i.id === id)?.chem;
   const skladRows = useMemo<StockRow[]>(() => dmItems

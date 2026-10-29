@@ -182,7 +182,7 @@ export default function StockPickerModal({
                     </>}
                     <td className="px-3 py-2 text-gray-500">{r.location}</td>
                     <td className="px-3 py-2 text-gray-500">{left(r) || "—"}</td>
-                    {anyInput && <td className="px-3 py-2">{hasInput(r) ? <Input value={selectedQty[r.id] ?? ""} onChange={v => setQty(r.id, v)} placeholder="1" disabled={!checked} /> : <span className="text-xs text-gray-400">целиком</span>}</td>}
+                    {anyInput && <td className="px-3 py-2">{hasInput(r) ? <Input value={selectedQty[r.id] ?? (left(r) === 1 ? "1" : "")} onChange={v => setQty(r.id, v)} placeholder="1" disabled={!checked} /> : <span className="text-xs text-gray-400">целиком</span>}</td>}
                   </tr>
                 );
               })}

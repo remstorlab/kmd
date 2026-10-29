@@ -47,6 +47,7 @@ export function useScreenGroups(): Group[] {
       dm2 && { title: "СДМ №2: просмотр позиции", path: `${P["ostatok-sdm2"]}/view/${dm2.id}` },
       dm2 && { title: "СДМ №2: смена места хранения", path: `${P["ostatok-sdm2"]}/mesto/${dm2.id}` },
       { title: "СДМ №2: объединение позиций", path: `${P["ostatok-sdm2"]}/merge` },
+      { title: "Остатки на СОГП", path: P["ostatok-sogp"] },
     ].filter(Boolean) as Screen[] },
     { title: "Складские операции", screens: [
       { title: "Складские операции", path: P["sklad-oper-hub"] },
@@ -54,6 +55,8 @@ export function useScreenGroups(): Group[] {
       { title: "Приход: новый документ", path: `${P["prihod-list"]}/new` },
       { title: "Приход: новая накладная", path: `${P["prihod-list"]}/new/nakladnaya` },
       { title: "Приход: новый акт", path: `${P["prihod-list"]}/new/akt` },
+      { title: "Приход: новый возврат СОГП", path: `${P["prihod-list"]}/new/vozvrat-sogp` },
+      { title: "Возврат СОГП: добавить позиции со склада «СОГП»", path: `${P["prihod-list"]}/new/vozvrat-sogp/pick` },
       { title: "Приход: добавить позицию", path: `${P["prihod-list"]}/new/position-new` },
       prihodOrder && { title: "Приход: просмотр ордера", path: `${P["prihod-list"]}/view/${prihodOrder.id}` },
       prihodOrder && { title: "Приход: редактирование ордера", path: `${P["prihod-list"]}/edit/${prihodOrder.id}` },

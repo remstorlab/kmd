@@ -6,21 +6,22 @@ import {
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp,
 } from "../components/ui";
-import { GPItem, DMItem, SDM1, SDM2 } from "../data/mock";
+import { GPItem, DMItem, SDM1, SDM2, SOGP } from "../data/mock";
 import { Coins } from "lucide-react";
 import DMPositionViewModal from "../components/DMPositionViewModal";
 import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, parseLoc, NO_LOC } from "../components/DMPositionFormModal";
 import { useScreen } from "../router";
 
 // Позиции учёта ГП в виде позиций склада ДМ — склад один, показываются все классы.
-const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, sklad: i.sklad, status: i.status, chem: i.chem, createdAt: i.createdAt, createdBy: i.createdBy });
+const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, sklad: i.sklad, status: i.status, chem: i.chem, zakazchik: i.zakazchik, ownProperty: i.ownProperty, createdAt: i.createdAt, createdBy: i.createdBy });
 
 // ── Склады ХАБ ───────────────────────────────────────────────────────────────
 
 // Подразделы «Склады»: у каждого склада свой экран остатков (сотрудник склада видит только позиции своего склада)
-export const SKLAD_PAGES: { page: "ostatok-sdm1" | "ostatok-sdm2"; sklad: string; sub: string }[] = [
-  { page: "ostatok-sdm1", sklad: SDM1, sub: "Склад приёмки: принятые позиции и резерв под шихтовые карты" },
-  { page: "ostatok-sdm2", sklad: SDM2, sub: "Склад выдачи: позиции для отгрузки и операций движения материала" },
+export const SKLAD_PAGES: { page: "ostatok-sdm1" | "ostatok-sdm2" | "ostatok-sogp"; sklad: string; title: string; sub: string }[] = [
+  { page: "ostatok-sdm1", sklad: SDM1, title: `Остатки материалов на ${SDM1}`, sub: "Склад приёмки: принятые позиции и резерв под шихтовые карты" },
+  { page: "ostatok-sdm2", sklad: SDM2, title: `Остатки материалов на ${SDM2}`, sub: "Склад выдачи: позиции для отгрузки и операций движения материала" },
+  { page: "ostatok-sogp", sklad: SOGP, title: `Остатки на ${SOGP}`, sub: "Позиции, выданные со склада по документам «Выдача со склада»; возврат — документом «Возврат СОГП»" },
 ];
 
 export function SkladyHub() {
@@ -29,13 +30,13 @@ export function SkladyHub() {
   return (
     <div>
       <PageHeader title="Склады" subtitle="Выберите раздел" breadcrumb={["Склады"]} />
-      <div className="grid grid-cols-2 gap-6 max-w-2xl">
+      <div className="grid grid-cols-3 gap-6 max-w-5xl">
         {SKLAD_PAGES.map(s => (
           <div key={s.page} className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(s.page)}>
             <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-4">
               <Coins className="w-5 h-5 text-blue-600" />
             </div>
-            <h3 className="font-semibold text-gray-900 mb-1">Остатки материалов на {s.sklad}</h3>
+            <h3 className="font-semibold text-gray-900 mb-1">{s.title}</h3>
             <p className="text-sm text-gray-500">{s.sub}</p>
           </div>
         ))}
@@ -239,7 +240,9 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
   // Смена места хранения: …/mesto/:id
   const moveItem = skladItems.find(it => it.id === screen.after("mesto")) ?? null;
   // Позиция физически на складе — место хранения можно изменить
-  const canMove = (it: DMItem) => it.status === "На складе" || it.status === "Резерв";
+  // На СОГП мест хранения нет — позиции хранятся без места («-»)
+  const noLocations = sklad === SOGP;
+  const canMove = (it: DMItem) => !noLocations && (it.status === "На складе" || it.status === "Резерв");
   const saveLocation = (it: DMItem, location: string, name: string) => {
     // Позиция хранится в учёте ДМ или ГП — меняем там, где она есть
     if (dmItems.some(d => d.id === it.id)) setDmItems(prev => prev.map(d => (d.id === it.id ? { ...d, location, name } : d)));
@@ -309,6 +312,9 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
       status: "На складе",
       chem: p.chem,
       info: p.info || undefined,
+      ...(new Set(mergeItems.map(it => it.zakazchik)).size === 1 && mergeItems[0].zakazchik
+        ? { zakazchik: mergeItems[0].zakazchik, ownProperty: mergeItems.every(it => it.ownProperty) }
+        : {}),
       ...createdStamp(),
     };
     setDmItems(prev => [...prev.filter(it => !ids.has(it.id)), merged]);
@@ -322,7 +328,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
     <div>
       <PageHeader
         title={`Остатки материалов на ${sklad}`}
-        subtitle={`${sklad}: актуальные позиции по сейфам и полкам`}
+        subtitle={noLocations ? `${sklad}: позиции, выданные со склада (без мест хранения)` : `${sklad}: актуальные позиции по сейфам и полкам`}
         breadcrumb={["Склады", `Остатки на ${sklad}`]}
         actions={
           <>
@@ -406,7 +412,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
                     <EditIcon
                       onClick={() => screen.openTop("mesto", item.id)}
                       disabled={!canMove(item)}
-                      title={canMove(item) ? "Изменить место хранения" : "Позиция не на складе — место хранения не меняется"}
+                      title={canMove(item) ? "Изменить место хранения" : noLocations ? `На складе «${SOGP}» места хранения не ведутся` : "Позиция не на складе — место хранения не меняется"}
                     />
                   </div>
                 </td>
@@ -436,4 +442,8 @@ export function OstatokSdm1() {
 
 export function OstatokSdm2() {
   return <OstatokSklad key={SDM2} sklad={SDM2} />;
+}
+
+export function OstatokSogp() {
+  return <OstatokSklad key={SOGP} sklad={SOGP} />;
 }

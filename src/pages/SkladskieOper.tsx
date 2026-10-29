@@ -16,7 +16,7 @@ import { useScreen } from "../router";
 export function SkladskieOperHub() {
   const { navigate } = useApp();
   const cards: { title: string; sub: string; icon: LucideIcon; page: "prihod-list" | "vydacha-list" | "dvizhenie-mat" }[] = [
-    { title: "Приход на склад", sub: "Приходные ордера, накладные и требования", icon: Inbox, page: "prihod-list" },
+    { title: "Приход на склад", sub: "Приходные ордера, накладные, акты, требования и возвраты СОГП", icon: Inbox, page: "prihod-list" },
     { title: "Выдача со склада", sub: "Документы отгрузки", icon: Send, page: "vydacha-list" },
     { title: "Движение материала (операции)", sub: "Журнал внутренних операций", icon: Repeat, page: "dvizhenie-mat" },
   ];

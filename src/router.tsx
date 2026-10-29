@@ -14,6 +14,7 @@ export const PAGE_PATHS: Record<Page, string> = {
   "sklady-hub": "/sklady",
   "ostatok-sdm1": "/sklady/sdm1",
   "ostatok-sdm2": "/sklady/sdm2",
+  "ostatok-sogp": "/sklady/sogp",
   "sklad-oper-hub": "/skladskie-operacii",
   "prihod-list": "/skladskie-operacii/prihod",
   "vydacha-list": "/skladskie-operacii/vydacha",
