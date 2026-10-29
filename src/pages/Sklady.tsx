@@ -21,7 +21,7 @@ const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nome
 export const SKLAD_PAGES: { page: "ostatok-sdm1" | "ostatok-sdm2" | "ostatok-sogp"; sklad: string; title: string; sub: string }[] = [
   { page: "ostatok-sdm1", sklad: SDM1, title: `Остатки материалов на ${SDM1}`, sub: "Склад приёмки: принятые позиции и резерв под шихтовые карты" },
   { page: "ostatok-sdm2", sklad: SDM2, title: `Остатки материалов на ${SDM2}`, sub: "Склад выдачи: позиции для отгрузки и операций движения материала" },
-  { page: "ostatok-sogp", sklad: SOGP, title: `Остатки на ${SOGP}`, sub: "Позиции, выданные со склада по документам «Выдача со склада»; возврат — документом «Возврат СОГП»" },
+  { page: "ostatok-sogp", sklad: SOGP, title: `Остатки на ${SOGP}`, sub: "Позиции, выданные с СДМ №2 по документам Выдачи" },
 ];
 
 export function SkladyHub() {
