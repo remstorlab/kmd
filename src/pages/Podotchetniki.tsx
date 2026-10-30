@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useApp } from "../store/AppContext";
-import { Badge, PosStatusBadge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, MultiSelect, KlassSelect, ProbaChem, usePaged, FillerRows,
+import { Badge, PosStatusBadge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, MultiSelect, KlassSelect, ProbaChem, usePaged, FillerRows, parseRuDate,
 } from "../components/ui";
 import { Podotchetnik, PodotchetPosition, Operation, OperPosition, StatusDM, spravValues, opVydacha, opVozvrat } from "../data/mock";
 import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, Lightbulb, LucideIcon } from "lucide-react";
@@ -136,24 +136,40 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
   );
 }
 
-// ── Блок вида операции: позиции, полученные / возвращённые подотчётником по этому виду ──
+// ── Блок операции: шапка «Вид операции — Наименование изделия», позиции операции ──
 
-function VidBlock({ vid, operations, rows, onOpenOperation }: { vid: string; operations: number; rows: ProcRow[]; onOpenOperation: (r: ProcRow) => void }) {
+function OpBlock({ vid, izdelie, rows, showOperation = false, onOpenOperation }: {
+  vid: string;
+  // Наименование изделия операции (поле «Наименование изделия» операции движения материала)
+  izdelie?: string;
+  rows: ProcRow[];
+  showOperation?: boolean;
+  onOpenOperation?: (r: ProcRow) => void;
+}) {
   const Icon = vidIcon[vid] ?? Flame;
   const totalNet = rows.reduce((s, r) => s + r.netWeight, 0);
+  const name = izdelie?.trim();
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">
         <Icon className="w-5 h-5 text-gray-500 shrink-0" />
-        <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900">{vid}</div>
+        <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900 truncate" title={name ? `${vid} — ${name}` : vid}>
+          {vid}{name && <span className="font-normal text-gray-700"> — {name}</span>}
+        </div>
         <div className="text-xs text-gray-500 shrink-0">
-          Операций: {operations} · Позиций: {rows.length} · Чистый вес: {totalNet.toFixed(2)} г
+          Позиций: {rows.length} · Чистый вес: {totalNet.toFixed(2)} г
         </div>
       </div>
-      <PositionsTable rows={rows} showOperation onOpenOperation={onOpenOperation} />
+      <PositionsTable rows={rows} showOperation={showOperation} onOpenOperation={onOpenOperation} />
     </div>
   );
 }
+
+// Порядок блоков: по справочнику «Виды операций», внутри вида — по дате операции (новые сверху)
+const vidOrder = (vid: string) => {
+  const i = spravValues("Виды операций").indexOf(vid);
+  return i < 0 ? 999 : i;
+};
 
 // Подотчётное лицо в операции записано полным ФИО или как «Фамилия И.О.»
 const shortFio = (full: string) => {
@@ -188,6 +204,25 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
   });
   const balanceF = usePositionFilters(balance);
   const balanceRows = balance.filter(balanceF.match);
+  // Операция, в которой позиция на руках выдана подотчётнику: операция движения материала (не завершённая —
+  // приоритетно), иначе процесс подотчётника, где позиция числится
+  const allPersonOps = operations.filter(o => isPersonOp(o, person));
+  const sourceOf = (nomenkl: string): { key: string; vid: string; izdelie?: string; date: string } => {
+    const withPos = allPersonOps.filter(o => opVydacha(o).some(p => p.nomenkl === nomenkl));
+    const op = withPos.find(o => !isReturned(o)) ?? withPos[0];
+    if (op) return { key: op.id, vid: op.vid, izdelie: op.description, date: op.date };
+    const pr = [...person.currentProcesses, ...person.completedProcesses].find(p => p.positions.some(x => x.nomenkl === nomenkl));
+    return pr ? { key: pr.id, vid: pr.vid, izdelie: pr.name, date: pr.date } : { key: "-", vid: "Без операции", date: "" };
+  };
+  const balanceGroups = (() => {
+    const map = new Map<string, { key: string; vid: string; izdelie?: string; date: string; rows: ProcRow[] }>();
+    for (const r of balanceRows) {
+      const src = sourceOf(r.nomenkl);
+      if (!map.has(src.key)) map.set(src.key, { ...src, rows: [] });
+      map.get(src.key)!.rows.push(r);
+    }
+    return [...map.values()].sort((a, b) => vidOrder(a.vid) - vidOrder(b.vid) || parseRuDate(b.date) - parseRuDate(a.date));
+  })();
 
   // Операции движения материала по подотчётнику: полученные (вкладка «Выдача») / возвращённые (вкладка «Возврат») позиции
   const personOps = operations.filter(o => isPersonOp(o, person) && (received ? isIssued(o) : isReturned(o)));
@@ -204,14 +239,11 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
   const opRows = (ops: Operation[]) => ops.flatMap(o => (received ? opVydacha(o) : opVozvrat(o)).map((p, i) => toRow(o, p, i)));
   const rows = opRows(personOps);
   const opF = usePositionFilters(rows);
-  // Блоки по видам операций в порядке справочника «Виды операций»
-  const vids = [...spravValues("Виды операций"), ...personOps.map(o => o.vid)].filter((v, i, a) => a.indexOf(v) === i);
-  const groups = vids
-    .map(vid => {
-      const ops = personOps.filter(o => o.vid === vid);
-      return { vid, operations: ops.length, rows: opRows(ops).filter(opF.match) };
-    })
-    .filter(g => g.operations > 0 && g.rows.length > 0);
+  // Блок на каждую операцию: «Вид операции — Наименование изделия»
+  const groups = [...personOps]
+    .sort((a, b) => vidOrder(a.vid) - vidOrder(b.vid) || parseRuDate(b.date) - parseRuDate(a.date))
+    .map(o => ({ op: o, rows: opRows([o]).filter(opF.match) }))
+    .filter(g => g.rows.length > 0);
   const openOperation = (r: ProcRow) => {
     if (r.opId) routerNavigate(`${PAGE_PATHS["dvizhenie-mat"]}/view/${r.opId}?tab=${received ? "vydacha" : "vozvrat"}`);
   };
@@ -251,8 +283,9 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
           <>
             {balanceF.bar}
             <div className="text-xs text-gray-500 mb-2">Найдено: {balanceRows.length} из {balance.length}</div>
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <PositionsTable rows={balanceRows} />
+            <div className="space-y-3">
+              {balanceGroups.map(g => <OpBlock key={g.key} vid={g.vid} izdelie={g.izdelie} rows={g.rows} />)}
+              {balanceRows.length === 0 && <p className="text-center text-sm text-gray-400 py-4">Нет позиций по заданным фильтрам</p>}
             </div>
           </>
         )}
@@ -268,7 +301,7 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
         {rows.length > 0 && opF.bar}
         <div className="space-y-3">
           {groups.map(g => (
-            <VidBlock key={g.vid} vid={g.vid} operations={g.operations} rows={g.rows} onOpenOperation={openOperation} />
+            <OpBlock key={g.op.id} vid={g.op.vid} izdelie={g.op.description} rows={g.rows} showOperation onOpenOperation={openOperation} />
           ))}
           {rows.length === 0 && (
             <p className="text-center text-sm text-gray-400 py-4">{received ? "Полученных позиций нет" : "Возвращённых позиций нет"}</p>
