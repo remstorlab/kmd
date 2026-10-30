@@ -22,8 +22,6 @@ export interface PrihodPosition {
   seyf: string;
   polka: string;
   chem: ChemComposition;
-  // % содержания элементов (только в форме): задан — им заполняется состав новой позиции (хим. состав партии)
-  pct?: ChemPercent;
   // Доп. информация — произвольный текст, необязательно
   info?: string;
 }
@@ -99,18 +97,13 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   const { storageLocations: locs, materialCodes } = useApp();
   const genNomenkl = useNextNomenkl();
   // Номер присваивается автоматически при добавлении и не редактируется
-  // Состав, заданный в % (хим. состав партии), — граммы по лигатурному весу позиции
-  const [form, setForm] = useState(() => {
-    const f = mode === "add" && !initial.nomenkl ? { ...initial, nomenkl: genNomenkl(reservedNomenkl) } : initial;
-    return initial.pct && Object.keys(initial.pct).length ? { ...f, chem: gramsFrom(initial.pct, num0(initial.lig)) } : f;
-  });
-  const set = (k: Exclude<keyof PrihodPosition, "chem" | "pct" | "nomenkl">) => (v: string) => setForm(f => ({ ...f, [k]: v }));
+  const [form, setForm] = useState(() => (mode === "add" && !initial.nomenkl ? { ...initial, nomenkl: genNomenkl(reservedNomenkl) } : initial));
+  const set = (k: Exclude<keyof PrihodPosition, "chem" | "nomenkl">) => (v: string) => setForm(f => ({ ...f, [k]: v }));
 
   // ── Хим. состав: % содержания по справочнику «Коды материалов» с поправкой на пробу, граммы — от лигатурного веса ──
   const ligN = num0(form.lig);
   const main = mainElementOf(form.code, materialCodes);
   const [pct, setPct] = useState<ChemPercent>(() => {
-    if (initial.pct && Object.keys(initial.pct).length) return initial.pct;
     if (Object.keys(initial.chem ?? {}).length) return pctFrom(initial.chem, num0(initial.lig));
     return applyProba(compositionOf(initial.code, materialCodes), initial.proba, mainElementOf(initial.code, materialCodes));
   });
@@ -170,9 +163,9 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
     if (canMany && many && onSaveMany) {
       const first = Number(form.nomenkl);
       onSaveMany(Array.from({ length: count }, (_, i) => ({
-        ...form, net: netStr, pct: undefined, chem: { ...form.chem }, id: `${form.id}-${i + 1}`, nomenkl: String(first + i),
+        ...form, net: netStr, chem: { ...form.chem }, id: `${form.id}-${i + 1}`, nomenkl: String(first + i),
       })));
-    } else onSave({ ...form, net: netStr, pct: undefined });
+    } else onSave({ ...form, net: netStr });
   };
   const lastNomenkl = String(Number(form.nomenkl) + Math.max(count, 1) - 1);
   const title = titleProp ?? (mode === "add" ? "Добавить позицию ДМ" : mode === "edit" ? "Редактирование позиции ДМ" : "Просмотр позиции ДМ");

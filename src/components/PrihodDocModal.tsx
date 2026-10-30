@@ -4,9 +4,8 @@ import {
   Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem, usePaged, FillerRows, useCreatedStamp,
   InfoField,
 } from "./ui";
-import { SkladDoc, DocStatus, ChemComposition, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_PRIHOD_AKT, DOC_TREBOVANIE, DOC_VOZVRAT_SGP, SGP } from "../data/mock";
+import { SkladDoc, DocStatus, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_PRIHOD_AKT, DOC_TREBOVANIE, DOC_VOZVRAT_SGP, SGP } from "../data/mock";
 import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
-import ChemCompositionBlock from "./ChemCompositionBlock";
 import TrebovanieDocModal from "./TrebovanieDocModal";
 import VozvratSgpDocModal from "./VozvratSgpDocModal";
 import { useApp } from "../store/AppContext";
@@ -132,8 +131,6 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     doc?.type === DOC_PRIHOD_AKT ? doc.prihodPositions ?? [] : initialPositions(DOC_PRIHOD_NAKLAD, DEMO_NAKLAD));
 
   // Хим. состав на партию — задаётся в документе и подставляется в каждую новую позицию
-  const [partyChemOn, setPartyChemOn] = useState(!!doc?.partyChem);
-  const [partyChem, setPartyChem] = useState<ChemComposition>(() => doc?.partyChem ?? {});
 
   const positions = isOrder ? orderPositions : nakladPositions;
   const setPositions = isOrder ? setOrderPositions : setNakladPositions;
@@ -141,8 +138,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
 
   const posModal: { mode: "add" | "edit" | "view"; pos: PrihodPosition } | null = (() => {
     if (screen.has("position-new")) {
-      const pos = emptyPosition(storageLocations, sklad, isOrder ? "Слиток" : "Готовая продукция", "1000");
-      return { mode: "add", pos: partyChemOn && Object.keys(partyChem).length ? { ...pos, pct: { ...partyChem } } : pos };
+      return { mode: "add", pos: emptyPosition(storageLocations, sklad, isOrder ? "Слиток" : "Готовая продукция", "1000") };
     }
     const view = positions.find(x => x.id === screen.after("position"));
     if (view) return { mode: "view", pos: view };
@@ -197,7 +193,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     if (status === "Оформлено" && !posted) postToStock();
     // Отметка создания — при первом сохранении документа, при редактировании сохраняется прежняя
     const created = doc?.createdAt ? { createdAt: doc.createdAt, createdBy: doc.createdBy } : stamp();
-    const base = { id: doc?.id ?? `sd-${Date.now()}`, ...created, status, receiver: sklad, info: info.trim() || undefined, prihodPositions: positions, partyChem: partyChemOn ? partyChem : undefined };
+    const base = { id: doc?.id ?? `sd-${Date.now()}`, ...created, status, receiver: sklad, info: info.trim() || undefined, prihodPositions: positions };
     const d: SkladDoc = isOrder
       ? { ...base, date: head.date, type: DOC_PRIHOD_ORDER, number: head.number, sender: head.otpravitel }
       : { ...base, date: head.nakladDate, type: isAkt ? DOC_PRIHOD_AKT : DOC_PRIHOD_NAKLAD, number: isAkt ? head.aktNumber : head.nakladNumber, sender: head.zakazchik };
@@ -284,24 +280,6 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
           ? <MultiFileUpload files={orderFiles} onChange={setOrderFiles} disabled={ro} />
           : <MultiFileUpload files={nakladFiles} onChange={setNakladFiles} disabled={ro} />}
       </div>
-
-      {/* Хим. состав позиции: подставляется в каждую новую позицию документа (в позиции его можно изменить) */}
-      {(!ro || partyChemOn) && (
-        <div className="mb-4">
-          {!ro && (
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer mb-2">
-              <input type="checkbox" checked={partyChemOn} onChange={e => setPartyChemOn(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-              Задать хим. состав позиции
-            </label>
-          )}
-          {partyChemOn && (
-            <>
-              <ChemCompositionBlock value={partyChem} onChange={setPartyChem} disabled={ro} percentOnly />
-              {!ro && <div className="text-xs text-gray-500 mt-1">% содержания партии подставляется в новые позиции документа — граммы рассчитываются по лигатурному весу позиции</div>}
-            </>
-          )}
-        </div>
-      )}
 
       <div className="border-t border-gray-200 pt-4">
         <div className="flex items-center justify-between mb-3">
