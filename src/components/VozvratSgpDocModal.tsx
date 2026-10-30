@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
+  InfoField,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, SGP, PRIHOD_SKLAD, DOC_VOZVRAT_SGP } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -49,6 +50,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
   const [ownProperty, setOwnProperty] = useState(doc?.ownProperty ?? true);
+  const [info, setInfo] = useState(doc?.info ?? "");
   const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Возврат СГП_${doc.number}.pdf`)] : []));
   const [positions, setPositions] = useState<VsPosition[]>(() => doc?.positions ?? []);
 
@@ -136,6 +138,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
       receiver: head.receiver,
       zakazchik,
       ownProperty: isOwn,
+      info: info.trim() || undefined,
       positions,
     });
   };
@@ -178,6 +181,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
           <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
           <Toggle checked={isOwn} onChange={setOwnProperty} disabled={lockZakazchik} label={isOwn ? "Да" : "Нет"} />
         </div>
+        <InfoField value={info} onChange={setInfo} disabled={ro} />
       </div>
 
       <div className="mb-4">

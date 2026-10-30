@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp, PosStatusBadge,
+  InfoField,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, SDM1, SDM2, SGP, DOC_TREBOVANIE } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -55,6 +56,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
   const [ownProperty, setOwnProperty] = useState(doc?.ownProperty ?? true);
+  const [info, setInfo] = useState(doc?.info ?? "");
   const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Требование_${doc.number}.pdf`)] : []));
   const [positions, setPositions] = useState<TrebPosition[]>(() => doc?.positions ?? []);
 
@@ -177,6 +179,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       shihtaId: head.shihtaId || undefined,
       zakazchik,
       ownProperty: isOwn,
+      info: info.trim() || undefined,
       positions,
     });
   };
@@ -231,6 +234,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
           <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
           <Toggle checked={isOwn} onChange={setOwnProperty} disabled={lockZakazchik} label={isOwn ? "Да" : "Нет"} />
         </div>
+        <InfoField value={info} onChange={setInfo} disabled={ro} />
       </div>
       {!lockPos && head.sender === head.receiver && (
         <div className="mb-4 -mt-2 text-xs text-red-600">Склад-отправитель и склад-получатель должны различаться</div>

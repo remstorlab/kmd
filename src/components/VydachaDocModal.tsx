@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   Badge, Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
+  InfoField,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, MAIN_SKLAD, SGP, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -63,6 +64,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     osnovanie: "",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
+  const [info, setInfo] = useState(doc?.info ?? "");
   const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Накладная_${doc.number}.pdf`)] : []));
   const showPick = screen.has("pick");
   const setShowPick = (open: boolean) => (open ? screen.open("pick") : screen.close("pick"));
@@ -185,6 +187,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       sender: MAIN_SKLAD,
       receiver: SGP,
       zakazchik,
+      info: info.trim() || undefined,
       positions,
     });
   };
@@ -237,6 +240,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
         <div className="col-span-3">
           <Field label="Основание выдачи" required={!ro}><Input value={head.osnovanie} onChange={h("osnovanie")} placeholder="Например: реализация по договору" disabled={ro} /></Field>
         </div>
+        <InfoField value={info} onChange={setInfo} disabled={ro} />
       </div>
 
       <div className="mb-4">

@@ -526,6 +526,28 @@ export function useCreatedStamp() {
 export const createdText = (r: Created) => (r.createdAt ? formatDateTime(r.createdAt) : "—");
 // Ключ сортировки по дате создания
 export const createdSortKey = (r: Created) => (r.createdAt ? new Date(r.createdAt).getTime() : 0);
+// Поле «Доп. информация» документа — на всю ширину формы, необязательное
+export const INFO_LABEL = "Доп. информация";
+export function InfoField({ value, onChange, disabled = false }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  return (
+    <div className="col-span-full">
+      <label className="block text-xs font-medium text-gray-500 mb-1">{INFO_LABEL}</label>
+      <Textarea value={value} onChange={onChange} rows={2} placeholder={disabled ? "" : "Дополнительная информация по документу"} disabled={disabled} />
+    </div>
+  );
+}
+
+// Ячейка «Доп. информация»: не больше двух строк с многоточием, полный текст — во всплывающей подсказке
+export function InfoCell({ text, className = "px-4 py-3" }: { text?: string; className?: string }) {
+  return (
+    <td className={`${className} text-gray-600 max-w-xs`}>
+      {text
+        ? <div title={text} className="line-clamp-2 break-words whitespace-pre-line cursor-help">{text}</div>
+        : <span className="text-gray-400">—</span>}
+    </td>
+  );
+}
+
 export function CreatedCell({ row, className = "px-4 py-3" }: { row: Created; className?: string }) {
   return (
     <td className={`${className} text-gray-500 whitespace-nowrap`}>

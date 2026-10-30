@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
   Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem, usePaged, FillerRows, useCreatedStamp,
+  InfoField,
 } from "./ui";
 import { SkladDoc, DocStatus, ChemComposition, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_PRIHOD_AKT, DOC_TREBOVANIE, DOC_VOZVRAT_SGP, SGP } from "../data/mock";
 import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
@@ -115,6 +116,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     if (!doc) setHead(x => ({ ...x, poluchatel: PRIHOD_SKLAD }));
   }, [docType, doc]);
   const [ownProperty, setOwnProperty] = useState(true);
+  const [info, setInfo] = useState(doc?.info ?? "");
 
   // Документы (несколько файлов, отдельно для ордера и накладной)
   const [orderFiles, setOrderFiles] = useState<File[]>(() => [new File([], `Приходный ордер ${doc?.number || "ПО-0342"}.pdf`)]);
@@ -195,7 +197,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     if (status === "Оформлено" && !posted) postToStock();
     // Отметка создания — при первом сохранении документа, при редактировании сохраняется прежняя
     const created = doc?.createdAt ? { createdAt: doc.createdAt, createdBy: doc.createdBy } : stamp();
-    const base = { id: doc?.id ?? `sd-${Date.now()}`, ...created, status, receiver: sklad, prihodPositions: positions, partyChem: partyChemOn ? partyChem : undefined };
+    const base = { id: doc?.id ?? `sd-${Date.now()}`, ...created, status, receiver: sklad, info: info.trim() || undefined, prihodPositions: positions, partyChem: partyChemOn ? partyChem : undefined };
     const d: SkladDoc = isOrder
       ? { ...base, date: head.date, type: DOC_PRIHOD_ORDER, number: head.number, sender: head.otpravitel }
       : { ...base, date: head.nakladDate, type: isAkt ? DOC_PRIHOD_AKT : DOC_PRIHOD_NAKLAD, number: isAkt ? head.aktNumber : head.nakladNumber, sender: head.zakazchik };
@@ -258,6 +260,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
           <Field label="Цена за единицу, тг"><Input value={head.price} onChange={h("price")} disabled={ro} /></Field>
           <Field label="Сумма в тенге"><Input value={head.sum} onChange={h("sum")} disabled={ro} /></Field>
           <Field label="Позиция годового плана"><Input value={head.planPos} onChange={h("planPos")} disabled={ro} /></Field>
+          <InfoField value={info} onChange={setInfo} disabled={ro} />
         </div>
       ) : (
         <div className="grid grid-cols-4 gap-4 mb-5">
@@ -271,6 +274,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
             <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
             <Toggle checked={ownProperty} onChange={setOwnProperty} disabled={ro} label={ownProperty ? "Да" : "Нет"} />
           </div>
+          <InfoField value={info} onChange={setInfo} disabled={ro} />
         </div>
       )}
 

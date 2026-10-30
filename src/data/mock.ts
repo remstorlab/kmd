@@ -94,6 +94,8 @@ export interface SkladDoc {
   // Требование: заказчик и признак собственности — по позициям шихтовой карты
   zakazchik?: string;
   ownProperty?: boolean;
+  // Доп. информация — произвольный текст, необязательно
+  info?: string;
   // Позиции приходного ордера / накладной (приём на склад)
   prihodPositions?: PrihodPosition[];
   // Хим. состав на партию: задан на уровне документа и подставляется в новые позиции
@@ -465,7 +467,7 @@ export const initialSkladDocs: SkladDoc[] = [
   { id: "sd1", date: "19.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0342", status: "В работе", sender: "ОО «АурумПоставка»", receiver: PRIHOD_SKLAD },
   { id: "sd2", date: "18.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0118", status: "В работе", sender: "Монетный двор", receiver: PRIHOD_SKLAD },
   { id: "sd3", date: "17.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0341", status: "Оформлено", sender: "АО «Металл Инвест»", receiver: PRIHOD_SKLAD },
-  { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "Национальный банк", receiver: PRIHOD_SKLAD },
+  { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "Национальный банк", receiver: PRIHOD_SKLAD, info: "Давальческий материал по договору с Национальным банком. Приёмка в присутствии представителя заказчика, пломбы целы, расхождений по массе не выявлено. Паспорта качества приложены к накладной." },
   { id: "sd5", date: "15.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0340", status: "Оформлено", sender: "ОО «СереброТрейд»", receiver: PRIHOD_SKLAD },
   { id: "sd6", date: "14.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0116", status: "Оформлено", sender: "Монетный двор", receiver: PRIHOD_SKLAD },
   { id: "sd9", date: "13.08.2026", type: DOC_PRIHOD_AKT, number: "АКТ-0042", status: "В работе", sender: "Национальный банк", receiver: PRIHOD_SKLAD },
@@ -489,7 +491,7 @@ initialSkladDocs.unshift(
 export const initialVydachaDocs: SkladDoc[] = [
   { id: "vd1", date: "19.08.2026", type: DOC_PEREDACHA_GP, number: "НО-0205", status: "В работе", sender: MAIN_SKLAD, receiver: SGP, zakazchik: "Монетный двор", positions: [vpos("gp", "gp2"), vpos("gp", "gp9")] },
   { id: "vd2", date: "17.08.2026", type: DOC_PEREDACHA_GP, number: "НО-0204", status: "Оформлено", sender: MAIN_SKLAD, receiver: SGP, zakazchik: "Монетный двор", positions: [vpos("gp", "gp35"), vpos("gp", "gp36")] },
-  { id: "vd3", date: "15.08.2026", type: DOC_OTGRUZKA_DM, number: "НО-0203", status: "Оформлено", sender: MAIN_SKLAD, receiver: SGP, zakazchik: "Национальный банк", positions: [vpos("dm", "dm19")] },
+  { id: "vd3", date: "15.08.2026", type: DOC_OTGRUZKA_DM, number: "НО-0203", status: "Оформлено", sender: MAIN_SKLAD, receiver: SGP, zakazchik: "Национальный банк", info: "Передача на СГП для изготовления памятных монет", positions: [vpos("dm", "dm19")] },
 ];
 
 // --- Операции движения ---
