@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useApp } from "../store/AppContext";
-import { Badge, PosStatusBadge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, MultiSelect, KlassSelect, ProbaChem, usePaged, FillerRows, parseRuDate,
+import { Badge, PosStatusBadge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Field, Select, MultiSelect, KlassSelect, probaText, NetAuAg, NET_AU_AG, usePaged, FillerRows, parseRuDate,
 } from "../components/ui";
 import { Podotchetnik, PodotchetPosition, Operation, OperPosition, StatusDM, spravValues, opVydacha, opVozvrat } from "../data/mock";
 import { ArrowLeft, Flame, FlaskConical, Microscope, Zap, Factory, Lightbulb, LucideIcon } from "lucide-react";
@@ -99,7 +99,7 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
           <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
           <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
           <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
-          <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Вес чист.</SortTh>
+          <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>{NET_AU_AG}</SortTh>
           <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
           <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
         </tr></thead>
@@ -118,9 +118,9 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
               <td className="px-3 py-2">{r.qty}</td>
               <td className="px-3 py-2"><KlassCode value={r.klass} /></td>
               <td className="px-3 py-2 text-blue-600 font-medium">{r.metal ? codeLabel(r.metal) : "—"}</td>
-              <td className="px-3 py-2"><ProbaChem proba={r.proba} chem={dmItems.find(d => d.nomenkl === r.nomenkl)?.chem} /></td>
+              <td className="px-3 py-2">{probaText(r.proba)}</td>
               <td className="px-3 py-2">{r.ligWeight.toFixed(2)}</td>
-              <td className="px-3 py-2">{r.netWeight.toFixed(2)}</td>
+              <td className="px-3 py-2"><NetAuAg chem={dmItems.find(d => d.nomenkl === r.nomenkl)?.chem} net={r.netWeight} metal={r.metal} /></td>
               <td className="px-3 py-2 text-gray-500">{r.location}</td>
               <td className="px-3 py-2"><PosStatusBadge status={r.status} nomenkl={r.nomenkl} /></td>
             </tr>

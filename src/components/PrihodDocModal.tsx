@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
-  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, ProbaChem, usePaged, FillerRows, useCreatedStamp,
+  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, probaText, NetAuAg, NET_AU_AG, usePaged, FillerRows, useCreatedStamp,
   InfoField,
 } from "./ui";
 import { SkladDoc, DocStatus, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_PRIHOD_AKT, DOC_TREBOVANIE, DOC_VOZVRAT_SGP, SGP } from "../data/mock";
@@ -306,7 +306,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
               {isOrder && <>
                 <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
                 <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
-                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес чист.</SortTh>
+                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               </>}
               <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <th className="w-24"></th>
@@ -320,9 +320,9 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                   <td className="px-3 py-2">{p.kol || "—"}</td>
                   {isOrder && <>
-                    <td className="px-3 py-2"><ProbaChem proba={p.proba} chem={p.chem} /></td>
+                    <td className="px-3 py-2">{probaText(p.proba)}</td>
                     <td className="px-3 py-2 font-medium">{p.lig}</td>
-                    <td className="px-3 py-2 text-blue-600">{p.net}</td>
+                    <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} net={p.net} metal={p.code} /></td>
                   </>}
                   <td className="px-3 py-2 text-gray-500">{locOf(p)}</td>
                   <td className="px-3 py-2">

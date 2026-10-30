@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, ProbaChem, usePaged,
+  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, probaText, NetAuAg, NET_AU_AG, usePaged,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip,
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
@@ -33,6 +33,11 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
   // Выбранные позиции (id) и количество к выдаче; без ввода — всё количество позиции
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qtyById, setQtyById] = useState<Record<string, string>>({});
+  // Частичная выдача: лигатурный вес, остающийся на складе у позиции
+  const [restById, setRestById] = useState<Record<string, string>>({});
+  const restOf = (i: { id: string }) => parseFloat((restById[i.id] ?? "").replace(",", "."));
+  const restOk = (i: { id: string; ligWeight: number }) => { const r = restOf(i); return Number.isFinite(r) && r > 0 && r < i.ligWeight; };
+  const partial = (i: { id: string; qty: number }) => i.qty > 1 && issueQty(i) < i.qty;
   const issueQty = (i: { id: string; qty: number }) => {
     if (i.qty <= 1) return i.qty;
     const n = parseInt(qtyById[i.id] ?? "", 10);
@@ -97,11 +102,13 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
   const add = () => {
     const chosen = availableItems.filter(i => selected.has(i.id));
     if (chosen.length === 0) return;
+    if (chosen.some(i => partial(i) && !restOk(i))) return;
     // Частичная выдача: массы и хим. состав — пропорционально выдаваемому количеству;
     // запись склада делится при сохранении операции (applyVydacha)
     onAdd(chosen.map(i => {
       const q = issueQty(i);
-      const k = i.qty > 0 ? q / i.qty : 1;
+      // Доля выдаваемой части: по введённому весу остатка (выдаётся вес позиции − остаток)
+      const k = partial(i) ? (i.ligWeight - restOf(i)) / i.ligWeight : 1;
       const r2 = (v: number) => Math.round(v * k * 100) / 100;
       const chem = k === 1 || !i.chem ? i.chem
         : Object.fromEntries(Object.entries(i.chem).map(([el, v]) => {
@@ -117,6 +124,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
   };
 
   const pg5 = usePaged(sorted, "dm-add-pick");
+  const restMissing = availableItems.some(i => selected.has(i.id) && partial(i) && !restOk(i));
   return (
     <Modal
       title={`Добавить позицию ДМ со склада «${MAIN_SKLAD}»`}
@@ -124,7 +132,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
       largeWide
       footer={<>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={add} disabled={selectedCount === 0}>Добавить{selectedCount > 0 ? ` (${selectedCount})` : ""}</Btn>
+        <Btn onClick={add} disabled={selectedCount === 0 || restMissing}>Добавить{selectedCount > 0 ? ` (${selectedCount})` : ""}</Btn>
       </>}
     >
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 grid grid-cols-4 gap-3 items-end">
@@ -161,7 +169,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл.№</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
-              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес чист.</SortTh>
+              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <th className="px-3 py-2 text-left">Статус</th>
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
@@ -176,8 +184,8 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                     <td className="px-3 py-2 font-medium">{i.name}</td>
                     <td className="px-3 py-2 text-gray-500">{i.nomenkl}</td>
                     <td className="px-3 py-2"><KlassCode value={i.klass} /></td>
-                    <td className="px-3 py-2"><ProbaChem proba={i.proba} chem={i.chem} /></td>
-                    <td className="px-3 py-2">{i.netWeight}</td>
+                    <td className="px-3 py-2">{probaText(i.proba)}</td>
+                    <td className="px-3 py-2"><NetAuAg chem={i.chem} net={i.netWeight} metal={i.metal} /></td>
                     <td className="px-3 py-2 text-gray-500">{i.location}</td>
                     <td className="px-3 py-2">
                       <PosStatusBadge status={i.status} nomenkl={i.nomenkl} />
@@ -192,6 +200,14 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                           <span className="text-xs text-gray-400 whitespace-nowrap">из {i.qty}</span>
                         </div>
                       ) : (i.qty || "—")}
+                      {checked && partial(i) && (
+                        <div className="mt-1.5">
+                          <div className="text-[11px] text-gray-500 mb-0.5 whitespace-nowrap">Лиг. вес остатка на складе, г</div>
+                          <div className={`w-28 ${restOk(i) ? "" : "rounded-lg ring-1 ring-red-400"}`}>
+                            <Input value={restById[i.id] ?? ""} onChange={v => setRestById(prev => ({ ...prev, [i.id]: v.replace(/[^\d.,]/g, "") }))} placeholder={`< ${i.ligWeight.toFixed(2)}`} />
+                          </div>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -201,6 +217,9 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
           </table>
           {pg5.pager}
         </div>
+      )}
+      {restMissing && (
+        <div className="mt-3 text-sm text-red-600">При частичной выдаче укажите лигатурный вес, остающийся на складе (больше 0 и меньше веса позиции)</div>
       )}
       {affectedKarty.length > 0 && (
         <div className="mt-3 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm text-orange-800">
@@ -351,7 +370,7 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
               <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
-              <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Вес чист.</SortTh>
+              <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>{NET_AU_AG}</SortTh>
               <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -366,9 +385,9 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
                     <td className="px-3 py-2">{p.qty ?? "—"}</td>
                     <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                     <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
-                    <td className="px-3 py-2"><ProbaChem proba={p.proba} chem={v.chem} /></td>
+                    <td className="px-3 py-2">{probaText(p.proba)}</td>
                     <td className="px-3 py-2">{dash(v.ligWeight)}</td>
-                    <td className="px-3 py-2">{dash(v.netWeight)}</td>
+                    <td className="px-3 py-2"><NetAuAg chem={v.chem} net={v.netWeight} metal={v.metal} /></td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                   </tr>
                 );
@@ -663,7 +682,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
           <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
           <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
           <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
-          <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Вес чист.</SortTh>
+          <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>{NET_AU_AG}</SortTh>
           <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
           <th className={readOnly ? "w-10" : onEdit ? "w-28" : "w-20"}></th>
         </tr></thead>
@@ -677,9 +696,9 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
                 <td className="px-3 py-2">{p.qty ?? "—"}</td>
                 <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                 <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
-                <td className="px-3 py-2"><ProbaChem proba={p.proba} chem={v.chem} /></td>
+                <td className="px-3 py-2">{probaText(p.proba)}</td>
                 <td className="px-3 py-2">{dash(v.ligWeight)}</td>
-                <td className="px-3 py-2">{dash(v.netWeight)}</td>
+                <td className="px-3 py-2"><NetAuAg chem={v.chem} net={v.netWeight} metal={v.metal} /></td>
                 <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">
@@ -814,7 +833,7 @@ function ItogoPositions({ title, rows, view, total }: {
           <th className="px-3 py-2 text-left">Класс</th>
           <th className="px-3 py-2 text-left">Код материала</th>
           <th className={`px-3 py-2 text-right ${ligCls}`}>Вес лигат.</th>
-          <th className="px-3 py-2 text-right">Вес чист.</th>
+          <th className="px-3 py-2 text-right">{NET_AU_AG}</th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {rows.map(p => {
@@ -825,7 +844,7 @@ function ItogoPositions({ title, rows, view, total }: {
                 <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                 <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
                 <td className={`px-3 py-2 text-right ${ligCls}`}>{fmt(p.ves)}</td>
-                <td className="px-3 py-2 text-right text-gray-600">{dash(v.netWeight)}</td>
+                <td className="px-3 py-2 text-right text-gray-600"><NetAuAg chem={v.chem} net={v.netWeight} metal={v.metal} /></td>
               </tr>
             );
           })}
@@ -1327,12 +1346,15 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     const linked = new Map<number, string>();
     const pending = new Map<number, string>();
     const take = new Map<string, number>();
+    // Лигатурный вес выдаваемой части при частичной выдаче — запись склада делится по весу
+    const partLig = new Map<string, number>();
     for (const p of rows) {
       const it = srcOf(p);
       if (!it) continue;
       if (it.status === "В подотчёте") { linked.set(p.n, it.id); continue; }
       if (it.status !== "На складе" && it.status !== "Резерв") continue;
       take.set(it.id, (take.get(it.id) ?? 0) + (p.qty && it.qty > 0 ? p.qty : it.qty));
+      if (p.qty && it.qty > 0 && p.qty < it.qty && p.lig) partLig.set(it.id, (partLig.get(it.id) ?? 0) + p.lig);
       pending.set(p.n, it.id);
     }
     const keep = new Set(linked.values());
@@ -1344,6 +1366,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       take,
       i => ({ ...i, status: "В подотчёте" as const, location: NO_LOC }),
       i => `${i.id}-p${stamp}`,
+      partLig,
     );
     setDmItems(items);
     const withSrc = vydacha.map(p => {

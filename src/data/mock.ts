@@ -116,9 +116,11 @@ export interface VydachaDocPosition {
   location: string;
   // Склад позиции (справочник «Склады»)
   sklad?: string;
-  // Химический состав (для подсказки у пробы)
+  // Химический состав (для подсказки у чистого веса)
   chem?: ChemComposition;
   issue: number;
+  // Частичная выдача (issue < qty): лигатурный вес, г, остающийся на складе у исходной позиции (вводится вручную)
+  restLig?: string;
 }
 
 // Статус операции движения материала: (Сохранить) «В работе» → (Оформить) «Завершено».
@@ -1151,13 +1153,13 @@ export function findMassTolerance(list: MassTolerance[], metal: string, massG: n
 export type ChemComposition = Record<string, string>;
 
 export const initialChemElements: ChemElement[] = [
-  { id: "au", name: "Золото", shortName: "Au", showDm: true, showShk: false },
+  { id: "au", name: "Золото", shortName: "Au", showDm: true, showShk: true },
   { id: "ag", name: "Серебро", shortName: "Ag", showDm: true, showShk: true },
   { id: "pd", name: "Палладий", shortName: "Pd", showDm: true, showShk: false },
-  { id: "rh", name: "Родий", shortName: "Rh", showDm: true, showShk: false },
+  { id: "rh", name: "Родий", shortName: "Rh", showDm: false, showShk: false },
   { id: "pt", name: "Платина", shortName: "Pt", showDm: true, showShk: false },
   { id: "ir", name: "Иридий", shortName: "Ir", showDm: false, showShk: false },
-  { id: "cu", name: "Медь", shortName: "Cu", showDm: false, showShk: true },
+  { id: "cu", name: "Медь", shortName: "Cu", showDm: true, showShk: true },
   { id: "p", name: "Фосфор", shortName: "P", showDm: false, showShk: true },
   { id: "fe", name: "Железо", shortName: "Fe", showDm: false, showShk: true },
   { id: "pb", name: "Свинец", shortName: "Pb", showDm: false, showShk: true },

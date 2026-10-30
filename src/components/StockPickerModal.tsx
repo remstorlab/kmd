@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort, useMaterialCodeLabel, ProbaChem, usePaged, FillerRows,
+import { Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort, useMaterialCodeLabel, probaText, NetAuAg, NET_AU_AG, usePaged, FillerRows,
 } from "./ui";
 import { VydachaDocPosition } from "../data/mock";
 
@@ -105,7 +105,7 @@ export default function StockPickerModal({
   const add = () => {
     const picked = available
       .filter(r => r.id in selectedQty)
-      .map(r => ({ row: r, qty: hasInput(r) ? Math.max(1, Math.min(parseInt(selectedQty[r.id], 10) || 1, left(r))) : left(r) }));
+      .map(r => ({ row: r, qty: hasInput(r) ? Math.max(1, Math.min(parseInt(selectedQty[r.id], 10) || left(r), left(r))) : left(r) }));
     if (picked.length) onAdd(picked);
   };
 
@@ -159,7 +159,7 @@ export default function StockPickerModal({
               {showWeights && <>
                 <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
                 <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
-                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес чист.</SortTh>
+                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               </>}
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
@@ -176,13 +176,13 @@ export default function StockPickerModal({
                     <td className="px-3 py-2"><KlassCode value={r.klass} /></td>
                     <td className="px-3 py-2 text-blue-600">{codeLabel(r.code)}</td>
                     {showWeights && <>
-                      <td className="px-3 py-2"><ProbaChem proba={r.proba} chem={r.chem} /></td>
+                      <td className="px-3 py-2">{probaText(r.proba)}</td>
                       <td className="px-3 py-2">{r.lig}</td>
-                      <td className="px-3 py-2">{r.net}</td>
+                      <td className="px-3 py-2"><NetAuAg chem={r.chem} net={r.net} metal={r.code} /></td>
                     </>}
                     <td className="px-3 py-2 text-gray-500">{r.location}</td>
                     <td className="px-3 py-2 text-gray-500">{left(r) || "—"}</td>
-                    {anyInput && <td className="px-3 py-2">{hasInput(r) ? <Input value={selectedQty[r.id] ?? (left(r) === 1 ? "1" : "")} onChange={v => setQty(r.id, v)} placeholder="1" disabled={!checked} /> : <span className="text-xs text-gray-400">целиком</span>}</td>}
+                    {anyInput && <td className="px-3 py-2">{hasInput(r) ? <Input value={selectedQty[r.id] ?? String(left(r))} onChange={v => setQty(r.id, v)} placeholder={String(left(r))} disabled={!checked} /> : <span className="text-xs text-gray-400">целиком</span>}</td>}
                   </tr>
                 );
               })}

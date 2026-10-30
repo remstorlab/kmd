@@ -3,11 +3,12 @@ import {
   Badge, Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
   InfoField,
+  NetAuAg, NET_AU_AG,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, MAIN_SKLAD, SGP, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
-import { takeFromStock } from "../data/stock";
+import { takeFromStock, isPartialIssue, restLigOk, issueShare, partLigMap } from "../data/stock";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
@@ -141,13 +142,30 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
   const totalQty = positions.reduce((s, p) => s + p.issue, 0);
   // Массы выдаваемой части — пропорционально количеству (без количества изделий — вся масса позиции)
-  const share = (p: VydachaPosition, v: number | null) => (v == null ? 0 : p.qty > 0 ? (v * p.issue) / p.qty : v);
+  // Доля выдаваемой части: при частичной выдаче — по введённому весу остатка на складе
+  const share = (p: VydachaPosition, v: number | null) => (v == null ? 0 : v * issueShare(p));
+  const setRestLig = (id: string, v: string) => setPositions(prev => prev.map(p => (p.id === id ? { ...p, restLig: v.replace(/[^\d.,]/g, "") } : p)));
+  // Частичная выдача без корректного веса остатка не оформляется
+  const badRest = positions.filter(p => isPartialIssue(p) && !restLigOk(p));
+  const restCell = (p: VydachaPosition) => isPartialIssue(p) && (
+    lockPos
+      ? (p.restLig ? <div className="text-xs text-gray-500 mt-1 whitespace-nowrap">остаток на складе: {p.restLig} г</div> : null)
+      : (
+        <div className="mt-1.5">
+          <div className="text-[11px] text-gray-500 mb-0.5 whitespace-nowrap">Лиг. вес остатка на складе, г</div>
+          <div className={`w-28 ${restLigOk(p) ? "" : "rounded-lg ring-1 ring-red-400"}`}>
+            <Input value={p.restLig ?? ""} onChange={v => setRestLig(p.id, v)} placeholder={p.lig != null ? `< ${p.lig.toFixed(2)}` : "0.00"} />
+          </div>
+        </div>
+      )
+  );
   const totalLig = positions.reduce((s, p) => s + share(p, p.lig), 0);
   const totalNet = positions.reduce((s, p) => s + share(p, p.net), 0);
 
   const save = (status: DocStatus) => {
     // Списание выполняется один раз — при первом оформлении документа
     if (badIssue.length) { show(`Укажите количество к выдаче: ${badIssue.map(p => p.name).join(", ")}`); return; }
+    if (status === "Оформлено" && badRest.length) { show(`Укажите лигатурный вес остатка на складе (больше 0 и меньше веса позиции): ${badRest.map(p => p.name).join(", ")}`); return; }
     if (status === "Оформлено" && !zakazchik) { show("Укажите заказчика / организацию"); return; }
     if (status === "Оформлено" && !issued) {
       if (positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
@@ -165,8 +183,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       const partId = (it: { id: string }) => `${it.id}-v${stamp}`;
       // Выданная позиция — на склад СГП №2 без места хранения; заказчик позиции сохраняется (без него — из документа)
       const toSgp = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: SGP, status: "На складе", location: NO_LOC, zakazchik: it.zakazchik ?? zakazchik });
-      if (gpIssue.size) setGpItems(prev => takeFromStock(prev, gpIssue, toSgp, partId).items);
-      if (dmIssue.size) setDmItems(prev => takeFromStock(prev, dmIssue, toSgp, partId).items);
+      if (gpIssue.size) setGpItems(prev => takeFromStock(prev, gpIssue, toSgp, partId, partLigMap(positions)).items);
+      if (dmIssue.size) setDmItems(prev => takeFromStock(prev, dmIssue, toSgp, partId, partLigMap(positions)).items);
       // Выданные позиции из резерва: шихтовая карта, которая их резервировала, возвращается в «Редактирование»
       if (affectedKarty.length) {
         const ids = new Set(affectedKarty.map(k => k.id));
@@ -269,7 +287,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код</SortTh>
               <SortTh sortKey="issue" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
-              <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес чист.</SortTh>
+              <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
               {!lockPos && <th className="w-12"></th>}
             </tr></thead>
@@ -289,9 +307,10 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                         <span className="text-xs text-gray-400 whitespace-nowrap">из {p.qty}</span>
                       </div>
                     ) : (p.issue || "—")}
+                    {restCell(p)}
                   </td>
                   <td className="px-3 py-2">{p.lig == null ? "—" : share(p, p.lig).toFixed(2)}</td>
-                  <td className="px-3 py-2 text-blue-600">{p.net == null ? "—" : share(p, p.net).toFixed(2)}</td>
+                  <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} net={p.net} metal={p.code} k={issueShare(p)} /></td>
                   <td className="px-3 py-2 text-gray-500">{p.location}</td>
                   {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
                 </tr>

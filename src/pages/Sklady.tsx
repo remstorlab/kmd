@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, usePaged, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, ProbaChem,
+  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, probaText, NetAuAg, NET_AU_AG,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp,
 } from "../components/ui";
 import { GPItem, DMItem, SDM1, SDM2, SGP } from "../data/mock";
@@ -165,7 +165,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
           <th className={th}>Код материала</th>
           <th className={th}>Проба</th>
           <th className="px-3 py-1.5 text-right font-medium">Вес лигат.</th>
-          <th className="px-3 py-1.5 text-right font-medium">Вес чист.</th>
+          <th className="px-3 py-1.5 text-right font-medium">{NET_AU_AG}</th>
           <th className={th}>Место хранения</th>
           <th className={th}>Статус</th>
         </tr></thead>
@@ -177,9 +177,9 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
               <td className="px-3 py-1.5">{it.qty || "—"}</td>
               <td className="px-3 py-1.5"><KlassCode value={it.klass} /></td>
               <td className="px-3 py-1.5 text-blue-600 font-medium">{codeLabel(it.metal)}</td>
-              <td className="px-3 py-1.5"><ProbaChem proba={it.proba} chem={it.chem} /></td>
+              <td className="px-3 py-1.5">{probaText(it.proba)}</td>
               <td className="px-3 py-1.5 text-right">{it.ligWeight.toFixed(2)}</td>
-              <td className="px-3 py-1.5 text-right">{it.netWeight.toFixed(2)}</td>
+              <td className="px-3 py-1.5 text-right"><NetAuAg chem={it.chem} net={it.netWeight} metal={it.metal} /></td>
               <td className="px-3 py-1.5 text-gray-500">{it.location}</td>
               <td className="px-3 py-1.5"><PosStatusBadge status={it.status} nomenkl={it.nomenkl} /></td>
             </tr>
@@ -382,7 +382,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
               <SortTh sortKey="metal" sort={sort} onSort={toggleSort}>Код материала</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort}>Проба</SortTh>
               <SortTh sortKey="ligWeight" sort={sort} onSort={toggleSort}>Вес лигат.</SortTh>
-              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort}>Вес чист.</SortTh>
+              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort}>{NET_AU_AG}</SortTh>
               <SortTh sortKey="sklad" sort={sort} onSort={toggleSort}>Склад</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
@@ -399,9 +399,9 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
                 <td className="px-4 py-3">{item.qty || "—"}</td>
                 <td className="px-4 py-3"><KlassCode value={item.klass} /></td>
                 <td className="px-4 py-3 text-blue-600 font-medium">{codeLabel(item.metal)}</td>
-                <td className="px-4 py-3"><ProbaChem proba={item.proba} chem={item.chem} /></td>
+                <td className="px-4 py-3">{probaText(item.proba)}</td>
                 <td className="px-4 py-3">{item.ligWeight}</td>
-                <td className="px-4 py-3">{item.netWeight}</td>
+                <td className="px-4 py-3"><NetAuAg chem={item.chem} net={item.netWeight} metal={item.metal} /></td>
                 <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{item.sklad}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><PosStatusBadge status={item.status} nomenkl={item.nomenkl} /></td>

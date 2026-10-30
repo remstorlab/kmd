@@ -60,10 +60,13 @@ const addChem = (a: ChemComposition | undefined, b: ChemComposition | undefined)
 // Можно ли выдать из записи часть (есть количество изделий и берётся меньше него)
 export const isPartial = (it: { qty: number }, q: number) => it.qty > 0 && q > 0 && q < it.qty;
 
-// Делит запись: [остаток с прежним id, выделенная часть с новым id]
-export function splitRecord<T extends StockRecord>(it: T, q: number, newId: string): [T, T] {
-  const k = q / it.qty;
-  const lig = it.ligWeight == null ? undefined : round2(it.ligWeight * k);
+// Делит запись: [остаток с прежним id, выделенная часть с новым id].
+// partLig — лигатурный вес выделенной части (= вес записи − введённый вес остатка на складе): если задан,
+// массы и хим. состав делятся по весу, иначе — пропорционально количеству.
+export function splitRecord<T extends StockRecord>(it: T, q: number, newId: string, partLig?: number): [T, T] {
+  const byWeight = partLig != null && it.ligWeight != null && it.ligWeight > 0 && partLig > 0 && partLig < it.ligWeight;
+  const k = byWeight ? partLig! / it.ligWeight! : q / it.qty;
+  const lig = it.ligWeight == null ? undefined : byWeight ? round2(partLig!) : round2(it.ligWeight * k);
   const net = it.netWeight == null ? undefined : round2(it.netWeight * k);
   const [chemPart, chemRest] = splitChem(it.chem, k);
   const rest = {
@@ -88,6 +91,8 @@ export function takeFromStock<T extends StockRecord>(
   take: Map<string, number>,
   apply: (it: T) => T,
   newId: (it: T) => string,
+  // id записи → лигатурный вес выделяемой части (частичная выдача с введённым весом остатка)
+  partLig?: Map<string, number>,
 ): { items: T[]; taken: Map<string, string> } {
   const taken = new Map<string, string>();
   const out = items.flatMap(it => {
@@ -97,12 +102,30 @@ export function takeFromStock<T extends StockRecord>(
       taken.set(it.id, it.id);
       return [apply(it)];
     }
-    const [rest, part] = splitRecord(it, q, newId(it));
+    const [rest, part] = splitRecord(it, q, newId(it), partLig?.get(it.id));
     taken.set(it.id, part.id);
     return [rest, apply(part)];
   });
   return { items: out, taken };
 }
+
+// ── Частичная выдача позиции документа (выдача, требование, возврат СГП №2) ──
+// Позиция выдаётся частично, если выдаётся меньше изделий, чем есть. Тогда вводится лигатурный вес,
+// остающийся на складе; выдаваемая часть = вес позиции − остаток, чистый вес и хим. состав — в той же доле.
+export interface IssuePos { qty: number; issue: number; lig: number | null; restLig?: string }
+export const isPartialIssue = (p: IssuePos) => p.qty > 0 && p.issue > 0 && p.issue < p.qty;
+export const restLigOf = (p: IssuePos) => num(p.restLig);
+// Введённый остаток корректен: больше 0 и меньше веса позиции
+export const restLigOk = (p: IssuePos) => {
+  const r = restLigOf(p);
+  return Number.isFinite(r) && r > 0 && p.lig != null && r < p.lig;
+};
+// Доля выдаваемой части позиции (0..1): по введённому весу остатка, без него — по количеству
+export const issueShare = (p: IssuePos) =>
+  !isPartialIssue(p) ? 1 : restLigOk(p) ? (p.lig! - restLigOf(p)) / p.lig! : p.issue / p.qty;
+// Лигатурный вес выдаваемых частей для takeFromStock: id записи → вес
+export const partLigMap = <P extends IssuePos & { id: string }>(ps: P[]) =>
+  new Map(ps.filter(p => isPartialIssue(p) && restLigOk(p)).map(p => [p.id, round2(p.lig! - restLigOf(p))]));
 
 // Возврат записей на склад: часть объединяется с исходной записью (parentId), если та на складе
 // со статусом stockStatus; иначе запись получает статус stockStatus (и место хранения, если задано).

@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Plus } from "lucide-react";
-import { initialMaterialClasses, MaterialCode, StatusColor, StatusGroup, ChemComposition } from "../data/mock";
+import { initialMaterialClasses, MaterialCode, StatusColor, StatusGroup, ChemComposition, baseMetal } from "../data/mock";
 import { useApp } from "../store/AppContext";
 
 // ── Badge ────────────────────────────────────────────────────────────────────
@@ -88,24 +88,27 @@ export function Badge({ label, group }: { label: string; group?: StatusGroup }) 
   );
 }
 
-// ── Проба с подсказкой химического состава ───────────────────────────────────
-// Значение пробы в таблицах позиций. Если у позиции есть химический состав, проба подчёркнута пунктиром,
-// а при наведении на неё появляется компактная подсказка «элемент — масса в чистоте, г».
+// ── Проба в таблицах позиций ─────────────────────────────────────────────────
+export const probaText = (proba: number | string | null | undefined) =>
+  proba === null || proba === undefined || proba === "" || proba === 0 ? "—" : proba;
+
+// ── Подсказка с химическим составом ──────────────────────────────────────────
+// При наведении на содержимое — компактная подсказка «элемент — масса в чистоте, г» (k — доля, напр. выдаваемая часть).
 // Подсказка выводится поверх всего (в body), поэтому не обрезается таблицами с прокруткой.
 
-export function ProbaChem({ proba, chem }: { proba: React.ReactNode; chem?: ChemComposition | null }) {
+const chemVal = (v: string | undefined) => {
+  const n = parseFloat(String(v ?? "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+export function ChemTip({ chem, k = 1, children }: { chem?: ChemComposition | null; k?: number; children: React.ReactNode }) {
   const { chemElements } = useApp();
   const [pos, setPos] = useState<{ x: number; y: number; up: boolean } | null>(null);
-  const val = (v: string | undefined) => {
-    const n = parseFloat(String(v ?? "").replace(",", "."));
-    return Number.isFinite(n) && n > 0 ? n : null;
-  };
   // Элементы в порядке справочника «Химический состав»; затем — ключи, которых в справочнике нет
   const known = chemElements.map(e => ({ id: e.id, label: e.shortName }));
   const extra = Object.keys(chem ?? {}).filter(k => !known.some(e => e.id === k)).map(k => ({ id: k, label: k }));
-  const rows = [...known, ...extra].map(e => ({ ...e, v: val(chem?.[e.id]) })).filter(e => e.v !== null);
-  const shown = proba === null || proba === undefined || proba === "" || proba === 0 ? "—" : proba;
-  if (rows.length === 0) return <>{shown}</>;
+  const rows = [...known, ...extra].map(e => ({ ...e, v: chemVal(chem?.[e.id]) })).filter(e => e.v !== null);
+  if (rows.length === 0) return <>{children}</>;
 
   const open = (e: React.MouseEvent<HTMLSpanElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -117,9 +120,9 @@ export function ProbaChem({ proba, chem }: { proba: React.ReactNode; chem?: Chem
       <span
         onMouseEnter={open}
         onMouseLeave={() => setPos(null)}
-        className="cursor-help border-b border-dotted border-gray-400 hover:border-blue-500 hover:text-blue-600"
+        className="cursor-help border-b border-dotted border-gray-400 hover:border-blue-500 hover:text-blue-600 whitespace-nowrap"
       >
-        {shown}
+        {children}
       </span>
       {pos && createPortal(
         <div
@@ -131,7 +134,7 @@ export function ProbaChem({ proba, chem }: { proba: React.ReactNode; chem?: Chem
             {rows.map(e => (
               <React.Fragment key={e.id}>
                 <span className="text-slate-300">{e.label}</span>
-                <span className="text-right font-medium">{e.v!.toFixed(2)}</span>
+                <span className="text-right font-medium">{(e.v! * k).toFixed(2)}</span>
               </React.Fragment>
             ))}
           </div>
@@ -140,6 +143,24 @@ export function ProbaChem({ proba, chem }: { proba: React.ReactNode; chem?: Chem
       )}
     </>
   );
+}
+
+// ── Вес чистый позиции: «Au / Ag», г ─────────────────────────────────────────
+// Значения — из хим. состава позиции (золото и серебро в чистоте); если в составе их нет — чистый вес
+// относится к основному металлу кода материала. k — доля (выдаваемая часть позиции). При наведении — весь хим. состав.
+export const NET_AU_AG = "Вес чист. Au/Ag";
+export function NetAuAg({ chem, net, metal, k = 1 }: { chem?: ChemComposition | null; net?: number | string | null; metal?: string; k?: number }) {
+  const { materialCodes } = useApp();
+  let au = chemVal(chem?.au);
+  let ag = chemVal(chem?.ag);
+  const n = net == null || net === "" ? null : Number(String(net).replace(",", "."));
+  if (au === null && ag === null && n != null && Number.isFinite(n) && n > 0 && metal) {
+    const m = baseMetal(metal, materialCodes);
+    if (m === "Au") au = n; else if (m === "Ag") ag = n;
+  }
+  if (au === null && ag === null) return <ChemTip chem={chem} k={k}>—</ChemTip>;
+  const f = (v: number | null) => (v === null ? "—" : (v * k).toFixed(2));
+  return <ChemTip chem={chem} k={k}><span className="tabular-nums">{f(au)} / {f(ag)}</span></ChemTip>;
 }
 
 // ── Статус позиции с подсказкой ──────────────────────────────────────────────
