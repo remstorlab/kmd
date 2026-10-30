@@ -11,9 +11,9 @@ import { takeFromStock } from "../data/stock";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
-// ── Возврат СГП: возврат позиций со склада СГП на склад СДМ ────────────────
-// Поля — как у накладной прихода; отправитель — всегда склад СГП, получатель — склад из справочника «Склады»
-// (по умолчанию склад приёмки СДМ1). Позиции подбираются со склада СГП с количеством к перемещению.
+// ── Возврат СГП №2: возврат позиций со склада СГП №2 на склад СДМ ────────────────
+// Поля — как у накладной прихода; отправитель — всегда склад СГП №2, получатель — склад из справочника «Склады»
+// (по умолчанию склад приёмки СДМ1). Позиции подбираются со склада СГП №2 с количеством к перемещению.
 // При оформлении позиции встают на склад-получатель «На складе» без места хранения («-») — размещаются потом
 // через «Изменить место хранения»; заказчик и признак собственности позиций сохраняются.
 
@@ -34,7 +34,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
   const { gpItems, dmItems, setGpItems, setDmItems } = useApp();
   const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
-  // Вложенный экран: …/pick (подбор со склада СГП)
+  // Вложенный экран: …/pick (подбор со склада СГП №2)
   const screen = useScreen();
   const showPick = screen.has("pick");
   const setShowPick = (open: boolean) => (open ? screen.open("pick") : screen.close("pick"));
@@ -51,10 +51,10 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
   const [ownProperty, setOwnProperty] = useState(doc?.ownProperty ?? true);
   const [info, setInfo] = useState(doc?.info ?? "");
-  const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Возврат СГП_${doc.number}.pdf`)] : []));
+  const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Возврат СГП №2_${doc.number}.pdf`)] : []));
   const [positions, setPositions] = useState<VsPosition[]>(() => doc?.positions ?? []);
 
-  // Остатки склада СГП. Количество к перемещению вводится всегда: позиция без количества изделий
+  // Остатки склада СГП №2. Количество к перемещению вводится всегда: позиция без количества изделий
   // (или из одного изделия) — 1 шт.
   const stock = useMemo<StockRow[]>(() => [
     ...gpItems.filter(i => i.sklad === SGP && i.status === "На складе").map(i => ({ id: i.id, src: "gp" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: Math.max(i.qty, 1), unit: i.unit, proba: i.proba ?? null, lig: i.ligWeight ?? null, net: i.netWeight ?? null, location: i.location, sklad: i.sklad, chem: i.chem })),

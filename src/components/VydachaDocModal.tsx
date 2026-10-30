@@ -12,7 +12,7 @@ import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
 // ── Выдача со склада: «Накладная» ─────────────────────────────────────────────
-// Не связана с «Движением материала»: выдача со склада выдачи (СДМ2) на склад СГП — в обоих типах документа.
+// Не связана с «Движением материала»: выдача со склада выдачи (СДМ2) на склад СГП №2 — в обоих типах документа.
 // Тип документа — из справочника «Типы документов отгрузки»; набор полей общий, отличается печатная форма.
 // Выдать можно любую позицию склада, независимо от класса. Заказчик / Организация — отдельное поле: по умолчанию
 // заказчик выдаваемых позиций (из документа приёма на СДМ1, сохраняется через требование и объединение).
@@ -23,8 +23,8 @@ type VydachaPosition = VydachaDocPosition;
 
 // Перемещение выдаваемого количества — только при оформлении накладной. Пока накладная «В работе»,
 // позиции склада не меняются (статус и место хранения прежние). При оформлении выданная позиция встаёт на склад
-// СГП «На складе» без места хранения («-»); при частичной выдаче остаток остаётся на СДМ2 на своём месте
-// с уменьшенным количеством, а выданная часть выделяется в отдельную запись на СГП (data/stock.ts).
+// СГП №2 «На складе» без места хранения («-»); при частичной выдаче остаток остаётся на СДМ2 на своём месте
+// с уменьшенным количеством, а выданная часть выделяется в отдельную запись на СГП №2 (data/stock.ts).
 const NO_LOC = "-";
 // Выдать можно позицию на складе или в резерве; «В подотчёте» и «Закрыта» — нет
 const canIssue = (status: string) => status === "На складе" || status === "Резерв";
@@ -55,7 +55,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const [head, setHead] = useState(() => ({
     number: doc?.number || `НО-${Math.floor(Math.random() * 900 + 100)}`,
     date: doc?.date || today,
-    // Отправитель — всегда склад выдачи (СДМ2), получатель — склад СГП
+    // Отправитель — всегда склад выдачи (СДМ2), получатель — склад СГП №2
     sender: MAIN_SKLAD,
     schetFaktura: "",
     schetFakturaDate: today,
@@ -163,7 +163,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       const gpIssue = new Map(positions.filter(p => p.src === "gp").map(p => [p.id, p.issue]));
       const dmIssue = new Map(positions.filter(p => p.src === "dm").map(p => [p.id, p.issue]));
       const partId = (it: { id: string }) => `${it.id}-v${stamp}`;
-      // Выданная позиция — на склад СГП без места хранения; заказчик позиции сохраняется (без него — из документа)
+      // Выданная позиция — на склад СГП №2 без места хранения; заказчик позиции сохраняется (без него — из документа)
       const toSgp = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: SGP, status: "На складе", location: NO_LOC, zakazchik: it.zakazchik ?? zakazchik });
       if (gpIssue.size) setGpItems(prev => takeFromStock(prev, gpIssue, toSgp, partId).items);
       if (dmIssue.size) setDmItems(prev => takeFromStock(prev, dmIssue, toSgp, partId).items);

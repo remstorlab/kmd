@@ -240,7 +240,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
   // Смена места хранения: …/mesto/:id
   const moveItem = skladItems.find(it => it.id === screen.after("mesto")) ?? null;
   // Позиция физически на складе — место хранения можно изменить
-  // На СГП мест хранения нет — позиции хранятся без места («-»)
+  // На СГП №2 мест хранения нет — позиции хранятся без места («-»)
   const noLocations = sklad === SGP;
   const canMove = (it: DMItem) => !noLocations && (it.status === "На складе" || it.status === "Резерв");
   const saveLocation = (it: DMItem, location: string, name: string) => {

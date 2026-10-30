@@ -81,7 +81,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
   const lockPos = ro || posted;
   const { toast, show, clear } = useToast();
   const today = new Date().toLocaleDateString("ru-RU");
-  // Склады СДМ (СГП — только через выдачу со склада и «Возврат СГП»)
+  // Склады СДМ (СГП №2 — только через выдачу со склада и «Возврат СГП №2»)
   const sklady = spravValues("Склады").filter(s => s !== SGP);
 
   const [head, setHead] = useState(() => ({

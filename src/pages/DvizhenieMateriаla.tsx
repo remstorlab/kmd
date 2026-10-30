@@ -648,7 +648,6 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
     lig: p => view(p).ligWeight ?? 0,
     net: p => view(p).netWeight ?? 0,
     loc: p => p.loc,
-    status: p => view(p).status ?? "",
   });
   const th = "px-3 py-2";
   const dash = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v);
@@ -666,7 +665,6 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
           <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
           <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>Вес чист.</SortTh>
           <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
-          <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
           <th className={readOnly ? "w-10" : onEdit ? "w-28" : "w-20"}></th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
@@ -683,7 +681,6 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
                 <td className="px-3 py-2">{dash(v.ligWeight)}</td>
                 <td className="px-3 py-2">{dash(v.netWeight)}</td>
                 <td className="px-3 py-2 text-gray-500">{p.loc}</td>
-                <td className="px-3 py-2">{v.status ? <PosStatusBadge status={v.status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => onView(p)} />
@@ -695,9 +692,9 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
             );
           })}
           {sorted.length === 0 && (
-            <tr><td colSpan={11} className="px-3 py-6 text-center text-sm text-gray-400">Позиции не добавлены</td></tr>
+            <tr><td colSpan={10} className="px-3 py-6 text-center text-sm text-gray-400">Позиции не добавлены</td></tr>
           )}
-          <FillerRows count={pg7.fill} cols={11} />
+          <FillerRows count={pg7.fill} cols={10} />
         </tbody>
       </table>
       {pg7.pager}

@@ -87,7 +87,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
   // Доступные позиции для шихты — на выбранном складе (по умолчанию склад приёмки СДМ1). Позиции СДМ1
   // по требованию перемещаются на СДМ2 (резерв сохраняется); с СДМ2 карта выдаётся на плавку
-  // Склады СДМ (СГП — только через выдачу со склада и «Возврат СГП»)
+  // Склады СДМ (СГП №2 — только через выдачу со склада и «Возврат СГП №2»)
   const sklady = spravValues("Склады").filter(s => s !== SGP);
   const [pickSklad, setPickSklad] = useState(PRIHOD_SKLAD);
   const skladChem = (id: string) => dmItems.find(i => i.id === id)?.chem;

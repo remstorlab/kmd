@@ -41,7 +41,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const showPick = screen.has("pick");
   const setShowPick = (open: boolean) => (open ? screen.open("pick") : screen.close("pick"));
   const today = new Date().toLocaleDateString("ru-RU");
-  // Склады СДМ (СГП — только через выдачу со склада и «Возврат СГП»)
+  // Склады СДМ (СГП №2 — только через выдачу со склада и «Возврат СГП №2»)
   const sklady = spravValues("Склады").filter(s => s !== SGP);
 
   const [head, setHead] = useState(() => ({
