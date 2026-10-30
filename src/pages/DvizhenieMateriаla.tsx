@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, probaText, NetAuAg, NET_AU_AG, usePaged,
+  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, probaText, NetAuAg, NET_AU_AG, ChemTip, usePaged,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip,
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
@@ -807,11 +807,10 @@ const ligCls = "bg-blue-50 font-semibold text-gray-900";
 // Общая сетка колонок таблиц вкладки — колонки всех блоков стоят друг под другом
 const ItogoCols = () => (
   <colgroup>
-    <col style={{ width: "34%" }} />
-    <col style={{ width: "18%" }} />
-    <col style={{ width: "16%" }} />
-    <col style={{ width: "16%" }} />
-    <col style={{ width: "16%" }} />
+    <col style={{ width: "40%" }} />
+    <col style={{ width: "20%" }} />
+    <col style={{ width: "20%" }} />
+    <col style={{ width: "20%" }} />
   </colgroup>
 );
 
@@ -822,7 +821,6 @@ function ItogoPositions({ title, rows, view, total }: {
   total: number;
 }) {
   const codeLabel = useMaterialCodeLabel();
-  const dash = (v: number | null | undefined) => (v === null || v === undefined ? "—" : fmt(v));
   return (
     <div className="mb-5">
       <div className="text-xs font-semibold text-gray-500 uppercase mb-2">{title}</div>
@@ -833,7 +831,6 @@ function ItogoPositions({ title, rows, view, total }: {
           <th className="px-3 py-2 text-left">Класс</th>
           <th className="px-3 py-2 text-left">Код материала</th>
           <th className={`px-3 py-2 text-right ${ligCls}`}>Вес лигат.</th>
-          <th className="px-3 py-2 text-right">{NET_AU_AG}</th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {rows.map(p => {
@@ -842,20 +839,19 @@ function ItogoPositions({ title, rows, view, total }: {
               <tr key={p.n}>
                 <td className="px-3 py-2 text-gray-900">{p.name}</td>
                 <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
-                <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
+                {/* Хим. состав позиции — во всплывающей подсказке у кода материала */}
+                <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? <ChemTip chem={v.chem}>{codeLabel(v.metal)}</ChemTip> : "—"}</td>
                 <td className={`px-3 py-2 text-right ${ligCls}`}>{fmt(p.ves)}</td>
-                <td className="px-3 py-2 text-right text-gray-600"><NetAuAg chem={v.chem} net={v.netWeight} metal={v.metal} /></td>
               </tr>
             );
           })}
           {rows.length === 0 && (
-            <tr><td colSpan={5} className="px-3 py-3 text-center text-xs text-gray-400">Позиции не добавлены</td></tr>
+            <tr><td colSpan={4} className="px-3 py-3 text-center text-xs text-gray-400">Позиции не добавлены</td></tr>
           )}
         </tbody>
         <tfoot><tr className="border-t border-gray-200 bg-gray-50">
           <td colSpan={3} className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Итого {title.toLowerCase()}</td>
           <td className={`px-3 py-2 text-right ${ligCls}`}>{fmt(total)} г</td>
-          <td></td>
         </tr></tfoot>
       </table>
     </div>
@@ -880,7 +876,6 @@ function ItogoLosses({ losses, total }: { losses: LossRow[]; total: number }) {
           <th className="px-3 py-2 text-left">Норма потерь</th>
           <th className="px-3 py-2 text-left">Код материала</th>
           <th className={`px-3 py-2 text-right ${ligCls}`}>Вес лигат.</th>
-          <th></th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {losses.map(l => (
@@ -890,17 +885,15 @@ function ItogoLosses({ losses, total }: { losses: LossRow[]; total: number }) {
               <td className="px-3 py-2 text-blue-600 font-medium">{l.metal ? codeLabel(l.metal) : "—"}</td>
               {/* Потеря — светло-красный фон, прирост — светло-зелёный */}
               <td className={`px-3 py-2 text-right font-semibold text-gray-900 ${vesBg(l.type)}`}>{fmt(num(l.ves))}</td>
-              <td></td>
             </tr>
           ))}
           {losses.length === 0 && (
-            <tr><td colSpan={5} className="px-3 py-3 text-center text-xs text-gray-400">Списания не указаны</td></tr>
+            <tr><td colSpan={4} className="px-3 py-3 text-center text-xs text-gray-400">Списания не указаны</td></tr>
           )}
         </tbody>
         <tfoot><tr className="border-t border-gray-200 bg-gray-50">
           <td colSpan={3} className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Итого списание</td>
           <td className={`px-3 py-2 text-right ${ligCls}`}>{fmt(total)} г</td>
-          <td></td>
         </tr></tfoot>
       </table>
     </div>
