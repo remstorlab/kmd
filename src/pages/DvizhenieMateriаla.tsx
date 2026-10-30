@@ -702,6 +702,85 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
   );
 }
 
+// ── Свод по позициям вкладки «Выдача» / «Возврат»: общие цифры и разбивка по кодам материала ──
+
+function PositionsSummary({ rows, view }: { rows: OperPosition[]; view: (p: OperPosition) => DMPositionView }) {
+  const codeLabel = useMaterialCodeLabel();
+  if (rows.length === 0) return null;
+  type Agg = { code: string; positions: number; qty: number; lig: number; net: number };
+  const add = (a: Agg, p: OperPosition) => {
+    const v = view(p);
+    a.positions += 1;
+    a.qty += p.qty ?? 0;
+    // Лигатурный вес — тот же, что в расчётах вкладок «Списание» и «Итого»
+    a.lig += p.ves || 0;
+    a.net += v.netWeight ?? 0;
+  };
+  const total: Agg = { code: "", positions: 0, qty: 0, lig: 0, net: 0 };
+  const byCode = new Map<string, Agg>();
+  for (const p of rows) {
+    add(total, p);
+    const code = view(p).metal ?? "";
+    if (!byCode.has(code)) byCode.set(code, { code, positions: 0, qty: 0, lig: 0, net: 0 });
+    add(byCode.get(code)!, p);
+  }
+  const codes = [...byCode.values()].sort((a, b) => b.lig - a.lig);
+  const qtyText = (q: number) => (q ? String(q) : "—");
+  const cards: { label: string; value: string; unit?: string; accent?: boolean }[] = [
+    { label: "Позиций", value: String(total.positions) },
+    { label: "Изделий", value: qtyText(total.qty), unit: total.qty ? "шт" : undefined },
+    { label: "Вес лигатурный", value: fmt(total.lig), unit: "г", accent: true },
+    { label: "Вес чистый", value: fmt(total.net), unit: "г" },
+    { label: "Кодов материала", value: String(codes.length) },
+  ];
+  return (
+    <div className="mb-3 border border-gray-200 rounded-lg overflow-hidden">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-gray-100 bg-gray-50 border-b border-gray-200">
+        {cards.map(c => (
+          <div key={c.label} className={`px-4 py-2.5 ${c.accent ? "bg-blue-50" : ""}`}>
+            <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">{c.label}</div>
+            <div className={`text-lg font-semibold tabular-nums ${c.accent ? "text-blue-700" : "text-gray-900"}`}>
+              {c.value}{c.unit && <span className="ml-1 text-xs font-normal text-gray-500">{c.unit}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <table className="w-full text-sm tabular-nums">
+        <thead><tr className="text-gray-500 text-xs border-b border-gray-100">
+          <th className="px-4 py-1.5 text-left font-medium">Код материала</th>
+          <th className="px-3 py-1.5 text-right font-medium">Позиций</th>
+          <th className="px-3 py-1.5 text-right font-medium">Изделий, шт</th>
+          <th className={`px-3 py-1.5 text-right font-medium ${ligCls}`}>Вес лигат., г</th>
+          <th className="px-3 py-1.5 text-right font-medium">Вес чист., г</th>
+          <th className="px-4 py-1.5 text-left font-medium w-1/4">Доля по лигат. весу</th>
+        </tr></thead>
+        <tbody className="divide-y divide-gray-100">
+          {codes.map(c => {
+            const share = total.lig > 0 ? (c.lig / total.lig) * 100 : 0;
+            return (
+              <tr key={c.code || "-"}>
+                <td className="px-4 py-1.5 text-blue-600 font-medium">{c.code ? codeLabel(c.code) : <span className="text-gray-400">Без кода</span>}</td>
+                <td className="px-3 py-1.5 text-right">{c.positions}</td>
+                <td className="px-3 py-1.5 text-right">{qtyText(c.qty)}</td>
+                <td className={`px-3 py-1.5 text-right ${ligCls}`}>{fmt(c.lig)}</td>
+                <td className="px-3 py-1.5 text-right text-gray-600">{fmt(c.net)}</td>
+                <td className="px-4 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${share}%` }} />
+                    </div>
+                    <span className="w-12 text-right text-xs text-gray-500">{share.toFixed(1)}%</span>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Вкладка «Итого»: позиции выдачи / возврата и списания с промежуточными итогами ──
 
 // Лигатурный вес — основа расчёта итогов и списаний, поэтому колонка выделена
@@ -1395,6 +1474,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               )}
             </div>
           )}
+          <PositionsSummary rows={vydacha} view={posView} />
           <OperPositionsTable
             rows={vydacha}
             view={posView}
@@ -1417,6 +1497,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               <Btn size="sm" variant="secondary" onClick={() => setShowVozvratFromVyd(true)} disabled={vydacha.length === 0}><Plus className="w-4 h-4" />Добавить из Выдачи</Btn>
             </div>
           )}
+          <PositionsSummary rows={vozvrat} view={posView} />
           <OperPositionsTable
             rows={vozvrat}
             view={posView}
