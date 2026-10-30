@@ -185,7 +185,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                     <td className="px-3 py-2 text-gray-500">{i.nomenkl}</td>
                     <td className="px-3 py-2"><KlassCode value={i.klass} /></td>
                     <td className="px-3 py-2">{probaText(i.proba)}</td>
-                    <td className="px-3 py-2"><NetAuAg chem={i.chem} net={i.netWeight} metal={i.metal} /></td>
+                    <td className="px-3 py-2"><NetAuAg chem={i.chem} /></td>
                     <td className="px-3 py-2 text-gray-500">{i.location}</td>
                     <td className="px-3 py-2">
                       <PosStatusBadge status={i.status} nomenkl={i.nomenkl} />
@@ -387,7 +387,7 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
                     <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
                     <td className="px-3 py-2">{probaText(p.proba)}</td>
                     <td className="px-3 py-2">{dash(v.ligWeight)}</td>
-                    <td className="px-3 py-2"><NetAuAg chem={v.chem} net={v.netWeight} metal={v.metal} /></td>
+                    <td className="px-3 py-2"><NetAuAg chem={v.chem} /></td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                   </tr>
                 );
@@ -698,7 +698,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
                 <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
                 <td className="px-3 py-2">{probaText(p.proba)}</td>
                 <td className="px-3 py-2">{dash(v.ligWeight)}</td>
-                <td className="px-3 py-2"><NetAuAg chem={v.chem} net={v.netWeight} metal={v.metal} /></td>
+                <td className="px-3 py-2"><NetAuAg chem={v.chem} /></td>
                 <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">
@@ -721,79 +721,72 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
   );
 }
 
-// ── Свод по позициям вкладки «Выдача» / «Возврат»: общие цифры и разбивка по кодам материала ──
+// ── Свод по позициям вкладки «Выдача» / «Возврат» ──
+// Одна таблица: первая строка — итог по всем позициям, ниже — по кодам материала. Веса — итоговые цифры:
+// лигатурный (основа расчётов операции) и в чистоте по золоту и серебру (из хим. состава позиций).
 
 function PositionsSummary({ rows, view }: { rows: OperPosition[]; view: (p: OperPosition) => DMPositionView }) {
   const codeLabel = useMaterialCodeLabel();
   if (rows.length === 0) return null;
-  type Agg = { code: string; positions: number; qty: number; lig: number; net: number };
+  type Agg = { code: string; positions: number; qty: number; lig: number; au: number; ag: number };
+  const g = (v: string | undefined) => { const n = parseFloat(String(v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : 0; };
+  const empty = (code: string): Agg => ({ code, positions: 0, qty: 0, lig: 0, au: 0, ag: 0 });
   const add = (a: Agg, p: OperPosition) => {
-    const v = view(p);
+    const chem = view(p).chem;
     a.positions += 1;
     a.qty += p.qty ?? 0;
     // Лигатурный вес — тот же, что в расчётах вкладок «Списание» и «Итого»
     a.lig += p.ves || 0;
-    a.net += v.netWeight ?? 0;
+    a.au += g(chem?.au);
+    a.ag += g(chem?.ag);
   };
-  const total: Agg = { code: "", positions: 0, qty: 0, lig: 0, net: 0 };
+  const total = empty("");
   const byCode = new Map<string, Agg>();
   for (const p of rows) {
     add(total, p);
     const code = view(p).metal ?? "";
-    if (!byCode.has(code)) byCode.set(code, { code, positions: 0, qty: 0, lig: 0, net: 0 });
+    if (!byCode.has(code)) byCode.set(code, empty(code));
     add(byCode.get(code)!, p);
   }
   const codes = [...byCode.values()].sort((a, b) => b.lig - a.lig);
-  const qtyText = (q: number) => (q ? String(q) : "—");
-  const cards: { label: string; value: string; unit?: string; accent?: boolean }[] = [
-    { label: "Позиций", value: String(total.positions) },
-    { label: "Изделий", value: qtyText(total.qty), unit: total.qty ? "шт" : undefined },
-    { label: "Вес лигатурный", value: fmt(total.lig), unit: "г", accent: true },
-    { label: "Вес чистый", value: fmt(total.net), unit: "г" },
-    { label: "Кодов материала", value: String(codes.length) },
-  ];
+  const w = (v: number) => (v > 0 ? fmt(v) : "—");
+  const cells = (a: Agg) => <>
+    <td className="px-3 py-2 text-right">{a.positions}</td>
+    <td className="px-3 py-2 text-right">{a.qty || "—"}</td>
+    <td className={`px-3 py-2 text-right ${ligCls}`}>{fmt(a.lig)}</td>
+    <td className="px-3 py-2 text-right">{w(a.au)}</td>
+    <td className="px-3 py-2 text-right">{w(a.ag)}</td>
+  </>;
   return (
     <div className="mb-3 border border-gray-200 rounded-lg overflow-hidden">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-gray-100 bg-gray-50 border-b border-gray-200">
-        {cards.map(c => (
-          <div key={c.label} className={`px-4 py-2.5 ${c.accent ? "bg-blue-50" : ""}`}>
-            <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">{c.label}</div>
-            <div className={`text-lg font-semibold tabular-nums ${c.accent ? "text-blue-700" : "text-gray-900"}`}>
-              {c.value}{c.unit && <span className="ml-1 text-xs font-normal text-gray-500">{c.unit}</span>}
-            </div>
-          </div>
-        ))}
-      </div>
-      <table className="w-full text-sm tabular-nums">
-        <thead><tr className="text-gray-500 text-xs border-b border-gray-100">
-          <th className="px-4 py-1.5 text-left font-medium">Код материала</th>
-          <th className="px-3 py-1.5 text-right font-medium">Позиций</th>
-          <th className="px-3 py-1.5 text-right font-medium">Изделий, шт</th>
-          <th className={`px-3 py-1.5 text-right font-medium ${ligCls}`}>Вес лигат., г</th>
-          <th className="px-3 py-1.5 text-right font-medium">Вес чист., г</th>
-          <th className="px-4 py-1.5 text-left font-medium w-1/4">Доля по лигат. весу</th>
+      <table className="w-full table-fixed text-sm tabular-nums">
+        <colgroup>
+          <col style={{ width: "30%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "13%" }} />
+          <col style={{ width: "15%" }} />
+          <col style={{ width: "15%" }} />
+          <col style={{ width: "15%" }} />
+        </colgroup>
+        <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
+          <th className="px-3 py-2 text-left font-medium">Свод по позициям</th>
+          <th className="px-3 py-2 text-right font-medium">Позиций</th>
+          <th className="px-3 py-2 text-right font-medium">Изделий, шт</th>
+          <th className={`px-3 py-2 text-right font-medium ${ligCls}`}>Вес лигат., г</th>
+          <th className="px-3 py-2 text-right font-medium">Вес чист. Au, г</th>
+          <th className="px-3 py-2 text-right font-medium">Вес чист. Ag, г</th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
-          {codes.map(c => {
-            const share = total.lig > 0 ? (c.lig / total.lig) * 100 : 0;
-            return (
-              <tr key={c.code || "-"}>
-                <td className="px-4 py-1.5 text-blue-600 font-medium">{c.code ? codeLabel(c.code) : <span className="text-gray-400">Без кода</span>}</td>
-                <td className="px-3 py-1.5 text-right">{c.positions}</td>
-                <td className="px-3 py-1.5 text-right">{qtyText(c.qty)}</td>
-                <td className={`px-3 py-1.5 text-right ${ligCls}`}>{fmt(c.lig)}</td>
-                <td className="px-3 py-1.5 text-right text-gray-600">{fmt(c.net)}</td>
-                <td className="px-4 py-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${share}%` }} />
-                    </div>
-                    <span className="w-12 text-right text-xs text-gray-500">{share.toFixed(1)}%</span>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
+          <tr className="bg-blue-50/40 font-semibold text-gray-900 border-b border-gray-200">
+            <td className="px-3 py-2">Итого по позициям</td>
+            {cells(total)}
+          </tr>
+          {codes.map(c => (
+            <tr key={c.code || "-"} className="text-gray-700">
+              <td className="px-3 py-2 pl-6 text-blue-600 font-medium">{c.code ? codeLabel(c.code) : <span className="text-gray-400">Без кода</span>}</td>
+              {cells(c)}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

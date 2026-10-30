@@ -729,9 +729,11 @@ export const initialRoles: Role[] = [
 // Атрибуты позиции в журнале — как в карточке позиции склада
 const logAttrs = (name: string, nomenkl: string, klass: string, code: string, qty: string, proba: string, lig: string, net: string, loc: string, status: string) => [
   { label: "Наименование", value: name }, { label: "Номенкл. №", value: nomenkl }, { label: "Класс", value: klass }, { label: "Код материала", value: code },
-  { label: "Количество изделий", value: qty }, { label: "Проба", value: proba }, { label: "Вес лигат.", value: lig }, { label: "Вес чист.", value: net },
+  { label: "Количество изделий", value: qty }, { label: "Проба", value: proba }, { label: "Вес лигат.", value: lig }, { label: "Вес чист. Au/Ag", value: net },
   { label: "Место хранения", value: loc }, { label: "Статус", value: status },
 ];
+// Вес чистый в журнале — «Au / Ag», г, из хим. состава
+const auAgText = (chem?: ChemComposition) => `${chem?.au ?? "—"} / ${chem?.ag ?? "—"} г`;
 const logItem = (i: DMItem | GPItem, status: LogItemStatus, loc = i.location, st: string = i.status): LogSnapshotItem => {
   const code = "metal" in i ? i.metal : i.code;
   const short: Record<string, string> = { "1000": "Au чистое", "2000": "Ag чистое", "4000": "Pt чистое", "0100": "ЗлМ 585", "0300": "ЗлСрМ 750-150" };
@@ -739,7 +741,7 @@ const logItem = (i: DMItem | GPItem, status: LogItemStatus, loc = i.location, st
   return {
     title: `${i.nomenkl} · ${i.name}`, status,
     attrs: logAttrs(i.name, i.nomenkl, i.klass, label ? `${label.code}-${label.shortName}` : code, String(i.qty || "—"), String(i.proba || "—"),
-      `${fx(i.ligWeight ?? 0)} г`, `${fx(i.netWeight ?? 0)} г`, loc, st),
+      `${(i.ligWeight ?? 0).toFixed(2)} г`, auAgText(i.chem), loc, st),
   };
 };
 const itemById = (id: string) => (initialDMItems.find(x => x.id === id) ?? initialGPItems.find(x => x.id === id))!;
@@ -785,7 +787,7 @@ export const initialLogs: LogEntry[] = [
   {
     id: "l6", datetime: "16.08.2026, 15:45", user: "Ким А.Ю.", section: "Склады", type: "Удаление",
     description: "Удалена позиция 5015320 (ошибочный ввод)",
-    before: [{ title: "5015320 · Браслет серебряный", status: "Удалена", attrs: logAttrs("Браслет серебряный", "5015320", "Готовая продукция", "2000-Ag чистое", "36", "925", "432.00 г", "399.60 г", L(3, 1), "На складе") }],
+    before: [{ title: "5015320 · Браслет серебряный", status: "Удалена", attrs: logAttrs("Браслет серебряный", "5015320", "Готовая продукция", "2000-Ag чистое", "36", "925", "432.00 г", "— / 399.60 г", L(3, 1), "На складе") }],
     after: [],
   },
   {
@@ -806,16 +808,16 @@ export const initialLogs: LogEntry[] = [
     id: "l9", datetime: "12.08.2026, 10:05", user: "Петров С.В.", section: "Склады", type: "Изменение",
     description: "Объединены позиции 5015350 и 5015351 в новую позицию 5015352",
     before: [
-      { title: "5015350 · Слиток золота ЗлБ-2", status: "Объединена", attrs: logAttrs("Слиток золота ЗлБ-2", "5015350", "Слиток", "1000-Au чистое", "1", "999", "300.00 г", "299.70 г", L(3, 1), "На складе") },
-      { title: "5015351 · Слиток золота ЗлБ-3", status: "Объединена", attrs: logAttrs("Слиток золота ЗлБ-3", "5015351", "Слиток", "1000-Au чистое", "1", "999", "200.00 г", "199.80 г", L(3, 1), "На складе") },
+      { title: "5015350 · Слиток золота ЗлБ-2", status: "Объединена", attrs: logAttrs("Слиток золота ЗлБ-2", "5015350", "Слиток", "1000-Au чистое", "1", "999", "300.00 г", "299.70 / — г", L(3, 1), "На складе") },
+      { title: "5015351 · Слиток золота ЗлБ-3", status: "Объединена", attrs: logAttrs("Слиток золота ЗлБ-3", "5015351", "Слиток", "1000-Au чистое", "1", "999", "200.00 г", "199.80 / — г", L(3, 1), "На складе") },
     ],
-    after: [{ title: "5015352 · Слиток золота ЗлБ-2/3", status: "Новая", attrs: logAttrs("Слиток золота ЗлБ-2/3", "5015352", "Слиток", "1000-Au чистое", "2", "999", "500.00 г", "499.50 г", L(3, 1), "На складе") }],
+    after: [{ title: "5015352 · Слиток золота ЗлБ-2/3", status: "Новая", attrs: logAttrs("Слиток золота ЗлБ-2/3", "5015352", "Слиток", "1000-Au чистое", "2", "999", "500.00 г", "499.50 / — г", L(3, 1), "На складе") }],
   },
   {
     id: "l10", datetime: "10.08.2026, 08:30", user: "Ким А.Ю.", section: "Шихтовые карты", type: "Изменение",
     description: "Слиток 5015355 переплавлен в стружку 5015356 по шихтовой карте П-2026-0087",
-    before: [{ title: "5015355 · Слиток золота ЗлВ-1", status: "Преобразована", attrs: logAttrs("Слиток золота ЗлВ-1", "5015355", "Слиток", "0100-ЗлМ 585", "1", "585", "410.00 г", "239.85 г", L(2, 1), "На складе") }],
-    after: [{ title: "5015356 · Стружка золотая ЗлВ-1", status: "Преобразована", attrs: logAttrs("Стружка золотая ЗлВ-1", "5015356", "Стружка", "0100-ЗлМ 585", "1", "585", "405.00 г", "236.93 г", L(2, 1), "На складе") }],
+    before: [{ title: "5015355 · Слиток золота ЗлВ-1", status: "Преобразована", attrs: logAttrs("Слиток золота ЗлВ-1", "5015355", "Слиток", "0100-ЗлМ 585", "1", "585", "410.00 г", "239.85 / — г", L(2, 1), "На складе") }],
+    after: [{ title: "5015356 · Стружка золотая ЗлВ-1", status: "Преобразована", attrs: logAttrs("Стружка золотая ЗлВ-1", "5015356", "Стружка", "0100-ЗлМ 585", "1", "585", "405.00 г", "236.93 / — г", L(2, 1), "На складе") }],
   },
 ];
 

@@ -179,7 +179,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
               <td className="px-3 py-1.5 text-blue-600 font-medium">{codeLabel(it.metal)}</td>
               <td className="px-3 py-1.5">{probaText(it.proba)}</td>
               <td className="px-3 py-1.5 text-right">{it.ligWeight.toFixed(2)}</td>
-              <td className="px-3 py-1.5 text-right"><NetAuAg chem={it.chem} net={it.netWeight} metal={it.metal} /></td>
+              <td className="px-3 py-1.5 text-right"><NetAuAg chem={it.chem} /></td>
               <td className="px-3 py-1.5 text-gray-500">{it.location}</td>
               <td className="px-3 py-1.5"><PosStatusBadge status={it.status} nomenkl={it.nomenkl} /></td>
             </tr>
@@ -401,7 +401,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
                 <td className="px-4 py-3 text-blue-600 font-medium">{codeLabel(item.metal)}</td>
                 <td className="px-4 py-3">{probaText(item.proba)}</td>
                 <td className="px-4 py-3">{item.ligWeight}</td>
-                <td className="px-4 py-3"><NetAuAg chem={item.chem} net={item.netWeight} metal={item.metal} /></td>
+                <td className="px-4 py-3"><NetAuAg chem={item.chem} /></td>
                 <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{item.sklad}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><PosStatusBadge status={item.status} nomenkl={item.nomenkl} /></td>

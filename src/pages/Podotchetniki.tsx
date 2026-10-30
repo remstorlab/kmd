@@ -120,7 +120,7 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
               <td className="px-3 py-2 text-blue-600 font-medium">{r.metal ? codeLabel(r.metal) : "—"}</td>
               <td className="px-3 py-2">{probaText(r.proba)}</td>
               <td className="px-3 py-2">{r.ligWeight.toFixed(2)}</td>
-              <td className="px-3 py-2"><NetAuAg chem={dmItems.find(d => d.nomenkl === r.nomenkl)?.chem} net={r.netWeight} metal={r.metal} /></td>
+              <td className="px-3 py-2"><NetAuAg chem={dmItems.find(d => d.nomenkl === r.nomenkl)?.chem} /></td>
               <td className="px-3 py-2 text-gray-500">{r.location}</td>
               <td className="px-3 py-2"><PosStatusBadge status={r.status} nomenkl={r.nomenkl} /></td>
             </tr>
@@ -147,7 +147,7 @@ function OpBlock({ vid, izdelie, rows, showOperation = false, onOpenOperation }:
   onOpenOperation?: (r: ProcRow) => void;
 }) {
   const Icon = vidIcon[vid] ?? Flame;
-  const totalNet = rows.reduce((s, r) => s + r.netWeight, 0);
+  const totalLig = rows.reduce((s, r) => s + r.ligWeight, 0);
   const name = izdelie?.trim();
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -157,7 +157,7 @@ function OpBlock({ vid, izdelie, rows, showOperation = false, onOpenOperation }:
           {vid}{name && <span className="font-normal text-gray-700"> — {name}</span>}
         </div>
         <div className="text-xs text-gray-500 shrink-0">
-          Позиций: {rows.length} · Чистый вес: {totalNet.toFixed(2)} г
+          Позиций: {rows.length} · Вес лигат.: {totalLig.toFixed(2)} г
         </div>
       </div>
       <PositionsTable rows={rows} showOperation={showOperation} onOpenOperation={onOpenOperation} />

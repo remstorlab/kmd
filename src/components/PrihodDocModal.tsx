@@ -322,7 +322,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
                   {isOrder && <>
                     <td className="px-3 py-2">{probaText(p.proba)}</td>
                     <td className="px-3 py-2 font-medium">{p.lig}</td>
-                    <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} net={p.net} metal={p.code} /></td>
+                    <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} /></td>
                   </>}
                   <td className="px-3 py-2 text-gray-500">{locOf(p)}</td>
                   <td className="px-3 py-2">

@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Plus } from "lucide-react";
-import { initialMaterialClasses, MaterialCode, StatusColor, StatusGroup, ChemComposition, baseMetal } from "../data/mock";
+import { initialMaterialClasses, MaterialCode, StatusColor, StatusGroup, ChemComposition } from "../data/mock";
 import { useApp } from "../store/AppContext";
 
 // ── Badge ────────────────────────────────────────────────────────────────────
@@ -146,18 +146,12 @@ export function ChemTip({ chem, k = 1, children }: { chem?: ChemComposition | nu
 }
 
 // ── Вес чистый позиции: «Au / Ag», г ─────────────────────────────────────────
-// Значения — из хим. состава позиции (золото и серебро в чистоте); если в составе их нет — чистый вес
-// относится к основному металлу кода материала. k — доля (выдаваемая часть позиции). При наведении — весь хим. состав.
+// Значения — граммы золота и серебра из хим. состава позиции («—», если элемента в составе нет).
+// k — доля (выдаваемая часть позиции). При наведении — весь хим. состав.
 export const NET_AU_AG = "Вес чист. Au/Ag";
-export function NetAuAg({ chem, net, metal, k = 1 }: { chem?: ChemComposition | null; net?: number | string | null; metal?: string; k?: number }) {
-  const { materialCodes } = useApp();
-  let au = chemVal(chem?.au);
-  let ag = chemVal(chem?.ag);
-  const n = net == null || net === "" ? null : Number(String(net).replace(",", "."));
-  if (au === null && ag === null && n != null && Number.isFinite(n) && n > 0 && metal) {
-    const m = baseMetal(metal, materialCodes);
-    if (m === "Au") au = n; else if (m === "Ag") ag = n;
-  }
+export function NetAuAg({ chem, k = 1 }: { chem?: ChemComposition | null; k?: number }) {
+  const au = chemVal(chem?.au);
+  const ag = chemVal(chem?.ag);
   if (au === null && ag === null) return <ChemTip chem={chem} k={k}>—</ChemTip>;
   const f = (v: number | null) => (v === null ? "—" : (v * k).toFixed(2));
   return <ChemTip chem={chem} k={k}><span className="tabular-nums">{f(au)} / {f(ag)}</span></ChemTip>;

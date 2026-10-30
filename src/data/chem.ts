@@ -56,7 +56,7 @@ export const gramOf = (pct: string | undefined, lig: number) => {
   return Number.isFinite(p) && lig > 0 ? s2((lig * p) / 100) : "";
 };
 export const gramsFrom = (pct: ChemPercent, lig: number): ChemComposition =>
-  Object.fromEntries(Object.entries(pct).map(([k, v]) => [k, gramOf(v, lig)]).filter(([, g]) => g !== ""));
+  Object.fromEntries(Object.entries(pct).map(([k, v]) => [k, gramOf(v, lig)]).filter(([, g]) => g !== "" && Number(g) > 0));
 
 // % элемента по граммам и лигатурному весу (для позиций, сохранённых раньше в граммах)
 export const pctOf = (g: string | undefined, lig: number) => {

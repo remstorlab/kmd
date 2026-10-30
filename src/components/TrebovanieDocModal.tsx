@@ -310,7 +310,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
                     {restCell(p)}
                     </td>
                     <td className="px-3 py-2">{p.lig == null ? "—" : share(p, p.lig).toFixed(2)}</td>
-                    <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} net={p.net} metal={p.code} k={issueShare(p)} /></td>
+                    <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={issueShare(p)} /></td>
                     <td className="px-3 py-2 text-gray-500">{p.location}</td>
                     <td className="px-3 py-2">{status ? <PosStatusBadge status={status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
                     {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}

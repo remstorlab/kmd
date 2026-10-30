@@ -178,7 +178,7 @@ export default function StockPickerModal({
                     {showWeights && <>
                       <td className="px-3 py-2">{probaText(r.proba)}</td>
                       <td className="px-3 py-2">{r.lig}</td>
-                      <td className="px-3 py-2"><NetAuAg chem={r.chem} net={r.net} metal={r.code} /></td>
+                      <td className="px-3 py-2"><NetAuAg chem={r.chem} /></td>
                     </>}
                     <td className="px-3 py-2 text-gray-500">{r.location}</td>
                     <td className="px-3 py-2 text-gray-500">{left(r) || "—"}</td>
