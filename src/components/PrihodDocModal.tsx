@@ -142,7 +142,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
   const posModal: { mode: "add" | "edit" | "view"; pos: PrihodPosition } | null = (() => {
     if (screen.has("position-new")) {
       const pos = emptyPosition(storageLocations, sklad, isOrder ? "Слиток" : "Готовая продукция", "1000");
-      return { mode: "add", pos: partyChemOn ? { ...pos, chem: { ...partyChem } } : pos };
+      return { mode: "add", pos: partyChemOn && Object.keys(partyChem).length ? { ...pos, pct: { ...partyChem } } : pos };
     }
     const view = positions.find(x => x.id === screen.after("position"));
     if (view) return { mode: "view", pos: view };
@@ -296,8 +296,8 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
           )}
           {partyChemOn && (
             <>
-              <ChemCompositionBlock value={partyChem} onChange={setPartyChem} disabled={ro} />
-              {!ro && <div className="text-xs text-gray-500 mt-1">Хим. состав партии автоматически заполняется в новых позициях документа</div>}
+              <ChemCompositionBlock value={partyChem} onChange={setPartyChem} disabled={ro} percentOnly />
+              {!ro && <div className="text-xs text-gray-500 mt-1">% содержания партии подставляется в новые позиции документа — граммы рассчитываются по лигатурному весу позиции</div>}
             </>
           )}
         </div>

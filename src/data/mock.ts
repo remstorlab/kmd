@@ -1025,24 +1025,27 @@ export interface MaterialCode {
   code: string;
   name: string;
   shortName: string;
+  // Процентное содержание элементов сплава: id элемента справочника «Химический состав» → %
+  // (ЗлСрМ 750-125 → Au 75, Ag 12,5, остальное Cu 12,5). По нему рассчитывается хим. состав позиций (data/chem.ts)
+  composition?: Record<string, number>;
 }
 
 export const initialMaterialCodes: MaterialCode[] = [
-  { code: "2000", name: "Серебро чистое", shortName: "Ag чистое" },
-  { code: "3000", name: "Палладий чистый", shortName: "Pd чистый" },
-  { code: "1000", name: "Золото чистое", shortName: "Au чистое" },
-  { code: "0200", name: "Сплав ЗлСрПд 585-250-165", shortName: "ЗлСрПд 585-250-165" },
-  { code: "0300", name: "Сплав ЗлСрМ 750-150", shortName: "ЗлСрМ 750-150" },
-  { code: "0400", name: "Сплав ЗлСрМ 750-125", shortName: "ЗлСрМ 750-125" },
-  { code: "0500", name: "Сплав ЗлСрМ 585-80", shortName: "ЗлСрМ 585-80" },
-  { code: "0100", name: "Сплав ЗлМ 585", shortName: "ЗлМ 585" },
-  { code: "0600", name: "Сплав AuAg", shortName: "AuAg" },
-  { code: "4000", name: "Платина чистое", shortName: "Pt чистое" },
-  { code: "0700", name: "Сплав ЗлСрПдМ 375-100-38", shortName: "ЗлСрПдМ 375-100-38" },
-  { code: "0800", name: "Сплав ЗлСрМ 950", shortName: "ЗлСрМ 950" },
+  { code: "2000", name: "Серебро чистое", shortName: "Ag чистое", composition: { ag: 100 } },
+  { code: "3000", name: "Палладий чистый", shortName: "Pd чистый", composition: { pd: 100 } },
+  { code: "1000", name: "Золото чистое", shortName: "Au чистое", composition: { au: 100 } },
+  { code: "0200", name: "Сплав ЗлСрПд 585-250-165", shortName: "ЗлСрПд 585-250-165", composition: { au: 58.5, ag: 25, pd: 16.5 } },
+  { code: "0300", name: "Сплав ЗлСрМ 750-150", shortName: "ЗлСрМ 750-150", composition: { au: 75, ag: 15, cu: 10 } },
+  { code: "0400", name: "Сплав ЗлСрМ 750-125", shortName: "ЗлСрМ 750-125", composition: { au: 75, ag: 12.5, cu: 12.5 } },
+  { code: "0500", name: "Сплав ЗлСрМ 585-80", shortName: "ЗлСрМ 585-80", composition: { au: 58.5, ag: 8, cu: 33.5 } },
+  { code: "0100", name: "Сплав ЗлМ 585", shortName: "ЗлМ 585", composition: { au: 58.5, cu: 41.5 } },
+  { code: "0600", name: "Сплав AuAg", shortName: "AuAg", composition: { au: 50, ag: 50 } },
+  { code: "4000", name: "Платина чистое", shortName: "Pt чистое", composition: { pt: 100 } },
+  { code: "0700", name: "Сплав ЗлСрПдМ 375-100-38", shortName: "ЗлСрПдМ 375-100-38", composition: { au: 37.5, ag: 10, pd: 3.8, cu: 48.7 } },
+  { code: "0800", name: "Сплав ЗлСрМ 950", shortName: "ЗлСрМ 950", composition: { au: 95, ag: 2.5, cu: 2.5 } },
   { code: "0120", name: "Сигнальные образцы", shortName: "Сигн. образцы" },
-  { code: "8000", name: "Сплав ЗлСрМ 375-20", shortName: "ЗлСрМ 375-20" },
-  { code: "7000", name: "Сплав ЗлСрМ 375-100", shortName: "ЗлСрМ 375-100" },
+  { code: "8000", name: "Сплав ЗлСрМ 375-20", shortName: "ЗлСрМ 375-20", composition: { au: 37.5, ag: 2, cu: 60.5 } },
+  { code: "7000", name: "Сплав ЗлСрМ 375-100", shortName: "ЗлСрМ 375-100", composition: { au: 37.5, ag: 10, cu: 52.5 } },
   { code: "0050", name: "Бриллиантовые вставки", shortName: "Брилл. вставки" },
 ];
 

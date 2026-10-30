@@ -8,6 +8,7 @@ import {
 import { ShihtovayaKarta, ShihtaMaterial, DMItem, ChemComposition, isGPKlass, PRIHOD_SKLAD, SGP, spravValues } from "../data/mock";
 import { takeFromStock, returnToStock } from "../data/stock";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
+import { ChemPercent, gramsFrom, num0 } from "../data/chem";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
 import { Plus, X, Calculator } from "lucide-react";
 import { useScreen } from "../router";
@@ -78,7 +79,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const nested = (name: string) => [screen.has(name), (open: boolean) => (open ? screen.open(name) : screen.close(name))] as const;
   const [showFromSklad, setShowFromSklad] = nested("from-sklad");
   const [showAddDop, setShowAddDop] = nested("dop-material");
-  const emptyDop = () => ({ name: "", unit: "г", ves: "", chem: {} as ChemComposition });
+  const emptyDop = () => ({ name: "", unit: "г", ves: "", chem: {} as ChemComposition, pct: {} as ChemPercent });
   const [dopForm, setDopForm] = useState(emptyDop);
   const showResult = screen.has("raschet");
   const setShowResult = (on: boolean) => screen.toggle("raschet", on);
@@ -404,10 +405,10 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           <div className="grid grid-cols-3 gap-4">
             <Field label="Наименование материала" required full><Input value={dopForm.name} onChange={v => setDopForm(f => ({ ...f, name: v }))} placeholder="Название" /></Field>
             <Field label="Ед. измерения" required><Select value={dopForm.unit} options={["г", "кг", "шт"]} onChange={v => setDopForm(f => ({ ...f, unit: v }))} /></Field>
-            <Field label="Масса лигатурная, г" required><Input value={dopForm.ves} onChange={v => setDopForm(f => ({ ...f, ves: v }))} placeholder="0.00" /></Field>
+            <Field label="Масса лигатурная, г" required><Input value={dopForm.ves} onChange={v => setDopForm(f => ({ ...f, ves: v, chem: gramsFrom(f.pct, num0(v)) }))} placeholder="0.00" /></Field>
           </div>
           <div className="mt-4">
-            <ChemCompositionBlock scope="shk" value={dopForm.chem} onChange={chem => setDopForm(f => ({ ...f, chem }))} />
+            <ChemCompositionBlock scope="shk" value={dopForm.chem} lig={num0(dopForm.ves)} pct={dopForm.pct} onChange={(chem, pct) => setDopForm(f => ({ ...f, chem, pct }))} />
           </div>
         </Modal>
       )}

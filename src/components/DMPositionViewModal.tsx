@@ -1,6 +1,8 @@
 import React from "react";
 import { Badge, PosStatusBadge, Btn, Modal, Field, Input, useMaterialCodeLabel } from "./ui";
 import { ChemComposition } from "../data/mock";
+import { mainElementOf } from "../data/chem";
+import { useApp } from "../store/AppContext";
 import ChemCompositionBlock from "./ChemCompositionBlock";
 
 // Позиция ДМ для просмотра: все поля позиции склада ДМ и химический состав
@@ -24,6 +26,7 @@ const val = (v: number | null | undefined) => (v === null || v === undefined ? "
 // Модалка «Просмотр позиции ДМ» — общая для склада ДМ и операций движения материала
 export default function DMPositionViewModal({ item, onClose }: { item: DMPositionView; onClose: () => void }) {
   const codeLabel = useMaterialCodeLabel();
+  const { materialCodes } = useApp();
   return (
     <Modal title="Просмотр позиции ДМ" wide onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Закрыть</Btn>}>
       <div className="grid grid-cols-4 gap-4 mb-4">
@@ -39,7 +42,7 @@ export default function DMPositionViewModal({ item, onClose }: { item: DMPositio
         <Field label="Доп. информация" full><Input value={item.info || "—"} disabled /></Field>
         <Field label="Статус">{item.status ? <PosStatusBadge status={item.status} nomenkl={item.nomenkl} /> : <Input value="—" disabled />}</Field>
       </div>
-      <ChemCompositionBlock value={item.chem} disabled />
+      <ChemCompositionBlock value={item.chem} disabled lig={item.ligWeight ?? 0} main={item.metal ? mainElementOf(item.metal, materialCodes) : undefined} proba={item.proba ? String(item.proba) : ""} net={item.netWeight ?? undefined} />
     </Modal>
   );
 }

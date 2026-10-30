@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Btn, Modal, Field, Input, Select, KlassSelect, MaterialCodeSelect } from "./ui";
 import { StorageLocation, ChemComposition, spravValues, isStoneKlass } from "../data/mock";
 import ChemCompositionBlock from "./ChemCompositionBlock";
+import { ChemPercent, compositionOf, applyProba, gramsFrom, pctFrom, mainElementOf, num0, r2 } from "../data/chem";
 import { useApp } from "../store/AppContext";
 
 // ── Позиция ДМ: добавление / просмотр / редактирование (с химическим составом) ──
@@ -21,6 +22,8 @@ export interface PrihodPosition {
   seyf: string;
   polka: string;
   chem: ChemComposition;
+  // % содержания элементов (только в форме): задан — им заполняется состав новой позиции (хим. состав партии)
+  pct?: ChemPercent;
   // Доп. информация — произвольный текст, необязательно
   info?: string;
 }
@@ -93,11 +96,41 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   fixedHeight?: boolean;
 }) {
   const ro = mode === "view";
-  const { storageLocations: locs } = useApp();
+  const { storageLocations: locs, materialCodes } = useApp();
   const genNomenkl = useNextNomenkl();
   // Номер присваивается автоматически при добавлении и не редактируется
-  const [form, setForm] = useState(() => (mode === "add" && !initial.nomenkl ? { ...initial, nomenkl: genNomenkl(reservedNomenkl) } : initial));
-  const set = (k: Exclude<keyof PrihodPosition, "chem" | "nomenkl">) => (v: string) => setForm(f => ({ ...f, [k]: v }));
+  // Состав, заданный в % (хим. состав партии), — граммы по лигатурному весу позиции
+  const [form, setForm] = useState(() => {
+    const f = mode === "add" && !initial.nomenkl ? { ...initial, nomenkl: genNomenkl(reservedNomenkl) } : initial;
+    return initial.pct && Object.keys(initial.pct).length ? { ...f, chem: gramsFrom(initial.pct, num0(initial.lig)) } : f;
+  });
+  const set = (k: Exclude<keyof PrihodPosition, "chem" | "pct" | "nomenkl">) => (v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  // ── Хим. состав: % содержания по справочнику «Коды материалов» с поправкой на пробу, граммы — от лигатурного веса ──
+  const ligN = num0(form.lig);
+  const main = mainElementOf(form.code, materialCodes);
+  const [pct, setPct] = useState<ChemPercent>(() => {
+    if (initial.pct && Object.keys(initial.pct).length) return initial.pct;
+    if (Object.keys(initial.chem ?? {}).length) return pctFrom(initial.chem, num0(initial.lig));
+    return applyProba(compositionOf(initial.code, materialCodes), initial.proba, mainElementOf(initial.code, materialCodes));
+  });
+  const applyPct = (p: ChemPercent, lig = ligN) => { setPct(p); setForm(f => ({ ...f, chem: gramsFrom(p, lig) })); };
+  // Код материала: справочное содержание (с поправкой на уже выбранную пробу)
+  const changeCode = (code: string) => {
+    setForm(f => ({ ...f, code }));
+    applyPct(applyProba(compositionOf(code, materialCodes), form.proba, mainElementOf(code, materialCodes)));
+  };
+  // Проба: содержание основного металла = Проба / 10 %, остаток (Cu) пересчитывается
+  const changeProba = (proba: string) => {
+    setForm(f => ({ ...f, proba }));
+    const base = Object.keys(pct).length ? pct : compositionOf(form.code, materialCodes);
+    applyPct(applyProba(base, proba, main));
+  };
+  // Лигатурный вес: граммы элементов пересчитываются по %
+  const changeLig = (lig: string) => setForm(f => ({ ...f, lig, chem: gramsFrom(pct, num0(lig)) }));
+  // Чистый вес — граммы основного металла (Лигатурный вес × Проба / 1000); при заранее рассчитанных массах — как передан
+  const netN = lockWeights ? num0(form.net) : form.chem[main] ? num0(form.chem[main]) : num0(form.proba) > 0 ? r2((ligN * num0(form.proba)) / 1000) : 0;
+  const netStr = isStoneKlass(form.klass) && !netN ? form.net || "0.00" : netN.toFixed(2);
 
   const seyfs = seyfsOf(locs, sklad);
   // «-» — не выбрано; значение не из справочника сохраняется в списке
@@ -114,7 +147,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   // Драгоценные камни: веса металла подставляются 0.00 (можно сохранить как введённый вес),
   // количество изделий обязательно — отмечено звёздочкой, сообщение об ошибке — при попытке сохранить
   const isStone = isStoneKlass(form.klass);
-  const changeKlass = (klass: string) => setForm(f => (isStoneKlass(klass) ? { ...f, klass, lig: "0.00", net: "0.00" } : { ...f, klass }));
+  const changeKlass = (klass: string) => setForm(f => (isStoneKlass(klass) ? { ...f, klass, lig: "0.00", net: "0.00", chem: {} } : { ...f, klass }));
   const noKol = isStone && !(parseInt(form.kol, 10) > 0);
   const [tried, setTried] = useState(false);
   const kolError = !ro && tried && noKol;
@@ -137,9 +170,9 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
     if (canMany && many && onSaveMany) {
       const first = Number(form.nomenkl);
       onSaveMany(Array.from({ length: count }, (_, i) => ({
-        ...form, chem: { ...form.chem }, id: `${form.id}-${i + 1}`, nomenkl: String(first + i),
+        ...form, net: netStr, pct: undefined, chem: { ...form.chem }, id: `${form.id}-${i + 1}`, nomenkl: String(first + i),
       })));
-    } else onSave(form);
+    } else onSave({ ...form, net: netStr, pct: undefined });
   };
   const lastNomenkl = String(Number(form.nomenkl) + Math.max(count, 1) - 1);
   const title = titleProp ?? (mode === "add" ? "Добавить позицию ДМ" : mode === "edit" ? "Редактирование позиции ДМ" : "Просмотр позиции ДМ");
@@ -160,7 +193,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
       <div className="grid grid-cols-4 gap-4 mb-4">
         <Field label="Номенкл. номер"><Input value={form.nomenkl} disabled /></Field>
         <Field label="Класс" required={!ro}><KlassSelect value={form.klass} onChange={changeKlass} disabled={ro} /></Field>
-        <Field label="Код материала" required={!ro}><MaterialCodeSelect value={form.code} onChange={set("code")} disabled={ro} /></Field>
+        <Field label="Код материала" required={!ro}><MaterialCodeSelect value={form.code} onChange={changeCode} disabled={ro} /></Field>
         <Field label="Наименование" required={!ro} full><Input value={form.name} onChange={set("name")} placeholder="Наименование позиции" disabled={ro} /></Field>
         {/* Сколько изделий входит в одну позицию; для драгоценных камней — обязательно */}
         <Field label="Количество изделий, шт" required={!ro && isStone}>
@@ -171,19 +204,28 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         </Field>
         <Field label="Проба" required={!ro && !isStone}>
           <div className={probaError ? "rounded-lg ring-1 ring-red-400" : ""}>
-            <Select value={form.proba} options={probaOptions} onChange={set("proba")} optionLabel={v => v || (isStone ? "Не указана" : "Выберите пробу")} disabled={ro} />
+            <Select value={form.proba} options={probaOptions} onChange={changeProba} optionLabel={v => v || (isStone ? "Не указана" : "Выберите пробу")} disabled={ro} />
           </div>
           {probaError && <div className="text-xs text-red-600 mt-1">Укажите пробу</div>}
         </Field>
-        <Field label="Вес лигатурный, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={set("lig")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
-        <Field label="Вес чистый, г" required={!ro && !lockWeights}><Input value={form.net} onChange={set("net")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
+        <Field label="Вес лигатурный, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={changeLig} placeholder="0.00" disabled={ro || lockWeights} /></Field>
+        {/* Чистый вес не вводится — рассчитывается и выводится в итоге блока «Химический состав» */}
         <Field label="Склад"><Input value={sklad} disabled /></Field>
         {/* Необязательные: «-» — место хранения не задано */}
         <Field label="Сейф"><Select value={form.seyf || NO_LOC} options={seyfOptions} onChange={changeSeyf} disabled={ro} /></Field>
         <Field label="Полка" required={!ro && isSet(form.seyf)}><Select value={form.polka || NO_LOC} options={polkaOptions} onChange={set("polka")} disabled={ro || !isSet(form.seyf)} /></Field>
         <Field label="Доп. информация" full><Input value={form.info ?? ""} onChange={set("info")} placeholder="Дополнительная информация о позиции" disabled={ro} /></Field>
       </div>
-      <ChemCompositionBlock value={form.chem} onChange={chem => setForm(f => ({ ...f, chem }))} disabled={ro} />
+      <ChemCompositionBlock
+        value={form.chem}
+        onChange={(chem, p) => { setForm(f => ({ ...f, chem })); setPct(p); }}
+        disabled={ro}
+        lig={ligN}
+        pct={pct}
+        main={isStoneKlass(form.klass) ? undefined : main}
+        proba={form.proba}
+        net={netN}
+      />
       {canMany && (
         <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
           <div className="flex items-center gap-4 flex-wrap">

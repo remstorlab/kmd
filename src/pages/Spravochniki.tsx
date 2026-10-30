@@ -331,8 +331,27 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
 
 // ── Коды материалов ────────────────────────────────────────────────────────────
 
+// Состав кода: «Au 75 % · Ag 12,5 % · Cu 12,5 %»
+const compositionText = (comp: Record<string, number> | undefined, short: (id: string) => string) =>
+  Object.entries(comp ?? {}).filter(([, v]) => v > 0).map(([k, v]) => `${short(k)} ${String(v).replace(".", ",")} %`).join(" · ");
+
 function MaterialCodesPage({ onBack }: { onBack: () => void }) {
-  const { materialCodes: items, setMaterialCodes: setItems } = useApp();
+  const { materialCodes: items, setMaterialCodes: setItems, chemElements } = useApp();
+  const shortOf = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
+  // % содержания в форме — строками; Cu — остаток сплава: если не заполнен, считается как 100 % − остальные
+  const [pctForm, setPctForm] = useState<Record<string, string>>({});
+  const compElements = chemElements.filter(e => e.showDm || e.id === "cu" || pctForm[e.id]);
+  const pctNum = (v: string | undefined) => { const n = parseFloat((v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : 0; };
+  const othersSum = Math.round(Object.entries(pctForm).filter(([k]) => k !== "cu").reduce((a, [, v]) => a + pctNum(v), 0) * 100) / 100;
+  const restCu = Math.max(0, Math.round((100 - othersSum) * 100) / 100);
+  const cuAuto = !pctForm.cu?.trim() && othersSum > 0;
+  const totalPct = Math.round((othersSum + (cuAuto ? restCu : pctNum(pctForm.cu))) * 100) / 100;
+  const compositionOfForm = (): Record<string, number> | undefined => {
+    const comp: Record<string, number> = {};
+    for (const [k, v] of Object.entries(pctForm)) if (pctNum(v) > 0) comp[k] = pctNum(v);
+    if (cuAuto && restCu > 0) comp.cu = restCu;
+    return Object.keys(comp).length ? comp : undefined;
+  };
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [form, setForm] = useState<MaterialCode>({ code: "", name: "", shortName: "" });
@@ -340,6 +359,8 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (editItem) setForm(editItem);
     else if (showAdd) setForm({ code: "", name: "", shortName: "" });
+    const comp = editItem?.composition ?? {};
+    setPctForm(Object.fromEntries(Object.entries(comp).map(([k, v]) => [k, String(v).replace(".", ",")])));
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const [perPage, setPerPage] = usePerPage("sprav-codes", 10);
@@ -360,10 +381,12 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
   const openEdit = goEdit;
 
   const save = () => {
+    if (totalPct > 100.005) { show("Сумма содержания элементов больше 100 %"); return; }
+    const rec: MaterialCode = { ...form, composition: compositionOfForm() };
     if (editItem) {
-      setItems(prev => prev.map(i => i.code === editItem.code ? form : i));
+      setItems(prev => prev.map(i => i.code === editItem.code ? rec : i));
     } else {
-      setItems(prev => [...prev, form]);
+      setItems(prev => [...prev, rec]);
     }
     closeAll();
     show("Запись сохранена");
@@ -394,8 +417,10 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
+            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
             <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
             <SortTh sortKey="shortName" sort={sort} onSort={toggleSort}>Краткое наименование</SortTh>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Содержание в сплаве</th>
             <th className="w-12"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
@@ -404,13 +429,14 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
                 <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-gray-900">{item.name}</td>
                 <td className="px-4 py-3 text-gray-500">{item.shortName}</td>
+                <td className="px-4 py-3 text-gray-700 tabular-nums">{compositionText(item.composition, shortOf) || <span className="text-gray-400">—</span>}</td>
                 <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
               </tr>
             ))}
             {pageItems.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
-            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={4} />
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={5} />
           </tbody>
         </table>
         <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
@@ -418,6 +444,7 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
 
       {(showAdd || editItem) && (
         <Modal
+          wide
           title={editItem ? "Редактировать запись" : "Добавить запись"}
           onClose={() => { closeAll(); }}
           footer={
@@ -431,6 +458,24 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
             <Field label="Код" required><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem} placeholder="0000" /></Field>
             <Field label="Наименование" required><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
             <Field label="Краткое наименование" required><Input value={form.shortName} onChange={v => setForm(f => ({ ...f, shortName: v }))} /></Field>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Содержание элементов в сплаве, %</h4>
+              <p className="text-xs text-gray-500 mb-3">Напр. ЗлСрМ 750-125 → Au 75, Ag 12,5, остальное Cu. Если Cu не заполнена — подставляется остаток до 100 %. По этим значениям рассчитывается хим. состав позиций ДМ.</p>
+              <div className="grid grid-cols-6 gap-3">
+                {compElements.map(e => (
+                  <Field key={e.id} label={`${e.shortName}, %`}>
+                    <Input
+                      value={pctForm[e.id] ?? ""}
+                      onChange={v => setPctForm(p => ({ ...p, [e.id]: v.replace(/[^\d.,]/g, "") }))}
+                      placeholder={e.id === "cu" && cuAuto ? `ост. ${String(restCu).replace(".", ",")}` : "-"}
+                    />
+                  </Field>
+                ))}
+              </div>
+              <div className={`text-xs mt-2 ${totalPct > 100.005 ? "text-red-600" : "text-gray-500"}`}>
+                Итого: {String(totalPct).replace(".", ",")} %{cuAuto && restCu > 0 ? ` (в т. ч. Cu — остаток ${String(restCu).replace(".", ",")} %)` : ""}
+              </div>
+            </div>
           </div>
         </Modal>
       )}
