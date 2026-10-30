@@ -965,7 +965,7 @@ function operationHtml(o: Operation, spisano: number) {
     ["Наименование изделия", o.description],
     ["Тип документа", o.docType],
     ["Дата документа", o.date],
-    ["Заказчик", o.zakazchik],
+    ["Заказчик/Организация", o.zakazchik],
     ["Подотчётное лицо", o.responsible],
     ...(o.vid === "Плавка" ? [["Номер плавки", o.plavkaNo] as [string, string | undefined]] : []),
     ["Статус", o.stage],
@@ -1471,7 +1471,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <Field label="Тип документа" required={!headRo}><Select value={head.docType} options={docTypeOptions} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={headRo || !!fixedDocType} /></Field>
         <Field label="Номер документа"><Input value={head.document} disabled /></Field>
         <Field label="Дата документа" required={!headRo}><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
-        <Field label="Заказчик"><Select value={head.zakazchik} options={withBlank(["Монетный двор"])} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={headRo} /></Field>
+        <Field label="Заказчик/Организация"><Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...spravValues("Заказчики / Организации")]))} optionLabel={v => v || "Не указан"} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={headRo} /></Field>
         <Field label="Подотчётное лицо" required={!headRo} full><Select value={head.responsible} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"])} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={headRo} /></Field>
         {vid === "Плавка" && (
           <Field label="Номер плавки" required={!headRo}><Input value={head.plavkaNo} onChange={v => setHead(h => ({ ...h, plavkaNo: v }))} disabled={headRo} /></Field>

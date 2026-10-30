@@ -231,10 +231,10 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         {typeSelect}
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
         <Field label="Дата документа" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-        <Field label="Заказчик" required={!ro}>
+        <Field label="Заказчик/Организация">
           {lockZakazchik
             ? <Input value={zakazchik} disabled />
-            : <Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...spravValues("Заказчики / Организации")]))} onChange={h("zakazchik")} />}
+            : <Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...spravValues("Заказчики / Организации")]))} optionLabel={v => v || "Не указан"} onChange={h("zakazchik")} />}
         </Field>
         <Field label="Отправитель" required={!ro}><Select value={head.sender} options={skladOptions(head.sender)} onChange={changeSender} disabled={lockPos} /></Field>
         <Field label="Получатель" required={!ro}><Select value={head.receiver} options={skladOptions(head.receiver)} onChange={h("receiver")} disabled={lockPos} /></Field>

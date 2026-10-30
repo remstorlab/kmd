@@ -189,10 +189,10 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
         <Field label="Получатель" required={!ro}>
           <Select value={head.receiver} options={receivers.includes(head.receiver) ? receivers : [head.receiver, ...receivers]} onChange={h("receiver")} disabled={lockPos} />
         </Field>
-        <Field label="Заказчик / Организация" required={!ro}>
+        <Field label="Заказчик/Организация">
           {lockZakazchik
             ? <Input value={zakazchik} disabled />
-            : <Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...ORGS]))} onChange={h("zakazchik")} />}
+            : <Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...ORGS]))} optionLabel={v => v || "Не указан"} onChange={h("zakazchik")} />}
         </Field>
         <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные сотрудники")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
         <div>

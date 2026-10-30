@@ -166,7 +166,6 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     // Списание выполняется один раз — при первом оформлении документа
     if (badIssue.length) { show(`Укажите количество к выдаче: ${badIssue.map(p => p.name).join(", ")}`); return; }
     if (status === "Оформлено" && badRest.length) { show(`Укажите лигатурный вес остатка на складе (больше 0 и меньше веса позиции): ${badRest.map(p => p.name).join(", ")}`); return; }
-    if (status === "Оформлено" && !zakazchik) { show("Укажите заказчика / организацию"); return; }
     if (status === "Оформлено" && !issued) {
       if (positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
       const lacking = positions.filter(p => {
@@ -248,8 +247,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
         <Field label="Дата документа" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
         <Field label="Отправитель" required={!ro}><Input value={MAIN_SKLAD} disabled /></Field>
         <Field label="Получатель" required={!ro}><Input value={SGP} disabled /></Field>
-        <Field label="Заказчик / Организация" required={!ro}>
-          <Select value={zakazchik} options={zakazchikOptions} optionLabel={v => v || "Выберите заказчика"} onChange={v => setZakazchikManual(v)} disabled={ro} />
+        <Field label="Заказчик/Организация">
+          <Select value={zakazchik} options={zakazchikOptions} optionLabel={v => v || "Не указан"} onChange={v => setZakazchikManual(v)} disabled={ro} />
         </Field>
         <Field label="Доверенность получателя"><Input value={head.doverennost} onChange={h("doverennost")} placeholder="№ и дата доверенности" disabled={ro} /></Field>
         <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={h("schetFaktura")} placeholder="СФ-XXXX" disabled={ro} /></Field>
