@@ -1,6 +1,6 @@
 import React from "react";
 import { Badge, PosStatusBadge, Btn, Modal, Field, Input, useMaterialCodeLabel } from "./ui";
-import { ChemComposition } from "../data/mock";
+import { ChemComposition, isStoneKlass } from "../data/mock";
 import { mainElementOf } from "../data/chem";
 import { useApp } from "../store/AppContext";
 import ChemCompositionBlock from "./ChemCompositionBlock";
@@ -42,7 +42,7 @@ export default function DMPositionViewModal({ item, onClose }: { item: DMPositio
         <Field label="Доп. информация" full><Input value={item.info || "—"} disabled /></Field>
         <Field label="Статус">{item.status ? <PosStatusBadge status={item.status} nomenkl={item.nomenkl} /> : <Input value="—" disabled />}</Field>
       </div>
-      <ChemCompositionBlock value={item.chem} disabled lig={item.ligWeight ?? 0} main={item.metal ? mainElementOf(item.metal, materialCodes) : undefined} proba={item.proba ? String(item.proba) : ""} net={item.netWeight ?? undefined} />
+      {!isStoneKlass(item.klass) && <ChemCompositionBlock value={item.chem} disabled lig={item.ligWeight ?? 0} main={item.metal ? mainElementOf(item.metal, materialCodes) : undefined} proba={item.proba ? String(item.proba) : ""} net={item.netWeight ?? undefined} />}
     </Modal>
   );
 }

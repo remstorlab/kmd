@@ -123,7 +123,8 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   const changeLig = (lig: string) => setForm(f => ({ ...f, lig, chem: gramsFrom(pct, num0(lig)) }));
   // Чистый вес — граммы основного металла (Лигатурный вес × Проба / 1000); при заранее рассчитанных массах — как передан
   const netN = lockWeights ? num0(form.net) : form.chem[main] ? num0(form.chem[main]) : num0(form.proba) > 0 ? r2((ligN * num0(form.proba)) / 1000) : 0;
-  const netStr = isStoneKlass(form.klass) && !netN ? form.net || "0.00" : netN.toFixed(2);
+  // Драгоценные камни: металла в чистоте нет — чистый вес 0.00, хим. состав не задаётся
+  const netStr = isStoneKlass(form.klass) ? "0.00" : netN.toFixed(2);
 
   const seyfs = seyfsOf(locs, sklad);
   // «-» — не выбрано; значение не из справочника сохраняется в списке
@@ -137,10 +138,14 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   const probas = spravValues("Пробы");
   const probaOptions = ["", ...(form.proba && !probas.includes(form.proba) ? [form.proba] : []), ...probas];
 
-  // Драгоценные камни: веса металла подставляются 0.00 (можно сохранить как введённый вес),
-  // количество изделий обязательно — отмечено звёздочкой, сообщение об ошибке — при попытке сохранить
+  // Драгоценные камни: лигатурный вес подставляется 0.00 (можно сохранить с ним или указать массу камней),
+  // блок хим. состава скрыт; количество изделий обязательно — звёздочка, сообщение об ошибке — при попытке сохранить
   const isStone = isStoneKlass(form.klass);
-  const changeKlass = (klass: string) => setForm(f => (isStoneKlass(klass) ? { ...f, klass, lig: "0.00", net: "0.00", chem: {} } : { ...f, klass }));
+  const changeKlass = (klass: string) => setForm(f => (isStoneKlass(klass)
+    ? { ...f, klass, lig: "0.00", net: "0.00", chem: {} }
+    : { ...f, klass, chem: gramsFrom(pct, num0(f.lig)) }));
+  // Позиция к сохранению: у камней хим. состав пустой
+  const toSave = (p: PrihodPosition): PrihodPosition => ({ ...p, net: netStr, chem: isStone ? {} : { ...p.chem } });
   const noKol = isStone && !(parseInt(form.kol, 10) > 0);
   const [tried, setTried] = useState(false);
   const kolError = !ro && tried && noKol;
@@ -163,9 +168,9 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
     if (canMany && many && onSaveMany) {
       const first = Number(form.nomenkl);
       onSaveMany(Array.from({ length: count }, (_, i) => ({
-        ...form, net: netStr, chem: { ...form.chem }, id: `${form.id}-${i + 1}`, nomenkl: String(first + i),
+        ...toSave(form), id: `${form.id}-${i + 1}`, nomenkl: String(first + i),
       })));
-    } else onSave({ ...form, net: netStr });
+    } else onSave(toSave(form));
   };
   const lastNomenkl = String(Number(form.nomenkl) + Math.max(count, 1) - 1);
   const title = titleProp ?? (mode === "add" ? "Добавить позицию ДМ" : mode === "edit" ? "Редактирование позиции ДМ" : "Просмотр позиции ДМ");
@@ -209,16 +214,16 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         <Field label="Полка" required={!ro && isSet(form.seyf)}><Select value={form.polka || NO_LOC} options={polkaOptions} onChange={set("polka")} disabled={ro || !isSet(form.seyf)} /></Field>
         <Field label="Доп. информация" full><Input value={form.info ?? ""} onChange={set("info")} placeholder="Дополнительная информация о позиции" disabled={ro} /></Field>
       </div>
-      <ChemCompositionBlock
+      {!isStone && <ChemCompositionBlock
         value={form.chem}
         onChange={(chem, p) => { setForm(f => ({ ...f, chem })); setPct(p); }}
         disabled={ro}
         lig={ligN}
         pct={pct}
-        main={isStoneKlass(form.klass) ? undefined : main}
+        main={main}
         proba={form.proba}
         net={netN}
-      />
+      />}
       {canMany && (
         <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
           <div className="flex items-center gap-4 flex-wrap">
