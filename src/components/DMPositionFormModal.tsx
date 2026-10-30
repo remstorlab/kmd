@@ -118,6 +118,9 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   const noKol = isStone && !(parseInt(form.kol, 10) > 0);
   const [tried, setTried] = useState(false);
   const kolError = !ro && tried && noKol;
+  // Проба обязательна для всех классов, кроме драгоценных камней
+  const noProba = !isStone && !form.proba;
+  const probaError = !ro && tried && noProba;
 
   const changeSeyf = (seyf: string) => setForm(f => ({ ...f, seyf, polka: isSet(seyf) ? polkasOf(locs, sklad, seyf)[0] ?? NO_LOC : NO_LOC }));
 
@@ -130,7 +133,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
 
   const save = () => {
     if (!canSave) return;
-    if (noKol) { setTried(true); return; }
+    if (noKol || noProba) { setTried(true); return; }
     if (canMany && many && onSaveMany) {
       const first = Number(form.nomenkl);
       onSaveMany(Array.from({ length: count }, (_, i) => ({
@@ -166,7 +169,12 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
           </div>
           {kolError && <div className="text-xs text-red-600 mt-1">Для класса «Драгоценные камни» необходимо указать количество изделий</div>}
         </Field>
-        <Field label="Проба" required={!ro}><Select value={form.proba} options={probaOptions} onChange={set("proba")} optionLabel={v => v || "Выберите пробу"} disabled={ro} /></Field>
+        <Field label="Проба" required={!ro && !isStone}>
+          <div className={probaError ? "rounded-lg ring-1 ring-red-400" : ""}>
+            <Select value={form.proba} options={probaOptions} onChange={set("proba")} optionLabel={v => v || (isStone ? "Не указана" : "Выберите пробу")} disabled={ro} />
+          </div>
+          {probaError && <div className="text-xs text-red-600 mt-1">Укажите пробу</div>}
+        </Field>
         <Field label="Вес лигатурный, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={set("lig")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
         <Field label="Вес чистый, г" required={!ro && !lockWeights}><Input value={form.net} onChange={set("net")} placeholder="0.00" disabled={ro || lockWeights} /></Field>
         <Field label="Склад"><Input value={sklad} disabled /></Field>
