@@ -1,4 +1,5 @@
-import { ChemComposition, MaterialCode, baseMetal } from "./mock";
+// Только типы: data/mock.ts сам использует этот расчёт для демо-данных (без циклической зависимости при загрузке)
+import type { ChemComposition, MaterialCode } from "./mock";
 
 // ── Расчёт химического состава позиции по коду материала, пробе и лигатурному весу ──
 // Справочник «Коды материалов» хранит процентное содержание элементов сплава (ЗлСрМ 750-125 → Au 75 %, Ag 12,5 %,
@@ -23,8 +24,12 @@ const s2 = (v: number) => r2(v).toFixed(2);
 // Процентное содержание: id элемента → %, строкой (как вводится в поля)
 export type ChemPercent = Record<string, string>;
 
-// Основной металл кода (au / ag / pt / pd) — к нему относится проба
-export const mainElementOf = (code: string, codes: MaterialCode[]) => baseMetal(code, codes).toLowerCase();
+// Основной металл кода (au / ag / pt / pd) — к нему относится проба: префикс краткого наименования кода
+// (как baseMetal в data/mock.ts), по умолчанию — золото
+export const mainElementOf = (code: string, codes: MaterialCode[]) => {
+  const prefix = (codes.find(c => c.code === code)?.shortName ?? code).slice(0, 2);
+  return prefix === "Au" || prefix === "Ag" || prefix === "Pt" || prefix === "Pd" ? prefix.toLowerCase() : "au";
+};
 
 // Справочное содержание кода материала, % (пусто — у кода состав не задан)
 export function compositionOf(code: string, codes: MaterialCode[]): ChemPercent {

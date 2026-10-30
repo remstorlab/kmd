@@ -1,3 +1,4 @@
+import { applyProba, gramsFrom } from "./chem";
 import type { PrihodPosition } from "../components/DMPositionFormModal";
 // «Закрыта» — позиция выдана со склада наружу по оформленной накладной на отгрузку.
 export type StatusGP = "На складе" | "Резерв" | "В подотчёте" | "Закрыта";
@@ -311,20 +312,36 @@ export interface LogEntry {
 // выданы в операциях движения, резерв — в шихтовых картах, закрытые — по оформленным накладным.
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
-const fx = (v: number) => r2(v).toFixed(2);
-// Химический состав по коду материала: основной металл = чистый вес, для сплавов — лигатурные компоненты
-function chemOf(code: string, lig: number, net: number): ChemComposition {
-  switch (code) {
-    case "1000": return { au: fx(net) };
-    case "2000": return { ag: fx(net) };
-    case "4000": return { pt: fx(net) };
-    case "3000": return { pd: fx(net) };
-    case "0100": return { au: fx(net), cu: fx(lig - net) };                        // ЗлМ 585
-    case "0300": return { au: fx(net), ag: fx(lig * 0.15), cu: fx(lig * 0.10) };    // ЗлСрМ 750-150
-    case "0500": return { au: fx(net), ag: fx(lig * 0.08), cu: fx(lig - net - lig * 0.08) }; // ЗлСрМ 585-80
-    default: return {};
-  }
+
+// Процентное содержание элементов по кодам материала (справочник «Коды материалов», поле composition).
+// Первый элемент — основной металл кода, к нему относится проба.
+const CODE_COMPOSITION: Record<string, Record<string, number>> = {
+  "1000": { au: 100 },
+  "2000": { ag: 100 },
+  "3000": { pd: 100 },
+  "4000": { pt: 100 },
+  "0100": { au: 58.5, cu: 41.5 },                     // ЗлМ 585
+  "0200": { au: 58.5, ag: 25, pd: 16.5 },             // ЗлСрПд 585-250-165
+  "0300": { au: 75, ag: 15, cu: 10 },                 // ЗлСрМ 750-150
+  "0400": { au: 75, ag: 12.5, cu: 12.5 },             // ЗлСрМ 750-125
+  "0500": { au: 58.5, ag: 8, cu: 33.5 },              // ЗлСрМ 585-80
+  "0600": { au: 50, ag: 50 },                         // AuAg
+  "0700": { au: 37.5, ag: 10, pd: 3.8, cu: 48.7 },    // ЗлСрПдМ 375-100-38
+  "0800": { au: 95, ag: 2.5, cu: 2.5 },               // ЗлСрМ 950
+  "8000": { au: 37.5, ag: 2, cu: 60.5 },              // ЗлСрМ 375-20
+  "7000": { au: 37.5, ag: 10, cu: 52.5 },             // ЗлСрМ 375-100
+};
+const mainOf = (code: string) => Object.keys(CODE_COMPOSITION[code] ?? {})[0] ?? "au";
+
+// Хим. состав демо-позиции — тем же расчётом, что и в форме позиции ДМ (data/chem.ts):
+// справочное содержание кода → поправка по пробе (основной металл = Проба / 10 %, остаток — Cu) → граммы от лиг. веса.
+// Чистый вес позиции = граммы основного металла (= Лигатурный вес × Проба / 1000). Без пробы (камни) — состава нет.
+function chemOf(code: string, lig: number, proba: number): ChemComposition {
+  if (!(proba > 0) || !(lig > 0)) return {};
+  const pct = Object.fromEntries(Object.entries(CODE_COMPOSITION[code] ?? {}).map(([k, v]) => [k, v.toFixed(2)]));
+  return gramsFrom(applyProba(pct, String(proba), mainOf(code)), lig);
 }
+const netOf = (code: string, chem: ChemComposition) => Number(chem[mainOf(code)] ?? 0);
 
 // --- Склады (справочник «Склады») ---
 // СДМ №1 — склад приёмки: на него принимаются позиции по приходному ордеру и накладной, с него
@@ -341,8 +358,8 @@ export const SGP = "СГП №2";
 // qty — количество изделий, unitG — лигатурная масса одного изделия, г
 const gp = (id: string, name: string, nomenkl: string, qty: number, code: string, proba: number, unitG: number, location: string, status: StatusGP = "На складе", sklad = SDM2): GPItem => {
   const ligWeight = r2(qty * unitG);
-  const netWeight = r2(ligWeight * proba / 1000);
-  return { id, name, nomenkl, qty, unit: "шт", klass: "Готовая продукция", code, location, sklad, status, proba, ligWeight, netWeight, chem: chemOf(code, ligWeight, netWeight) };
+  const chem = chemOf(code, ligWeight, proba);
+  return { id, name, nomenkl, qty, unit: "шт", klass: "Готовая продукция", code, location, sklad, status, proba, ligWeight, netWeight: netOf(code, chem), chem };
 };
 const L = (s: number, p: number) => `Сейф №${s}, Полка ${p}`;
 
@@ -385,16 +402,23 @@ export const initialGPItems: GPItem[] = [
   // Выданы по оформленной накладной НО-0204 — на СГП №2, без места хранения
   gp("gp35", "Монета «Атамекен» Ag 925", "5015347", 50, "2000", 925, 31.10, "-", "На складе", SGP),
   gp("gp36", "Орден «Алтын алка»", "5015348", 10, "0300", 750, 22.40, "-", "На складе", SGP),
+  // Изделия из остальных сплавов справочника «Коды материалов»
+  gp("gp37", "Кольцо ЗлСрМ 750-125 с фианитом", "5015405", 15, "0400", 750, 3.60, L(1, 1)),
+  gp("gp38", "Серьги ЗлСрМ 585-80 конго", "5015406", 20, "0500", 585, 2.20, L(1, 2)),
+  gp("gp39", "Медаль «Отан» ЗлСрМ 950", "5015407", 5, "0800", 958, 15.00, L(2, 1)),
+  gp("gp40", "Кольцо ЗлСрМ 375-100 тонкое", "5015408", 12, "7000", 375, 2.90, L(3, 2)),
+  gp("gp41", "Подвеска ЗлСрМ 375-20 «Тулпар»", "5015409", 25, "8000", 375, 1.80, L(4, 1)),
+  gp("gp42", "Монета палладиевая «Барыс» Pd 999", "5015410", 8, "3000", 999, 31.10, L(4, 2)),
 ];
 
 // --- DM Items ---
-const dm = (id: string, name: string, nomenkl: string, klass: string, metal: string, proba: number, ligWeight: number, location: string, status: StatusDM = "На складе", qty = 1, net?: number, sklad = SDM2): DMItem => {
-  const netWeight = net ?? r2(ligWeight * proba / 1000);
-  return { id, name, nomenkl, klass, metal, qty, proba, ligWeight, netWeight, location, sklad, status, chem: chemOf(metal, ligWeight, netWeight) };
+const dm = (id: string, name: string, nomenkl: string, klass: string, metal: string, proba: number, ligWeight: number, location: string, status: StatusDM = "На складе", qty = 1, sklad = SDM2): DMItem => {
+  const chem = chemOf(metal, ligWeight, proba);
+  return { id, name, nomenkl, klass, metal, qty, proba, ligWeight, netWeight: netOf(metal, chem), location, sklad, status, chem };
 };
 // Позиция на складе приёмки СДМ1
 const dm1 = (id: string, name: string, nomenkl: string, klass: string, metal: string, proba: number, ligWeight: number, location: string, status: StatusDM = "На складе") =>
-  dm(id, name, nomenkl, klass, metal, proba, ligWeight, location, status, 1, undefined, SDM1);
+  dm(id, name, nomenkl, klass, metal, proba, ligWeight, location, status, 1, SDM1);
 
 export const initialDMItems: DMItem[] = [
   // Резерв шихтовой карты П-2026-0089 — на СДМ1, ждёт требования
@@ -422,12 +446,24 @@ export const initialDMItems: DMItem[] = [
   dm("dm11", "Слиток золота ЗлА-2", "5015381", "Слиток", "1000", 999, 300.00, "-", "В подотчёте"),
   dm("dm12", "Стружка золотая 750", "5015382", "Стружка", "0300", 750, 62.40, "-", "В подотчёте"),
   dm("dm13", "Подкат золотой 999", "5015383", "Подкат", "1000", 999, 520.00, "-", "В подотчёте"),
-  dm("dm5", "Раствор серебра AgNO3", "5015375", "Электролит", "2000", 999, 250.00, "-", "В подотчёте", 1, 158.75),
+  dm("dm5", "Раствор серебра AgNO3", "5015375", "Электролит", "2000", 999, 250.00, "-", "В подотчёте"),
   dm("dm18", "Пластина серебряная", "5015388", "Пластина", "2000", 999, 120.00, "-", "В подотчёте"),
   // Закрыта: израсходована на анализ в ЛКИ
   dm("dm16", "Контрольная проба Au-585", "5015386", "Контрольная проба", "0100", 585, 6.20, "-", "Закрыта"),
   // Выдана по оформленной накладной НО-0203 — на СГП №2, без места хранения
-  dm("dm19", "Слиток золота ЗлБ-1", "5015389", "Слиток", "1000", 999, 200.00, "-", "На складе", 1, undefined, SGP),
+  dm("dm19", "Слиток золота ЗлБ-1", "5015389", "Слиток", "1000", 999, 200.00, "-", "На складе", 1, SGP),
+  // Позиции из остальных кодов справочника «Коды материалов»
+  dm("dm23", "Слиток палладия ПдА-1", "5015395", "Слиток", "3000", 999, 250.00, L(1, 1)),
+  dm("dm24", "Пластина ЗлСрПд 585-250-165", "5015396", "Пластина", "0200", 585, 64.20, L(2, 2)),
+  dm("dm26", "Проволока ЗлСрМ 585-80", "5015398", "Проволока", "0500", 585, 42.50, L(3, 1)),
+  dm("dm28", "Пластина ЗлСрПдМ 375-100-38", "5015400", "Пластина", "0700", 375, 38.60, L(3, 2)),
+  dm("dm29", "Слиток ЗлСрМ 950", "5015401", "Слиток", "0800", 958, 120.00, L(1, 2)),
+  dm("dm30", "Сигнальный образец Au 585", "5015402", "Контрольная проба", "0120", 585, 4.80, L(4, 2)),
+  dm("dm31", "Проволока ЗлСрМ 375-20", "5015403", "Проволока", "8000", 375, 27.00, L(2, 2)),
+  dm("dm32", "Пластина ЗлСрМ 375-100", "5015404", "Пластина", "7000", 375, 55.40, L(4, 1)),
+  // Резерв шихтовой карты П-2026-0092 — на СДМ1
+  dm1("dm25", "Подкат ЗлСрМ 750-125", "5015397", "Подкат", "0400", 750, 210.00, L(1, 2), "Резерв"),
+  dm1("dm27", "Гранулы сплава AuAg", "5015399", "Гранулы", "0600", 500, 150.00, L(2, 2), "Резерв"),
 ];
 
 // Заказчик и признак собственности заказчика — из документов приёма. По умолчанию — «Монетный двор»
@@ -501,14 +537,14 @@ export const initialVydachaDocs: SkladDoc[] = [
 const opPos = (n: number, id: string, loc: string, over: Partial<OperPosition> = {}): OperPosition => {
   const i = initialDMItems.find(x => x.id === id)!;
   const lig = over.lig ?? i.ligWeight;
-  const net = over.net ?? i.netWeight;
-  const chem = chemOf(i.metal, lig, net);
+  const chem = chemOf(i.metal, lig, i.proba);
+  const net = netOf(i.metal, chem);
   return { n, name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: i.qty, ves: lig, ag: chem.ag ?? "-", cu: chem.cu ?? "-", chem, loc, metal: i.metal, lig, net, ...over };
 };
 // Новая позиция возврата (создана при возврате, на склад ещё не поставлена)
 const newPos = (n: number, name: string, nomenkl: string, klass: string, metal: string, proba: number, lig: number, loc: string, qty?: number): OperPosition => {
-  const net = r2(lig * proba / 1000);
-  const chem = chemOf(metal, lig, net);
+  const chem = chemOf(metal, lig, proba);
+  const net = netOf(metal, chem);
   return { n, name, nomenkl, klass, proba, qty, ves: lig, ag: chem.ag ?? "-", cu: chem.cu ?? "-", chem, loc, metal, lig, net };
 };
 const VYDAL = "Ким Александр Юрьевич";
@@ -543,7 +579,7 @@ export const initialOperations: Operation[] = [
     id: "op3", date: "17.08.2026", type: "Выдача-Возврат", vid: "Отбор пробы", positions: 1, document: "1232", responsible: "Смирнов Константин Дмитриевич",
     stage: "Завершено", description: "Отбор пробы от слитка серебра СрА-4", statusVydacha: "Выдано", statusVozvrat: "Полностью", statusClose: "Закрыто",
     docType: "Приказ", zakazchik: "Монетный двор", vydal: VYDAL, poluchil: "Смирнов Константин Дмитриевич",
-    vydachaPos: [opPos(1, "dm14", L(1, 2), { lig: 800.00, net: 799.20, ves: 800.00 })],
+    vydachaPos: [opPos(1, "dm14", L(1, 2), { lig: 800.00, ves: 800.00 })],
     vozvratPos: [opPos(1, "dm14", L(1, 2)), opPos(2, "dm15", L(3, 1))],
     losses: [{ id: "l1", date: "2026-08-17", name: "Проведение входного контроля стандартных слитков", ves: "0.08", type: "Потеря", metal: "2000" }],
   },
@@ -570,6 +606,11 @@ const shMat = (id: string): ShihtaMaterial => {
 };
 export const initialShihtovyeKarty: ShihtovayaKarta[] = [
   {
+    id: "sk6", date: "21.08.2026", name: "Шихта сплав ЗлСрМ 750-125 + AuAg", plavkaNo: "П-2026-0092", status: "Новая",
+    materials: [shMat("dm25"), shMat("dm27")],
+    createdAt: "2026-08-21T11:20:00", createdBy: "Бекова Айгуль Маратовна",
+  },
+  {
     id: "sk5", date: "20.08.2026", name: "Шихта Au-585 партия В (черновик)", plavkaNo: "П-2026-0090", status: "Редактирование",
     materials: [shMat("dm7"), shMat("dm20")],
     createdAt: "2026-08-20T10:05:00", createdBy: "Ковалева Елена",
@@ -586,13 +627,21 @@ export const initialShihtovyeKarty: ShihtovayaKarta[] = [
   },
   {
     id: "sk3", date: "10.08.2026", name: "Шихта серебро 925 (кольца)", plavkaNo: "П-2026-0087", status: "Выполнена",
-    materials: [{ name: "Слиток серебра СрА-1", nomenkl: "5015360", klass: "Слиток", proba: 999, ves: 1000.50, loc: "-", qty: 1, chem: { ag: "999.50" } }],
+    materials: [{ name: "Слиток серебра СрА-1", nomenkl: "5015360", klass: "Слиток", proba: 999, ves: 1000.50, loc: "-", qty: 1, chem: chemOf("2000", 1000.50, 999) }],
     createdAt: "2026-08-10T08:30:00", createdBy: "Петров Сергей Владимирович",
   },
   {
     id: "sk4", date: "05.08.2026", name: "Шихта Au-999 слитки партия Б", plavkaNo: "П-2026-0086", status: "Выполнена",
-    materials: [{ name: "Слиток золота стандартный", nomenkl: "5015361", klass: "Слиток", proba: 999.9, ves: 1000.00, loc: "-", qty: 1, chem: { au: "999.90" } }],
+    materials: [{ name: "Слиток золота стандартный", nomenkl: "5015361", klass: "Слиток", proba: 999.9, ves: 1000.00, loc: "-", qty: 1, chem: chemOf("1000", 1000.00, 999.9) }],
     createdAt: "2026-08-05T11:00:00", createdBy: "Ковалева Елена",
+  },
+  {
+    id: "sk7", date: "01.08.2026", name: "Шихта ЗлСрПдМ 375 (лом и пластина)", plavkaNo: "П-2026-0085", status: "Выполнена",
+    materials: [
+      { name: "Лом ЗлСрПдМ 375-100-38", nomenkl: "5015357", klass: "Скрап", proba: 375, ves: 84.30, loc: "-", qty: 1, chem: chemOf("0700", 84.30, 375) },
+      { name: "Пластина ЗлСрМ 375-20", nomenkl: "5015358", klass: "Пластина", proba: 375, ves: 46.10, loc: "-", qty: 1, chem: chemOf("8000", 46.10, 375) },
+    ],
+    createdAt: "2026-08-01T10:40:00", createdBy: "Петров Сергей Владимирович",
   },
 ];
 
@@ -1031,21 +1080,21 @@ export interface MaterialCode {
 }
 
 export const initialMaterialCodes: MaterialCode[] = [
-  { code: "2000", name: "Серебро чистое", shortName: "Ag чистое", composition: { ag: 100 } },
-  { code: "3000", name: "Палладий чистый", shortName: "Pd чистый", composition: { pd: 100 } },
-  { code: "1000", name: "Золото чистое", shortName: "Au чистое", composition: { au: 100 } },
-  { code: "0200", name: "Сплав ЗлСрПд 585-250-165", shortName: "ЗлСрПд 585-250-165", composition: { au: 58.5, ag: 25, pd: 16.5 } },
-  { code: "0300", name: "Сплав ЗлСрМ 750-150", shortName: "ЗлСрМ 750-150", composition: { au: 75, ag: 15, cu: 10 } },
-  { code: "0400", name: "Сплав ЗлСрМ 750-125", shortName: "ЗлСрМ 750-125", composition: { au: 75, ag: 12.5, cu: 12.5 } },
-  { code: "0500", name: "Сплав ЗлСрМ 585-80", shortName: "ЗлСрМ 585-80", composition: { au: 58.5, ag: 8, cu: 33.5 } },
-  { code: "0100", name: "Сплав ЗлМ 585", shortName: "ЗлМ 585", composition: { au: 58.5, cu: 41.5 } },
-  { code: "0600", name: "Сплав AuAg", shortName: "AuAg", composition: { au: 50, ag: 50 } },
-  { code: "4000", name: "Платина чистое", shortName: "Pt чистое", composition: { pt: 100 } },
-  { code: "0700", name: "Сплав ЗлСрПдМ 375-100-38", shortName: "ЗлСрПдМ 375-100-38", composition: { au: 37.5, ag: 10, pd: 3.8, cu: 48.7 } },
-  { code: "0800", name: "Сплав ЗлСрМ 950", shortName: "ЗлСрМ 950", composition: { au: 95, ag: 2.5, cu: 2.5 } },
+  { code: "2000", name: "Серебро чистое", shortName: "Ag чистое", composition: CODE_COMPOSITION["2000"] },
+  { code: "3000", name: "Палладий чистый", shortName: "Pd чистый", composition: CODE_COMPOSITION["3000"] },
+  { code: "1000", name: "Золото чистое", shortName: "Au чистое", composition: CODE_COMPOSITION["1000"] },
+  { code: "0200", name: "Сплав ЗлСрПд 585-250-165", shortName: "ЗлСрПд 585-250-165", composition: CODE_COMPOSITION["0200"] },
+  { code: "0300", name: "Сплав ЗлСрМ 750-150", shortName: "ЗлСрМ 750-150", composition: CODE_COMPOSITION["0300"] },
+  { code: "0400", name: "Сплав ЗлСрМ 750-125", shortName: "ЗлСрМ 750-125", composition: CODE_COMPOSITION["0400"] },
+  { code: "0500", name: "Сплав ЗлСрМ 585-80", shortName: "ЗлСрМ 585-80", composition: CODE_COMPOSITION["0500"] },
+  { code: "0100", name: "Сплав ЗлМ 585", shortName: "ЗлМ 585", composition: CODE_COMPOSITION["0100"] },
+  { code: "0600", name: "Сплав AuAg", shortName: "AuAg", composition: CODE_COMPOSITION["0600"] },
+  { code: "4000", name: "Платина чистое", shortName: "Pt чистое", composition: CODE_COMPOSITION["4000"] },
+  { code: "0700", name: "Сплав ЗлСрПдМ 375-100-38", shortName: "ЗлСрПдМ 375-100-38", composition: CODE_COMPOSITION["0700"] },
+  { code: "0800", name: "Сплав ЗлСрМ 950", shortName: "ЗлСрМ 950", composition: CODE_COMPOSITION["0800"] },
   { code: "0120", name: "Сигнальные образцы", shortName: "Сигн. образцы" },
-  { code: "8000", name: "Сплав ЗлСрМ 375-20", shortName: "ЗлСрМ 375-20", composition: { au: 37.5, ag: 2, cu: 60.5 } },
-  { code: "7000", name: "Сплав ЗлСрМ 375-100", shortName: "ЗлСрМ 375-100", composition: { au: 37.5, ag: 10, cu: 52.5 } },
+  { code: "8000", name: "Сплав ЗлСрМ 375-20", shortName: "ЗлСрМ 375-20", composition: CODE_COMPOSITION["8000"] },
+  { code: "7000", name: "Сплав ЗлСрМ 375-100", shortName: "ЗлСрМ 375-100", composition: CODE_COMPOSITION["7000"] },
   { code: "0050", name: "Бриллиантовые вставки", shortName: "Брилл. вставки" },
 ];
 
