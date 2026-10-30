@@ -158,6 +158,8 @@ export interface Operation {
   stage: OperStage;
   // Описание операции (вводится при создании)
   description?: string;
+  // Доп. информация — произвольный текст, необязательно
+  info?: string;
   statusVydacha: "Выдано" | "Не выдано";
   statusVozvrat: "Не начат" | "Частично" | "Полностью";
   statusClose: "Не закрыто" | "Закрыто: списано" | "Закрыто";

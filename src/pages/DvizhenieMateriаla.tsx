@@ -4,7 +4,7 @@ import {
   Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, ProbaChem, usePaged,
-  CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp,
+  CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip,
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
@@ -1110,6 +1110,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [vid, setVid] = useState<string>(op?.vid || "Плавка");
   const [type, setType] = useState<string>(op?.type || "Выдача");
   const [description, setDescription] = useState(op?.description ?? "");
+  const [info, setInfo] = useState(op?.info ?? "");
   const [vydacha, setVydacha] = useState<OperPosition[]>(() => (op ? opVydacha(op) : []));
   const [vozvrat, setVozvrat] = useState<OperPosition[]>(() => (op ? opVozvrat(op) : []));
   const [losses, setLosses] = useState<LossRow[]>(() => {
@@ -1299,6 +1300,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     responsible: head.responsible,
     stage: next,
     description,
+    info: info.trim() || undefined,
     statusVydacha: "Выдано",
     statusVozvrat: next === "Завершено" ? "Полностью" : vozvrat.length > 0 ? "Частично" : "Не начат",
     statusClose: next !== "Завершено" ? "Не закрыто" : "Закрыто",
@@ -1377,6 +1379,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         )}
         <Field label="Выдал"><Input value={head.vydal} disabled /></Field>
         <Field label="Получил" required={!headRo}><Select value={head.poluchil} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович"])} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={headRo} /></Field>
+        {/* Доп. информация редактируется, пока операция не завершена */}
+        <InfoField value={info} onChange={setInfo} disabled={ro} />
       </div>
 
       {/* Tabs */}
@@ -1677,7 +1681,7 @@ export function DvizhenieMateriаla() {
                   <button onClick={() => setViewOp(op)} className="text-blue-600 hover:underline">{op.vid}</button>
                 </td>
                 <td className="px-4 py-3 text-gray-700 max-w-64">{op.description || <span className="text-gray-400">—</span>}</td>
-                <td className="px-4 py-3 text-blue-600">{op.document}</td>
+                <td className="px-4 py-3 text-blue-600"><InfoTip info={op.info}>{op.document}</InfoTip></td>
                 <td className="px-4 py-3 text-gray-700">{op.responsible}</td>
                 <td className="px-4 py-3 whitespace-nowrap"><Badge label={op.stage} group="operacii" /></td>
                 <CreatedCell row={op} />

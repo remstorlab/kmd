@@ -537,15 +537,13 @@ export function InfoField({ value, onChange, disabled = false }: { value: string
   );
 }
 
-// Ячейка «Доп. информация»: не больше двух строк с многоточием, полный текст — во всплывающей подсказке
-export function InfoCell({ text, className = "px-4 py-3" }: { text?: string; className?: string }) {
-  return (
-    <td className={`${className} text-gray-600 max-w-xs`}>
-      {text
-        ? <div title={text} className="line-clamp-2 break-words whitespace-pre-line cursor-help">{text}</div>
-        : <span className="text-gray-400">—</span>}
-    </td>
-  );
+// Номер документа в таблице: при заполненной «Доп. информации» — подсказка с её текстом при наведении
+// (номер подчёркнут пунктиром); без текста подсказки нет
+export function InfoTip({ info, children }: { info?: string; children: React.ReactNode }) {
+  const text = info?.trim();
+  return text
+    ? <span title={`${INFO_LABEL}: ${text}`} className="cursor-help border-b border-dotted border-current">{children}</span>
+    : <>{children}</>;
 }
 
 export function CreatedCell({ row, className = "px-4 py-3" }: { row: Created; className?: string }) {
