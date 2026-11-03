@@ -160,7 +160,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
         <thead><tr className="text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
           <th className={th}>Номенкл. №</th>
           <th className={th}>Наименование</th>
-          <th className={th}>Количество изделий</th>
+          <th className={th}>Количество</th>
           <th className={th}>Класс</th>
           <th className={th}>Код материала</th>
           <th className={th}>Проба</th>
@@ -377,7 +377,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
               </th>
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort}>Номенкл. №</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
-              <SortTh sortKey="qty" sort={sort} onSort={toggleSort}>Количество изделий</SortTh>
+              <SortTh sortKey="qty" sort={sort} onSort={toggleSort}>Количество</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort}>Класс</SortTh>
               <SortTh sortKey="metal" sort={sort} onSort={toggleSort}>Код материала</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort}>Проба</SortTh>

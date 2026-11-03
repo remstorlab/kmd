@@ -172,7 +172,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
               <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <th className="px-3 py-2 text-left">Статус</th>
-              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
+              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {pg5.pageItems.map(i => {
@@ -365,7 +365,7 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
               <th className="w-10 px-3 py-2"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 accent-blue-600" title="Выбрать все найденные" /></th>
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className={th}>Номенкл. №</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort} className={th}>Наименование</SortTh>
-              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество изделий</SortTh>
+              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
               <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
@@ -677,7 +677,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
         <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
           <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className={th}>Номенкл. №</SortTh>
           <SortTh sortKey="name" sort={sort} onSort={toggleSort} className={th}>Наименование</SortTh>
-          <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество изделий</SortTh>
+          <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество</SortTh>
           <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
           <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
           <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
@@ -771,7 +771,7 @@ function PositionsSummary({ rows, view }: { rows: OperPosition[]; view: (p: Oper
         <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
           <th className="px-3 py-2 text-left font-medium">Свод по позициям</th>
           <th className="px-3 py-2 text-right font-medium">Позиций</th>
-          <th className="px-3 py-2 text-right font-medium">Изделий, шт</th>
+          <th className="px-3 py-2 text-right font-medium">Количество</th>
           <th className={`px-3 py-2 text-right font-medium ${ligCls}`}>Вес лигат., г</th>
           <th className="px-3 py-2 text-right font-medium">Вес чист. Au, г</th>
           <th className="px-3 py-2 text-right font-medium">Вес чист. Ag, г</th>

@@ -162,7 +162,7 @@ export default function StockPickerModal({
                 <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               </>}
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
-              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
+              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
               {anyInput && <th className="px-3 py-2 text-left w-28">{qtyLabel}</th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">

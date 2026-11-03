@@ -729,7 +729,7 @@ export const initialRoles: Role[] = [
 // Атрибуты позиции в журнале — как в карточке позиции склада
 const logAttrs = (name: string, nomenkl: string, klass: string, code: string, qty: string, proba: string, lig: string, net: string, loc: string, status: string) => [
   { label: "Наименование", value: name }, { label: "Номенкл. №", value: nomenkl }, { label: "Класс", value: klass }, { label: "Код материала", value: code },
-  { label: "Количество изделий", value: qty }, { label: "Проба", value: proba }, { label: "Вес лигат.", value: lig }, { label: "Вес чист. Au/Ag", value: net },
+  { label: "Количество", value: qty }, { label: "Проба", value: proba }, { label: "Вес лигат.", value: lig }, { label: "Вес чист. Au/Ag", value: net },
   { label: "Место хранения", value: loc }, { label: "Статус", value: status },
 ];
 // Вес чистый в журнале — «Au / Ag», г, из хим. состава

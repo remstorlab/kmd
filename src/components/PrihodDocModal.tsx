@@ -302,7 +302,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
               <SortTh sortKey="name" sort={sort} onSort={toggleSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код материала</SortTh>
-              <SortTh sortKey="kol" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество изделий</SortTh>
+              <SortTh sortKey="kol" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
               {isOrder && <>
                 <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
                 <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>

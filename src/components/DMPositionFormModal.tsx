@@ -194,11 +194,11 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         <Field label="Код материала" required={!ro}><MaterialCodeSelect value={form.code} onChange={changeCode} disabled={ro} /></Field>
         <Field label="Наименование" required={!ro} full><Input value={form.name} onChange={set("name")} placeholder="Наименование позиции" disabled={ro} /></Field>
         {/* Сколько изделий входит в одну позицию; для драгоценных камней — обязательно */}
-        <Field label="Количество изделий, шт" required={!ro && isStone}>
+        <Field label="Количество" required={!ro && isStone}>
           <div className={kolError ? "rounded-lg ring-1 ring-red-400" : ""}>
             <Input value={form.kol} onChange={v => set("kol")(v.replace(/[^\d]/g, ""))} placeholder="количество в пределах одной позиции" disabled={ro} />
           </div>
-          {kolError && <div className="text-xs text-red-600 mt-1">Для класса «Драгоценные камни» необходимо указать количество изделий</div>}
+          {kolError && <div className="text-xs text-red-600 mt-1">Для класса «Драгоценные камни» необходимо указать количество</div>}
         </Field>
         <Field label="Проба" required={!ro && !isStone}>
           <div className={probaError ? "rounded-lg ring-1 ring-red-400" : ""}>
