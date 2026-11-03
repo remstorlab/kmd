@@ -20,6 +20,7 @@ export default function StockPickerModal({
   showWeights = false,
   qtyLabel = "Кол-во к выдаче",
   qtyInput = true,
+  fillMax = false,
   emptyText = "Нет доступных позиций на складе",
   addLabel = "Добавить",
   toolbar,
@@ -37,6 +38,8 @@ export default function StockPickerModal({
   // false — без ввода количества: позиция берётся целиком (весь доступный остаток).
   // Функция — ввод количества только для подходящих позиций.
   qtyInput?: boolean | ((r: StockRow) => boolean);
+  // При отметке позиции подставлять максимальное доступное количество (иначе — 1)
+  fillMax?: boolean;
   emptyText?: string;
   addLabel?: string;
   // Дополнительные поля над фильтрами (например, выбор склада)
@@ -87,15 +90,16 @@ export default function StockPickerModal({
   const selectedCount = Object.keys(selectedQty).length;
   const allChecked = filtered.length > 0 && filtered.every(r => r.id in selectedQty);
 
-  const toggle = (id: string) => setSelectedQty(prev => {
+  const initQty = (r: StockRow) => (fillMax ? String(left(r)) : "1");
+  const toggle = (r: StockRow) => setSelectedQty(prev => {
     const next = { ...prev };
-    if (id in next) delete next[id]; else next[id] = "1";
+    if (r.id in next) delete next[r.id]; else next[r.id] = initQty(r);
     return next;
   });
   const toggleAll = () => setSelectedQty(prev => {
     const next = { ...prev };
     if (allChecked) filtered.forEach(r => delete next[r.id]);
-    else filtered.forEach(r => { if (!(r.id in next)) next[r.id] = "1"; });
+    else filtered.forEach(r => { if (!(r.id in next)) next[r.id] = initQty(r); });
     return next;
   });
   const setQty = (id: string, v: string) => setSelectedQty(prev => (id in prev ? { ...prev, [id]: v.replace(/[^\d]/g, "") } : prev));
@@ -170,7 +174,7 @@ export default function StockPickerModal({
                 const checked = r.id in selectedQty;
                 return (
                   <tr key={r.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
-                    <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(r.id)} className="w-4 h-4 accent-blue-600" /></td>
+                    <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(r)} className="w-4 h-4 accent-blue-600" /></td>
                     <td className="px-3 py-2 text-gray-500">{r.nomenkl}</td>
                     <td className="px-3 py-2 font-medium">{r.name}</td>
                     <td className="px-3 py-2"><KlassCode value={r.klass} /></td>

@@ -61,10 +61,11 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Требование_${doc.number}.pdf`)] : []));
   const [positions, setPositions] = useState<TrebPosition[]>(() => doc?.positions ?? []);
 
-  // Остатки склада-отправителя (позиции «На складе» и «Резерв» из обоих учётов)
+  // Остатки склада-отправителя (позиции «На складе» и «Резерв» из обоих учётов). Количество к перемещению
+  // вводится всегда (как в «Возврате СГП №2»): позиция без количества изделий (или из одного изделия) — 1 шт.
   const stock = useMemo<StockRow[]>(() => [
     ...gpItems.filter(i => i.sklad === head.sender && canMove(i.status) && i.qty > 0).map(i => ({ id: i.id, src: "gp" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: i.qty, unit: i.unit, proba: i.proba ?? null, lig: i.ligWeight ?? null, net: i.netWeight ?? null, location: i.location, sklad: i.sklad, chem: i.chem })),
-    ...dmItems.filter(i => i.sklad === head.sender && canMove(i.status)).map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem })),
+    ...dmItems.filter(i => i.sklad === head.sender && canMove(i.status)).map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: Math.max(i.qty, 1), unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem })),
   ], [gpItems, dmItems, head.sender]);
 
   const itemOf = (p: TrebPosition): GPItem | DMItem | undefined =>
@@ -122,13 +123,13 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     show(`Добавлено позиций: ${picked.length}`);
   };
 
-  // Количество к перемещению — от 1 до количества изделий; без количества изделий позиция перемещается целиком
+  // Количество к перемещению — от 1 до количества изделий
   const setIssue = (id: string, v: string) => setPositions(prev => prev.map(p => {
     if (p.id !== id) return p;
     const n = parseInt(v.replace(/[^\d]/g, ""), 10);
     return { ...p, issue: Number.isFinite(n) ? Math.min(Math.max(n, 0), p.qty) : 0 };
   }));
-  const badIssue = positions.filter(p => p.qty > 0 && (p.issue < 1 || p.issue > p.qty));
+  const badIssue = positions.filter(p => p.issue < 1 || p.issue > p.qty);
 
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(positions, {
@@ -171,7 +172,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       if (positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
       const lacking = positions.filter(p => {
         const it = itemOf(p);
-        return !it || it.sklad !== head.sender || !canMove(it.status) || it.qty < p.issue;
+        return !it || it.sklad !== head.sender || !canMove(it.status) || Math.max(it.qty, 1) < p.issue;
       });
       if (lacking.length) { show(`Позиции недоступны на складе «${head.sender}»: ${lacking.map(p => p.name).join(", ")}`); return; }
       // Перемещение: меняется только склад — место хранения, статус и прочие атрибуты сохраняются.
@@ -299,7 +300,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
                     <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                     <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                     <td className="px-3 py-2">
-                      {!lockPos && p.qty > 1 ? (
+                      {!lockPos ? (
                         <div className="flex items-center gap-1.5">
                           <div className={`w-20 ${p.issue < 1 ? "rounded-lg ring-1 ring-red-400" : ""}`}>
                             <Input value={p.issue ? String(p.issue) : ""} onChange={v => setIssue(p.id, v)} placeholder="1" />
@@ -333,7 +334,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
 
       {showPick && (
         <StockPickerModal
-          qtyInput={r => r.qty > 1}
+          fillMax
           qtyLabel="Кол-во к перемещению"
           title={`Добавить позиции со склада «${head.sender}»`}
           rows={stock}
