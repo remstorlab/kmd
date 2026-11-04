@@ -219,15 +219,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         <Btn onClick={() => save("В работе")}>Сохранить</Btn>
       </>}
     >
-      {posted ? (
-        <div className="mb-4 text-sm bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5">
-          Требование оформлено: позиции перемещены со склада «{head.sender}» на склад «{head.receiver}» с сохранением мест хранения и статусов. Состав позиций изменить нельзя.
-        </div>
-      ) : !ro && (
-        <div className="mb-4 text-sm bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5">
-          При оформлении позиции перемещаются на склад-получатель: место хранения, статус (в т. ч. «Резерв» под шихтовую карту) и остальные атрибуты не меняются. Резерв шихтовой карты остаётся резервом карты; дополнительно добавленные позиции встают на склад-получатель «На складе» — шихтовая карта не меняется.
-        </div>
-      )}
       <div className="grid grid-cols-4 gap-4 mb-5">
         {typeSelect}
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
