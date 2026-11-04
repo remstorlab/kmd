@@ -1,7 +1,7 @@
 import React from "react";
 import { Field, Input } from "./ui";
 import { ChemComposition } from "../data/mock";
-import { ChemPercent, gramOf, pctOf, pctFrom, pctSum, num0 } from "../data/chem";
+import { ChemPercent, gramOf, pctOf, pctFrom, pctSum } from "../data/chem";
 import { useApp } from "../store/AppContext";
 
 // Блок «Химический состав (в чистоте)» — поля формируются по справочнику «Химический состав»:
@@ -10,10 +10,10 @@ import { useApp } from "../store/AppContext";
 //
 // Режимы:
 //  • lig задан — расчёт по лигатурному весу: у каждого элемента граммы и % содержания (оба поля редактируемые:
-//    изменили % — пересчитались граммы, изменили граммы — пересчитался %), внизу итог «в чистоте» по элементам;
+//    изменили % — пересчитались граммы, изменили граммы — пересчитался %);
 //  • percentOnly — только % содержания (напр. хим. состав партии: подставляется в новые позиции документа);
 //  • иначе — только граммы.
-export default function ChemCompositionBlock({ value, onChange, disabled = false, scope = "dm", lig, pct, percentOnly = false, main, proba, net }: {
+export default function ChemCompositionBlock({ value, onChange, disabled = false, scope = "dm", lig, pct, percentOnly = false }: {
   value: ChemComposition | undefined;
   onChange?: (chem: ChemComposition, pct: ChemPercent) => void;
   disabled?: boolean;
@@ -23,10 +23,9 @@ export default function ChemCompositionBlock({ value, onChange, disabled = false
   // % содержания; не задан — выводится по граммам и лигатурному весу
   pct?: ChemPercent;
   percentOnly?: boolean;
-  // Основной металл кода материала (au / ag / …) и проба — для строки «Чистый вес» в итоге
+  // Не используются (итог «Чистый вес» под составом убран); оставлены для совместимости вызовов
   main?: string;
   proba?: string;
-  // Чистый вес позиции, г (если не задан — граммы основного металла)
   net?: number;
 }) {
   const { chemElements } = useApp();
@@ -54,11 +53,6 @@ export default function ChemCompositionBlock({ value, onChange, disabled = false
   const title = percentOnly ? "Химический состав, % содержания в сплаве" : calc ? "Химический состав: граммы в чистоте и % содержания в сплаве" : "Химический состав (в чистоте), г";
   const sum = pctSum(percent);
   const hasPct = Object.keys(percent).length > 0;
-  const nameOf = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
-  const totals = shown.filter(e => num0(chem[e.id]) > 0);
-  const mainG = main ? num0(chem[main]) : 0;
-  const netG = net ?? mainG;
-  const probaN = num0(proba);
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -88,37 +82,6 @@ export default function ChemCompositionBlock({ value, onChange, disabled = false
         <div className="text-xs text-amber-600 mt-2">Сумма содержания элементов: {sum.toFixed(2)} % (должно быть 100 %)</div>
       )}
 
-      {/* Итог по позиции: сколько каждого металла в чистоте */}
-      {calc && (
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          <div className="flex flex-wrap items-stretch gap-2">
-            {main && (
-              <div className="px-3 py-2 rounded-lg bg-blue-50 border border-blue-100 min-w-40">
-                <div className="text-[11px] font-medium text-blue-700 uppercase tracking-wide">Чистый вес ({nameOf(main)})</div>
-                <div className="text-lg font-semibold text-blue-800 tabular-nums">
-                  {netG.toFixed(2)} <span className="text-xs font-normal">г</span>
-                  {percent[main] && <span className="ml-1.5 text-xs font-normal text-blue-700">· {percent[main]} %</span>}
-                </div>
-              </div>
-            )}
-            {totals.length === 0 && !main && <div className="text-sm text-gray-400">Укажите лигатурный вес и состав</div>}
-            {totals.filter(e => e.id !== main).map(e => (
-              <div key={e.id} className="px-3 py-2 rounded-lg bg-white border border-gray-200 min-w-28">
-                <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">{e.shortName} в чистоте</div>
-                <div className="text-lg font-semibold text-gray-900 tabular-nums">
-                  {num0(chem[e.id]).toFixed(2)} <span className="text-xs font-normal text-gray-500">г</span>
-                  {percent[e.id] && <span className="ml-1.5 text-xs font-normal text-gray-500">· {percent[e.id]} %</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="text-xs text-gray-500 mt-2">
-            {main && probaN > 0 && lig! > 0
-              ? <>Чистый вес = Лигатурный вес × Проба / 1000 = {lig!.toFixed(2)} × {proba} / 1000 = <b>{netG.toFixed(2)} г</b></>
-              : "Граммы элемента = Лигатурный вес × % содержания / 100"}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

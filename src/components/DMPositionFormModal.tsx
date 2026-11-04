@@ -207,7 +207,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
           {probaError && <div className="text-xs text-red-600 mt-1">Укажите пробу</div>}
         </Field>
         <Field label="Вес лигатурный, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={changeLig} placeholder="0.00" disabled={ro || lockWeights} /></Field>
-        {/* Чистый вес не вводится — рассчитывается и выводится в итоге блока «Химический состав» */}
+        {/* Чистый вес не вводится — рассчитывается (граммы основного металла в блоке «Химический состав») */}
         <Field label="Склад"><Input value={sklad} disabled /></Field>
         {/* Необязательные: «-» — место хранения не задано */}
         <Field label="Сейф"><Select value={form.seyf || NO_LOC} options={seyfOptions} onChange={changeSeyf} disabled={ro} /></Field>
