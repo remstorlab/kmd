@@ -137,13 +137,12 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
     if (Number.isFinite(n)) chem[k] = String(+((parseFloat(chem[k] ?? "0") || 0) + n).toFixed(2));
   }
   const loc = parseLoc(items[0].location);
-  // Количество изделий — сумма по позициям, где оно указано (поле остаётся редактируемым)
-  const totalQty = items.reduce((s, i) => s + (i.qty || 0), 0);
+  // Количество изделий объединённой позиции по умолчанию — 1 (поле остаётся редактируемым)
   const [initial] = useState<PrihodPosition>(() => ({
     // Наименование и проба не подставляются — вводятся вручную
     id: `merge-${Date.now()}`, nomenkl: "", name: "",
     klass: same(i => i.klass) ?? "Слиток", code: same(i => i.metal) ?? items[0].metal,
-    kol: totalQty > 0 ? String(totalQty) : "", unit: "шт", proba: "",
+    kol: "1", unit: "шт", proba: "",
     lig: totalLig.toFixed(2), net: totalNet.toFixed(2), seyf: loc.seyf, polka: loc.polka, chem,
   }));
 
