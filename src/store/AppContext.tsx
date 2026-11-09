@@ -39,6 +39,27 @@ export function evaluatePasswordRules(pwd: string, policy: SecurityPolicy): stri
   return errors;
 }
 
+// Генерация пароля по парольной политике: длина не меньше минимальной (но не короче 12),
+// все 4 типа символов (покрывает требование «не менее N типов»). Без похожих символов (0/O, 1/l/I).
+export function generatePassword(policy: SecurityPolicy): string {
+  const sets = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnpqrstuvwxyz", "23456789", "!@#$%^&*-_=+?"];
+  const all = sets.join("");
+  const len = Math.max(policy.minLength, 12);
+  const rand = (n: number) => {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0] % n;
+  };
+  const chars = sets.map(s => s[rand(s.length)]);
+  while (chars.length < len) chars.push(all[rand(all.length)]);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = rand(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  const pwd = chars.join("");
+  return evaluatePasswordRules(pwd, policy).length ? generatePassword(policy) : pwd;
+}
+
 export function passwordDiffPositions(a: string, b: string): number {
   const maxLen = Math.max(a.length, b.length);
   let diff = 0;

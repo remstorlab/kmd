@@ -3,6 +3,7 @@ import { useApp, Page, Lang, daysSince, evaluatePasswordRules } from "../store/A
 import { Modal, Btn, Field, Input } from "./ui";
 import { Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, ChevronRight, Languages, LogOut, KeyRound, ShieldAlert } from "lucide-react";
 import { KmdLogo } from "./KmdLogo";
+import PasswordSuggest from "./PasswordSuggest";
 import { useSearchParams } from "react-router";
 
 // hasSub — внутри раздела есть кнопки перехода на подразделы (показывается стрелка «›»)
@@ -59,6 +60,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     >
       <div className="space-y-4">
         <Field label="Текущий пароль" required><Input value={oldPwd} onChange={setOldPwd} placeholder="••••••••" /></Field>
+        <PasswordSuggest onUse={p => { setNewPwd(p); setConfirmPwd(p); }} />
         <Field label="Новый пароль" required><Input value={newPwd} onChange={setNewPwd} placeholder="••••••••" /></Field>
         <Field label="Подтверждение нового пароля" required><Input value={confirmPwd} onChange={setConfirmPwd} placeholder="••••••••" /></Field>
 
