@@ -265,16 +265,13 @@ function NewUserModal({ user, onClose, onSave }: { user?: AppUser | null; onClos
     role: user?.role || "Сотрудник склада ДМ",
     blocked: user?.status === "Заблокирован",
     password: "",
-    confirmPassword: "",
     position: "",
     phone: "+7 (___) ___-__-__",
   });
   const { securityPolicy } = useApp();
   // Новый пользователь — пароль обязателен; при редактировании — меняется, только если введён
-  const pwdTouched = !user || !!form.password || !!form.confirmPassword;
   const pwdErrors = form.password ? evaluatePasswordRules(form.password, securityPolicy) : [];
-  const pwdMismatch = !!form.confirmPassword && form.password !== form.confirmPassword;
-  const pwdInvalid = pwdTouched && (!form.password || pwdErrors.length > 0 || form.password !== form.confirmPassword);
+  const pwdInvalid = (!user && !form.password) || pwdErrors.length > 0;
 
   return (
     <Modal
@@ -297,16 +294,14 @@ function NewUserModal({ user, onClose, onSave }: { user?: AppUser | null; onClos
       }
     >
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Username" required full><Input value={form.username} onChange={v => setForm(f => ({ ...f, username: v }))} placeholder="login" /></Field>
         <div className="col-span-2">
-          <PasswordSuggest onUse={p => setForm(f => ({ ...f, password: p, confirmPassword: p }))} />
+          <PasswordSuggest onUse={p => setForm(f => ({ ...f, password: p }))} />
         </div>
+        <Field label="Username" required><Input value={form.username} onChange={v => setForm(f => ({ ...f, username: v }))} placeholder="login" /></Field>
         <Field label={user ? "Новый пароль" : "Пароль"} required={!user}><Input value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} placeholder="••••••••" /></Field>
-        <Field label="Повтор пароля" required={!user}><Input value={form.confirmPassword} onChange={v => setForm(f => ({ ...f, confirmPassword: v }))} placeholder="••••••••" /></Field>
-        {(pwdErrors.length > 0 || pwdMismatch) && (
+        {pwdErrors.length > 0 && (
           <div className="col-span-2 text-xs text-amber-600 space-y-0.5 -mt-2">
             {pwdErrors.map(e => <div key={e}>• {e}</div>)}
-            {pwdMismatch && <div>• Пароль и повтор пароля не совпадают</div>}
           </div>
         )}
         <Field label="ФИО" required full><Input value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Иванов Иван Иванович" /></Field>
