@@ -1,20 +1,21 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useApp, Page, Lang, daysSince, evaluatePasswordRules } from "../store/AppContext";
 import { Modal, Btn, Field, Input } from "./ui";
-import { Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, Languages, LogOut, KeyRound, ShieldAlert } from "lucide-react";
+import { Warehouse, ArrowLeftRight, Repeat, ClipboardList, Users, FileBarChart2, BookOpen, List, Settings, Moon, Sun, ChevronDown, ChevronRight, Languages, LogOut, KeyRound, ShieldAlert } from "lucide-react";
 import { KmdLogo } from "./KmdLogo";
 import { useSearchParams } from "react-router";
 
-const menuItems: { key: string; page: Page; icon: React.ReactNode }[] = [
-  { key: "nav.sklady", page: "sklady-hub", icon: <Warehouse className="w-5 h-5" /> },
-  { key: "nav.skladOper", page: "sklad-oper-hub", icon: <ArrowLeftRight className="w-5 h-5" /> },
+// hasSub — внутри раздела есть кнопки перехода на подразделы (показывается стрелка «›»)
+const menuItems: { key: string; page: Page; icon: React.ReactNode; hasSub?: boolean }[] = [
+  { key: "nav.sklady", page: "sklady-hub", icon: <Warehouse className="w-5 h-5" />, hasSub: true },
+  { key: "nav.skladOper", page: "sklad-oper-hub", icon: <ArrowLeftRight className="w-5 h-5" />, hasSub: true },
   { key: "nav.dvizhenie", page: "dvizhenie-mat", icon: <Repeat className="w-5 h-5" /> },
   { key: "nav.shihtovye", page: "shihtovye-karty", icon: <ClipboardList className="w-5 h-5" /> },
   { key: "nav.podotchet", page: "podotchetniki", icon: <Users className="w-5 h-5" /> },
   { key: "nav.otchet", page: "otchetnost", icon: <FileBarChart2 className="w-5 h-5" /> },
   { key: "nav.sprav", page: "spravochniki", icon: <BookOpen className="w-5 h-5" /> },
   { key: "nav.log", page: "logirovanie", icon: <List className="w-5 h-5" /> },
-  { key: "nav.admin", page: "admin-users", icon: <Settings className="w-5 h-5" /> },
+  { key: "nav.admin", page: "admin-users", icon: <Settings className="w-5 h-5" />, hasSub: true },
 ];
 
 function isActive(menuPage: Page, currentPage: Page): boolean {
@@ -275,7 +276,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span className={`shrink-0 ${active ? "text-white" : "text-slate-500"}`}>
                   {item.icon}
                 </span>
-                <span className="truncate text-sm">{tr(item.key)}</span>
+                <span className="truncate text-sm flex-1">{tr(item.key)}</span>
+                {item.hasSub && (
+                  <ChevronRight className={`w-4 h-4 shrink-0 ${active ? "text-white" : "text-slate-500"}`} />
+                )}
               </button>
             );
           })}
