@@ -14,7 +14,7 @@ const menuItems: { key: string; page: Page; icon: React.ReactNode; hasSub?: bool
   { key: "nav.shihtovye", page: "shihtovye-karty", icon: <ClipboardList className="w-5 h-5" /> },
   { key: "nav.podotchet", page: "podotchetniki", icon: <Users className="w-5 h-5" /> },
   { key: "nav.otchet", page: "otchetnost", icon: <FileBarChart2 className="w-5 h-5" /> },
-  { key: "nav.sprav", page: "spravochniki", icon: <BookOpen className="w-5 h-5" /> },
+  { key: "nav.sprav", page: "spravochniki", icon: <BookOpen className="w-5 h-5" />, hasSub: true },
   { key: "nav.log", page: "logirovanie", icon: <List className="w-5 h-5" /> },
   { key: "nav.admin", page: "admin-users", icon: <Settings className="w-5 h-5" />, hasSub: true },
 ];
