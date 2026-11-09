@@ -8,7 +8,8 @@ import {
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, MAIN_SKLAD, SGP, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
-import { takeFromStock, isPartialIssue, restLigOk, issueShare, partLigMap } from "../data/stock";
+import { takeFromStock, partLigMap } from "../data/stock";
+import { useIssuePositions } from "./IssueInputs";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
@@ -120,13 +121,9 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
 
   const changeType = (t: string) => screen.toggle("gp", t === DOC_PEREDACHA_GP);
-  // Количество к выдаче — от 1 до количества изделий позиции; без количества изделий позиция выдаётся целиком
-  const setIssue = (id: string, v: string) => setPositions(prev => prev.map(p => {
-    if (p.id !== id) return p;
-    const n = parseInt(v.replace(/[^\d]/g, ""), 10);
-    return { ...p, issue: Number.isFinite(n) ? Math.min(Math.max(n, 0), p.qty) : 0 };
-  }));
-  const badIssue = positions.filter(p => p.qty > 0 && (p.issue < 1 || p.issue > p.qty));
+  // Количество к выдаче (от 1 до количества изделий) и выданный вес при частичной выдаче — IssueLine;
+  // без количества изделий позиция выдаётся целиком
+  const iss = useIssuePositions(positions, setPositions);
 
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(positions, {
@@ -140,32 +137,10 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     location: p => p.location,
   });
 
-  const totalQty = positions.reduce((s, p) => s + p.issue, 0);
-  // Массы выдаваемой части — пропорционально количеству (без количества изделий — вся масса позиции)
-  // Доля выдаваемой части: при частичной выдаче — по введённому весу остатка на складе
-  const share = (p: VydachaPosition, v: number | null) => (v == null ? 0 : v * issueShare(p));
-  const setRestLig = (id: string, v: string) => setPositions(prev => prev.map(p => (p.id === id ? { ...p, restLig: v.replace(/[^\d.,]/g, "") } : p)));
-  // Частичная выдача без корректного веса остатка не оформляется
-  const badRest = positions.filter(p => isPartialIssue(p) && !restLigOk(p));
-  const restCell = (p: VydachaPosition) => isPartialIssue(p) && (
-    lockPos
-      ? (p.restLig ? <div className="text-xs text-gray-500 mt-1 whitespace-nowrap">остаток на складе: {p.restLig} г</div> : null)
-      : (
-        <div className="mt-1.5">
-          <div className="text-[11px] text-gray-500 mb-0.5 whitespace-nowrap">Лиг. вес остатка на складе, г</div>
-          <div className={`w-28 ${restLigOk(p) ? "" : "rounded-lg ring-1 ring-red-400"}`}>
-            <Input value={p.restLig ?? ""} onChange={v => setRestLig(p.id, v)} placeholder={p.lig != null ? `< ${p.lig.toFixed(2)}` : "0.00"} />
-          </div>
-        </div>
-      )
-  );
-  const totalLig = positions.reduce((s, p) => s + share(p, p.lig), 0);
-  const totalNet = positions.reduce((s, p) => s + share(p, p.net), 0);
-
   const save = (status: DocStatus) => {
     // Списание выполняется один раз — при первом оформлении документа
-    if (badIssue.length) { show(`Укажите количество к выдаче: ${badIssue.map(p => p.name).join(", ")}`); return; }
-    if (status === "Оформлено" && badRest.length) { show(`Укажите лигатурный вес остатка на складе (больше 0 и меньше веса позиции): ${badRest.map(p => p.name).join(", ")}`); return; }
+    const err = iss.validate(status === "Оформлено" && !issued);
+    if (err) { show(err); return; }
     if (status === "Оформлено" && !issued) {
       if (positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
       const lacking = positions.filter(p => {
@@ -297,19 +272,9 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
-                  <td className="px-3 py-2">
-                    {!lockPos && p.qty > 1 ? (
-                      <div className="flex items-center gap-1.5">
-                        <div className={`w-20 ${p.issue < 1 ? "rounded-lg ring-1 ring-red-400" : ""}`}>
-                          <Input value={p.issue ? String(p.issue) : ""} onChange={v => setIssue(p.id, v)} placeholder="1" />
-                        </div>
-                        <span className="text-xs text-gray-400 whitespace-nowrap">из {p.qty}</span>
-                      </div>
-                    ) : (p.issue || "—")}
-                    {restCell(p)}
-                  </td>
-                  <td className="px-3 py-2">{p.lig == null ? "—" : share(p, p.lig).toFixed(2)}</td>
-                  <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={issueShare(p)} /></td>
+                  <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos)}</td>
+                  <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos)}</td>
+                  <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
                   <td className="px-3 py-2 text-gray-500">{p.location}</td>
                   {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
                 </tr>
@@ -318,9 +283,9 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
             </tbody>
             <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
-              <td className="px-3 py-2">{totalQty}</td>
-              <td className="px-3 py-2">{totalLig.toFixed(2)}</td>
-              <td className="px-3 py-2 text-blue-600">{totalNet.toFixed(2)}</td>
+              <td className="px-3 py-2">{iss.totals.qty}</td>
+              <td className="px-3 py-2">{iss.totals.lig.toFixed(2)}</td>
+              <td className="px-3 py-2 text-blue-600">{iss.totals.net.toFixed(2)}</td>
               <td colSpan={lockPos ? 1 : 2}></td>
             </tr></tfoot>
           </table>

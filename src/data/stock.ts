@@ -46,7 +46,10 @@ function splitChem(chem: ChemComposition | undefined, k: number): [ChemCompositi
   return [part, rest];
 }
 
-const addChem = (a: ChemComposition | undefined, b: ChemComposition | undefined): ChemComposition | undefined => {
+// Хим. состав части k (0..1) позиции
+export const scaleChem = (chem: ChemComposition | undefined, k: number) => (k >= 1 ? chem : splitChem(chem, k)[0]);
+
+export const addChem = (a:ChemComposition | undefined, b: ChemComposition | undefined): ChemComposition | undefined => {
   if (!a && !b) return undefined;
   const out: ChemComposition = { ...a };
   for (const [el, v] of Object.entries(b ?? {})) {
@@ -109,23 +112,74 @@ export function takeFromStock<T extends StockRecord>(
   return { items: out, taken };
 }
 
-// ── Частичная выдача позиции документа (выдача, требование, возврат СГП №2) ──
-// Позиция выдаётся частично, если выдаётся меньше изделий, чем есть. Тогда вводится лигатурный вес,
-// остающийся на складе; выдаваемая часть = вес позиции − остаток, чистый вес и хим. состав — в той же доле.
-export interface IssuePos { qty: number; issue: number; lig: number | null; restLig?: string }
-export const isPartialIssue = (p: IssuePos) => p.qty > 0 && p.issue > 0 && p.issue < p.qty;
-export const restLigOf = (p: IssuePos) => num(p.restLig);
-// Введённый остаток корректен: больше 0 и меньше веса позиции
-export const restLigOk = (p: IssuePos) => {
-  const r = restLigOf(p);
-  return Number.isFinite(r) && r > 0 && p.lig != null && r < p.lig;
-};
-// Доля выдаваемой части позиции (0..1): по введённому весу остатка, без него — по количеству
-export const issueShare = (p: IssuePos) =>
-  !isPartialIssue(p) ? 1 : restLigOk(p) ? (p.lig! - restLigOf(p)) / p.lig! : p.issue / p.qty;
-// Лигатурный вес выдаваемых частей для takeFromStock: id записи → вес
+// ── Частичная выдача позиции (выдача, требование, возврат СГП №2, движение материала) ──
+// Позиция выдаётся частично, если выдаётся меньше изделий, чем есть. Тогда вручную вводится лигатурный вес
+// выдаваемой части (больше 0 и меньше веса позиции); вес, остающийся на складе, = вес позиции − выданный.
+// Чистый вес и хим. состав выдаваемой части — в доле выданного веса.
+
+// Позиция с выдаваемым количеством: qty / lig — количество и лиг. вес всей позиции склада,
+// issue — количество к выдаче, issueLig — введённый лиг. вес выдаваемой части (строка поля ввода)
+export interface IssuePos { qty: number; issue: number; lig: number | null; issueLig?: string }
+
+// Расчёт выдачи по одной позиции: количество, выданный вес, остаток на складе, доля, проверки
+export class IssueLine {
+  constructor(private readonly p: IssuePos) {}
+
+  static of(p: IssuePos) { return new IssueLine(p); }
+
+  get qty() { return this.p.qty; }
+  get issue() { return this.p.issue; }
+  // Полный лиг. вес позиции склада
+  get totalLig() { return this.p.lig; }
+  // Количество можно менять: у позиции больше одного изделия
+  get qtyEditable() { return this.p.qty > 1; }
+  get partial() { return this.p.qty > 0 && this.p.issue > 0 && this.p.issue < this.p.qty; }
+  // При частичной выдаче вводится вес (если у позиции есть лиг. вес)
+  get needsLig() { return this.partial && this.p.lig != null && this.p.lig > 0; }
+  get qtyOk() { return this.p.qty <= 0 || (this.p.issue >= 1 && this.p.issue <= this.p.qty); }
+  get enteredLig() { return num(this.p.issueLig); }
+  get ligOk() {
+    if (!this.needsLig) return true;
+    const v = this.enteredLig;
+    return Number.isFinite(v) && v > 0 && v < this.p.lig!;
+  }
+  get ok() { return this.qtyOk && this.ligOk; }
+  // Выданный лиг. вес: вся позиция; при частичной — введённый (пока не введён корректно — null)
+  get issuedLig(): number | null {
+    if (this.p.lig == null) return null;
+    if (!this.needsLig) return this.p.lig;
+    return this.ligOk ? round2(this.enteredLig) : null;
+  }
+  // Лиг. вес, остающийся на складе (при частичной выдаче)
+  get restLig(): number | null {
+    const v = this.issuedLig;
+    return this.partial && v != null && this.p.lig != null ? round2(this.p.lig - v) : null;
+  }
+  // Доля выдаваемой части (0..1): по выданному весу, без веса — по количеству
+  get share(): number {
+    if (!this.partial) return 1;
+    if (this.needsLig) return this.ligOk ? this.enteredLig / this.p.lig! : 0;
+    return this.p.issue / this.p.qty;
+  }
+  // Величина выдаваемой части (чистый вес, металл хим. состава)
+  part(v: number | null | undefined): number | null { return v == null ? null : round2(v * this.share); }
+  // Текст ошибки для подсказки у поля
+  get error(): string | null {
+    if (!this.qtyOk) return `Количество от 1 до ${this.p.qty}`;
+    if (!this.ligOk) return `Выданный вес больше 0 и меньше ${this.p.lig!.toFixed(2)} г`;
+    return null;
+  }
+}
+
+// Совместимые функции-обёртки
+export const isPartialIssue = (p: IssuePos) => IssueLine.of(p).partial;
+export const issueShare = (p: IssuePos) => IssueLine.of(p).share;
+// Лиг. вес выдаваемых частей для takeFromStock: id записи → вес
 export const partLigMap = <P extends IssuePos & { id: string }>(ps: P[]) =>
-  new Map(ps.filter(p => isPartialIssue(p) && restLigOk(p)).map(p => [p.id, round2(p.lig! - restLigOf(p))]));
+  new Map(ps.flatMap(p => {
+    const l = IssueLine.of(p);
+    return l.needsLig && l.issuedLig != null ? [[p.id, l.issuedLig] as [string, number]] : [];
+  }));
 
 // Возврат записей на склад: часть объединяется с исходной записью (parentId), если та на складе
 // со статусом stockStatus; иначе запись получает статус stockStatus (и место хранения, если задано).

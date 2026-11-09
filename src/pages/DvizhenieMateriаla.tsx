@@ -8,7 +8,8 @@ import {
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
-import { takeFromStock, returnToStock } from "../data/stock";
+import { takeFromStock, returnToStock, IssueLine, scaleChem, addChem } from "../data/stock";
+import { IssueQtyCell, IssueLigCell } from "../components/IssueInputs";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
@@ -33,16 +34,16 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
   // Выбранные позиции (id) и количество к выдаче; без ввода — всё количество позиции
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qtyById, setQtyById] = useState<Record<string, string>>({});
-  // Частичная выдача: лигатурный вес, остающийся на складе у позиции
-  const [restById, setRestById] = useState<Record<string, string>>({});
-  const restOf = (i: { id: string }) => parseFloat((restById[i.id] ?? "").replace(",", "."));
-  const restOk = (i: { id: string; ligWeight: number }) => { const r = restOf(i); return Number.isFinite(r) && r > 0 && r < i.ligWeight; };
-  const partial = (i: { id: string; qty: number }) => i.qty > 1 && issueQty(i) < i.qty;
+  // Частичная выдача: лигатурный вес выдаваемой части (остаток на складе рассчитывается)
+  const [ligById, setLigById] = useState<Record<string, string>>({});
+  // Количество к выдаче: по умолчанию — всё количество позиции; пустое поле — ошибка
   const issueQty = (i: { id: string; qty: number }) => {
-    if (i.qty <= 1) return i.qty;
-    const n = parseInt(qtyById[i.id] ?? "", 10);
-    return Number.isFinite(n) ? Math.min(Math.max(n, 1), i.qty) : i.qty;
+    if (i.qty <= 1 || qtyById[i.id] === undefined) return i.qty;
+    const n = parseInt(qtyById[i.id], 10);
+    return Number.isFinite(n) ? Math.min(Math.max(n, 0), i.qty) : 0;
   };
+  const lineOf = (i: { id: string; qty: number; ligWeight: number }) =>
+    IssueLine.of({ qty: i.qty, issue: issueQty(i), lig: i.ligWeight, issueLig: ligById[i.id] });
   const [search, setSearch] = useState("");
   const [klass, setKlass] = useState(ALL_KLASS);
   const [metal, setMetal] = useState(ALL_METALS);
@@ -81,6 +82,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
     netWeight: i => i.netWeight,
     location: i => i.location,
     qty: i => i.qty,
+    ligWeight: i => i.ligWeight,
   });
 
   const selectedCount = selected.size;
@@ -102,29 +104,23 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
   const add = () => {
     const chosen = availableItems.filter(i => selected.has(i.id));
     if (chosen.length === 0) return;
-    if (chosen.some(i => partial(i) && !restOk(i))) return;
-    // Частичная выдача: массы и хим. состав — пропорционально выдаваемому количеству;
+    if (chosen.some(i => !lineOf(i).ok)) return;
+    // Частичная выдача: вес — введённый выданный, чистый вес и хим. состав — в его доле;
     // запись склада делится при сохранении операции (applyVydacha)
     onAdd(chosen.map(i => {
-      const q = issueQty(i);
-      // Доля выдаваемой части: по введённому весу остатка (выдаётся вес позиции − остаток)
-      const k = partial(i) ? (i.ligWeight - restOf(i)) / i.ligWeight : 1;
-      const r2 = (v: number) => Math.round(v * k * 100) / 100;
-      const chem = k === 1 || !i.chem ? i.chem
-        : Object.fromEntries(Object.entries(i.chem).map(([el, v]) => {
-          const n = parseFloat(String(v).replace(",", "."));
-          return [el, Number.isFinite(n) ? r2(n).toFixed(2) : v];
-        }));
+      const line = lineOf(i);
+      const lig = line.issuedLig ?? i.ligWeight;
+      const chem = scaleChem(i.chem, line.share);
       return {
-        name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: q || undefined, ves: r2(i.ligWeight),
-        ag: chem?.ag || "-", cu: chem?.cu || "-", chem, loc: i.location, metal: i.metal, lig: r2(i.ligWeight), net: r2(i.netWeight),
+        name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: line.issue || undefined, ves: lig,
+        ag: chem?.ag || "-", cu: chem?.cu || "-", chem, loc: i.location, metal: i.metal, lig, net: line.part(i.netWeight) ?? undefined,
         srcId: i.id,
       };
     }));
   };
 
   const pg5 = usePaged(sorted, "dm-add-pick");
-  const restMissing = availableItems.some(i => selected.has(i.id) && partial(i) && !restOk(i));
+  const restMissing = availableItems.some(i => selected.has(i.id) && !lineOf(i).ok);
   return (
     <Modal
       title={`Добавить позицию ДМ со склада «${MAIN_SKLAD}»`}
@@ -173,6 +169,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <th className="px-3 py-2 text-left">Статус</th>
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
+              <SortTh sortKey="ligWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {pg5.pageItems.map(i => {
@@ -191,35 +188,27 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                       <PosStatusBadge status={i.status} nomenkl={i.nomenkl} />
                       {karta && <div className="text-xs text-gray-400 mt-0.5" title={karta.name}>ШК {karta.plavkaNo}</div>}
                     </td>
-                    <td className="px-3 py-2 text-gray-700">
-                      {checked && i.qty > 1 ? (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-20">
-                            <Input value={qtyById[i.id] ?? String(i.qty)} onChange={v => setQtyById(prev => ({ ...prev, [i.id]: v.replace(/[^\d]/g, "") }))} placeholder={String(i.qty)} />
-                          </div>
-                          <span className="text-xs text-gray-400 whitespace-nowrap">из {i.qty}</span>
-                        </div>
-                      ) : (i.qty || "—")}
-                      {checked && partial(i) && (
-                        <div className="mt-1.5">
-                          <div className="text-[11px] text-gray-500 mb-0.5 whitespace-nowrap">Лиг. вес остатка на складе, г</div>
-                          <div className={`w-28 ${restOk(i) ? "" : "rounded-lg ring-1 ring-red-400"}`}>
-                            <Input value={restById[i.id] ?? ""} onChange={v => setRestById(prev => ({ ...prev, [i.id]: v.replace(/[^\d.,]/g, "") }))} placeholder={`< ${i.ligWeight.toFixed(2)}`} />
-                          </div>
-                        </div>
-                      )}
+                    <td className="px-3 py-2 text-gray-700 align-top">
+                      {checked
+                        ? <IssueQtyCell line={lineOf(i)} editable onChange={v => setQtyById(prev => ({ ...prev, [i.id]: v }))} />
+                        : (i.qty || "—")}
+                    </td>
+                    <td className="px-3 py-2 text-gray-700 align-top">
+                      {checked
+                        ? <IssueLigCell line={lineOf(i)} editable value={ligById[i.id] ?? ""} onChange={v => setLigById(prev => ({ ...prev, [i.id]: v }))} />
+                        : i.ligWeight.toFixed(2)}
                     </td>
                   </tr>
                 );
               })}
-              <FillerRows count={pg5.fill} cols={9} />
+              <FillerRows count={pg5.fill} cols={10} />
             </tbody>
           </table>
           {pg5.pager}
         </div>
       )}
       {restMissing && (
-        <div className="mt-3 text-sm text-red-600">При частичной выдаче укажите лигатурный вес, остающийся на складе (больше 0 и меньше веса позиции)</div>
+        <div className="mt-3 text-sm text-red-600">Укажите количество к выдаче, а при частичной выдаче — лигатурный вес выдаваемой части (больше 0 и меньше веса позиции)</div>
       )}
       {affectedKarty.length > 0 && (
         <div className="mt-3 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm text-orange-800">
@@ -647,7 +636,16 @@ function SpisanieTab({ losses, setLosses, files, setFiles, vydacha, vozvrat, cod
 
 // ── Таблица позиций операции: те же столбцы и порядок, что на складе ДМ ───────
 
-function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: {
+// Редактирование количества и веса выдаваемой части прямо в таблице (вкладка «Выдача»)
+type OperIssueEdit = {
+  // Расчёт выдачи позиции относительно записи склада; null — позиция без записи склада (не редактируется)
+  line: (p: OperPosition) => IssueLine | null;
+  ligValue: (p: OperPosition) => string;
+  setQty: (p: OperPosition, v: string) => void;
+  setLig: (p: OperPosition, v: string) => void;
+};
+
+function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, issue }: {
   rows: OperPosition[];
   view: (p: OperPosition) => DMPositionView;
   readOnly: boolean;
@@ -655,7 +653,9 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
   // Если передан — у позиции есть иконка редактирования
   onEdit?: (p: OperPosition) => void;
   onDelete: (p: OperPosition) => void;
+  issue?: OperIssueEdit;
 }) {
+  const lineOf = (p: OperPosition) => (issue && !readOnly ? issue.line(p) : null);
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(rows, {
     nomenkl: p => p.nomenkl,
@@ -689,15 +689,20 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete }: 
         <tbody className="divide-y divide-gray-100">
           {pg7.pageItems.map(p => {
             const v = view(p);
+            const line = lineOf(p);
             return (
               <tr key={p.n} className="hover:bg-gray-50">
                 <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                 <td className="px-3 py-2 font-medium">{p.name}</td>
-                <td className="px-3 py-2">{p.qty ?? "—"}</td>
+                <td className="px-3 py-2 align-top">
+                  {line && issue ? <IssueQtyCell line={line} editable onChange={val => issue.setQty(p, val)} /> : (p.qty ?? "—")}
+                </td>
                 <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                 <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
                 <td className="px-3 py-2">{probaText(p.proba)}</td>
-                <td className="px-3 py-2">{dash(v.ligWeight)}</td>
+                <td className="px-3 py-2 align-top">
+                  {line && issue ? <IssueLigCell line={line} editable value={issue.ligValue(p)} onChange={val => issue.setLig(p, val)} /> : dash(v.ligWeight)}
+                </td>
                 <td className="px-3 py-2"><NetAuAg chem={v.chem} /></td>
                 <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                 <td className="px-3 py-2">
@@ -1240,6 +1245,60 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       location: p.loc, status: dm?.status, chem: p.chem ?? dm?.chem, info: p.info ?? dm?.info,
     };
   };
+  // ── Количество и вес выдаваемой части (вкладка «Выдача») ──
+  // Остаток на складе, от которого операция отделила выданную запись (`<id>-p<stamp>`, см. applyVydacha):
+  // при изменении выдачи часть объединяется с ним обратно и выдаётся заново
+  const splitParent = (it: (typeof dmItems)[number]) =>
+    it.parentId && it.id.startsWith(`${it.parentId}-p`)
+      ? dmItems.find(i => i.id === it.parentId && i.status === "На складе" && i.sklad === it.sklad)
+      : undefined;
+  // База позиции выдачи — запись склада целиком: до сохранения — запись на складе / в резерве,
+  // после — выданная запись «В подотчёте» вместе с остатком на складе. Без записи склада — не редактируется.
+  const issueBase = (p: OperPosition) => {
+    if (isGPKlass(p.klass)) return null;
+    const it = srcOf(p);
+    if (!it) return null;
+    if (it.status === "На складе" || it.status === "Резерв") return { qty: it.qty, lig: it.ligWeight, net: it.netWeight, chem: it.chem };
+    if (it.status !== "В подотчёте") return null;
+    const parent = splitParent(it);
+    if (!parent) return { qty: it.qty, lig: it.ligWeight, net: it.netWeight, chem: it.chem };
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    return { qty: it.qty + parent.qty, lig: r2(it.ligWeight + parent.ligWeight), net: r2(it.netWeight + parent.netWeight), chem: addChem(it.chem, parent.chem) };
+  };
+  // Введённый вес выдаваемой части (строка поля); по умолчанию — текущий вес позиции
+  const [ligDraft, setLigDraft] = useState<Record<number, string>>({});
+  const ligValue = (p: OperPosition) => ligDraft[p.n] ?? (p.lig != null ? String(p.lig) : "");
+  const issueLine = (p: OperPosition, issue = p.qty, issueLig = ligValue(p)) => {
+    const b = issueBase(p);
+    return b ? IssueLine.of({ qty: b.qty, issue: issue ?? b.qty, lig: b.lig, issueLig }) : null;
+  };
+  // Пересчёт позиции по количеству и весу: вес — введённый (или вся позиция), чистый вес и хим. состав — в его доле
+  const reissue = (p: OperPosition, issue: number, issueLig: string): OperPosition => {
+    const b = issueBase(p);
+    const line = issueLine(p, issue, issueLig);
+    if (!b || !line) return p;
+    if (!line.ok) return { ...p, qty: issue };
+    const lig = line.issuedLig ?? p.lig ?? 0;
+    const chem = scaleChem(b.chem, line.share);
+    return { ...p, qty: issue || undefined, lig, ves: lig, net: line.part(b.net) ?? p.net, chem, ag: chem?.ag || "-", cu: chem?.cu || "-" };
+  };
+  const vydachaIssue: OperIssueEdit = {
+    line: p => issueLine(p),
+    ligValue,
+    setQty: (p, v) => {
+      const b = issueBase(p);
+      if (!b) return;
+      const n = parseInt(v, 10);
+      const issue = Number.isFinite(n) ? Math.min(Math.max(n, 0), b.qty) : 0;
+      setVydacha(prev => prev.map(x => (x.n === p.n ? reissue(x, issue, ligValue(x)) : x)));
+    },
+    setLig: (p, v) => {
+      setLigDraft(prev => ({ ...prev, [p.n]: v }));
+      setVydacha(prev => prev.map(x => (x.n === p.n ? reissue(x, x.qty ?? issueBase(x)?.qty ?? 0, v) : x)));
+    },
+  };
+  const badVydacha = vydacha.filter(p => issueLine(p)?.ok === false);
+
   // Просмотр позиции: …/position/<вкладка>-<n>
   const posKey = screen.after("position");
   const viewPos = (() => {
@@ -1334,21 +1393,42 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     const take = new Map<string, number>();
     // Лигатурный вес выдаваемой части при частичной выдаче — запись склада делится по весу
     const partLig = new Map<string, number>();
+    // Выданные записи, у которых изменили количество или вес: возвращаются на склад (объединяются с остатком,
+    // от которого отделены, — на его месте хранения) и выдаются заново
+    const reissued: { p: OperPosition; it: (typeof dmItems)[number] }[] = [];
+    const relocate = new Map<string, string>();
+    const differs = (a: number | undefined, b: number) => a !== undefined && Math.abs(a - b) > 0.005;
+    // Выдача из записи склада: q изделий (без количества изделий — вся запись), при частичной — по весу
+    const addTake = (p: OperPosition, it: { id: string; qty: number }) => {
+      const q = p.qty && it.qty > 0 ? p.qty : it.qty;
+      take.set(it.id, (take.get(it.id) ?? 0) + q);
+      if (it.qty > 0 && q < it.qty && p.lig) partLig.set(it.id, (partLig.get(it.id) ?? 0) + p.lig);
+      pending.set(p.n, it.id);
+    };
     for (const p of rows) {
       const it = srcOf(p);
       if (!it) continue;
+      if (it.status === "В подотчёте" && (differs(it.qty > 0 ? p.qty : undefined, it.qty) || differs(p.lig, it.ligWeight))) {
+        reissued.push({ p, it });
+        relocate.set(it.id, p.loc);
+        continue;
+      }
       if (it.status === "В подотчёте") { linked.set(p.n, it.id); continue; }
       if (it.status !== "На складе" && it.status !== "Резерв") continue;
-      take.set(it.id, (take.get(it.id) ?? 0) + (p.qty && it.qty > 0 ? p.qty : it.qty));
-      if (p.qty && it.qty > 0 && p.qty < it.qty && p.lig) partLig.set(it.id, (partLig.get(it.id) ?? 0) + p.lig);
-      pending.set(p.n, it.id);
+      addTake(p, it);
     }
     const keep = new Set(linked.values());
-    const ubrano = new Set([...prevIds].filter(id => !keep.has(id) && dmItems.find(i => i.id === id)?.status === "В подотчёте"));
+    const ubrano = new Set([...prevIds, ...reissued.map(r => r.it.id)].filter(id => !keep.has(id) && dmItems.find(i => i.id === id)?.status === "В подотчёте"));
     const izRezerva = dmItems.filter(i => i.status === "Резерв" && take.has(i.id));
     const stamp = Date.now();
+    const returned = returnToStock(dmItems, ubrano, "На складе", i => relocate.get(i.id) ?? i.location);
+    // Изменённая выдача — заново из записи на складе: остатка, с которым объединилась часть, или самой части
+    for (const { p, it } of reissued) {
+      const origin = returned.find(i => i.id === it.id) ?? returned.find(i => i.id === it.parentId);
+      if (origin) addTake(p, origin);
+    }
     const { items, taken } = takeFromStock(
-      returnToStock(dmItems, ubrano, "На складе"),
+      returned,
       take,
       i => ({ ...i, status: "В подотчёте" as const, location: NO_LOC }),
       i => `${i.id}-p${stamp}`,
@@ -1404,6 +1484,11 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
   // «Сохранить» — операция «В работе», «Оформить» — «Завершено»
   const save = (oformit = false) => {
+    if (badVydacha.length) {
+      setTab("Выдача");
+      show(`Выдача: укажите количество, а при частичной выдаче — лигатурный вес выдаваемой части: ${badVydacha.map(p => p.name).join(", ")}`);
+      return;
+    }
     const next: OperStage = oformit ? "Завершено" : "В работе";
     onSave(buildOp(next, applyVydacha()));
   };
@@ -1490,6 +1575,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
             readOnly={ro}
             onView={p => screen.open("position", `vydacha-${p.n}`)}
             onDelete={p => setVydacha(prev => prev.filter(x => x.n !== p.n))}
+            issue={vydachaIssue}
           />
           <div className="mt-4">
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
