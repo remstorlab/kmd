@@ -495,9 +495,6 @@ export const DOC_TREBOVANIE = "Требование";
 // Возврат СГП №2 — возврат позиций со склада СГП №2 на склад СДМ (поля как у накладной, отправитель — СГП №2)
 export const DOC_VOZVRAT_SGP = "Возврат СГП №2";
 
-// Склады документа (отправитель и/или получатель — значения справочника «Склады»)
-export const docSklady = (d: { sender: string; receiver: string }) =>
-  [d.sender, d.receiver].filter((v, i, a) => spravValues("Склады").includes(v) && a.indexOf(v) === i);
 export const DOC_OTGRUZKA_DM = "Накладная на отгрузку ДМ";
 export const DOC_PEREDACHA_GP = "Накладная на передачу ГП";
 
