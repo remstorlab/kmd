@@ -10,6 +10,7 @@ import { SkladDoc } from "../data/mock";
 import { Inbox, Send, Repeat, Plus, X, LucideIcon } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
+import { canPrintXlsx, printDocXlsx } from "../utils/printForms";
 import { useScreen } from "../router";
 
 // ── Hub ───────────────────────────────────────────────────────────────────────
@@ -137,6 +138,7 @@ function DocList({
   onDelete: (id: string) => void;
 }) {
   const { toast, show, clear } = useToast();
+  const { shihtovyeKarty } = useApp();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
   const { filtered, bar } = useDocFilters(docs, () => setPage(1), true);
@@ -205,7 +207,14 @@ function DocList({
                   <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
                   <EditIcon onClick={() => screen.openTop("edit", doc.id)} />
                   <DeleteIcon onClick={() => confirm(`Удалить документ ${doc.number}?`, () => { onDelete(doc.id); show(`Документ ${doc.number} удалён`); })} />
-                  <PrintIcon onClick={() => show(`Документ ${doc.number} отправлен на печать`)} />
+                  <PrintIcon
+                    title={canPrintXlsx(doc) ? "Печать (Excel)" : "Печать"}
+                    onClick={() => {
+                      if (!canPrintXlsx(doc)) { show(`Документ ${doc.number} отправлен на печать`); return; }
+                      printDocXlsx(doc, { karty: shihtovyeKarty });
+                      show(`Печатная форма документа ${doc.number} сохранена в Excel`);
+                    }}
+                  />
                 </td>
               </tr>
             ))}

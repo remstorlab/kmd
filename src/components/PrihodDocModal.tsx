@@ -55,7 +55,7 @@ export default function PrihodDocModal(props: Props) {
 const ORGS = spravValues("Заказчики / Организации");
 
 // Демо-позиции для документов из демо-данных (без сохранённых позиций)
-const DEMO_ORDER: PrihodPosition[] = [
+export const DEMO_ORDER: PrihodPosition[] = [
   { id: "po-1", nomenkl: "5015301", name: "Слиток золотой стандартный", klass: "Слиток", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "1000.00", net: "999.90", seyf: "1", polka: "1", chem: { au: "999.90" } },
   { id: "po-2", nomenkl: "5015302", name: "Слиток серебряный", klass: "Слиток", code: "2000", kol: "1", unit: "шт", proba: "925", lig: "318.60", net: "294.71", seyf: "2", polka: "1", chem: { ag: "294.71" } },
 ];
@@ -63,6 +63,16 @@ const DEMO_NAKLAD: PrihodPosition[] = [
   { id: "pn-1", nomenkl: "5015303", name: "Монета «Атамекен» Ag 925", klass: "Готовая продукция", code: "2000", kol: "200", unit: "шт", proba: "925", lig: "6220.00", net: "5753.50", seyf: "1", polka: "1", chem: { ag: "5753.50" } },
   { id: "pn-2", nomenkl: "5015304", name: "Орден «Алтын алка»", klass: "Готовая продукция", code: "0300", kol: "30", unit: "шт", proba: "750", lig: "672.00", net: "504.00", seyf: "1", polka: "2", chem: { au: "504.00", ag: "100.80", cu: "67.20" } },
 ];
+
+// Реквизиты приходного ордера по умолчанию (поля шапки формы; используются и печатной формой)
+export const ORDER_HEAD_DEFAULTS = {
+  schetFaktura: "СФ-0091",
+  dogovor: "ДОГ-2026-045",
+  pasport: "ПМ-000456",
+  platDoc: "ПД-001234",
+  price: "32 500.00",
+  planPos: "План-2026/Q3-AU",
+};
 
 // ── Документ прихода (приходный ордер / накладная) ───────────────────────────
 
@@ -89,20 +99,15 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     otpravitel: doc?.sender || ORGS[0],
     // Получатель — склад из справочника «Склады»; по умолчанию склад приёмки (СДМ1)
     poluchatel: doc && sklady.includes(doc.receiver) ? doc.receiver : PRIHOD_SKLAD,
-    schetFaktura: "СФ-0091",
+    ...ORDER_HEAD_DEFAULTS,
     schetFakturaData: today,
-    dogovor: "ДОГ-2026-045",
     dogovorData: today,
-    pasport: "ПМ-000456",
-    platDoc: "ПД-001234",
     platDocData: today,
     ligByDoc: "1 000.00 г",
     massByDoc: "999.90 г",
     ligAccepted: "999.50 г",
     netAccepted: "998.80 г",
-    price: "32 500.00",
     sum: "32 467 500.00",
-    planPos: "План-2026/Q3-AU",
     nakladNumber: doc?.number || "НП-001234",
     aktNumber: doc?.number || "АКТ-0043",
     nakladDate: doc?.date || today,
