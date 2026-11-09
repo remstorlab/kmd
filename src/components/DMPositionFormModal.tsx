@@ -196,7 +196,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         {/* Сколько изделий входит в одну позицию; для драгоценных камней — обязательно */}
         <Field label="Количество" required={!ro && isStone}>
           <div className={kolError ? "rounded-lg ring-1 ring-red-400" : ""}>
-            <Input value={form.kol} onChange={v => set("kol")(v.replace(/[^\d]/g, ""))} placeholder="количество в пределах одной позиции" disabled={ro} />
+            <Input value={form.kol} onChange={v => set("kol")(v.replace(/[^\d]/g, ""))} placeholder="в пределах позиции" disabled={ro} />
           </div>
           {kolError && <div className="text-xs text-red-600 mt-1">Для класса «Драгоценные камни» необходимо указать количество</div>}
         </Field>
