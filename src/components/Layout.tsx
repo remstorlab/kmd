@@ -241,7 +241,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full" style={{ backgroundColor: theme === "dark" ? "#0f172a" : "#f8fafc" }}>
       {/* Sidebar */}
-      <aside className="w-56 shrink-0 bg-slate-900 flex flex-col h-full overflow-hidden">
+      <aside className="w-max min-w-56 shrink-0 bg-slate-900 flex flex-col h-full overflow-hidden">
         {/* Logo */}
         <div className="px-4 py-4 border-b border-slate-700/60">
           <button
@@ -260,7 +260,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5">
           {menuItems.map(item => {
             const active = isActive(item.page, page);
             return (
@@ -276,7 +276,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span className={`shrink-0 ${active ? "text-white" : "text-slate-500"}`}>
                   {item.icon}
                 </span>
-                <span className="truncate text-sm flex-1">{tr(item.key)}</span>
+                <span className="whitespace-nowrap text-sm flex-1">{tr(item.key)}</span>
                 {item.hasSub && (
                   <ChevronRight className={`w-4 h-4 shrink-0 ${active ? "text-white" : "text-slate-500"}`} />
                 )}
