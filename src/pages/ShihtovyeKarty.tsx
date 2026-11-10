@@ -380,7 +380,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           skladFilter={pickSklad}
           already={already}
           showWeights
-          qtyLabel="Количество"
+          qtyLabel="Количество к выдаче"
           emptyText={`Нет доступных позиций на складе «${pickSklad}»`}
           addLabel="Добавить выбранные"
           onClose={() => setShowFromSklad(false)}

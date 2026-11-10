@@ -296,7 +296,6 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       {showPick && (
         <StockPickerModal
           qtyInput={r => r.qty > 1}
-          fillMax
           title={`Добавить позиции со склада «${MAIN_SKLAD}»`}
           rows={stock}
           already={already}

@@ -290,7 +290,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
 
       {showPick && (
         <StockPickerModal
-          fillMax
           qtyLabel="Кол-во к перемещению"
           title={`Добавить позиции со склада «${head.sender}»`}
           rows={stock}

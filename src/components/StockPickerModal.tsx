@@ -18,9 +18,8 @@ export default function StockPickerModal({
   rows,
   already = {},
   showWeights = false,
-  qtyLabel = "Кол-во к выдаче",
+  qtyLabel = "Количество к выдаче",
   qtyInput = true,
-  fillMax = false,
   emptyText = "Нет доступных позиций на складе",
   addLabel = "Добавить",
   toolbar,
@@ -38,8 +37,6 @@ export default function StockPickerModal({
   // false — без ввода количества: позиция берётся целиком (весь доступный остаток).
   // Функция — ввод количества только для подходящих позиций.
   qtyInput?: boolean | ((r: StockRow) => boolean);
-  // При отметке позиции подставлять максимальное доступное количество (иначе — 1)
-  fillMax?: boolean;
   emptyText?: string;
   addLabel?: string;
   // Дополнительные поля над фильтрами (например, выбор склада)
@@ -90,7 +87,8 @@ export default function StockPickerModal({
   const selectedCount = Object.keys(selectedQty).length;
   const allChecked = filtered.length > 0 && filtered.every(r => r.id in selectedQty);
 
-  const initQty = (r: StockRow) => (fillMax ? String(left(r)) : "1");
+  // При отметке позиции подставляется всё доступное количество — его можно уменьшить
+  const initQty = (r: StockRow) => String(left(r));
   const toggle = (r: StockRow) => setSelectedQty(prev => {
     const next = { ...prev };
     if (r.id in next) delete next[r.id]; else next[r.id] = initQty(r);
