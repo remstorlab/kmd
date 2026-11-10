@@ -52,7 +52,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
   const [onlySelected, setOnlySelected] = useState(false);
 
   type Item = (typeof dmItems)[number];
-  // Позиции в резерве тоже можно выдать — тогда шихтовая карта, которая их резервирует, вернётся в «Редактирование».
+  // Позиции в резерве тоже можно выдать — тогда шихтовая карта, которая их резервирует, вернётся в «На редактировании».
   // Выдача — только со склада выдачи (СДМ2); позиции склада приёмки (СДМ1) сначала перемещаются по требованию
   const availableItems = dmItems.filter(i => i.sklad === MAIN_SKLAD && !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв") && !already.includes(i.id) && !already.includes(i.nomenkl));
   const reservedBy = (nomenkl: string) => shihtovyeKarty.find(k => k.status !== "Выполнена" && k.materials.some(m => m.nomenkl === nomenkl));
@@ -212,7 +212,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
       )}
       {affectedKarty.length > 0 && (
         <div className="mt-3 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm text-orange-800">
-          ⚠ Выбраны позиции из резерва. После выдачи шихтовая карта {affectedKarty.map(n => `«${n}»`).join(", ")} вернётся в статус «Редактирование» и станет недоступна для плавки.
+          ⚠ Выбраны позиции из резерва. После выдачи шихтовая карта {affectedKarty.map(n => `«${n}»`).join(", ")} вернётся в статус «На редактировании» и станет недоступна для плавки.
         </div>
       )}
     </Modal>
@@ -1380,7 +1380,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const oformit = () => (inNorm || type === "Выдача" || type === "Возврат" ? save(true) : setConfirmOformit(true));
 
   // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
-  // эта карта возвращается в «Редактирование» и пропадает из выбора ШК для плавки (там только «Новая»).
+  // эта карта возвращается в «На редактировании» и пропадает из выбора ШК для плавки (там только «Новая»).
   // Выдача проводится при каждом сохранении: позиции, убранные из выдачи, возвращаются на склад.
   // При выдаче части количества запись склада делится (data/stock.ts): остаток остаётся на складе,
   // выданная часть — отдельная запись «В подотчёте»; позиция операции ссылается на неё (srcId).
@@ -1447,9 +1447,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       const hit = k.materials.filter(m => rezNomenkl.has(m.nomenkl)).map(m => m.name);
       if (hit.length === 0) return k;
       zatronuty.push(k.name);
-      return { ...k, status: "Редактирование", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
+      return { ...k, status: "На редактировании", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
     }));
-    if (zatronuty.length) show(`Шихтовая карта ${zatronuty.map(n => `«${n}»`).join(", ")} переведена в «Редактирование»`);
+    if (zatronuty.length) show(`Шихтовая карта ${zatronuty.map(n => `«${n}»`).join(", ")} переведена в «На редактировании»`);
     return withSrc;
   };
 

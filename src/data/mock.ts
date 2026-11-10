@@ -8,10 +8,10 @@ export type OpType = "Выдача" | "Возврат" | "Выдача-Возв�
 export type OpVid = "Отбор пробы" | "Анализ в ЛКИ" | "Плавка" | "Гальванопокрытие" | "Производство ГП" | "НИОКР";
 export type UserStatus = "Активен" | "Заблокирован";
 export type LogType = "Создание" | "Изменение" | "Удаление";
-// Жизненный цикл шихтовой карты: «Редактирование» (черновик, Сохранить) → (Оформить) «Новая» → «Выполнена».
+// Жизненный цикл шихтовой карты: «На редактировании» (черновик, Сохранить) → (Оформить) «Новая» → «Выполнена».
 // Карта «Новая» доступна для выдачи на плавку и не редактируется; если её зарезервированную позицию выдадут
-// в другой операции, карта возвращается в «Редактирование».
-export type ShihtaStatus = "Редактирование" | "Новая" | "Выполнена";
+// в другой операции, карта возвращается в «На редактировании».
+export type ShihtaStatus = "На редактировании" | "Новая" | "Выполнена";
 
 export interface GPItem {
   // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
@@ -182,26 +182,45 @@ export interface Operation {
   poluchil?: string;
 }
 
+// Вид строки шихты: позиция склада ДМ или доп. материал (лигатура Cu-P, медь МО, гранулы из подбора, прочее)
+export type ShihtaMatKind = "sklad" | "cup" | "medMO" | "granuly" | "prochee";
+
 export interface ShihtaMaterial {
   name: string;
   nomenkl: string;
   klass: string;
   proba: number;
+  // Масса в шихту, г
   ves: number;
   loc: string;
   // Количество, шт (для позиций, зарезервированных со склада ДМ)
   qty?: number;
-  // Содержание в чистоте, г (для доп. материалов — вводится вручную)
+  // Содержание в чистоте, г — на массу в шихту
   chem?: ChemComposition;
+  // Вид строки (по умолчанию: с номенкл. № — позиция склада, без — прочий доп. материал)
+  kind?: ShihtaMatKind;
+  // Лигатура Cu-P: содержание фосфора, %
+  phosphorPct?: number;
+  // Склад позиции
+  sklad?: string;
 }
 
 export interface ShihtovayaKarta {
   id: string;
   date: string;
   name: string;
+  // Номер плавки — целое число, сквозная нумерация с 1 января
   plavkaNo: string;
   status: ShihtaStatus;
-  // Позиции ДМ из резерва карты, выданные в другой операции (причина возврата карты в «Редактирование»).
+  // Марка сплава — id записи справочника «Марки сплавов»
+  alloyId?: string;
+  // Оборот: число или «чистая»
+  oborot?: string;
+  // Назначение слитков — значение справочника «Назначение слитков»
+  naznachenie?: string;
+  osnovanie?: string;
+  note?: string;
+  // Позиции ДМ из резерва карты, выданные в другой операции (причина возврата карты в «На редактировании»).
   vydannyePozicii?: string[];
   materials: ShihtaMaterial[];
   // Прикреплённые документы (несколько файлов)
@@ -418,23 +437,27 @@ const dm = (id: string, name: string, nomenkl: string, klass: string, metal: str
   const chem = chemOf(metal, ligWeight, proba);
   return { id, name, nomenkl, klass, metal, qty, proba, ligWeight, netWeight: netOf(metal, chem), location, sklad, status, chem };
 };
+// Позиция с заданным содержанием драгметаллов, г (фактические данные анализа): Cu — остаток до лигатурного веса
+const dmX = (id: string, name: string, nomenkl: string, klass: string, metal: string, proba: number, ligWeight: number, metals: Record<string, number>, location: string, status: StatusDM = "На складе", sklad = SDM1): DMItem => {
+  const rest = r2(ligWeight - Object.values(metals).reduce((a, v) => a + v, 0));
+  const chem: ChemComposition = Object.fromEntries([...Object.entries(metals), ...(rest > 0 ? [["cu", rest] as [string, number]] : [])].map(([k, v]) => [k, v.toFixed(2)]));
+  return { id, name, nomenkl, klass, metal, qty: 1, proba, ligWeight, netWeight: netOf(metal, chem), location, sklad, status, chem };
+};
 // Позиция на складе приёмки СДМ1
 const dm1 = (id: string, name: string, nomenkl: string, klass: string, metal: string, proba: number, ligWeight: number, location: string, status: StatusDM = "На складе") =>
   dm(id, name, nomenkl, klass, metal, proba, ligWeight, location, status, 1, SDM1);
 
 export const initialDMItems: DMItem[] = [
-  // Резерв шихтовой карты П-2026-0089 — на СДМ1, ждёт требования
-  dm1("dm1", "Слиток золота ЗлА-1", "5015371", "Слиток", "1000", 999, 500.25, L(1, 1), "Резерв"),
-  dm1("dm3", "Стружка золотая 585", "5015373", "Стружка", "0100", 585, 45.80, L(2, 1), "Резерв"),
-  // Резерв шихтовой карты П-2026-0088: ещё на СДМ1 (требование ТР-0013 в работе)
-  dm1("dm4", "Проба золота Au-750", "5015374", "Основная проба", "0300", 750, 12.30, L(2, 1), "Резерв"),
-  dm1("dm8", "Золотой порошок Au", "5015378", "Гранулы", "1000", 999.9, 25.00, L(3, 1), "Резерв"),
   // На складе приёмки СДМ1
-  dm1("dm2", "Слиток серебра СрА-2", "5015372", "Слиток", "2000", 999, 1000.50, L(1, 2)),
+  dm1("dm1", "Слиток золота ЗлА-1", "5015371", "Слиток", "1000", 999, 500.25, L(1, 1)),
+  dm1("dm3", "Стружка золотая 585", "5015373", "Стружка", "0100", 585, 45.80, L(2, 1)),
+  dm1("dm4", "Проба золота Au-750", "5015374", "Основная проба", "0300", 750, 12.30, L(2, 1)),
+  dm1("dm8", "Золотой порошок Au", "5015378", "Гранулы", "1000", 999.9, 25.00, L(3, 1)),
+  // Фактическая проба 99,99 %: чистый вес 1 000,50 × 99,99 % = 1 000,40 г
+  dm1("dm2", "Слиток серебра СрА-2", "5015372", "Слиток", "2000", 999.9, 1000.50, L(1, 2)),
   dm1("dm6", "Слиток платины ПлА-1", "5015376", "Слиток", "4000", 999, 300.00, L(1, 1)),
-  // Резерв шихтовой карты П-2026-0090 (черновик) — на СДМ1
-  dm1("dm7", "Лом золота 585", "5015377", "Скрап", "0100", 585, 88.40, L(3, 2), "Резерв"),
-  dm1("dm20", "Проволока золотая 585", "5015390", "Проволока", "0100", 585, 35.00, L(2, 1), "Резерв"),
+  dm1("dm7", "Лом золота 585", "5015377", "Скрап", "0100", 585, 88.40, L(3, 2)),
+  dm1("dm20", "Проволока золотая 585", "5015390", "Проволока", "0100", 585, 35.00, L(2, 1)),
   // На складе выдачи СДМ2
   dm("dm14", "Слиток серебра СрА-4", "5015384", "Слиток", "2000", 999, 791.40, L(1, 2)),
   dm("dm15", "Проба серебра Ag-999", "5015385", "Основная проба", "2000", 999, 8.50, L(3, 1)),
@@ -463,9 +486,24 @@ export const initialDMItems: DMItem[] = [
   dm("dm30", "Сигнальный образец Au 585", "5015402", "Контрольная проба", "0120", 585, 4.80, L(4, 2)),
   dm("dm31", "Проволока ЗлСрМ 375-20", "5015403", "Проволока", "8000", 375, 27.00, L(2, 2)),
   dm("dm32", "Пластина ЗлСрМ 375-100", "5015404", "Пластина", "7000", 375, 55.40, L(4, 1)),
-  // Резерв шихтовой карты П-2026-0092 — на СДМ1
-  dm1("dm25", "Подкат ЗлСрМ 750-125", "5015397", "Подкат", "0400", 750, 210.00, L(1, 2), "Резерв"),
-  dm1("dm27", "Гранулы сплава AuAg", "5015399", "Гранулы", "0600", 500, 150.00, L(2, 2), "Резерв"),
+  dm1("dm25", "Подкат ЗлСрМ 750-125", "5015397", "Подкат", "0400", 750, 210.00, L(1, 2)),
+  dm1("dm27", "Гранулы сплава AuAg", "5015399", "Гранулы", "0600", 500, 150.00, L(2, 2)),
+  // Резерв шихтовой карты плавки № 47 (СрМ 92,5) — перемещены на СДМ2, карта доступна для плавки
+  dmX("dm40", "Слиток серебра СрА-1", "5015420", "Слиток", "2000", 999.9, 22500.00, { ag: 22497.75 }, L(1, 2), "Резерв", SDM2),
+  dmX("dm41", "Отходы Ср 99,99", "5015421", "Отходы", "2000", 999.9, 20463.80, { ag: 20461.76 }, L(3, 1), "Резерв", SDM2),
+  dmX("dm42", "Отходы СрМ 92,5", "5015422", "Отходы", "2000", 925, 28578.70, { ag: 26435.32 }, L(3, 2), "Резерв", SDM2),
+  // Резерв шихтовой карты плавки № 13 (ЗлСрМ 750-150, черновик) — на СДМ1 (требование ТР-0013 в работе)
+  dmX("dm43", "Н/п чеканки «Барс»", "5015423", "НП чеканки", "0500", 589.5, 3431.59, { au: 2022.95, ag: 261.04 }, L(2, 2), "Резерв", SDM1),
+  dmX("dm44", "Отходы Зл 99,99", "5015424", "Отходы", "1000", 999.9, 4000.00, { au: 3999.60 }, L(1, 1), "Резерв", SDM1),
+  dmX("dm45", "Слиток серебра СрА 99,99", "5015425", "Слиток", "2000", 999.9, 600.00, { ag: 599.94 }, L(1, 2), "Резерв", SDM1),
+  // Остатки для шихтовых карт: серебро и золото с фактическими пробами (99,99; 92,50; 92,52)
+  dmX("dm46", "Слиток серебра СрА-5", "5015426", "Слиток", "2000", 999.9, 22500.00, { ag: 22497.75 }, L(1, 2)),
+  dmX("dm47", "Отходы Ср 99,99", "5015427", "Отходы", "2000", 999.9, 20463.80, { ag: 20461.76 }, L(3, 1)),
+  dmX("dm48", "Отходы СрМ 92,5", "5015428", "Отходы", "2000", 925, 28578.70, { ag: 26435.32 }, L(3, 2)),
+  dmX("dm49", "Отходы Зл 999", "5015429", "Отходы", "1000", 999.9, 3010.00, { au: 3009.70 }, L(2, 1)),
+  dm1("dm50", "Стружка серебряная СрМ 92,52", "5015430", "Стружка", "2000", 925.2, 1250.40, L(4, 1)),
+  dm1("dm51", "Отходы ЗлСрМ 585-80", "5015431", "Отходы", "0500", 585, 512.30, L(4, 2)),
+  dm("dm52", "Гранулы серебра Ag 99,99", "5015432", "Гранулы", "2000", 999.9, 800.00, L(2, 1)),
 ];
 
 // Заказчик и признак собственности заказчика — из документов приёма. По умолчанию — «Монетный двор»
@@ -522,7 +560,7 @@ const vpos = (src: "gp" | "dm", id: string): VydachaDocPosition => {
 
 // Требование ТР-0013 (в работе) — резерв карты П-2026-0088, позиции ещё на СДМ1
 initialSkladDocs.unshift(
-  { id: "sd7", date: "20.08.2026", type: DOC_TREBOVANIE, number: "ТР-0013", status: "В работе", sender: SDM1, receiver: SDM2, shihtaId: "sk2", positions: [vpos("dm", "dm4"), vpos("dm", "dm8")] },
+  { id: "sd7", date: "20.08.2026", type: DOC_TREBOVANIE, number: "ТР-0013", status: "В работе", sender: SDM1, receiver: SDM2, shihtaId: "sk3", positions: [vpos("dm", "dm43"), vpos("dm", "dm44"), vpos("dm", "dm45")] },
 );
 
 export const initialVydachaDocs: SkladDoc[] = [
@@ -599,48 +637,57 @@ export const initialOperations: Operation[] = [
 ];
 
 // --- Шихтовые карты ---
+// Позиция склада в карте: масса в шихту = лигатурный вес позиции, состав — из записи склада
 const shMat = (id: string): ShihtaMaterial => {
   const i = initialDMItems.find(x => x.id === id)!;
-  return { name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.ligWeight, loc: i.location, qty: i.qty, chem: i.chem };
+  return { kind: "sklad", name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.ligWeight, loc: i.location, qty: i.qty, chem: i.chem, sklad: i.sklad };
 };
+// Позиция, уже израсходованная в плавке (выполненная карта): содержание драгметаллов, г; Cu — остаток
+const shDone = (name: string, nomenkl: string, klass: string, proba: number, ves: number, metals: Record<string, number>): ShihtaMaterial => {
+  const rest = r2(ves - Object.values(metals).reduce((a, v) => a + v, 0));
+  const chem: ChemComposition = Object.fromEntries([...Object.entries(metals), ...(rest > 0 ? [["cu", rest] as [string, number]] : [])].map(([k, v]) => [k, v.toFixed(2)]));
+  return { kind: "sklad", name, nomenkl, klass, proba, ves, loc: "-", qty: 1, chem, sklad: SDM2 };
+};
+// Лигатура Cu-P: Cu = ROUND(M × (1 − P/100); 2), P = M − Cu (округление без ошибки двоичной дроби)
+const shCuP = (ves: number, phosphorPct: number): ShihtaMaterial => {
+  const cuG = Math.round(Number((ves * (1 - phosphorPct / 100) * 100).toFixed(6))) / 100;
+  return { kind: "cup", name: "Лигатура Cu-P", nomenkl: "", klass: "", proba: 0, ves, loc: "", phosphorPct, chem: { cu: cuG.toFixed(2), p: r2(ves - cuG).toFixed(2) } };
+};
+const shMedMO = (ves: number): ShihtaMaterial => ({ kind: "medMO", name: "Медь МО", nomenkl: "", klass: "", proba: 0, ves, loc: "", chem: { cu: ves.toFixed(2) } });
+
 export const initialShihtovyeKarty: ShihtovayaKarta[] = [
   {
-    id: "sk6", date: "21.08.2026", name: "Шихта сплав ЗлСрМ 750-125 + AuAg", plavkaNo: "П-2026-0092", status: "Новая",
-    materials: [shMat("dm25"), shMat("dm27")],
-    createdAt: "2026-08-21T11:20:00", createdBy: "Бекова Айгуль Маратовна",
+    id: "sk1", date: "20.08.2026", name: "Шихта СрМ 92,5 (монеты коллекционные)", plavkaNo: "47", status: "Новая",
+    alloyId: "agm-925", oborot: "7", naznachenie: "Монеты коллекционные (пруф, пруф-лайк)",
+    materials: [shCuP(127.55, 8.51), shMat("dm40"), shMat("dm41"), shMat("dm42"), shMedMO(3360)],
+    createdAt: "2026-08-20T11:20:00", createdBy: "Бекова Айгуль Маратовна",
   },
   {
-    id: "sk5", date: "20.08.2026", name: "Шихта Au-585 партия В (черновик)", plavkaNo: "П-2026-0090", status: "Редактирование",
-    materials: [shMat("dm7"), shMat("dm20")],
-    createdAt: "2026-08-20T10:05:00", createdBy: "Ковалева Елена",
+    id: "sk3", date: "08.04.2026", name: "Шихта ЗлСрМ 750-150 (сувенирная продукция)", plavkaNo: "13", status: "На редактировании",
+    alloyId: "auagm-750-150", naznachenie: "Сувенирная продукция",
+    materials: [shCuP(3.5, 9.44), shMat("dm43"), shMat("dm44"), shMat("dm45")],
+    createdAt: "2026-04-08T10:05:00", createdBy: "Ковалева Елена",
   },
   {
-    id: "sk1", date: "19.08.2026", name: "Шихта для плавки Au-585 (партия А)", plavkaNo: "П-2026-0089", status: "Новая",
-    materials: [shMat("dm1"), shMat("dm3")],
-    createdAt: "2026-08-19T09:12:00", createdBy: "Ковалева Елена",
-  },
-  {
-    id: "sk2", date: "15.08.2026", name: "Шихта золото 750 пробы", plavkaNo: "П-2026-0088", status: "Новая",
-    materials: [shMat("dm4"), shMat("dm8")],
-    createdAt: "2026-08-15T14:45:00", createdBy: "Нурланов Асхат Бекович",
-  },
-  {
-    id: "sk3", date: "10.08.2026", name: "Шихта серебро 925 (кольца)", plavkaNo: "П-2026-0087", status: "Выполнена",
-    materials: [{ name: "Слиток серебра СрА-1", nomenkl: "5015360", klass: "Слиток", proba: 999, ves: 1000.50, loc: "-", qty: 1, chem: chemOf("2000", 1000.50, 999) }],
-    createdAt: "2026-08-10T08:30:00", createdBy: "Петров Сергей Владимирович",
-  },
-  {
-    id: "sk4", date: "05.08.2026", name: "Шихта Au-999 слитки партия Б", plavkaNo: "П-2026-0086", status: "Выполнена",
-    materials: [{ name: "Слиток золота стандартный", nomenkl: "5015361", klass: "Слиток", proba: 999.9, ves: 1000.00, loc: "-", qty: 1, chem: chemOf("1000", 1000.00, 999.9) }],
-    createdAt: "2026-08-05T11:00:00", createdBy: "Ковалева Елена",
-  },
-  {
-    id: "sk7", date: "01.08.2026", name: "Шихта ЗлСрПдМ 375 (лом и пластина)", plavkaNo: "П-2026-0085", status: "Выполнена",
+    id: "sk2", date: "02.04.2026", name: "Шихта ЗлСрМ 585-80 (сувенирная продукция)", plavkaNo: "12", status: "Выполнена",
+    alloyId: "auagm-585-80", naznachenie: "Сувенирная продукция",
     materials: [
-      { name: "Лом ЗлСрПдМ 375-100-38", nomenkl: "5015357", klass: "Скрап", proba: 375, ves: 84.30, loc: "-", qty: 1, chem: chemOf("0700", 84.30, 375) },
-      { name: "Пластина ЗлСрМ 375-20", nomenkl: "5015358", klass: "Пластина", proba: 375, ves: 46.10, loc: "-", qty: 1, chem: chemOf("8000", 46.10, 375) },
+      shCuP(3, 9.44),
+      shDone("Отходы Зл 99,99", "5015361", "Отходы", 999.9, 655.33, { au: 655.26 }),
+      shDone("Н/п чеканки Зл 99,99", "5015362", "НП чеканки", 999.9, 848.00, { au: 847.92 }),
+      shDone("Отходы ЗлСрМ 585-200", "5015363", "Отходы", 588.2, 1917.70, { au: 1128.00, ag: 379.45 }),
+      shMedMO(1050),
     ],
-    createdAt: "2026-08-01T10:40:00", createdBy: "Петров Сергей Владимирович",
+    createdAt: "2026-04-02T09:12:00", createdBy: "Ковалева Елена",
+  },
+  {
+    id: "sk4", date: "13.01.2026", name: "Шихта Ср 99,99 (инвестиционные монеты)", plavkaNo: "1", status: "Выполнена",
+    alloyId: "ag-9999", oborot: "чистая", naznachenie: "Инвестиционные монеты",
+    materials: [
+      shDone("Слиток серебра СрА 99,99", "5015360", "Слиток", 999.9, 92000.00, { ag: 91990.80 }),
+      shDone("Отходы Ср 99,99", "5015364", "Отходы", 999.9, 48983.00, { ag: 48978.11 }),
+    ],
+    createdAt: "2026-01-13T08:30:00", createdBy: "Петров Сергей Владимирович",
   },
 ];
 
@@ -766,12 +813,12 @@ export const initialLogs: LogEntry[] = [
   },
   {
     id: "l4", datetime: "19.08.2026, 14:10", user: "Ковалева Е.", section: "Шихтовые карты", type: "Изменение",
-    description: "Оформлена шихтовая карта П-2026-0089",
-    before: [{ title: "П-2026-0089 · Шихтовая карта", status: "Изменена", attrs: [
-      { label: "Наименование", value: "Шихта для плавки Au-585 (партия А)" }, { label: "Номер плавки", value: "П-2026-0089" }, { label: "Статус", value: "Редактирование" },
+    description: "Оформлена шихтовая карта, плавка № 47",
+    before: [{ title: "Плавка № 47 · Шихтовая карта", status: "Изменена", attrs: [
+      { label: "Наименование", value: "Шихта СрМ 92,5 (монеты коллекционные)" }, { label: "Номер плавки", value: "47" }, { label: "Статус", value: "На редактировании" },
     ] }],
-    after: [{ title: "П-2026-0089 · Шихтовая карта", status: "Изменена", attrs: [
-      { label: "Наименование", value: "Шихта для плавки Au-585 (партия А)" }, { label: "Номер плавки", value: "П-2026-0089" }, { label: "Статус", value: "Новая" },
+    after: [{ title: "Плавка № 47 · Шихтовая карта", status: "Изменена", attrs: [
+      { label: "Наименование", value: "Шихта СрМ 92,5 (монеты коллекционные)" }, { label: "Номер плавки", value: "47" }, { label: "Статус", value: "Новая" },
     ] }],
   },
   {
@@ -962,6 +1009,18 @@ export const spravochniki = {
       .map((value, i) => ({ code: String(i + 1), value, status: "Активно" })),
   },
   // Код — номер строки справочника
+  // Назначение слитков (шапка шихтовой карты); мин. доля аффинированного металла — bullionAffinage
+  "Назначение слитков": {
+    count: 6,
+    items: [
+      { code: "НС-01", value: "Монеты коллекционные (пруф, пруф-лайк)", status: "Активно" },
+      { code: "НС-02", value: "Инвестиционные монеты", status: "Активно" },
+      { code: "НС-03", value: "Столовое серебро", status: "Активно" },
+      { code: "НС-04", value: "Государственные награды", status: "Активно" },
+      { code: "НС-05", value: "Медально-значковая продукция", status: "Активно" },
+      { code: "НС-06", value: "Сувенирная продукция", status: "Активно" },
+    ]
+  },
   "Тип списания": {
     count: 2,
     items: [
@@ -975,6 +1034,88 @@ export const spravochniki = {
 export function spravValues(name: keyof typeof spravochniki): string[] {
   return spravochniki[name].items.filter(i => i.status === "Активно").map(i => i.value);
 }
+
+// --- Назначение слитков: минимальная доля аффинированного металла в шихте, % ---
+// Ключ — код записи справочника «Назначение слитков»; пусто — правило не установлено.
+export const bullionAffinage: Record<string, string> = {
+  "НС-01": "50",
+  "НС-02": "10",
+  "НС-03": "",
+  "НС-04": "10",
+  "НС-05": "10",
+  "НС-06": "10",
+};
+
+// Мин. доля аффинажа по значению назначения слитков (undefined — правило не установлено)
+export function minAffinageOf(naznachenie: string | undefined): number | undefined {
+  const code = spravochniki["Назначение слитков"].items.find(i => i.value === naznachenie)?.code;
+  const v = parseFloat((code ? bullionAffinage[code] : "")?.replace(",", ".") ?? "");
+  return Number.isFinite(v) ? v : undefined;
+}
+
+// Назначение, при котором в шихту не допускается стружка
+export const NAZN_PROOF = "Монеты коллекционные (пруф, пруф-лайк)";
+export const STRUZHKA_KLASS = "Стружка";
+
+// --- Марки сплавов ---
+// Основа марки — металл, по которому подбирается состав; диапазоны элементов — норма, с которой сверяется шихта.
+export type AlloyBase = "Ag" | "Au" | "Pd" | "Pt";
+export const ALLOY_BASES: AlloyBase[] = ["Ag", "Au", "Pd", "Pt"];
+// Элементы, для которых задаются диапазоны марки (id справочника «Химический состав»)
+export const ALLOY_RANGE_ELEMENTS = ["au", "ag", "pd", "pt", "cu"];
+// Примеси (справочно, не рассчитываются)
+export const ALLOY_IMPURITIES = ["fe", "sb", "bi", "pb"] as const;
+
+export interface AlloyRange {
+  element: string;
+  // Мин / макс, % — одно из значений может быть пустым
+  min?: number;
+  max?: number;
+  // Номинал, % — целевая доля для подбора состава (пусто — середина диапазона)
+  nominal?: number;
+}
+
+export interface AlloyGrade {
+  createdAt?: string;
+  createdBy?: string;
+  id: string;
+  name: string;
+  // Код материала — значение справочника «Коды материалов»
+  materialCode?: string;
+  base: AlloyBase;
+  // Нормативный документ
+  nd: string;
+  ranges: AlloyRange[];
+  // Элемент «Остальное» (в строке «Содержание в шихте, %» выводится текстом)
+  rest?: string;
+  // Примеси, не более, %: fe / sb / bi / pb и всего
+  impurities: Partial<Record<(typeof ALLOY_IMPURITIES)[number] | "total", number>>;
+  // Допускается отклонение — оформление карты, не соответствующей марке, с примечанием
+  allowDeviation: boolean;
+  status: "Активно" | "Неактивно";
+}
+
+const ag = (min?: number, max?: number, nominal?: number): AlloyRange => ({ element: "ag", min, max, nominal });
+const au = (min?: number, max?: number, nominal?: number): AlloyRange => ({ element: "au", min, max, nominal });
+const cu = (min?: number, max?: number, nominal?: number): AlloyRange => ({ element: "cu", min, max, nominal });
+const grade = (id: string, name: string, base: AlloyBase, nd: string, ranges: AlloyRange[], rest?: string, extra: Partial<AlloyGrade> = {}): AlloyGrade =>
+  ({ id, name, base, nd, ranges, rest, impurities: {}, allowDeviation: false, status: "Активно", ...extra });
+
+export const initialAlloyGrades: AlloyGrade[] = [
+  grade("ag-9999", "Ср 99,99", "Ag", "ГОСТ 6836-2002", [ag(99.99, undefined, 99.99)], undefined, { materialCode: "2000" }),
+  grade("ag-999", "Ср 99,9", "Ag", "ГОСТ 6836-2002", [ag(99.9, undefined, 99.9)], undefined, { materialCode: "2000" }),
+  grade("agm-925", "СрМ 92,5", "Ag", "ГОСТ 6836-2002", [ag(92.2, 92.8, 92.5)], "cu", {
+    impurities: { pb: 0.004, fe: 0.1, sb: 0.002, bi: 0.002, total: 0.11 },
+  }),
+  grade("agm-80", "СрМ 80", "Ag", "ГОСТ 6836-2002", [ag(79.7, 80.3, 80)], "cu"),
+  grade("aum-583", "ЗлМ 58,3", "Au", "ГОСТ 6835-2002", [au(58.0, 58.6, 58.3), cu(41.4, 42.0, 41.7)]),
+  grade("aum-916", "ЗлМ 91,6", "Au", "ГОСТ 6835-2002", [au(91.3, 91.9, 91.6), cu(8.1, 8.7, 8.4)]),
+  grade("auagm-585-80", "ЗлСрМ 585-80", "Au", "ГОСТ 30649-99", [au(58.5, 59.0, 58.5), ag(7.5, 8.5, 8.0)], "cu", { materialCode: "0500" }),
+  grade("auagm-375-160", "ЗлСрМ 375-160", "Au", "ГОСТ 30649-99", [au(37.5, 38.0, 37.5), ag(15.5, 16.5, 16.0)], "cu"),
+  grade("auagm-750-150", "ЗлСрМ 750-150", "Au", "ГОСТ 30649-99", [au(75.0, 75.5, 75.0), ag(14.5, 15.5, 15.0)], "cu", { materialCode: "0300" }),
+  // Моковая запись для проверки флага «Допускается отклонение»; нормы уточняются
+  grade("psr-45", "ПСр 45", "Ag", "ГОСТ 19738", [ag(44.5, 45.5, 45)], undefined, { allowDeviation: true }),
+];
 
 // --- Нормативы потерь драгоценных металлов по технологическим операциям ---
 // Ключ — код записи справочника «Технологические операции». unit — база расчёта норматива,
@@ -1050,7 +1191,7 @@ export const initialStatusDicts: StatusDict[] = [
   { group: "operacii", name: "Статусы операций движения материала", sections: "Движение материала",
     items: st("operacii", [["В работе", "blue"], ["Завершено", "green"]]) },
   { group: "shihta", name: "Статусы шихтовых карт", sections: "Шихтовые карты, Движение материала (выдача по шихтовой карте)",
-    items: st("shihta", [["Редактирование", "blue"], ["Новая", "green"], ["Выполнена", "gray"]]) },
+    items: st("shihta", [["На редактировании", "blue"], ["Новая", "green"], ["Выполнена", "gray"]]) },
   { group: "gost", name: "Статусы соответствия ГОСТ", sections: "Шихтовые карты, Отчётность",
     items: st("gost", [["Соответствует", "green"], ["Не соответствует", "red"]]) },
   { group: "podotchet", name: "Статусы подотчётника", sections: "Подотчётники",
@@ -1205,16 +1346,16 @@ export type ChemComposition = Record<string, string>;
 export const initialChemElements: ChemElement[] = [
   { id: "au", name: "Золото", shortName: "Au", showDm: true, showShk: true },
   { id: "ag", name: "Серебро", shortName: "Ag", showDm: true, showShk: true },
-  { id: "pd", name: "Палладий", shortName: "Pd", showDm: true, showShk: false },
+  { id: "pd", name: "Палладий", shortName: "Pd", showDm: true, showShk: true },
   { id: "rh", name: "Родий", shortName: "Rh", showDm: false, showShk: false },
   { id: "pt", name: "Платина", shortName: "Pt", showDm: true, showShk: false },
   { id: "ir", name: "Иридий", shortName: "Ir", showDm: false, showShk: false },
   { id: "cu", name: "Медь", shortName: "Cu", showDm: true, showShk: true },
   { id: "p", name: "Фосфор", shortName: "P", showDm: false, showShk: true },
-  { id: "fe", name: "Железо", shortName: "Fe", showDm: false, showShk: true },
-  { id: "pb", name: "Свинец", shortName: "Pb", showDm: false, showShk: true },
-  { id: "sb", name: "Сурьма", shortName: "Sb", showDm: false, showShk: true },
-  { id: "bi", name: "Висмут", shortName: "Bi", showDm: false, showShk: true },
+  { id: "fe", name: "Железо", shortName: "Fe", showDm: false, showShk: false },
+  { id: "pb", name: "Свинец", shortName: "Pb", showDm: false, showShk: false },
+  { id: "sb", name: "Сурьма", shortName: "Sb", showDm: false, showShk: false },
+  { id: "bi", name: "Висмут", shortName: "Bi", showDm: false, showShk: false },
   { id: "te", name: "Теллур", shortName: "Te", showDm: false, showShk: false },
   { id: "zn", name: "Цинк", shortName: "Zn", showDm: false, showShk: false },
   { id: "cd", name: "Кадмий", shortName: "Cd", showDm: false, showShk: false },
@@ -1263,3 +1404,7 @@ for (const l of initialStorageLocations) {
 }
 // Записи простых справочников (значения задаются при настройке системы)
 export const DEMO_DICT_CREATED = { createdAt: "2026-01-12T09:00:00", createdBy: DEMO_ADMIN };
+for (const g of initialAlloyGrades) {
+  g.createdAt ??= DEMO_DICT_CREATED.createdAt;
+  g.createdBy ??= DEMO_DICT_CREATED.createdBy;
+}

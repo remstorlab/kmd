@@ -18,6 +18,8 @@ export default function StockPickerModal({
   rows,
   already = {},
   showWeights = false,
+  probaPct = false,
+  excludeKlass,
   qtyLabel = "Количество к выдаче",
   qtyInput = true,
   emptyText = "Нет доступных позиций на складе",
@@ -33,6 +35,10 @@ export default function StockPickerModal({
   already?: Record<string, number>;
   // Показывать пробу и массы (для ДМ)
   showWeights?: boolean;
+  // Проба — фактическая, в % с 2 знаками; чистый вес — по ней (r.net); для шихтовых карт
+  probaPct?: boolean;
+  // Классы, которые не предлагаются в фильтре (позиции этих классов не передаются в rows)
+  excludeKlass?: string[];
   qtyLabel?: string;
   // false — без ввода количества: позиция берётся целиком (весь доступный остаток).
   // Функция — ввод количества только для подходящих позиций.
@@ -128,7 +134,7 @@ export default function StockPickerModal({
           <label className="block text-xs font-medium text-gray-500 mb-1">Наименование / Номенкл. №</label>
           <SearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
         </div>
-        <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
+        <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} exclude={excludeKlass} /></Field>
         <Field label="Код материала"><Select value={code} options={codes} onChange={setCode} optionLabel={v => (v === ALL_CODES ? v : codeLabel(v))} /></Field>
         <div className="col-span-2">
           <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
@@ -159,9 +165,9 @@ export default function StockPickerModal({
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код</SortTh>
               {showWeights && <>
-                <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
+                <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">{probaPct ? "Проба, %" : "Проба"}</SortTh>
                 <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
-                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
+                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{probaPct ? "Чистый вес, г" : NET_AU_AG}</SortTh>
               </>}
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
@@ -178,9 +184,9 @@ export default function StockPickerModal({
                     <td className="px-3 py-2"><KlassCode value={r.klass} /></td>
                     <td className="px-3 py-2 text-blue-600">{codeLabel(r.code)}</td>
                     {showWeights && <>
-                      <td className="px-3 py-2">{probaText(r.proba)}</td>
+                      <td className="px-3 py-2">{probaPct && r.proba ? (r.proba / 10).toFixed(2).replace(".", ",") : probaText(r.proba)}</td>
                       <td className="px-3 py-2">{r.lig}</td>
-                      <td className="px-3 py-2"><NetAuAg chem={r.chem} /></td>
+                      <td className="px-3 py-2">{probaPct ? (r.net != null ? r.net.toFixed(2).replace(".", ",") : "—") : <NetAuAg chem={r.chem} />}</td>
                     </>}
                     <td className="px-3 py-2 text-gray-500">{r.location}</td>
                     <td className="px-3 py-2 text-gray-500">{left(r) || "—"}</td>

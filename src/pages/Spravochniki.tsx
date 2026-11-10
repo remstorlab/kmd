@@ -4,12 +4,12 @@ import {
   PageHeader, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Badge, Toggle,
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination, usePerPage, FillerRows, fillerCount, statusColorClass, usePaged,
-  CREATED_LABEL, CreatedCell, Created, createdSortKey, useCreatedStamp,
+  CREATED_LABEL, CreatedCell, Created, createdSortKey, useCreatedStamp, RequiredMark,
 } from "../components/ui";
-import { spravochniki, DEMO_DICT_CREATED, techOpLossNorms, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS } from "../data/mock";
+import { spravochniki, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
-import { ArrowLeft, ArrowDownUp, Gem, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowDownUp, Gem, Target, Atom, X, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 // Кто и когда создал запись простого справочника: «<справочник>|<код>» → отметка (демо-записи — при настройке системы)
@@ -30,6 +30,7 @@ const DICT_SLUG: Record<SpravKey, string> = {
   "Технологические операции": "tehnologicheskie-operacii",
   "Тип списания": "tip-spisaniya",
   "Пробы": "proby",
+  "Назначение слитков": "naznachenie-slitkov",
 };
 export const SPRAV_SLUGS = {
   ...DICT_SLUG,
@@ -38,6 +39,7 @@ export const SPRAV_SLUGS = {
   "Места хранения": "mesta-hraneniya",
   "Химический состав": "himicheskiy-sostav",
   "Допустимые отклонения от массы": "dopustimye-otkloneniya",
+  "Марки сплавов": "marki-splavov",
 } as const;
 // Справочники статусов: /spravochniki/status-<группа>
 const statusSlug = (d: StatusDict) => `status-${d.group}`;
@@ -72,6 +74,7 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Технологические операции": Wrench,
   "Тип списания": ArrowDownUp,
   "Пробы": Gem,
+  "Назначение слитков": Target,
 };
 
 // Подпись поля «Значение» для справочников, где оно называется иначе
@@ -91,6 +94,10 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const valueLabel = VALUE_LABEL[name] ?? "Значение";
   // У технологических операций — нормативы допустимых потерь по золоту и серебру
   const withNorms = name === "Технологические операции";
+  // У назначения слитков — минимальная доля аффинированного металла в шихте
+  const withAffinage = name === "Назначение слитков";
+  const [affinage, setAffinage] = useState(bullionAffinage);
+  const [affForm, setAffForm] = useState("");
   const numbered = NUMBERED.includes(name);
   const [items, setItems] = useState(dict.items);
   const [norms, setNorms] = useState(techOpLossNorms);
@@ -100,11 +107,12 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.code);
   // Форма заполняется при открытии экрана добавления / редактирования (в т.ч. по прямой ссылке)
   useEffect(() => {
-    if (editItem) { setForm(editItem); setNormForm(norms[editItem.code] ?? emptyNorm); }
+    if (editItem) { setForm(editItem); setNormForm(norms[editItem.code] ?? emptyNorm); setAffForm(affinage[editItem.code] ?? ""); }
     else if (showAdd) {
       const nextNo = String(items.reduce((m, i) => Math.max(m, parseInt(i.code, 10) || 0), 0) + 1);
       setForm({ code: numbered ? nextNo : "", value: "", status: "Активно" });
       setNormForm(emptyNorm);
+      setAffForm("");
     }
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
@@ -129,6 +137,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
       // Нормативы читает раздел «Списание», поэтому также пишем их в общий источник
       techOpLossNorms[form.code] = normForm;
       setNorms({ ...techOpLossNorms });
+    }
+    if (withAffinage) {
+      // Правило читает конструктор шихтовой карты — пишем в общий источник
+      bullionAffinage[form.code] = affForm.trim();
+      setAffinage({ ...bullionAffinage });
     }
     closeAll();
     show("Запись сохранена");
@@ -160,6 +173,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
               <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Потери Au, %</th>
               <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Потери Ag, %</th>
             </>}
+            {withAffinage && <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Мин. доля аффинажа, %</th>}
             {!numbered && <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>}
             <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
             <th className="w-12"></th>
@@ -174,6 +188,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                   <td className="px-4 py-3 text-right tabular-nums">{normCell(norms[item.code]?.au ?? "")}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{normCell(norms[item.code]?.ag ?? "")}</td>
                 </>}
+                {withAffinage && <td className="px-4 py-3 text-right tabular-nums">{normCell(affinage[item.code] ?? "")}</td>}
                 {!numbered && <td className="px-4 py-3"><Badge label={item.status} group="zapisi-spravochnikov" /></td>}
                 <CreatedCell row={dictCreatedOf(name, item.code)} />
                 <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
@@ -206,6 +221,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                 <Field label="Допустимые потери — Серебро, %"><Input value={normForm.ag} onChange={v => setNormForm(f => ({ ...f, ag: v }))} placeholder="Не установлен" /></Field>
               </div>
             </>}
+            {withAffinage && <Field label="Мин. доля аффинажа, %"><Input value={affForm} onChange={v => setAffForm(v.replace(/[^d.,]/g, ""))} placeholder="Не установлено" /></Field>}
             {!numbered && <Field label="Статус" required><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>}
           </div>
         </Modal>
@@ -1105,6 +1121,274 @@ function MassTolerancesPage({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ── Марки сплавов (норма состава для сверки шихтовой карты) ───────────────────
+
+type RangeForm = { element: string; min: string; max: string; nominal: string };
+type GradeForm = {
+  name: string; materialCode: string; base: AlloyBase; nd: string; rest: string;
+  ranges: RangeForm[]; impurities: Record<string, string>; allowDeviation: boolean; status: string;
+};
+const IMPURITY_KEYS = [...ALLOY_IMPURITIES, "total"] as const;
+const numStr = (v: number | undefined) => (v == null ? "" : fmtNum(v));
+const optNum = (s: string) => { const v = numIn(s); return s.trim() && Number.isFinite(v) ? v : undefined; };
+const emptyGrade = (): GradeForm => ({
+  name: "", materialCode: "", base: "Ag", nd: "", rest: "cu",
+  ranges: [{ element: "ag", min: "", max: "", nominal: "" }], impurities: {}, allowDeviation: false, status: "Активно",
+});
+const gradeToForm = (g: AlloyGrade): GradeForm => ({
+  name: g.name, materialCode: g.materialCode ?? "", base: g.base, nd: g.nd, rest: g.rest ?? "",
+  ranges: g.ranges.map(r => ({ element: r.element, min: numStr(r.min), max: numStr(r.max), nominal: numStr(r.nominal) })),
+  impurities: Object.fromEntries(Object.entries(g.impurities).map(([k, v]) => [k, numStr(v)])),
+  allowDeviation: g.allowDeviation, status: g.status,
+});
+
+// Ошибка формы марки (пусто — можно сохранять)
+function gradeFormError(f: GradeForm, others: AlloyGrade[]): string {
+  if (!f.name.trim()) return "Укажите марку";
+  if (others.some(g => g.name.trim().toLowerCase() === f.name.trim().toLowerCase())) return "Марка с таким наименованием уже есть";
+  if (!f.nd.trim()) return "Укажите нормативный документ";
+  if (f.ranges.length === 0) return "Добавьте хотя бы один диапазон элемента";
+  const els = f.ranges.map(r => r.element);
+  if (new Set(els).size !== els.length) return "Элемент указан в диапазонах дважды";
+  for (const r of f.ranges) {
+    const min = optNum(r.min), max = optNum(r.max);
+    if ([r.min, r.max, r.nominal].some(s => s.trim() && !Number.isFinite(numIn(s)))) return "Значения диапазонов — числа";
+    if (min == null && max == null) return "Для каждого элемента укажите мин или макс";
+    if (min != null && max != null && min > max) return "Мин не может быть больше макс";
+  }
+  if (Object.values(f.impurities).some(s => s.trim() && !Number.isFinite(numIn(s)))) return "Примеси — числа";
+  return "";
+}
+
+function GradeFormFields({ form, setForm, disabled = false }: { form: GradeForm; setForm?: React.Dispatch<React.SetStateAction<GradeForm>>; disabled?: boolean }) {
+  const { materialCodes, chemElements } = useApp();
+  const short = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
+  const set = (patch: Partial<GradeForm>) => setForm?.(f => ({ ...f, ...patch }));
+  const setRange = (i: number, patch: Partial<RangeForm>) => setForm?.(f => ({ ...f, ranges: f.ranges.map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
+  const dec = (v: string) => v.replace(/[^\d.,]/g, "");
+  const freeEl = ALLOY_RANGE_ELEMENTS.find(e => !form.ranges.some(r => r.element === e));
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Марка" required={!disabled}><Input value={form.name} onChange={v => set({ name: v })} placeholder="СрМ 92,5" disabled={disabled} /></Field>
+        <Field label="Код материала">
+          <Select value={form.materialCode} options={["", ...materialCodes.map(c => c.code)]} optionLabel={v => (v ? `${v} · ${materialCodes.find(c => c.code === v)?.shortName ?? ""}` : "Не выбран")} onChange={v => set({ materialCode: v })} disabled={disabled} />
+        </Field>
+        <Field label="Основа" required={!disabled}><Select value={form.base} options={ALLOY_BASES} onChange={v => set({ base: v as AlloyBase })} disabled={disabled} /></Field>
+        <Field label="Нормативный документ" required={!disabled}><Input value={form.nd} onChange={v => set({ nd: v })} placeholder="ГОСТ 6836-2002" disabled={disabled} /></Field>
+        <Field label="Остальное">
+          <Select value={form.rest} options={["", ...ALLOY_RANGE_ELEMENTS]} optionLabel={v => (v ? short(v) : "Нет")} onChange={v => set({ rest: v })} disabled={disabled} />
+        </Field>
+        <Field label="Статус" required={!disabled}><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => set({ status: v })} disabled={disabled} /></Field>
+      </div>
+
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Диапазоны элементов{!disabled && <RequiredMark />}</h4>
+          {!disabled && freeEl && (
+            <Btn size="sm" variant="secondary" onClick={() => setForm?.(f => ({ ...f, ranges: [...f.ranges, { element: freeEl, min: "", max: "", nominal: "" }] }))}><Plus className="w-4 h-4" />Добавить элемент</Btn>
+          )}
+        </div>
+        <table className="w-full text-sm">
+          <thead><tr className="text-xs text-gray-500">
+            <th className="py-1 pr-2 text-left font-medium">Элемент</th>
+            <th className="py-1 px-2 text-left font-medium">Мин, %</th>
+            <th className="py-1 px-2 text-left font-medium">Макс, %</th>
+            <th className="py-1 px-2 text-left font-medium">Номинал, % <span className="font-normal text-gray-400">(для подбора)</span></th>
+            {!disabled && <th className="w-8"></th>}
+          </tr></thead>
+          <tbody>
+            {form.ranges.map((r, i) => (
+              <tr key={i}>
+                <td className="py-1 pr-2 w-32">
+                  <Select value={r.element} options={ALLOY_RANGE_ELEMENTS.filter(e => e === r.element || !form.ranges.some(x => x.element === e))} optionLabel={short} onChange={v => setRange(i, { element: v })} disabled={disabled} />
+                </td>
+                <td className="py-1 px-2"><Input value={r.min} onChange={v => setRange(i, { min: dec(v) })} placeholder="Не задано" disabled={disabled} /></td>
+                <td className="py-1 px-2"><Input value={r.max} onChange={v => setRange(i, { max: dec(v) })} placeholder="Не задано" disabled={disabled} /></td>
+                <td className="py-1 px-2"><Input value={r.nominal} onChange={v => setRange(i, { nominal: dec(v) })} placeholder="Середина диапазона" disabled={disabled} /></td>
+                {!disabled && <td className="py-1 text-center">
+                  <button onClick={() => setForm?.(f => ({ ...f, ranges: f.ranges.filter((_, j) => j !== i) }))} className="text-gray-400 hover:text-red-500" title="Убрать"><X className="w-3.5 h-3.5" /></button>
+                </td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-xs text-gray-500 mt-2">Одно из значений «Мин» или «Макс» может быть пустым. Состав шихты соответствует марке, если по каждому элементу факт не меньше мин и не больше макс.</p>
+      </div>
+
+      <div>
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Примеси, не более, % <span className="normal-case font-normal text-gray-400">(справочно, в шихте не рассчитываются)</span></h4>
+        <div className="grid grid-cols-5 gap-3">
+          {IMPURITY_KEYS.map(k => (
+            <Field key={k} label={k === "total" ? "Всего, %" : `${short(k)}, %`}>
+              <Input value={form.impurities[k] ?? ""} onChange={v => setForm?.(f => ({ ...f, impurities: { ...f.impurities, [k]: dec(v) } }))} placeholder="Не задано" disabled={disabled} />
+            </Field>
+          ))}
+        </div>
+      </div>
+
+      <ChemFlagCheckbox label="Допускается отклонение (карту, не соответствующую марке, можно оформить с примечанием)" checked={form.allowDeviation} onChange={v => set({ allowDeviation: v })} disabled={disabled} />
+    </div>
+  );
+}
+
+function AlloyGradesPage({ onBack }: { onBack: () => void }) {
+  const { alloyGrades: items, setAlloyGrades: setItems, chemElements } = useApp();
+  const short = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
+  const createdStamp = useCreatedStamp();
+  const [form, setForm] = useState<GradeForm>(emptyGrade);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Все статусы");
+  const [page, setPage] = useState(1);
+  const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, g => g.id);
+  useEffect(() => {
+    if (editItem) setForm(gradeToForm(editItem));
+    else if (showAdd) setForm(emptyGrade());
+  }, [editKey, showAdd]);
+  const { toast, show, clear } = useToast();
+  const [perPage, setPerPage] = usePerPage("sprav-grades", 10);
+
+  // Колонки диапазонов — элементы, нормированные хотя бы в одной марке (мин и макс — отдельные колонки)
+  const rangeEls = ALLOY_RANGE_ELEMENTS.filter(e => items.some(g => g.ranges.some(r => r.element === e)));
+  const filtered = items.filter(g => {
+    const q = search.trim().toLowerCase();
+    return (statusFilter === "Все статусы" || g.status === statusFilter)
+      && (!q || g.name.toLowerCase().includes(q) || g.nd.toLowerCase().includes(q));
+  });
+  const { sorted, sort, toggleSort } = useSort(filtered, {
+    name: g => g.name,
+    base: g => g.base,
+    nd: g => g.nd,
+    status: g => g.status,
+    created: g => createdSortKey(g),
+  });
+  const pageItems = sorted.slice((page - 1) * perPage, page * perPage);
+
+  const error = gradeFormError(form, items.filter(g => g.id !== editItem?.id));
+  const save = () => {
+    if (error) return;
+    const rec = {
+      name: form.name.trim(), materialCode: form.materialCode || undefined, base: form.base, nd: form.nd.trim(), rest: form.rest || undefined,
+      ranges: form.ranges.map(r => ({ element: r.element, min: optNum(r.min), max: optNum(r.max), nominal: optNum(r.nominal) })),
+      impurities: Object.fromEntries(Object.entries(form.impurities).map(([k, v]) => [k, optNum(v)]).filter(([, v]) => v != null)),
+      allowDeviation: form.allowDeviation, status: form.status as AlloyGrade["status"],
+    };
+    if (editItem) setItems(prev => prev.map(g => (g.id === editItem.id ? { ...g, ...rec } : g)));
+    else setItems(prev => [...prev, { id: `grade-${Date.now()}`, ...rec, ...createdStamp() }]);
+    closeAll();
+    show("Запись сохранена");
+  };
+  const cell = (v: number | undefined) => (v != null ? fmtNum(v) : <span className="text-gray-300">—</span>);
+  const totalCols = 4 + rangeEls.length * 2 + 5;
+
+  return (
+    <div>
+      <button onClick={onBack} className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-medium mb-4">
+        <ArrowLeft className="w-4 h-4" />
+        Назад к справочникам
+      </button>
+      <div className="text-xs text-gray-500 mb-4">Справочники / Марки сплавов</div>
+      <PageHeader
+        title="Марки сплавов"
+        subtitle={`${items.length} значений · норма состава для сверки шихтовых карт`}
+        actions={<Btn onClick={goAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
+      />
+
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex items-end gap-3">
+        <div className="w-72">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
+          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Марка, нормативный документ..." />
+        </div>
+        <div className="w-48">
+          <Field label="Статус"><Select value={statusFilter} options={["Все статусы", "Активно", "Неактивно"]} onChange={v => { setStatusFilter(v); setPage(1); }} /></Field>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-xs text-gray-500">
+              <th colSpan={4}></th>
+              {rangeEls.map(e => <th key={e} colSpan={2} className="px-3 pt-2 pb-1 text-center font-medium border-b border-gray-200">{short(e)}, %</th>)}
+              <th colSpan={5}></th>
+            </tr>
+            <tr className="bg-gray-50 border-b border-gray-200 whitespace-nowrap">
+              <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Марка</SortTh>
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Код материала</th>
+              <SortTh sortKey="base" sort={sort} onSort={toggleSort}>Основа</SortTh>
+              <SortTh sortKey="nd" sort={sort} onSort={toggleSort}>Нормативный документ</SortTh>
+              {rangeEls.map(e => (
+                <React.Fragment key={e}>
+                  <th className="px-3 py-3 text-right font-medium text-gray-500 text-xs">Мин</th>
+                  <th className="px-3 py-3 text-right font-medium text-gray-500 text-xs">Макс</th>
+                </React.Fragment>
+              ))}
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Остальное</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Отклонение</th>
+              <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
+              <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
+              <th className="w-20"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {pageItems.map(g => (
+              <tr key={g.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{g.name}</td>
+                <td className="px-4 py-3 font-mono text-blue-600">{g.materialCode ?? <span className="text-gray-300">—</span>}</td>
+                <td className="px-4 py-3">{g.base}</td>
+                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{g.nd}</td>
+                {rangeEls.map(e => {
+                  const r = g.ranges.find(x => x.element === e);
+                  return (
+                    <React.Fragment key={e}>
+                      <td className="px-3 py-3 text-right tabular-nums">{cell(r?.min)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{cell(r?.max)}</td>
+                    </React.Fragment>
+                  );
+                })}
+                <td className="px-4 py-3">{g.rest ? short(g.rest) : <span className="text-gray-300">—</span>}</td>
+                <td className="px-4 py-3">{g.allowDeviation ? "Да" : "Нет"}</td>
+                <td className="px-4 py-3"><Badge label={g.status} group="zapisi-spravochnikov" /></td>
+                <CreatedCell row={g} />
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => goView(g)} />
+                    <EditIcon onClick={() => goEdit(g)} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {pageItems.length === 0 && (
+              <tr><td colSpan={totalCols} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+            )}
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={totalCols} />
+          </tbody>
+        </table>
+        <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
+      </div>
+
+      {(showAdd || editItem) && (
+        <Modal largeWide title={editItem ? `Редактировать марку «${editItem.name}»` : "Добавить марку сплава"} onClose={closeAll} footer={<>
+          <Btn variant="secondary" onClick={closeAll}>Отмена</Btn>
+          <Btn onClick={save} disabled={!!error}>Сохранить</Btn>
+        </>}>
+          <GradeFormFields form={form} setForm={setForm} />
+          {error && <div className="mt-3 text-xs text-red-600">{error}</div>}
+        </Modal>
+      )}
+      {viewItem && (
+        <Modal largeWide title={`Марка сплава: ${viewItem.name}`} onClose={closeAll} footer={<>
+          <Btn variant="secondary" onClick={() => goEdit(viewItem)}>Редактировать</Btn>
+          <Btn variant="secondary" onClick={closeAll}>Закрыть</Btn>
+        </>}>
+          <GradeFormFields form={gradeToForm(viewItem)} disabled />
+        </Modal>
+      )}
+      {toast && <Toast message={toast} onDone={clear} />}
+    </div>
+  );
+}
+
 function ChemFlagCheckbox({ label, checked, onChange, disabled = false }: { label: string; checked: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
   return (
     <label className={`flex items-center gap-2 text-sm text-gray-700 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
@@ -1115,7 +1399,7 @@ function ChemFlagCheckbox({ label, checked, onChange, disabled = false }: { labe
 }
 
 export function Spravochniki() {
-  const { storageLocations, chemElements, materialCodes, statusDicts, massTolerances, navigate } = useApp();
+  const { storageLocations, chemElements, materialCodes, statusDicts, massTolerances, alloyGrades, navigate } = useApp();
   // Справочник — /spravochniki/<slug>
   const { pathname } = useLocation();
   const { page, segs } = matchPage(pathname);
@@ -1151,6 +1435,9 @@ export function Spravochniki() {
   }
   if (showMassTolerances) {
     return <MassTolerancesPage onBack={() => open()} />;
+  }
+  if (slug === SPRAV_SLUGS["Марки сплавов"]) {
+    return <AlloyGradesPage onBack={() => open()} />;
   }
   if (showChemElements) {
     return <ChemElementsPage onBack={() => setShowChemElements(false)} />;
@@ -1230,6 +1517,16 @@ export function Spravochniki() {
           </div>
           <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Допустимые отклонения от массы</h3>
           <p className="text-sm text-gray-400">{massTolerances.length} значений</p>
+        </button>
+        <button
+          onClick={() => open(SPRAV_SLUGS["Марки сплавов"])}
+          className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md transition-all hover:border-blue-300 group"
+        >
+          <div className="w-10 h-10 mb-3 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+            <Atom className="w-5 h-5" />
+          </div>
+          <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Марки сплавов</h3>
+          <p className="text-sm text-gray-400">{alloyGrades.length} значений</p>
         </button>
       </div>
 

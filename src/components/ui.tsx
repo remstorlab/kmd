@@ -32,7 +32,6 @@ const badgePalette: Record<string, string> = {
   "Новая": "bg-green-100 text-green-700 border-green-200",
   "Изменение": "bg-blue-100 text-blue-700 border-blue-200",
   "В норме": "bg-blue-100 text-blue-700 border-blue-200",
-  "Редактирование": "bg-blue-100 text-blue-700 border-blue-200",
 
   "Заблокирован": "bg-red-100 text-red-700 border-red-200",
   "Заблокировано": "bg-red-100 text-red-700 border-red-200",
@@ -742,8 +741,8 @@ export function MultiSelect({ values, onChange, options, allLabel = "Все", di
 }
 
 // Выпадающий список «Класс материала» для форм ввода: полные наименования из справочника.
-export function KlassSelect({ value, onChange, disabled = false, allLabel }: { value: string; onChange?: (v: string) => void; disabled?: boolean; allLabel?: string }) {
-  const names = initialMaterialClasses.map(c => c.name);
+export function KlassSelect({ value, onChange, disabled = false, allLabel, exclude = [] }: { value: string; onChange?: (v: string) => void; disabled?: boolean; allLabel?: string; exclude?: string[] }) {
+  const names = initialMaterialClasses.map(c => c.name).filter(n => !exclude.includes(n));
   const options = [...(allLabel ? [allLabel] : []), ...(value && value !== allLabel && !names.includes(value) ? [value] : []), ...names];
   return <Select value={value} onChange={onChange} options={options} disabled={disabled} />;
 }

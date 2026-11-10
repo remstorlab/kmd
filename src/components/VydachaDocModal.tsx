@@ -159,13 +159,13 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       const toSgp = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: SGP, status: "На складе", location: NO_LOC, zakazchik: it.zakazchik ?? zakazchik });
       if (gpIssue.size) setGpItems(prev => takeFromStock(prev, gpIssue, toSgp, partId, partLigMap(positions)).items);
       if (dmIssue.size) setDmItems(prev => takeFromStock(prev, dmIssue, toSgp, partId, partLigMap(positions)).items);
-      // Выданные позиции из резерва: шихтовая карта, которая их резервировала, возвращается в «Редактирование»
+      // Выданные позиции из резерва: шихтовая карта, которая их резервировала, возвращается в «На редактировании»
       if (affectedKarty.length) {
         const ids = new Set(affectedKarty.map(k => k.id));
         setShihtovyeKarty(prev => prev.map(k => {
           if (!ids.has(k.id)) return k;
           const hit = k.materials.filter(m => rezNomenkl.has(m.nomenkl)).map(m => m.name);
-          return { ...k, status: "Редактирование", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
+          return { ...k, status: "На редактировании", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
         }));
       }
     }
@@ -201,7 +201,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     >
       {!issued && !ro && affectedKarty.length > 0 && (
         <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm text-orange-800">
-          ⚠ В выдаче есть позиции из резерва. После оформления шихтовая карта {affectedKarty.map(k => `«${k.name}»`).join(", ")} вернётся в статус «Редактирование» и станет недоступна для плавки.
+          ⚠ В выдаче есть позиции из резерва. После оформления шихтовая карта {affectedKarty.map(k => `«${k.name}»`).join(", ")} вернётся в статус «На редактировании» и станет недоступна для плавки.
         </div>
       )}
       {issued && (

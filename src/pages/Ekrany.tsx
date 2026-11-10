@@ -25,7 +25,7 @@ export function useScreenGroups(): Group[] {
   const dm1 = dmItems.find(i => i.sklad === SDM1 && i.status !== "Закрыта");
   const dm2 = dmItems.find(i => i.sklad === SDM2 && i.status !== "Закрыта");
   const karta = shihtovyeKarty.find(k => k.status === "Новая") ?? shihtovyeKarty[0];
-  const kartaRed = shihtovyeKarty.find(k => k.status === "Редактирование");
+  const kartaRed = shihtovyeKarty.find(k => k.status === "На редактировании");
   const person = podotchetniki[0];
   const log = logs.find(l => (l.before?.length ?? 0) + (l.after?.length ?? 0) > 0) ?? logs[0];
   const S = SPRAV_SLUGS;
@@ -96,6 +96,7 @@ export function useScreenGroups(): Group[] {
       karta && { title: "Карта: просмотр", path: `${P["shihtovye-karty"]}/view/${karta.id}` },
       kartaRed && { title: "Карта: редактирование (черновик)", path: `${P["shihtovye-karty"]}/edit/${kartaRed.id}` },
       kartaRed && { title: "Карта: результат расчёта", path: `${P["shihtovye-karty"]}/edit/${kartaRed.id}/raschet` },
+      kartaRed && { title: "Карта: подбор состава", path: `${P["shihtovye-karty"]}/edit/${kartaRed.id}/podbor` },
     ].filter(Boolean) as Screen[] },
     { title: "Подотчётные лица", screens: [
       { title: "Реестр подотчётных лиц", path: P["podotchetniki"] },
@@ -125,6 +126,9 @@ export function useScreenGroups(): Group[] {
       { title: "Классы материалов — добавить запись", path: `${sprav(S["Классы материалов"])}/new` },
       { title: "Места хранения — добавить", path: `${sprav(S["Места хранения"])}/new` },
       storageLocations[0] && { title: "Места хранения — просмотр", path: `${sprav(S["Места хранения"])}/view/${storageLocations[0].id}` },
+      { title: "Марки сплавов — добавить запись", path: `${sprav(S["Марки сплавов"])}/new` },
+      { title: "Марки сплавов — просмотр", path: `${sprav(S["Марки сплавов"])}/view/agm-925` },
+      { title: "Назначение слитков — редактировать запись", path: `${sprav(S["Назначение слитков"])}/edit/${encodeURIComponent("НС-01")}` },
       { title: "Химический состав — добавить запись", path: `${sprav(S["Химический состав"])}/new` },
       { title: "Допустимые отклонения от массы — добавить запись", path: `${sprav(S["Допустимые отклонения от массы"])}/new` },
       { title: "Допустимые отклонения от массы — просмотр", path: `${sprav(S["Допустимые отклонения от массы"])}/view/tol-au-0` },

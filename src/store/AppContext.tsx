@@ -3,10 +3,10 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { matchPage, pagePath, LOGIN_PATH } from "../router";
 import {
   GPItem, DMItem, SkladDoc, Operation, ShihtovayaKarta,
-  Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy, StorageLocation, ChemElement, MaterialCode, StatusDict, MassTolerance,
+  Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy, StorageLocation, ChemElement, MaterialCode, StatusDict, MassTolerance, AlloyGrade,
   initialGPItems, initialDMItems, initialSkladDocs, initialVydachaDocs,
   initialOperations, initialShihtovyeKarty, initialPodotchetniki,
-  initialUsers, initialRoles, initialLogs, initialSecurityPolicy, initialStorageLocations, initialChemElements, initialMaterialCodes, initialStatusDicts, initialMassTolerances,
+  initialUsers, initialRoles, initialLogs, initialSecurityPolicy, initialStorageLocations, initialChemElements, initialMaterialCodes, initialStatusDicts, initialMassTolerances, initialAlloyGrades,
 } from "../data/mock";
 
 export type Page =
@@ -229,6 +229,8 @@ interface AppCtx {
   setStatusDicts: React.Dispatch<React.SetStateAction<StatusDict[]>>;
   massTolerances: MassTolerance[];
   setMassTolerances: React.Dispatch<React.SetStateAction<MassTolerance[]>>;
+  alloyGrades: AlloyGrade[];
+  setAlloyGrades: React.Dispatch<React.SetStateAction<AlloyGrade[]>>;
 }
 
 const Ctx = createContext<AppCtx>(null!);
@@ -340,6 +342,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [materialCodes, setMaterialCodes] = useState(initialMaterialCodes);
   const [statusDicts, setStatusDicts] = useState(initialStatusDicts);
   const [massTolerances, setMassTolerances] = useState(initialMassTolerances);
+  const [alloyGrades, setAlloyGrades] = useState(initialAlloyGrades);
 
   return (
     <Ctx.Provider value={{
@@ -364,6 +367,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       materialCodes, setMaterialCodes,
       statusDicts, setStatusDicts,
       massTolerances, setMassTolerances,
+      alloyGrades, setAlloyGrades,
     }}>
       {children}
     </Ctx.Provider>
