@@ -249,7 +249,8 @@ export interface AppUser {
   createdBy?: string;
   id: string;
   name: string;
-  role: string;
+  // Роли пользователя (несколько) — значения из «Управления ролями»
+  roles: string[];
   status: UserStatus;
   email: string;
   username: string;
@@ -708,11 +709,11 @@ export const initialPodotchetniki: Podotchetnik[] = [
 
 // --- Пользователи ---
 export const initialUsers: AppUser[] = [
-  { id: "u1", name: "Ковалева Елена", role: "Администратор", status: "Активен", email: "e.kovaleva@kmd.kz", username: "e.kovaleva" },
-  { id: "u2", name: "Нурланов Асхат Бекович", role: "Сотрудник склада ДМ", status: "Активен", email: "a.nurlanov@kmd.kz", username: "a.nurlanov" },
-  { id: "u3", name: "Петров Сергей Владимирович", role: "Сотрудник ПТО", status: "Активен", email: "s.petrov@kmd.kz", username: "s.petrov" },
-  { id: "u4", name: "Ким Александр Юрьевич", role: "Сотрудник склада ДМ", status: "Заблокирован", email: "a.kim@kmd.kz", username: "a.kim" },
-  { id: "u5", name: "Иванова Мария Сергеевна", role: "Технолог", status: "Активен", email: "m.ivanova@kmd.kz", username: "m.ivanova" },
+  { id: "u1", name: "Ковалева Елена", roles: ["Администратор"], status: "Активен", email: "e.kovaleva@kmd.kz", username: "e.kovaleva" },
+  { id: "u2", name: "Нурланов Асхат Бекович", roles: ["Сотрудник склада ДМ"], status: "Активен", email: "a.nurlanov@kmd.kz", username: "a.nurlanov" },
+  { id: "u3", name: "Петров Сергей Владимирович", roles: ["Сотрудник ПТО", "Технолог"], status: "Активен", email: "s.petrov@kmd.kz", username: "s.petrov" },
+  { id: "u4", name: "Ким Александр Юрьевич", roles: ["Сотрудник склада ДМ"], status: "Заблокирован", email: "a.kim@kmd.kz", username: "a.kim" },
+  { id: "u5", name: "Иванова Мария Сергеевна", roles: ["Технолог"], status: "Активен", email: "m.ivanova@kmd.kz", username: "m.ivanova" },
 ];
 
 // --- Роли ---

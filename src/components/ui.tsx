@@ -672,7 +672,8 @@ export function Select({ value, onChange, options, disabled = false, optionLabel
 
 // Множественный выбор из списка по чекбоксам (фильтры реестров, напр. «Статус»).
 // Пустой выбор = «все значения» (выводится allLabel).
-export function MultiSelect({ values, onChange, options, allLabel = "Все", disabled = false }: { values: string[]; onChange: (v: string[]) => void; options: string[]; allLabel?: string; disabled?: boolean }) {
+// hideAll — без пункта «Все» (выбор значений, а не фильтр); allLabel тогда — подсказка при пустом выборе
+export function MultiSelect({ values, onChange, options, allLabel = "Все", disabled = false, hideAll = false }: { values: string[]; onChange: (v: string[]) => void; options: string[]; allLabel?: string; disabled?: boolean; hideAll?: boolean }) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -712,7 +713,7 @@ export function MultiSelect({ values, onChange, options, allLabel = "Все", di
         title={values.length ? values.join(", ") : allLabel}
         className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500 bg-white"
       >
-        <span className={`truncate ${values.length ? "text-gray-900" : "text-gray-700"}`}>{label}</span>
+        <span className={`truncate ${values.length ? "text-gray-900" : hideAll ? "text-gray-400" : "text-gray-700"}`}>{label}</span>
         <svg className="w-4 h-4 text-gray-500 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
       </button>
       {open && rect && createPortal(
@@ -721,10 +722,12 @@ export function MultiSelect({ values, onChange, options, allLabel = "Все", di
           style={{ position: "fixed", top: rect.bottom + 4, left: rect.left, minWidth: rect.width, zIndex: 1000 }}
           className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-72 overflow-auto text-sm"
         >
-          <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-            <input type="checkbox" className="accent-blue-600" checked={values.length === 0} onChange={() => onChange([])} />
-            <span>{allLabel}</span>
-          </label>
+          {!hideAll && (
+            <label className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+              <input type="checkbox" className="accent-blue-600" checked={values.length === 0} onChange={() => onChange([])} />
+              <span>{allLabel}</span>
+            </label>
+          )}
           {options.map(o => (
             <label key={o} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer whitespace-nowrap">
               <input type="checkbox" className="accent-blue-600" checked={values.includes(o)} onChange={() => toggle(o)} />

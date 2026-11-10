@@ -4,7 +4,7 @@ import PasswordSuggest from "../components/PasswordSuggest";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PageHeader,
   useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, Toggle, SearchInput, SortTh, useSort, Pagination, usePerPage, FillerRows, fillerCount, formatDateTime,
+  Field, Input, Select, MultiSelect, Toggle, SearchInput, SortTh, useSort, Pagination, usePerPage, FillerRows, fillerCount, formatDateTime,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp,
 } from "../components/ui";
 import { AppUser, Role } from "../data/mock";
@@ -262,16 +262,19 @@ function NewUserModal({ user, onClose, onSave }: { user?: AppUser | null; onClos
     username: user?.username || "",
     name: user?.name || "",
     email: user?.email || "",
-    role: user?.role || "Сотрудник склада ДМ",
+    roles: user?.roles ?? ["Сотрудник склада ДМ"],
     blocked: user?.status === "Заблокирован",
     password: "",
     position: "",
     phone: "+7 (___) ___-__-__",
   });
-  const { securityPolicy } = useApp();
+  const { securityPolicy, roles } = useApp();
   // Новый пользователь — пароль обязателен; при редактировании — меняется, только если введён
   const pwdErrors = form.password ? evaluatePasswordRules(form.password, securityPolicy) : [];
   const pwdInvalid = (!user && !form.password) || pwdErrors.length > 0;
+  // Роли — активные роли из «Управления ролями» (уже назначенные неактивные остаются в списке)
+  const roleOptions = Array.from(new Set([...roles.filter(r => r.active).map(r => r.name), ...form.roles]));
+  const noRoles = form.roles.length === 0;
 
   return (
     <Modal
@@ -280,12 +283,12 @@ function NewUserModal({ user, onClose, onSave }: { user?: AppUser | null; onClos
       footer={
         <>
           <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn disabled={pwdInvalid} onClick={() => onSave({
+          <Btn disabled={pwdInvalid || noRoles} onClick={() => onSave({
             id: user?.id || `u-${Date.now()}`,
             name: form.name,
             username: form.username,
             email: form.email,
-            role: form.role,
+            roles: form.roles,
             status: form.blocked ? "Заблокирован" : "Активен",
           })}>
             {user ? "Сохранить" : "Добавить"}
@@ -308,12 +311,15 @@ function NewUserModal({ user, onClose, onSave }: { user?: AppUser | null; onClos
         <Field label="Должность"><Input value={form.position} onChange={v => setForm(f => ({ ...f, position: v }))} placeholder="Кладовщик" /></Field>
         <Field label="Электронная почта"><Input value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="email@company.ru" /></Field>
         <Field label="Телефон"><Input value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} placeholder="+7 (___) ___-__-__" /></Field>
-        <Field label="Роль" required full>
-          <Select
-            value={form.role}
-            options={["Администратор", "Сотрудник склада ДМ", "Сотрудник ПТО", "Технолог"]}
-            onChange={v => setForm(f => ({ ...f, role: v }))}
+        <Field label="Роли" required full>
+          <MultiSelect
+            values={form.roles}
+            options={roleOptions}
+            onChange={v => setForm(f => ({ ...f, roles: v }))}
+            allLabel="Выберите роли"
+            hideAll
           />
+          {noRoles && <div className="text-xs text-amber-600 mt-1">Выберите хотя бы одну роль</div>}
         </Field>
         <div className="col-span-2 flex items-center justify-between">
           <Toggle checked={form.blocked} onChange={v => setForm(f => ({ ...f, blocked: v }))} label="Блокировка" />
@@ -544,14 +550,14 @@ export function PanelAdmin() {
 
   const filtered = users.filter(u => {
     const q = search.trim().toLowerCase();
-    return !q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
+    return !q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q) || u.roles.join(", ").toLowerCase().includes(q);
   });
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
     id: u => u.id,
     name: u => u.name,
     username: u => u.username,
-    role: u => u.role,
+    role: u => u.roles.join(", "),
     email: u => u.email,
     status: u => u.status,
     created: u => createdSortKey(u),
@@ -607,7 +613,7 @@ export function PanelAdmin() {
                 <td className="px-4 py-3 text-gray-400">{user.id}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{user.name}</td>
                 <td className="px-4 py-3 text-gray-500">{user.username}</td>
-                <td className="px-4 py-3 text-gray-600">{user.role}</td>
+                <td className="px-4 py-3 text-gray-600">{user.roles.join(", ") || "—"}</td>
                 <td className="px-4 py-3 text-gray-500">{user.email}</td>
                 <td className="px-4 py-3"><Badge label={user.status} group="polzovateli" /></td>
                 <CreatedCell row={user} />
