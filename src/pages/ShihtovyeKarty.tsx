@@ -45,6 +45,8 @@ interface MatRow {
   ves: string;
   // Позиция склада: наибольшая масса в шихту — вес позиции
   maxVes?: number;
+  // Позиция склада: лигатурный вес всей позиции (взятая часть + то, что уже на складе) — для расчёта остатка
+  posLig?: number;
   // id позиции склада ДМ, выбранной в этой сессии — резервируется при сохранении карты
   srcId?: string;
   // Запись склада, уже зарезервированная под карту (при изменении массы резерв пересчитывается)
@@ -69,10 +71,13 @@ const toRow = (m: ShihtaMaterial, dm: DMItem[]): MatRow => {
   const rez = kind === "sklad" && m.nomenkl ? dm.find(i => i.nomenkl === m.nomenkl && i.status === "Резерв") : undefined;
   // Часть слитка, отрезанная по массе: можно вернуть массу до веса исходной записи на складе
   const parent = rez && isWeightPart(rez) ? dm.find(i => i.id === rez.parentId && i.status === "На складе" && i.sklad === rez.sklad) : undefined;
+  // Исходная позиция, от которой отделён резерв и которая осталась на складе (остаток позиции)
+  const stockParent = rez?.parentId ? dm.find(i => i.id === rez.parentId && i.status === "На складе" && i.sklad === rez.sklad) : undefined;
   return {
     key: newKey(), kind, mat: m.name, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, qty: m.qty ?? 1, loc: m.loc,
     sklad: rez?.sklad ?? m.sklad, share: shareOf(m.chem, m.ves), phosphorPct: m.phosphorPct, ves: str2(m.ves),
     maxVes: kind === "sklad" ? (rez ? r2(rez.ligWeight + (parent?.ligWeight ?? 0)) : m.ves) : undefined,
+    posLig: rez ? r2(rez.ligWeight + (stockParent?.ligWeight ?? 0)) : undefined,
     rezId: rez?.id, rezVes: rez?.ligWeight,
   };
 };
@@ -311,7 +316,6 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const setShowResult = (on: boolean) => screen.toggle("raschet", on);
   const { toast, show, clear } = useToast();
   const ro = readOnly;
-  const done = karta?.status === "Выполнена";
 
   // Марки: активные + уже выбранная (даже если её сделали неактивной)
   const grade = alloyGrades.find(g => g.id === alloyId);
@@ -355,7 +359,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
         const maxVes = r2((it.ligWeight * q) / (it.qty || 1));
         const rec: MatRow = {
           key: idx >= 0 ? next[idx].key : newKey(), kind: "sklad", mat: it.name, nomenkl: it.nomenkl, klass: it.klass, proba: it.proba, qty: q,
-          loc: it.location, sklad: it.sklad, share: shareOf(it.chem, it.ligWeight), ves: str2(maxVes), maxVes, srcId: it.id,
+          loc: it.location, sklad: it.sklad, share: shareOf(it.chem, it.ligWeight), ves: str2(maxVes), maxVes, posLig: it.ligWeight, srcId: it.id,
         };
         if (idx >= 0) next[idx] = rec; else next.push(rec);
       }
@@ -364,6 +368,13 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     setShowFromSklad(false);
     if (rejected.length) show(`Не добавлено — ${rejected.join("; ")}`);
     else show(`Добавлено позиций: ${accepted.length}. Резерв — при сохранении карты`);
+  };
+
+  // Остаток позиции на складе при взятии в шихту её части: вес позиции − масса в шихту (нет части — null)
+  const stockRest = (m: MatRow): number | null => {
+    if (m.kind !== "sklad" || m.posLig == null || massError(m)) return null;
+    const rest = r2(m.posLig - num(m.ves));
+    return rest > 0.005 ? rest : null;
   };
 
   const setVes = (key: string, v: string) => setMaterials(prev => prev.map(m => (m.key === key ? { ...m, ves: v } : m)));
@@ -380,7 +391,6 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const pctCell = (e: string) => {
     const t = calc.total(e);
     if (!(t > 0) || calc.base <= 0) return "—";
-    if (grade?.rest === e) return "Остальное";
     return fmt2(calc.pct(e));
   };
 
@@ -477,10 +487,6 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     onSave(k);
   };
 
-  const rowStatus = (m: MatRow) => {
-    if (m.kind !== "sklad") return <span className="text-xs text-gray-400">Доп. материал</span>;
-    return <Badge label={done ? "В подотчёте" : "Резерв"} group="pozicii" />;
-  };
   const subline = (m: MatRow) => {
     if (m.kind === "cup") return `P = ${str2(m.phosphorPct ?? 0)} %`;
     if (m.kind === "granuly") return "чистота 99,99 % · из подбора";
@@ -488,7 +494,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     return [m.nomenkl, m.proba > 0 ? `проба ${probaPctText(m.proba)} %` : "", m.loc && m.loc !== "-" ? m.loc : ""].filter(Boolean).join(" · ");
   };
 
-  const cols = 4 + shkEls.length + 2 + (ro ? 0 : 1);
+  const cols = 4 + shkEls.length + 1 + (ro ? 0 : 1);
   const pg9 = usePaged(sortedMaterials, "shihta-materials");
   return (
     <Modal
@@ -567,7 +573,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                 <tr className="bg-gray-50 text-gray-500 text-xs">
                   <th colSpan={4}></th>
                   <th colSpan={shkEls.length} className="px-3 pt-2 pb-1 text-center font-medium uppercase tracking-wide border-b border-gray-200">Содержание в чистоте, г</th>
-                  <th colSpan={ro ? 2 : 3}></th>
+                  <th colSpan={ro ? 1 : 2}></th>
                 </tr>
               )}
               <tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
@@ -579,7 +585,6 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                   <SortTh key={e.id} sortKey={`el-${e.id}`} sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">{e.shortName}</SortTh>
                 ))}
                 <SortTh sortKey="dola" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Доля, %</SortTh>
-                <th className="px-3 py-2 text-left">Статус</th>
                 {!ro && <th className="w-10"></th>}
               </tr>
             </thead>
@@ -599,14 +604,16 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                     <td className="px-3 py-2">{m.klass ? <KlassCode value={m.klass} /> : <span className="text-gray-400">—</span>}</td>
                     <td className="px-3 py-2 text-right font-medium">
                       {ro ? str2(num(m.ves)) : (
-                        <MassInput value={m.ves} onChange={v => setVes(m.key, v)} error={err} hint={m.maxVes != null ? `Вес позиции ${str2(m.maxVes)} г — можно взять часть` : undefined} />
+                        <div className="inline-block text-right">
+                          <MassInput value={m.ves} onChange={v => setVes(m.key, v)} error={err} hint={m.maxVes != null ? `Вес позиции ${str2(m.maxVes)} г — можно взять часть` : undefined} />
+                          {stockRest(m) != null && <div className="text-xs text-gray-500 mt-0.5 whitespace-nowrap font-normal">остаток на складе: {str2(stockRest(m)!)} г</div>}
+                        </div>
                       )}
                     </td>
                     {shkEls.map(e => (
                       <td key={e.id} className="px-3 py-2 text-right text-gray-600">{(ch[e.id] ?? 0) > 0 ? str2(ch[e.id]) : "—"}</td>
                     ))}
                     <td className="px-3 py-2 text-right text-blue-600">{fmt2(calc.dola(idxOfKey.get(m.key) ?? 0))}</td>
-                    <td className="px-3 py-2">{rowStatus(m)}</td>
                     {!ro && <td className="px-3 py-2 text-center">
                       <button onClick={() => setMaterials(prev => prev.filter(x => x.key !== m.key))} className="text-gray-400 hover:text-red-500 transition-colors" title="Убрать из карты"><X className="w-3.5 h-3.5" /></button>
                     </td>}
@@ -621,22 +628,22 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                 <td className="px-3 py-2 text-right font-semibold">{str2(calc.mass)}</td>
                 {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right text-gray-400">—</td>)}
                 <td className="px-3 py-2 text-right text-blue-600">100,00</td>
-                <td colSpan={ro ? 1 : 2}></td>
+                {!ro && <td></td>}
               </tr>
               <tr>
                 <td className="px-3 py-2 font-medium" colSpan={3}>Содержание в шихте, г</td>
                 <td className="px-3 py-2 text-right text-gray-400">—</td>
                 {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right">{calc.total(e.id) > 0 ? str2(calc.total(e.id)) : "—"}</td>)}
-                <td colSpan={ro ? 2 : 3}></td>
+                <td colSpan={ro ? 1 : 2}></td>
               </tr>
               <tr>
                 <td className="px-3 py-2 font-medium" colSpan={3}>Содержание в шихте, % <span className="text-xs font-normal text-gray-400">(к массе без фосфора {str2(calc.base)} г)</span></td>
                 <td className="px-3 py-2 text-right text-gray-400">—</td>
                 {shkEls.map(e => {
                   const v = pctCell(e.id);
-                  return <td key={e.id} className={`px-3 py-2 text-right ${v === "Остальное" ? "text-xs text-gray-600" : v === "—" ? "text-gray-400" : "font-semibold"}`}>{v}</td>;
+                  return <td key={e.id} className={`px-3 py-2 text-right ${v === "—" ? "text-gray-400" : "font-semibold"}`}>{v}</td>;
                 })}
-                <td colSpan={ro ? 2 : 3}></td>
+                <td colSpan={ro ? 1 : 2}></td>
               </tr>
               {grade && (["min", "max"] as const).map(k => (
                 <tr key={k} className="text-gray-600">
@@ -644,9 +651,9 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                   <td className="px-3 py-2 text-right text-gray-400">—</td>
                   {shkEls.map(e => {
                     const v = rangeOf(e.id)?.[k];
-                    return <td key={e.id} className="px-3 py-2 text-right">{v != null ? fmt2(v) : grade.rest === e.id && k === "min" ? <span className="text-xs">Остальное</span> : <span className="text-gray-400">—</span>}</td>;
+                    return <td key={e.id} className="px-3 py-2 text-right">{v != null ? fmt2(v) : <span className="text-gray-400">—</span>}</td>;
                   })}
-                  <td colSpan={ro ? 2 : 3}></td>
+                  <td colSpan={ro ? 1 : 2}></td>
                 </tr>
               ))}
             </tfoot>
