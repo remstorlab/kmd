@@ -31,6 +31,7 @@ const DICT_SLUG: Record<SpravKey, string> = {
   "Тип списания": "tip-spisaniya",
   "Пробы": "proby",
   "Назначение слитков": "naznachenie-slitkov",
+  "Типы доп. материалов шихты": "tipy-dop-materialov-shihty",
 };
 export const SPRAV_SLUGS = {
   ...DICT_SLUG,
@@ -44,6 +45,13 @@ export const SPRAV_SLUGS = {
 // Справочники статусов: /spravochniki/status-<группа>
 const statusSlug = (d: StatusDict) => `status-${d.group}`;
 export const STATUS_SPRAV_SLUGS: Record<string, string> = Object.fromEntries(initialStatusDicts.map(d => [d.name, statusSlug(d)]));
+
+// Статусы записей справочников — из справочника статусов «Статусы записей справочников» (Активно / Неактивно)
+function useRecordStatuses(): string[] {
+  const { statusDicts } = useApp();
+  const items = statusDicts.find(d => d.group === "zapisi-spravochnikov")?.items.map(i => i.name) ?? [];
+  return items.length ? items : ["Активно", "Неактивно"];
+}
 
 // Экраны записей справочника: …/new, …/view/:key, …/edit/:key
 function useRecordScreens<T>(items: T[], keyOf: (t: T) => string) {
@@ -75,6 +83,7 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Тип списания": ArrowDownUp,
   "Пробы": Gem,
   "Назначение слитков": Target,
+  "Типы доп. материалов шихты": Layers,
 };
 
 // Подпись поля «Значение» для справочников, где оно называется иначе
@@ -99,6 +108,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const [affinage, setAffinage] = useState(bullionAffinage);
   const [affForm, setAffForm] = useState("");
   const numbered = NUMBERED.includes(name);
+  const recordStatuses = useRecordStatuses();
   const [items, setItems] = useState(dict.items);
   const [norms, setNorms] = useState(techOpLossNorms);
   const createdStamp = useCreatedStamp();
@@ -222,7 +232,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
               </div>
             </>}
             {withAffinage && <Field label="Мин. доля аффинажа, %"><Input value={affForm} onChange={v => setAffForm(v.replace(/[^d.,]/g, ""))} placeholder="Не установлено" /></Field>}
-            {!numbered && <Field label="Статус" required><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>}
+            {!numbered && <Field label="Статус" required><Select value={form.status} options={recordStatuses} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>}
           </div>
         </Modal>
       )}
@@ -1167,6 +1177,7 @@ function GradeFormFields({ form, setForm, disabled = false }: { form: GradeForm;
   const setRange = (i: number, patch: Partial<RangeForm>) => setForm?.(f => ({ ...f, ranges: f.ranges.map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
   const dec = (v: string) => v.replace(/[^\d.,]/g, "");
   const freeEl = ALLOY_RANGE_ELEMENTS.find(e => !form.ranges.some(r => r.element === e));
+  const recordStatuses = useRecordStatuses();
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
@@ -1179,7 +1190,7 @@ function GradeFormFields({ form, setForm, disabled = false }: { form: GradeForm;
         <Field label="Остальное">
           <Select value={form.rest} options={["", ...ALLOY_RANGE_ELEMENTS]} optionLabel={v => (v ? short(v) : "Нет")} onChange={v => set({ rest: v })} disabled={disabled} />
         </Field>
-        <Field label="Статус" required={!disabled}><Select value={form.status} options={["Активно", "Неактивно"]} onChange={v => set({ status: v })} disabled={disabled} /></Field>
+        <Field label="Статус" required={!disabled}><Select value={form.status} options={recordStatuses} onChange={v => set({ status: v })} disabled={disabled} /></Field>
       </div>
 
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -1239,6 +1250,7 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
   const [form, setForm] = useState<GradeForm>(emptyGrade);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Все статусы");
+  const recordStatuses = useRecordStatuses();
   const [page, setPage] = useState(1);
   const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, g => g.id);
   useEffect(() => {
@@ -1300,7 +1312,7 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
           <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Марка, нормативный документ..." />
         </div>
         <div className="w-48">
-          <Field label="Статус"><Select value={statusFilter} options={["Все статусы", "Активно", "Неактивно"]} onChange={v => { setStatusFilter(v); setPage(1); }} /></Field>
+          <Field label="Статус"><Select value={statusFilter} options={["Все статусы", ...recordStatuses]} onChange={v => { setStatusFilter(v); setPage(1); }} /></Field>
         </div>
       </div>
 

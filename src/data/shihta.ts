@@ -3,10 +3,8 @@ import type { AlloyGrade, AlloyRange, ChemComposition, ShihtaMatKind, ShihtaMate
 // ── Строки карты ──
 // Вид строки: у старых записей без kind — по номенкл. № (позиция склада) или «прочее»
 export const kindOf = (m: Pick<ShihtaMaterial, "kind" | "nomenkl">): ShihtaMatKind => m.kind ?? (m.nomenkl ? "sklad" : "prochee");
-// Со склада выдаются и резервируются только позиции склада; доп. материалы выдаёт распределитель работ участка,
-// строка-подсказка подбора («Гранулы …») — не со склада
+// Со склада выдаются и резервируются только позиции склада; доп. материалы выдаёт распределитель работ участка
 export const isSkladMaterial = (m: Pick<ShihtaMaterial, "kind" | "nomenkl">) => kindOf(m) === "sklad";
-export const isHint = (m: Pick<ShihtaMaterial, "kind" | "nomenkl">) => kindOf(m) === "granuly";
 
 // Позиции карты выданы в другой операции (doc): карта возвращается в «На редактировании» с пометкой выданных позиций.
 // Выполненная карта и карта без этих позиций не меняются (возвращается тот же объект).
@@ -20,7 +18,7 @@ export function markIssuedElsewhere(k: ShihtovayaKarta, nomenkl: Set<string>, do
 
 // ── Расчёт шихтовой карты ──────────────────────────────────────────────────────
 // По строке i (Mᵢ — масса в шихту):
-//   • позиция склада / гранулы: Au, Ag, Pd, Pt = Mᵢ × доля элемента в позиции; Cu = Mᵢ − Au − Ag − Pd − Pt;
+//   • позиция склада: Au, Ag, Pd, Pt = Mᵢ × доля элемента в позиции; Cu = Mᵢ − Au − Ag − Pd − Pt;
 //   • лигатура Cu-P: Cu = ROUND(Mᵢ × (1 − p/100); 2); P = Mᵢ − Cu;
 //   • медь МО: Cu = Mᵢ;
 //   • прочее: элементы = Mᵢ × доля (состав вводится вручную).
@@ -32,10 +30,7 @@ export const r2 = (v: number) => Math.round(Number((v * 100).toFixed(6))) / 100;
 export const PRECIOUS = ["au", "ag", "pd", "pt"];
 // Доля основного металла аффинированного материала, %
 export const AFFINAGE_PCT = 99.99;
-// Чистота гранул, предлагаемых подбором
-export const GRANULES_PURITY = 0.9999;
 // Лигатура Cu-P: доля в шихте серебряных сплавов (0,17 %) и допуск
-export const CUP_SHARE = 0.0017;
 export const CUP_SHARE_MIN = 0.15;
 export const CUP_SHARE_MAX = 0.19;
 // Фосфор лигатуры по ГОСТ 4515, %
@@ -54,7 +49,7 @@ export interface ShihtaLine {
   kind: ShihtaMatKind;
   // Масса в шихту, г
   mass: number;
-  // Доли элементов в материале (0..1): позиция склада, гранулы, прочее
+  // Доли элементов в материале (0..1): позиция склада, прочее
   share?: Record<string, number>;
   // Лигатура Cu-P: фосфор, %
   phosphorPct?: number;
@@ -145,7 +140,7 @@ export class ShihtaCalc {
   // Доля аффинированного металла (материалы с долей основного металла марки ≥ 99,99 %) в массе шихты, %
   affinagePct(baseEl: string) {
     if (this.mass <= 0) return 0;
-    const aff = this.lines.filter(l => (l.kind === "sklad" || l.kind === "granuly") && r2((l.share?.[baseEl] ?? 0) * 100) >= AFFINAGE_PCT);
+    const aff = this.lines.filter(l => l.kind === "sklad" && r2((l.share?.[baseEl] ?? 0) * 100) >= AFFINAGE_PCT);
     return (aff.reduce((s, l) => s + l.mass, 0) / this.mass) * 100;
   }
 }
@@ -169,72 +164,4 @@ export function shihtaWarnings(calc: ShihtaCalc, opts: { oborot?: string; minAff
     if (share < CUP_SHARE_MIN || share > CUP_SHARE_MAX) out.push("Количество лигатуры вне нормы 0,17 ± 0,02 %");
   }
   return out;
-}
-
-// Целевая доля элемента для подбора: номинал марки, иначе середина диапазона (или единственная граница)
-export function nominalOf(r: AlloyRange): number | undefined {
-  if (r.nominal != null) return r.nominal;
-  if (r.min != null && r.max != null) return r2((r.min + r.max) / 2);
-  return r.min ?? r.max;
-}
-
-// Драгметаллы марки с диапазоном — для них задаются целевые доли подбора (основа — первой)
-export function podborElements(g: AlloyGrade): string[] {
-  const base = baseElement(g);
-  const els = g.ranges.map(r => r.element).filter(e => PRECIOUS.includes(e));
-  return [base, ...els.filter(e => e !== base)];
-}
-
-export interface PodborResult {
-  // Строки гранул второго драгметалла: элемент → масса, г
-  granules: { element: string; mass: number }[];
-  // Новая масса лигатуры Cu-P (основа Ag и лигатура есть в карте)
-  cupMass?: number;
-  // Медь МО, г (0 — не требуется)
-  medMO: number;
-  // Расчётная база B*
-  baseTarget: number;
-  warnings: string[];
-}
-
-// Подбор состава до целевых долей (targets — элемент → %).
-// Строки «Гранулы …» и «Медь МО» из прежнего подбора заменяются, лигатура Cu-P — пересчитывается.
-//  1) B* = ΣBase / tBase;
-//  2) второй драгметалл E: ΔE = B* × tE − ΣE; ΔE > 0 → гранулы E 99,99 массой ΔE / 0,9999; ΔE < 0 — «Избыток E»;
-//  3) основа Ag и есть лигатура Cu-P: Mш = B* / (1 − k × p/100); M(Cu-P) = ROUND(k × Mш; 2), k = 0,0017;
-//  4) медь МО = B* − Σ(Mᵢ − Pᵢ) по всем строкам с предложенными; округление вниз до 5 г.
-export function podbor(lines: ShihtaLine[], grade: AlloyGrade, targets: Record<string, number>, shortName: (e: string) => string = e => e): PodborResult {
-  const warnings: string[] = [];
-  const kept = lines.filter(l => l.kind !== "granuly" && l.kind !== "medMO");
-  const keptCalc = new ShihtaCalc(kept);
-  const base = baseElement(grade);
-  const tBase = (targets[base] ?? 0) / 100;
-  const baseSum = keptCalc.total(base);
-  if (!(tBase > 0) || !(baseSum > 0)) {
-    return { granules: [], medMO: 0, baseTarget: 0, warnings: [`В шихте нет основы марки (${shortName(base)})`] };
-  }
-  const bStar = baseSum / tBase;
-  const granules: PodborResult["granules"] = [];
-  for (const e of podborElements(grade).filter(e => e !== base)) {
-    const t = (targets[e] ?? 0) / 100;
-    const delta = bStar * t - keptCalc.total(e);
-    if (delta > 0.005) granules.push({ element: e, mass: r2(delta / GRANULES_PURITY) });
-    else if (delta < -0.005) warnings.push(`Избыток ${shortName(e)}: ${fmt2(-delta)} г сверх целевой доли`);
-  }
-  const cupIdx = kept.findIndex(l => l.kind === "cup");
-  let cupMass: number | undefined;
-  if (grade.base === "Ag" && cupIdx >= 0) {
-    const p = kept[cupIdx].phosphorPct ?? 0;
-    const mSh = bStar / (1 - CUP_SHARE * p / 100);
-    cupMass = r2(CUP_SHARE * mSh);
-  }
-  const proposed: ShihtaLine[] = [
-    ...kept.map((l, i) => (i === cupIdx && cupMass != null ? { ...l, mass: cupMass } : l)),
-    ...granules.map(g => ({ kind: "granuly" as const, mass: g.mass, share: { [g.element]: GRANULES_PURITY } })),
-  ];
-  const withoutP = proposed.reduce((s, l) => s + l.mass - (lineChem(l).p ?? 0), 0);
-  const cuRaw = bStar - withoutP;
-  const medMO = cuRaw > 0 ? Math.floor(r2(cuRaw) / 5) * 5 : 0;
-  if (cuRaw < 0) warnings.push(`Масса материалов превышает расчётную на ${fmt2(-cuRaw)} г — медь МО не требуется`);
-  return { granules, cupMass, medMO, baseTarget: r2(bStar), warnings };
 }

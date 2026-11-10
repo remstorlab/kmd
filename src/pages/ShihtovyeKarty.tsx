@@ -3,21 +3,20 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   useToast, Toast, Field, Input, Select, Textarea, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
-  SortTh, useSort, parseRuDate, usePaged, CREATED_LABEL, CreatedCell,
+  SortTh, useSort, parseRuDate, usePaged, CREATED_LABEL, CreatedCell, useMaterialCodeLabel,
 } from "../components/ui";
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
-  PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, baseMetal,
+  PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO,
 } from "../data/mock";
 import { returnToStock, splitRecord } from "../data/stock";
 import {
-  ShihtaCalc, ShihtaLine, chemStrings, fmt2, normText, nominalOf, podbor, podborElements, r2, shareOf, shihtaWarnings,
-  lineChem, PodborResult, GRANULES_PURITY, PRECIOUS, kindOf,
+  ShihtaCalc, ShihtaLine, chemStrings, fmt2, normText, r2, shareOf, shihtaWarnings, lineChem, kindOf,
 } from "../data/shihta";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { ChemPercent, gramsFrom, num0 } from "../data/chem";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
-import { Plus, X, Calculator, Wand2, AlertTriangle } from "lucide-react";
+import { Plus, X, Calculator, AlertTriangle } from "lucide-react";
 import { useScreen } from "../router";
 
 // ── Шихтовая карта: конструктор ─────────────────────────────────────────────────
@@ -34,6 +33,8 @@ interface MatRow {
   klass: string;
   // Проба позиции, ‰ (99,99 % = 999,9)
   proba: number;
+  // Код материала позиции склада (справочник «Коды материалов»)
+  code?: string;
   qty: number;
   loc: string;
   sklad?: string;
@@ -74,6 +75,7 @@ const toRow = (m: ShihtaMaterial, dm: DMItem[]): MatRow => {
   const stockParent = rez?.parentId ? dm.find(i => i.id === rez.parentId && i.status === "На складе" && i.sklad === rez.sklad) : undefined;
   return {
     key: newKey(), kind, mat: m.name, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, qty: m.qty ?? 1, loc: m.loc,
+    code: m.code ?? (m.nomenkl ? dm.find(i => i.nomenkl === m.nomenkl)?.metal : undefined),
     sklad: rez?.sklad ?? m.sklad, share: shareOf(m.chem, m.ves), phosphorPct: m.phosphorPct, ves: str2(m.ves),
     maxVes: kind === "sklad" ? (rez ? r2(rez.ligWeight + (parent?.ligWeight ?? 0)) : m.ves) : undefined,
     posLig: rez ? r2(rez.ligWeight + (stockParent?.ligWeight ?? 0)) : undefined,
@@ -91,14 +93,11 @@ const massError = (m: MatRow): string => {
   return "";
 };
 
-// Строка-подсказка подбора («Гранулы Ag 99,99»): драгметалл, который нужно подобрать со склада
-const hintElement = (m: MatRow) => PRECIOUS.find(e => (m.share[e] ?? 0) > 0) ?? "ag";
-
 // Строка карты из позиции склада: q изделий, масса в шихту по умолчанию — их лигатурный вес
 const stockRowOf = (it: DMItem, q: number, key = newKey()): MatRow => {
   const maxVes = r2((it.ligWeight * q) / (it.qty || 1));
   return {
-    key, kind: "sklad", mat: it.name, nomenkl: it.nomenkl, klass: it.klass, proba: it.proba, qty: q,
+    key, kind: "sklad", mat: it.name, nomenkl: it.nomenkl, klass: it.klass, proba: it.proba, code: it.metal, qty: q,
     loc: it.location, sklad: it.sklad, share: shareOf(it.chem, it.ligWeight), ves: str2(maxVes), maxVes, posLig: it.ligWeight, srcId: it.id,
   };
 };
@@ -180,31 +179,38 @@ function MassInput({ value, onChange, error, hint }: { value: string; onChange: 
 }
 
 // ── Окно «Добавить доп. материал» ──
-const DOP_TYPES = ["Лигатура Cu-P", "Медь МО", "Прочее"] as const;
-type DopType = (typeof DOP_TYPES)[number];
+// Типы — справочник «Типы доп. материалов шихты»: по коду записи определяется расчёт строки
+const dopKindOf = (type: string): ShihtaMatKind => {
+  const code = spravochniki["Типы доп. материалов шихты"].items.find(i => i.value === type)?.code;
+  return code === DOP_TYPE_CUP ? "cup" : code === DOP_TYPE_MED_MO ? "medMO" : "prochee";
+};
 
 function DopMaterialModal({ onClose, onAdd }: { onClose: () => void; onAdd: (row: MatRow) => void }) {
-  const [type, setType] = useState<DopType>("Лигатура Cu-P");
+  const types = spravValues("Типы доп. материалов шихты");
+  // Единицы измерения — коды активных записей справочника «Единицы измерения»
+  const units = spravochniki["Единицы измерения"].items.filter(i => i.status === "Активно").map(i => i.code);
+  const [type, setType] = useState(types[0] ?? "");
+  const kind = dopKindOf(type);
   const [name, setName] = useState("");
-  const [unit, setUnit] = useState("г");
+  const [unit, setUnit] = useState(units[0] ?? "г");
   const [ves, setVes] = useState("");
   const [pPct, setPPct] = useState("");
   const [chem, setChem] = useState<ChemComposition>({});
   const [pct, setPct] = useState<ChemPercent>({});
   const mass = num(ves);
   const p = num(pPct);
-  const cupChem = type === "Лигатура Cu-P" && mass > 0 && p > 0 && p < 100 ? lineChem({ kind: "cup", mass, phosphorPct: p }) : null;
+  const cupChem = kind === "cup" && mass > 0 && p > 0 && p < 100 ? lineChem({ kind: "cup", mass, phosphorPct: p }) : null;
   const error = !(mass > 0) ? "Укажите массу"
-    : type === "Лигатура Cu-P" && !(p > 0 && p < 100) ? "Укажите содержание фосфора, %"
-    : type === "Прочее" && !name.trim() ? "Укажите наименование материала"
+    : kind === "cup" && !(p > 0 && p < 100) ? "Укажите содержание фосфора, %"
+    : kind === "prochee" && !name.trim() ? "Укажите наименование материала"
     : "";
   const decimal = (set: (v: string) => void) => (v: string) => set(v.replace(/[^\d.,]/g, ""));
 
   const add = () => {
     if (error) return;
     const base = { key: newKey(), nomenkl: "", klass: "", proba: 0, qty: 1, loc: "", ves: str2(mass) };
-    if (type === "Лигатура Cu-P") onAdd({ ...base, kind: "cup", mat: "Лигатура Cu-P", share: {}, phosphorPct: r2(p) });
-    else if (type === "Медь МО") onAdd({ ...base, kind: "medMO", mat: "Медь МО", share: { cu: 1 } });
+    if (kind === "cup") onAdd({ ...base, kind: "cup", mat: type, share: {}, phosphorPct: r2(p) });
+    else if (kind === "medMO") onAdd({ ...base, kind: "medMO", mat: type, share: { cu: 1 } });
     else onAdd({ ...base, kind: "prochee", mat: name.trim(), share: shareOf(chem, mass) });
   };
 
@@ -213,88 +219,28 @@ function DopMaterialModal({ onClose, onAdd }: { onClose: () => void; onAdd: (row
       <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={add} disabled={!!error}>Добавить</Btn></>
     }>
       <div className="grid grid-cols-3 gap-4">
-        <Field label="Тип" required><Select value={type} options={[...DOP_TYPES]} onChange={v => setType(v as DopType)} /></Field>
-        {type === "Прочее" && <>
+        <Field label="Тип" required><Select value={type} options={types} onChange={setType} /></Field>
+        {kind === "prochee" && <>
           <Field label="Наименование материала" required><Input value={name} onChange={setName} placeholder="Название" /></Field>
-          <Field label="Ед. измерения" required><Select value={unit} options={["г", "кг", "шт"]} onChange={setUnit} /></Field>
+          <Field label="Ед. измерения" required><Select value={unit} options={units} onChange={setUnit} /></Field>
         </>}
-        <Field label={type === "Прочее" ? "Масса лигатурная, г" : "Масса, г"} required>
-          <Input value={ves} onChange={decimal(v => { setVes(v); if (type === "Прочее") setChem(gramsFrom(pct, num0(v))); })} placeholder="0,00" />
+        <Field label={kind === "prochee" ? "Масса лигатурная, г" : "Масса, г"} required>
+          <Input value={ves} onChange={decimal(v => { setVes(v); if (kind === "prochee") setChem(gramsFrom(pct, num0(v))); })} placeholder="0,00" />
         </Field>
-        {type === "Лигатура Cu-P" && <>
+        {kind === "cup" && <>
           <Field label="Фосфор, %" required><Input value={pPct} onChange={decimal(setPPct)} placeholder="8,00" /></Field>
           <div />
           <Field label="Медь (Cu), г"><Input value={cupChem ? str2(cupChem.cu) : ""} disabled placeholder="рассчитывается" /></Field>
           <Field label="Фосфор (P), г"><Input value={cupChem ? str2(cupChem.p) : ""} disabled placeholder="рассчитывается" /></Field>
         </>}
-        {type === "Медь МО" && <Field label="Медь (Cu), г"><Input value={mass > 0 ? str2(mass) : ""} disabled placeholder="= массе" /></Field>}
+        {kind === "medMO" && <Field label="Медь (Cu), г"><Input value={mass > 0 ? str2(mass) : ""} disabled placeholder="= массе" /></Field>}
       </div>
-      {type === "Лигатура Cu-P" && <p className="mt-3 text-xs text-gray-500">Cu = масса × (1 − P / 100), округление до 0,01 г; P = масса − Cu. Фосфор выгорает и не входит в базу расчёта долей.</p>}
-      {type === "Прочее" && (
+      {kind === "cup" && <p className="mt-3 text-xs text-gray-500">Cu = масса × (1 − P / 100), округление до 0,01 г; P = масса − Cu. Фосфор выгорает и не входит в базу расчёта долей.</p>}
+      {kind === "prochee" && (
         <div className="mt-4">
           <ChemCompositionBlock scope="shk" value={chem} lig={mass} pct={pct} onChange={(c, pc) => { setChem(c); setPct(pc); }} />
         </div>
       )}
-    </Modal>
-  );
-}
-
-// ── Окно «Подбор состава» ──
-function PodborModal({ grade, lines, shortName, onClose, onApply }: {
-  grade: AlloyGrade;
-  lines: ShihtaLine[];
-  shortName: (e: string) => string;
-  onClose: () => void;
-  onApply: (r: PodborResult) => void;
-}) {
-  const els = podborElements(grade);
-  const [targets, setTargets] = useState<Record<string, string>>(() => Object.fromEntries(els.map(e => {
-    const r = grade.ranges.find(x => x.element === e);
-    const n = r ? nominalOf(r) : undefined;
-    return [e, n != null ? String(n).replace(".", ",") : ""];
-  })));
-  const nums = Object.fromEntries(Object.entries(targets).map(([k, v]) => [k, num(v)]));
-  const res = podbor(lines, grade, nums, shortName);
-  const cupNow = lines.find(l => l.kind === "cup");
-  const ok = res.baseTarget > 0;
-
-  return (
-    <Modal title={`Подбор состава: ${grade.name}`} wide onClose={onClose} footer={
-      <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={() => onApply(res)} disabled={!ok}>Применить</Btn></>
-    }>
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Целевые доли, %</h4>
-      <div className="grid grid-cols-4 gap-4 mb-4">
-        {els.map((e, i) => (
-          <Field key={e} label={`${shortName(e)}${i === 0 ? " (основа)" : ""}, %`} required>
-            <Input value={targets[e] ?? ""} onChange={v => setTargets(t => ({ ...t, [e]: v.replace(/[^\d.,]/g, "") }))} />
-          </Field>
-        ))}
-      </div>
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Предлагаемые строки</h4>
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-            <th className="px-3 py-2 text-left">Материал</th>
-            <th className="px-3 py-2 text-right">Текущая масса, г</th>
-            <th className="px-3 py-2 text-right">Масса в шихту, г</th>
-          </tr></thead>
-          <tbody className="divide-y divide-gray-100">
-            {res.granules.map(g => (
-              <tr key={g.element}><td className="px-3 py-2">Гранулы {shortName(g.element)} 99,99</td><td className="px-3 py-2 text-right text-gray-400">—</td><td className="px-3 py-2 text-right font-medium">{str2(g.mass)}</td></tr>
-            ))}
-            {res.cupMass != null && (
-              <tr><td className="px-3 py-2">Лигатура Cu-P</td><td className="px-3 py-2 text-right text-gray-500">{cupNow ? str2(cupNow.mass) : "—"}</td><td className="px-3 py-2 text-right font-medium">{str2(res.cupMass)}</td></tr>
-            )}
-            <tr><td className="px-3 py-2">Медь МО</td><td className="px-3 py-2 text-right text-gray-400">—</td><td className="px-3 py-2 text-right font-medium">{res.medMO > 0 ? str2(res.medMO) : "не требуется"}</td></tr>
-          </tbody>
-        </table>
-      </div>
-      {ok && <p className="mt-2 text-xs text-gray-500">Расчётная база B* = {str2(res.baseTarget)} г. Медь МО округляется вниз до 5 г. {grade.base === "Au" ? "Для золотых сплавов лигатура Cu-P не подбирается." : !cupNow ? "Лигатуры Cu-P в карте нет — масса лигатуры не подбирается." : ""}</p>}
-      {res.warnings.map(w => (
-        <div key={w} className="mt-3 flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-sm text-yellow-800">
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />{w}
-        </div>
-      ))}
     </Modal>
   );
 }
@@ -317,12 +263,11 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const [note, setNote] = useState(karta?.note ?? "");
   const [files, setFiles] = useState<File[]>(() => karta?.files ?? []);
   const [materials, setMaterials] = useState<MatRow[]>(() => (karta?.materials ?? []).map(m => toRow(m, dmItems)));
-  // Вложенные экраны: …/from-sklad, …/dop-material, …/podbor, …/raschet (результат расчёта)
+  // Вложенные экраны: …/from-sklad, …/dop-material, …/raschet (результат расчёта)
   const screen = useScreen();
   const nested = (n: string) => [screen.has(n), (open: boolean) => (open ? screen.open(n) : screen.close(n))] as const;
   const [showFromSklad, setShowFromSklad] = nested("from-sklad");
   const [showAddDop, setShowAddDop] = nested("dop-material");
-  const [showPodbor, setShowPodbor] = nested("podbor");
   const showResult = screen.has("raschet");
   const setShowResult = (on: boolean) => screen.toggle("raschet", on);
   const { toast, show, clear } = useToast();
@@ -344,12 +289,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     // Чистый вес — сохранённый у позиции (тот же, по которому считается состав строки карты)
     .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem })),
   [dmItems]);
-  // «Выбрать со склада» у строки-подсказки: окно выбора с фильтром по её драгметаллу, выбранные позиции заменяют подсказку
-  const [replaceKey, setReplaceKey] = useState<string | null>(null);
-  const replaceRow = materials.find(m => m.key === replaceKey && m.kind === "granuly");
-  const pickerRows = replaceRow ? skladRows.filter(r => baseMetal(r.code).toLowerCase() === hintElement(replaceRow)) : skladRows;
-  const openPicker = (hintKey: string | null) => { setReplaceKey(hintKey); setShowFromSklad(true); };
-  const closePicker = () => { setReplaceKey(null); setShowFromSklad(false); };
+
 
   // Уже взято в карту из каждой позиции склада (в этой сессии)
   const already = materials.reduce<Record<string, number>>((acc, m) => {
@@ -382,27 +322,8 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       }
       return next;
     });
-    closePicker();
+    setShowFromSklad(false);
     if (accepted.length === picked.length) show(`Добавлено позиций: ${accepted.length}. Резерв — при сохранении карты`);
-  };
-
-  // Замена строки-подсказки позициями склада: масса подсказки распределяется по выбранным позициям
-  // (каждой — не больше её веса); если выбранного не хватает, подсказка остаётся с недостающей массой
-  const replaceHint = (picked: { row: StockRow; qty: number }[]) => {
-    if (!replaceRow) return closePicker();
-    let rest = num(replaceRow.ves);
-    const rows: MatRow[] = [];
-    for (const { it, qty } of acceptPicked(picked)) {
-      if (rest <= 0.005) break;
-      const row = stockRowOf(it, qty);
-      const mass = Math.min(rest, row.maxVes ?? rest);
-      rows.push({ ...row, ves: str2(mass) });
-      rest = r2(rest - mass);
-    }
-    const hintKey = replaceRow.key;
-    setMaterials(prev => prev.flatMap(m => (m.key !== hintKey ? [m] : [...rows, ...(rest > 0.005 ? [{ ...m, ves: str2(rest) }] : [])])));
-    closePicker();
-    if (rows.length) show(rest > 0.005 ? `Подсказка заменена частично — не хватает ${str2(rest)} г` : "Подсказка заменена позициями склада");
   };
 
   // Остаток позиции на складе при взятии в шихту её части: вес позиции − масса в шихту (нет части — null)
@@ -426,7 +347,6 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const warnings = [
     ...shihtaWarnings(calc, { oborot, minAffinage: minAffinageOf(naznachenie) }),
     ...(oborotValid(oborot) ? [] : ["Оборот — число или «чистая»"]),
-    ...materials.filter(m => m.kind === "granuly").map(m => `Строка «${m.mat}» не со склада — материал не будет зарезервирован`),
     ...[...new Set(materials.map(m => banReason(m, grade, naznachenie)).filter((w): w is string => !!w))],
   ];
   const rangeOf = (e: string) => grade?.ranges.find(r => r.element === e);
@@ -452,31 +372,12 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     : !note.trim() ? `Состав не соответствует марке ${grade.name}: ${failText}. Для марки допускается отклонение — заполните «Примечание»`
     : null;
 
-  const canPodbor = !!grade && materials.some(m => m.kind === "sklad");
-  const applyPodbor = (r: PodborResult) => {
-    setMaterials(prev => {
-      let cupDone = false;
-      const kept = prev.filter(m => m.kind !== "granuly" && m.kind !== "medMO").map(m => {
-        if (m.kind !== "cup" || cupDone || r.cupMass == null) return m;
-        cupDone = true;
-        return { ...m, ves: str2(r.cupMass) };
-      });
-      const extra: MatRow[] = [
-        ...r.granules.map(g => ({
-          key: newKey(), kind: "granuly" as const, mat: `Гранулы ${shortName(g.element)} 99,99`, nomenkl: "", klass: "", proba: 0, qty: 1, loc: "",
-          share: { [g.element]: GRANULES_PURITY }, ves: str2(g.mass),
-        })),
-        ...(r.medMO > 0 ? [{ key: newKey(), kind: "medMO" as const, mat: "Медь МО", nomenkl: "", klass: "", proba: 0, qty: 1, loc: "", share: { cu: 1 }, ves: str2(r.medMO) }] : []),
-      ];
-      return [...kept, ...extra];
-    });
-    setShowPodbor(false);
-    setShowResult(true);
-    show("Состав подобран, расчёт обновлён");
-  };
-
   const { sorted: sortedMaterials, sort: matSort, toggleSort: toggleMatSort } = useSort(materials, {
+    nomenkl: m => m.nomenkl,
     mat: m => m.mat,
+    code: m => m.code ?? "",
+    proba: m => m.proba,
+    loc: m => m.loc,
     sklad: m => m.sklad ?? "",
     klass: m => m.klass,
     ves: m => num(m.ves),
@@ -509,7 +410,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
     const mats: ShihtaMaterial[] = materials.map((m, i) => ({
       kind: m.kind, name: m.mat, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, ves: r2(num(m.ves)), loc: m.loc, qty: m.qty,
-      chem: chemStrings(calc.chems[i]), phosphorPct: m.phosphorPct, sklad: m.sklad,
+      chem: chemStrings(calc.chems[i]), phosphorPct: m.phosphorPct, sklad: m.sklad, code: m.code,
     }));
     const head = {
       name: name.trim() || karta?.name || "Новая шихтовая карта",
@@ -530,14 +431,13 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     onSave(k);
   };
 
-  const subline = (m: MatRow) => {
-    if (m.kind === "cup") return `P = ${str2(m.phosphorPct ?? 0)} %`;
-    if (m.kind === "granuly") return "подобрать со склада";
-    if (m.kind !== "sklad") return "";
-    return [m.nomenkl, m.proba > 0 ? `проба ${probaPctText(m.proba)} %` : "", m.loc && m.loc !== "-" ? m.loc : ""].filter(Boolean).join(" · ");
-  };
-
-  const cols = 4 + shkEls.length + 1 + (ro ? 0 : 1);
+  const codeLabel = useMaterialCodeLabel();
+  // Наименование строки: у лигатуры — с содержанием фосфора
+  const matName = (m: MatRow) => (m.kind === "cup" ? `${m.mat} (P = ${str2(m.phosphorPct ?? 0)} %)` : m.mat);
+  const dash = <span className="text-gray-400">—</span>;
+  // Колонки атрибутов позиции (до «Массы в шихту»)
+  const LEAD = 7;
+  const cols = LEAD + 1 + shkEls.length + 1 + (ro ? 0 : 1);
   const pg9 = usePaged(sortedMaterials, "shihta-materials");
   return (
     <Modal
@@ -604,7 +504,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Шихтовые материалы</h3>
           {!ro && (
             <div className="flex gap-2">
-              <Btn size="sm" onClick={() => openPicker(null)}><Plus className="w-4 h-4" />Добавить со склада</Btn>
+              <Btn size="sm" onClick={() => setShowFromSklad(true)}><Plus className="w-4 h-4" />Добавить со склада</Btn>
               <Btn size="sm" variant="secondary" onClick={() => setShowAddDop(true)}><Plus className="w-4 h-4" />Добавить доп. материал</Btn>
             </div>
           )}
@@ -620,15 +520,19 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
             <thead>
               {shkEls.length > 0 && (
                 <tr className="bg-gray-50 text-gray-500 text-xs">
-                  <th colSpan={4}></th>
+                  <th colSpan={LEAD + 1}></th>
                   <th colSpan={shkEls.length} className="px-3 pt-2 pb-1 text-center font-medium uppercase tracking-wide border-b border-gray-200">Содержание в чистоте, г</th>
                   <th colSpan={ro ? 1 : 2}></th>
                 </tr>
               )}
               <tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
+                <SortTh sortKey="nomenkl" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Номенкл. №</SortTh>
                 <SortTh sortKey="mat" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Материал</SortTh>
-                <SortTh sortKey="sklad" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Склад</SortTh>
                 <SortTh sortKey="klass" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Класс</SortTh>
+                <SortTh sortKey="code" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Код материала</SortTh>
+                <SortTh sortKey="proba" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Проба, %</SortTh>
+                <SortTh sortKey="sklad" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Склад</SortTh>
+                <SortTh sortKey="loc" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Место хранения</SortTh>
                 <SortTh sortKey="ves" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Масса в шихту, г</SortTh>
                 {shkEls.map(e => (
                   <SortTh key={e.id} sortKey={`el-${e.id}`} sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">{e.shortName}</SortTh>
@@ -643,18 +547,20 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                 const err = massError(m);
                 const ban = banReason(m, grade, naznachenie);
                 const issued = isIssued(m);
-                const hint = m.kind === "granuly";
+                const sklad = m.kind === "sklad";
                 return (
                   <tr key={m.key} className={`hover:bg-gray-50 ${ban || issued ? "bg-red-50/60" : ""}`}>
+                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{m.nomenkl || dash}</td>
                     <td className="px-3 py-2">
-                      <div className={hint ? "italic text-gray-400" : "font-medium"}>{m.mat}</div>
-                      {subline(m) && <div className={`text-xs text-gray-400 ${hint ? "italic" : ""}`}>{subline(m)}</div>}
-                      {hint && !ro && <button onClick={() => openPicker(m.key)} className="mt-0.5 text-xs text-blue-600 hover:underline">Выбрать со склада</button>}
+                      <div className="font-medium">{matName(m)}</div>
                       {issued && <div className="text-xs text-red-600">Выдана в другой операции — замените позицию</div>}
                       {ban && <div className="text-xs text-red-600">{ban}</div>}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap">{m.sklad ?? <span className="text-gray-400">—</span>}</td>
-                    <td className="px-3 py-2">{m.klass ? <KlassCode value={m.klass} /> : <span className="text-gray-400">—</span>}</td>
+                    <td className="px-3 py-2">{m.klass ? <KlassCode value={m.klass} /> : dash}</td>
+                    <td className="px-3 py-2 text-blue-600 whitespace-nowrap">{m.code ? codeLabel(m.code) : dash}</td>
+                    <td className="px-3 py-2 text-right">{sklad && m.proba > 0 ? probaPctText(m.proba) : dash}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{m.sklad ?? dash}</td>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{sklad && m.loc && m.loc !== "-" ? m.loc : dash}</td>
                     <td className="px-3 py-2 text-right font-medium">
                       {ro ? str2(num(m.ves)) : (
                         <div className="inline-block text-right">
@@ -677,20 +583,20 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
             </tbody>
             <tfoot className="border-t-2 border-gray-200 bg-gray-50 text-sm divide-y divide-gray-200">
               <tr className="font-medium">
-                <td className="px-3 py-2" colSpan={3}>Масса шихты, г <span className="text-xs font-normal text-gray-400">({materials.length} поз.)</span></td>
+                <td className="px-3 py-2" colSpan={LEAD}>Масса шихты, г <span className="text-xs font-normal text-gray-400">({materials.length} поз.)</span></td>
                 <td className="px-3 py-2 text-right font-semibold">{str2(calc.mass)}</td>
                 {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right text-gray-400">—</td>)}
                 <td className="px-3 py-2 text-right text-blue-600">100,00</td>
                 {!ro && <td></td>}
               </tr>
               <tr>
-                <td className="px-3 py-2 font-medium" colSpan={3}>Содержание в шихте, г</td>
+                <td className="px-3 py-2 font-medium" colSpan={LEAD}>Содержание в шихте, г</td>
                 <td className="px-3 py-2 text-right text-gray-400">—</td>
                 {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right">{calc.total(e.id) > 0 ? str2(calc.total(e.id)) : "—"}</td>)}
                 <td colSpan={ro ? 1 : 2}></td>
               </tr>
               <tr>
-                <td className="px-3 py-2 font-medium" colSpan={3}>Содержание в шихте, % <span className="text-xs font-normal text-gray-400">(к массе без фосфора {str2(calc.base)} г)</span></td>
+                <td className="px-3 py-2 font-medium" colSpan={LEAD}>Содержание в шихте, % <span className="text-xs font-normal text-gray-400">(к массе без фосфора {str2(calc.base)} г)</span></td>
                 <td className="px-3 py-2 text-right text-gray-400">—</td>
                 {shkEls.map(e => {
                   const v = pctCell(e.id);
@@ -700,7 +606,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
               </tr>
               {grade && (["min", "max"] as const).map(k => (
                 <tr key={k} className="text-gray-600">
-                  <td className="px-3 py-2 font-medium" colSpan={3}>{k === "min" ? "Норма мин, %" : "Норма макс, %"} <span className="text-xs font-normal text-gray-400">({grade.name})</span></td>
+                  <td className="px-3 py-2 font-medium" colSpan={LEAD}>{k === "min" ? "Норма мин, %" : "Норма макс, %"} <span className="text-xs font-normal text-gray-400">({grade.name})</span></td>
                   <td className="px-3 py-2 text-right text-gray-400">—</td>
                   {shkEls.map(e => {
                     const v = rangeOf(e.id)?.[k];
@@ -720,11 +626,6 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
             <Btn size="sm" variant="secondary" onClick={() => { setShowResult(true); show("Расчёт обновлён"); }}>
               <Calculator className="w-4 h-4" /> Рассчитать
             </Btn>
-            <span title={canPodbor ? undefined : "Выберите марку сплава и добавьте хотя бы один материал со склада"}>
-              <Btn size="sm" variant="secondary" onClick={() => setShowPodbor(true)} disabled={!canPodbor}>
-                <Wand2 className="w-4 h-4" /> Подобрать
-              </Btn>
-            </span>
           </div>
         )}
 
@@ -779,13 +680,13 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
       {showFromSklad && (
         <StockPickerModal
-          title={replaceRow ? `Выбрать со склада: ${replaceRow.mat} (${replaceRow.ves} г)` : "Добавить материал со склада"}
+          title="Добавить материал со склада"
           toolbar={
             <div className="w-64">
               <Field label="Склад" required><Select value={pickSklad} options={sklady} onChange={setPickSklad} /></Field>
             </div>
           }
-          rows={pickerRows}
+          rows={skladRows}
           skladFilter={pickSklad}
           already={already}
           showWeights
@@ -794,8 +695,8 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           qtyLabel="Количество к выдаче"
           emptyText={`Нет доступных позиций на складе «${pickSklad}»`}
           addLabel="Добавить выбранные"
-          onClose={closePicker}
-          onAdd={replaceRow ? replaceHint : addFromSklad}
+          onClose={() => setShowFromSklad(false)}
+          onAdd={addFromSklad}
         />
       )}
 
@@ -806,9 +707,6 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
         />
       )}
 
-      {showPodbor && grade && (
-        <PodborModal grade={grade} lines={materials.map(lineOf)} shortName={shortName} onClose={() => setShowPodbor(false)} onApply={applyPodbor} />
-      )}
       {toast && <Toast message={toast} onDone={clear} />}
     </Modal>
   );

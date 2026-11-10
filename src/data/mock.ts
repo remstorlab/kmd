@@ -182,8 +182,8 @@ export interface Operation {
   poluchil?: string;
 }
 
-// Вид строки шихты: позиция склада ДМ или доп. материал (лигатура Cu-P, медь МО, гранулы из подбора, прочее)
-export type ShihtaMatKind = "sklad" | "cup" | "medMO" | "granuly" | "prochee";
+// Вид строки шихты: позиция склада ДМ или доп. материал (лигатура Cu-P, медь МО, прочее — справочник «Типы доп. материалов шихты»)
+export type ShihtaMatKind = "sklad" | "cup" | "medMO" | "prochee";
 
 export interface ShihtaMaterial {
   name: string;
@@ -203,6 +203,8 @@ export interface ShihtaMaterial {
   phosphorPct?: number;
   // Склад позиции
   sklad?: string;
+  // Код материала позиции склада (справочник «Коды материалов»)
+  code?: string;
 }
 
 // Позиция карты, выданная в другой операции: наименование, номенкл. № и документ выдачи
@@ -652,13 +654,13 @@ export const initialOperations: Operation[] = [
 // Позиция склада в карте: масса в шихту = лигатурный вес позиции, состав — из записи склада
 const shMat = (id: string): ShihtaMaterial => {
   const i = initialDMItems.find(x => x.id === id)!;
-  return { kind: "sklad", name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, ves: i.ligWeight, loc: i.location, qty: i.qty, chem: i.chem, sklad: i.sklad };
+  return { kind: "sklad", name: i.name, nomenkl: i.nomenkl, klass: i.klass, code: i.metal, proba: i.proba, ves: i.ligWeight, loc: i.location, qty: i.qty, chem: i.chem, sklad: i.sklad };
 };
 // Позиция, уже израсходованная в плавке (выполненная карта): содержание драгметаллов, г; Cu — остаток
-const shDone = (name: string, nomenkl: string, klass: string, proba: number, ves: number, metals: Record<string, number>): ShihtaMaterial => {
+const shDone = (name: string, nomenkl: string, klass: string, code: string, proba: number, ves: number, metals: Record<string, number>): ShihtaMaterial => {
   const rest = r2(ves - Object.values(metals).reduce((a, v) => a + v, 0));
   const chem: ChemComposition = Object.fromEntries([...Object.entries(metals), ...(rest > 0 ? [["cu", rest] as [string, number]] : [])].map(([k, v]) => [k, v.toFixed(2)]));
-  return { kind: "sklad", name, nomenkl, klass, proba, ves, loc: "-", qty: 1, chem, sklad: SDM2 };
+  return { kind: "sklad", name, nomenkl, klass, code, proba, ves, loc: "-", qty: 1, chem, sklad: SDM2 };
 };
 // Лигатура Cu-P: Cu = ROUND(M × (1 − P/100); 2), P = M − Cu (округление без ошибки двоичной дроби)
 const shCuP = (ves: number, phosphorPct: number): ShihtaMaterial => {
@@ -692,9 +694,9 @@ export const initialShihtovyeKarty: ShihtovayaKarta[] = [
     alloyId: "auagm-585-80", naznachenie: "Сувенирная продукция",
     materials: [
       shCuP(3, 9.44),
-      shDone("Отходы Зл 99,99", "5015361", "Отходы", 999.9, 655.33, { au: 655.26 }),
-      shDone("Н/п чеканки Зл 99,99", "5015362", "НП чеканки", 999.9, 848.00, { au: 847.92 }),
-      shDone("Отходы ЗлСрМ 585-200", "5015363", "Отходы", 588.2, 1917.70, { au: 1128.00, ag: 379.45 }),
+      shDone("Отходы Зл 99,99", "5015361", "Отходы", "1000", 999.9, 655.33, { au: 655.26 }),
+      shDone("Н/п чеканки Зл 99,99", "5015362", "НП чеканки", "1000", 999.9, 848.00, { au: 847.92 }),
+      shDone("Отходы ЗлСрМ 585-200", "5015363", "Отходы", "0500", 588.2, 1917.70, { au: 1128.00, ag: 379.45 }),
       shMedMO(1050),
     ],
     createdAt: "2026-04-02T09:12:00", createdBy: "Ковалева Елена",
@@ -703,8 +705,8 @@ export const initialShihtovyeKarty: ShihtovayaKarta[] = [
     id: "sk4", date: "13.01.2026", name: "Шихта Ср 99,99 (инвестиционные монеты)", plavkaNo: "1", status: "Выполнена",
     alloyId: "ag-9999", oborot: "чистая", naznachenie: "Инвестиционные монеты",
     materials: [
-      shDone("Слиток серебра СрА 99,99", "5015360", "Слиток", 999.9, 92000.00, { ag: 91990.80 }),
-      shDone("Отходы Ср 99,99", "5015364", "Отходы", 999.9, 48983.00, { ag: 48978.11 }),
+      shDone("Слиток серебра СрА 99,99", "5015360", "Слиток", "2000", 999.9, 92000.00, { ag: 91990.80 }),
+      shDone("Отходы Ср 99,99", "5015364", "Отходы", "2000", 999.9, 48983.00, { ag: 48978.11 }),
     ],
     createdAt: "2026-01-13T08:30:00", createdBy: "Петров Сергей Владимирович",
   },
@@ -1040,6 +1042,15 @@ export const spravochniki = {
       { code: "НС-06", value: "Сувенирная продукция", status: "Активно" },
     ]
   },
+  // Типы доп. материалов шихтовой карты: по коду записи определяется расчёт строки (см. DOP_TYPE_*)
+  "Типы доп. материалов шихты": {
+    count: 3,
+    items: [
+      { code: "CUP", value: "Лигатура Cu-P", status: "Активно" },
+      { code: "MO", value: "Медь МО", status: "Активно" },
+      { code: "PR", value: "Прочее", status: "Активно" },
+    ]
+  },
   "Тип списания": {
     count: 2,
     items: [
@@ -1071,6 +1082,11 @@ export function minAffinageOf(naznachenie: string | undefined): number | undefin
   const v = parseFloat((code ? bullionAffinage[code] : "")?.replace(",", ".") ?? "");
   return Number.isFinite(v) ? v : undefined;
 }
+
+// Коды записей справочника «Типы доп. материалов шихты»: лигатура Cu-P (Cu и P по % фосфора), медь МО (только Cu);
+// остальные типы — состав вводится вручную
+export const DOP_TYPE_CUP = "CUP";
+export const DOP_TYPE_MED_MO = "MO";
 
 // Назначение, при котором в шихту не допускается стружка
 export const NAZN_PROOF = "Монеты коллекционные (пруф, пруф-лайк)";
