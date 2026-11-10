@@ -1248,8 +1248,8 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
   const { toast, show, clear } = useToast();
   const [perPage, setPerPage] = usePerPage("sprav-grades", 10);
 
-  // Колонки диапазонов — элементы, нормированные хотя бы в одной марке (мин и макс — отдельные колонки)
-  const rangeEls = ALLOY_RANGE_ELEMENTS.filter(e => items.some(g => g.ranges.some(r => r.element === e)));
+  // Колонки диапазонов — все элементы формы записи (Au, Ag, Pd, Pt, Cu); мин и макс — отдельные колонки
+  const rangeEls = ALLOY_RANGE_ELEMENTS;
   const filtered = items.filter(g => {
     const q = search.trim().toLowerCase();
     return (statusFilter === "Все статусы" || g.status === statusFilter)

@@ -205,6 +205,9 @@ export interface ShihtaMaterial {
   sklad?: string;
 }
 
+// Позиция карты, выданная в другой операции: наименование, номенкл. № и документ выдачи
+export interface IssuedElsewhere { name: string; nomenkl: string; doc: string }
+
 export interface ShihtovayaKarta {
   id: string;
   date: string;
@@ -221,7 +224,7 @@ export interface ShihtovayaKarta {
   osnovanie?: string;
   note?: string;
   // Позиции ДМ из резерва карты, выданные в другой операции (причина возврата карты в «На редактировании»).
-  vydannyePozicii?: string[];
+  vydannyePozicii?: IssuedElsewhere[];
   materials: ShihtaMaterial[];
   // Прикреплённые документы (несколько файлов)
   files?: File[];
@@ -504,6 +507,9 @@ export const initialDMItems: DMItem[] = [
   dm1("dm50", "Стружка серебряная СрМ 92,52", "5015430", "Стружка", "2000", 925.2, 1250.40, L(4, 1)),
   dm1("dm51", "Отходы ЗлСрМ 585-80", "5015431", "Отходы", "0500", 585, 512.30, L(4, 2)),
   dm("dm52", "Гранулы серебра Ag 99,99", "5015432", "Гранулы", "2000", 999.9, 800.00, L(2, 1)),
+  // Карта плавки № 46: СрА-6 в резерве; отходы СрМ 92,5 выданы в операцию «Отбор пробы» (№ 1235) — карта на редактировании
+  dmX("dm53", "Слиток серебра СрА-6", "5015433", "Слиток", "2000", 999.9, 1500.00, { ag: 1499.85 }, L(1, 2), "Резерв", SDM2),
+  dmX("dm54", "Отходы СрМ 92,5", "5015434", "Отходы", "2000", 925, 2000.00, { ag: 1850.00 }, "-", "В подотчёте", SDM2),
 ];
 
 // Заказчик и признак собственности заказчика — из документов приёма. По умолчанию — «Монетный двор»
@@ -634,6 +640,12 @@ export const initialOperations: Operation[] = [
     docType: "Маршрутный лист", zakazchik: "Монетный двор", vydal: VYDAL, poluchil: "Иванова Мария Сергеевна",
     vydachaPos: [opPos(1, "dm5", L(3, 1)), opPos(2, "dm18", L(1, 2))], vozvratPos: [], losses: [],
   },
+  {
+    id: "op6", date: "22.08.2026", type: "Выдача", vid: "Отбор пробы", positions: 1, document: "1235", responsible: "Петров Сергей Владимирович",
+    stage: "В работе", description: "Отбор пробы от отходов СрМ 92,5", statusVydacha: "Выдано", statusVozvrat: "Не начат", statusClose: "Не закрыто",
+    docType: "Приказ", zakazchik: "Монетный двор", vydal: VYDAL, poluchil: "Петров Сергей Владимирович",
+    vydachaPos: [opPos(1, "dm54", L(3, 2))], vozvratPos: [], losses: [],
+  },
 ];
 
 // --- Шихтовые карты ---
@@ -661,6 +673,13 @@ export const initialShihtovyeKarty: ShihtovayaKarta[] = [
     alloyId: "agm-925", oborot: "7", naznachenie: "Монеты коллекционные (пруф, пруф-лайк)",
     materials: [shCuP(127.55, 8.51), shMat("dm40"), shMat("dm41"), shMat("dm42"), shMedMO(3360)],
     createdAt: "2026-08-20T11:20:00", createdBy: "Бекова Айгуль Маратовна",
+  },
+  {
+    id: "sk5", date: "19.08.2026", name: "Шихта СрМ 92,5 (столовое серебро)", plavkaNo: "46", status: "На редактировании",
+    alloyId: "agm-925", naznachenie: "Столовое серебро",
+    materials: [shMat("dm53"), shMat("dm54"), shMedMO(120)],
+    vydannyePozicii: [{ name: "Отходы СрМ 92,5", nomenkl: "5015434", doc: "Отбор пробы, Приказ № 1235" }],
+    createdAt: "2026-08-19T15:40:00", createdBy: "Бекова Айгуль Маратовна",
   },
   {
     id: "sk3", date: "08.04.2026", name: "Шихта ЗлСрМ 750-150 (сувенирная продукция)", plavkaNo: "13", status: "На редактировании",

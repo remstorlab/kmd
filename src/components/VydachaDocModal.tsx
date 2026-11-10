@@ -9,6 +9,7 @@ import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, M
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
 import { takeFromStock, partLigMap } from "../data/stock";
+import { markIssuedElsewhere } from "../data/shihta";
 import { useIssuePositions } from "./IssueInputs";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
@@ -162,11 +163,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       // Выданные позиции из резерва: шихтовая карта, которая их резервировала, возвращается в «На редактировании»
       if (affectedKarty.length) {
         const ids = new Set(affectedKarty.map(k => k.id));
-        setShihtovyeKarty(prev => prev.map(k => {
-          if (!ids.has(k.id)) return k;
-          const hit = k.materials.filter(m => rezNomenkl.has(m.nomenkl)).map(m => m.name);
-          return { ...k, status: "На редактировании", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
-        }));
+        setShihtovyeKarty(prev => prev.map(k => (ids.has(k.id) ? markIssuedElsewhere(k, rezNomenkl, `выдача со склада, накладная № ${head.number}`) : k)));
       }
     }
     onSave({

@@ -1,4 +1,22 @@
-import type { AlloyGrade, AlloyRange, ChemComposition, ShihtaMatKind } from "./mock";
+import type { AlloyGrade, AlloyRange, ChemComposition, ShihtaMatKind, ShihtaMaterial, ShihtovayaKarta } from "./mock";
+
+// ── Строки карты ──
+// Вид строки: у старых записей без kind — по номенкл. № (позиция склада) или «прочее»
+export const kindOf = (m: Pick<ShihtaMaterial, "kind" | "nomenkl">): ShihtaMatKind => m.kind ?? (m.nomenkl ? "sklad" : "prochee");
+// Со склада выдаются и резервируются только позиции склада; доп. материалы выдаёт распределитель работ участка,
+// строка-подсказка подбора («Гранулы …») — не со склада
+export const isSkladMaterial = (m: Pick<ShihtaMaterial, "kind" | "nomenkl">) => kindOf(m) === "sklad";
+export const isHint = (m: Pick<ShihtaMaterial, "kind" | "nomenkl">) => kindOf(m) === "granuly";
+
+// Позиции карты выданы в другой операции (doc): карта возвращается в «На редактировании» с пометкой выданных позиций.
+// Выполненная карта и карта без этих позиций не меняются (возвращается тот же объект).
+export function markIssuedElsewhere(k: ShihtovayaKarta, nomenkl: Set<string>, doc: string): ShihtovayaKarta {
+  if (k.status === "Выполнена") return k;
+  const hit = k.materials.filter(m => isSkladMaterial(m) && nomenkl.has(m.nomenkl));
+  if (hit.length === 0) return k;
+  const kept = (k.vydannyePozicii ?? []).filter(v => !nomenkl.has(v.nomenkl));
+  return { ...k, status: "На редактировании", vydannyePozicii: [...kept, ...hit.map(m => ({ name: m.name, nomenkl: m.nomenkl, doc }))] };
+}
 
 // ── Расчёт шихтовой карты ──────────────────────────────────────────────────────
 // По строке i (Mᵢ — масса в шихту):

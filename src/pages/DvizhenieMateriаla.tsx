@@ -9,6 +9,7 @@ import {
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
 import { takeFromStock, returnToStock, IssueLine, scaleChem, addChem } from "../data/stock";
+import { isSkladMaterial, markIssuedElsewhere } from "../data/shihta";
 import { IssueQtyCell, IssueLigCell } from "../components/IssueInputs";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
@@ -645,7 +646,7 @@ type OperIssueEdit = {
   setLig: (p: OperPosition, v: string) => void;
 };
 
-function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, issue }: {
+function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, issue, probaPct = false }: {
   rows: OperPosition[];
   view: (p: OperPosition) => DMPositionView;
   readOnly: boolean;
@@ -654,6 +655,8 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
   onEdit?: (p: OperPosition) => void;
   onDelete: (p: OperPosition) => void;
   issue?: OperIssueEdit;
+  // Проба в процентах с 2 знаками (плавка — как в шихтовой карте)
+  probaPct?: boolean;
 }) {
   const lineOf = (p: OperPosition) => (issue && !readOnly ? issue.line(p) : null);
   const codeLabel = useMaterialCodeLabel();
@@ -680,7 +683,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
           <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество</SortTh>
           <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
           <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
-          <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
+          <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>{probaPct ? "Проба, %" : "Проба"}</SortTh>
           <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
           <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>{NET_AU_AG}</SortTh>
           <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
@@ -699,7 +702,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
                 </td>
                 <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                 <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
-                <td className="px-3 py-2">{probaText(p.proba)}</td>
+                <td className="px-3 py-2">{probaPct && p.proba ? (p.proba / 10).toFixed(2).replace(".", ",") : probaText(p.proba)}</td>
                 <td className="px-3 py-2 align-top">
                   {line && issue ? <IssueLigCell line={line} editable value={issue.ligValue(p)} onChange={val => issue.setLig(p, val)} /> : dash(v.ligWeight)}
                 </td>
@@ -1212,7 +1215,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [showVozvratFromVyd, setShowVozvratFromVyd] = nested("vozvrat-from-vydacha");
   const [showShihtaPick, setShowShihtaPick] = nested("shihta-pick");
   const [pickedShihtaId, setPickedShihtaId] = useState<string | null>(null);
-  const { dmItems, setDmItems, setShihtovyeKarty, operations, currentUser, storageLocations } = useApp();
+  const { dmItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, operations, currentUser, storageLocations } = useApp();
   const createdStamp = useCreatedStamp();
   // Документы вкладок «Выдача» / «Возврат»
   const [vydachaFiles, setVydachaFiles] = useState<File[]>(() =>
@@ -1441,14 +1444,10 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     });
     if (izRezerva.length === 0) return withSrc;
     const rezNomenkl = new Set(izRezerva.map(i => i.nomenkl));
-    const zatronuty: string[] = [];
-    setShihtovyeKarty(prev => prev.map(k => {
-      if (k.id === pickedShihtaId || k.status === "Выполнена") return k;
-      const hit = k.materials.filter(m => rezNomenkl.has(m.nomenkl)).map(m => m.name);
-      if (hit.length === 0) return k;
-      zatronuty.push(k.name);
-      return { ...k, status: "На редактировании", vydannyePozicii: [...new Set([...(k.vydannyePozicii ?? []), ...hit])] };
-    }));
+    const doc = `${vid}, ${head.docType || "документ"} № ${head.document}`;
+    const mark = (k: ShihtovayaKarta) => (k.id === pickedShihtaId ? k : markIssuedElsewhere(k, rezNomenkl, doc));
+    const zatronuty = shihtovyeKarty.filter(k => mark(k) !== k).map(k => k.name);
+    setShihtovyeKarty(prev => prev.map(mark));
     if (zatronuty.length) show(`Шихтовая карта ${zatronuty.map(n => `«${n}»`).join(", ")} переведена в «На редактировании»`);
     return withSrc;
   };
@@ -1490,7 +1489,10 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       return;
     }
     const next: OperStage = oformit ? "Завершено" : "В работе";
-    onSave(buildOp(next, applyVydacha()));
+    const pos = applyVydacha();
+    // Карта выдана в плавку — «Выполнена»
+    if (pickedShihtaId) setShihtovyeKarty(prev => prev.map(k => (k.id === pickedShihtaId ? { ...k, status: "Выполнена", vydannyePozicii: undefined } : k)));
+    onSave(buildOp(next, pos));
   };
 
   // Печать доступна для сохранённой операции — печатается текущее состояние формы.
@@ -1570,6 +1572,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           )}
           <PositionsSummary rows={vydacha} view={posView} />
           <OperPositionsTable
+            probaPct={vid === "Плавка"}
             rows={vydacha}
             view={posView}
             readOnly={ro}
@@ -1693,7 +1696,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <ShihtaPickModal
           onClose={() => setShowShihtaPick(false)}
           onPick={k => {
-            appendPositions("vydacha", k.materials.map(m => {
+            // Со склада выдаются только позиции склада; доп. материалы (лигатура, медь МО) выдаёт распределитель работ участка
+            appendPositions("vydacha", k.materials.filter(isSkladMaterial).map(m => {
               // Выдаётся запись склада, зарезервированная под карту (при частичном резерве — выделенная часть)
               const rez = m.nomenkl ? dmItems.find(i => i.nomenkl === m.nomenkl && i.status === "Резерв") : undefined;
               const dm = rez ?? dmItems.find(i => i.nomenkl === m.nomenkl);

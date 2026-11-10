@@ -7,12 +7,12 @@ import {
 } from "../components/ui";
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
-  PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS,
+  PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, baseMetal,
 } from "../data/mock";
 import { returnToStock, splitRecord } from "../data/stock";
 import {
   ShihtaCalc, ShihtaLine, chemStrings, fmt2, normText, nominalOf, podbor, podborElements, r2, shareOf, shihtaWarnings,
-  lineChem, PodborResult, GRANULES_PURITY,
+  lineChem, PodborResult, GRANULES_PURITY, PRECIOUS, kindOf,
 } from "../data/shihta";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { ChemPercent, gramsFrom, num0 } from "../data/chem";
@@ -62,7 +62,6 @@ const num = (v: string | undefined) => {
 };
 const str2 = (v: number) => r2(v).toFixed(2).replace(".", ",");
 const probaPctText = (proba: number) => (proba > 0 ? (proba / 10).toFixed(2).replace(".", ",") : "");
-const kindOf = (m: ShihtaMaterial): ShihtaMatKind => m.kind ?? (m.nomenkl ? "sklad" : "prochee");
 const isWeightPart = (it: { id: string }) => /-rw\d+$/.test(it.id);
 
 // Строка из сохранённой карты
@@ -84,12 +83,24 @@ const toRow = (m: ShihtaMaterial, dm: DMItem[]): MatRow => {
 
 const lineOf = (m: MatRow): ShihtaLine => ({ kind: m.kind, mass: num(m.ves), share: m.share, phosphorPct: m.phosphorPct, klass: m.klass });
 
-// Ошибка массы в шихту (пусто — масса корректна)
+// Ошибка массы в шихту (пусто — масса корректна). Блокирует сохранение карты.
 const massError = (m: MatRow): string => {
   const v = num(m.ves);
-  if (!(v > 0)) return "Масса должна быть больше 0";
-  if (m.maxVes != null && v > m.maxVes + 0.005) return `Не больше веса позиции ${str2(m.maxVes)} г`;
+  if (!(v > 0)) return `Масса в шихту не указана: ${m.mat}`;
+  if (m.maxVes != null && v > m.maxVes + 0.005) return `Масса в шихту больше веса позиции: ${m.mat} (${str2(m.maxVes)} г)`;
   return "";
+};
+
+// Строка-подсказка подбора («Гранулы Ag 99,99»): драгметалл, который нужно подобрать со склада
+const hintElement = (m: MatRow) => PRECIOUS.find(e => (m.share[e] ?? 0) > 0) ?? "ag";
+
+// Строка карты из позиции склада: q изделий, масса в шихту по умолчанию — их лигатурный вес
+const stockRowOf = (it: DMItem, q: number, key = newKey()): MatRow => {
+  const maxVes = r2((it.ligWeight * q) / (it.qty || 1));
+  return {
+    key, kind: "sklad", mat: it.name, nomenkl: it.nomenkl, klass: it.klass, proba: it.proba, qty: q,
+    loc: it.location, sklad: it.sklad, share: shareOf(it.chem, it.ligWeight), ves: str2(maxVes), maxVes, posLig: it.ligWeight, srcId: it.id,
+  };
 };
 
 // Следующий номер плавки в году (сквозная нумерация с 1 января)
@@ -330,9 +341,15 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const [pickSklad, setPickSklad] = useState(PRIHOD_SKLAD);
   const skladRows = useMemo<StockRow[]>(() => dmItems
     .filter(i => i.status === "На складе" && i.qty > 0 && !isGPKlass(i.klass) && !isStoneKlass(i.klass))
-    // Чистый вес — по фактической пробе позиции в процентах с 2 знаками
-    .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: r2((i.ligWeight * r2(i.proba / 10)) / 100), location: i.location, sklad: i.sklad, chem: i.chem })),
+    // Чистый вес — сохранённый у позиции (тот же, по которому считается состав строки карты)
+    .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem })),
   [dmItems]);
+  // «Выбрать со склада» у строки-подсказки: окно выбора с фильтром по её драгметаллу, выбранные позиции заменяют подсказку
+  const [replaceKey, setReplaceKey] = useState<string | null>(null);
+  const replaceRow = materials.find(m => m.key === replaceKey && m.kind === "granuly");
+  const pickerRows = replaceRow ? skladRows.filter(r => baseMetal(r.code).toLowerCase() === hintElement(replaceRow)) : skladRows;
+  const openPicker = (hintKey: string | null) => { setReplaceKey(hintKey); setShowFromSklad(true); };
+  const closePicker = () => { setReplaceKey(null); setShowFromSklad(false); };
 
   // Уже взято в карту из каждой позиции склада (в этой сессии)
   const already = materials.reduce<Record<string, number>>((acc, m) => {
@@ -340,34 +357,52 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     return acc;
   }, {});
 
-  const addFromSklad = (picked: { row: StockRow; qty: number }[]) => {
+  // Позиции из окна выбора, прошедшие запреты допуска в шихту (отклонённые — в сообщение)
+  const acceptPicked = (picked: { row: StockRow; qty: number }[]) => {
     const rejected: string[] = [];
-    const accepted = picked.filter(({ row }) => {
+    const accepted = picked.flatMap(({ row, qty }) => {
       const it = dmItems.find(i => i.id === row.id);
-      const why = banReason({ klass: row.klass, share: shareOf(it?.chem, it?.ligWeight ?? 0), kind: "sklad" }, grade, naznachenie);
-      if (why) rejected.push(`${row.name}: ${why}`);
-      return !why;
+      if (!it) return [];
+      const why = banReason({ klass: it.klass, share: shareOf(it.chem, it.ligWeight), kind: "sklad" }, grade, naznachenie);
+      if (why) { rejected.push(`${it.name}: ${why}`); return []; }
+      return [{ it, qty }];
     });
+    if (rejected.length) show(`Не добавлено — ${rejected.join("; ")}`);
+    return accepted;
+  };
+
+  const addFromSklad = (picked: { row: StockRow; qty: number }[]) => {
+    const accepted = acceptPicked(picked);
     setMaterials(prev => {
       const next = [...prev];
-      for (const { row, qty } of accepted) {
-        const it = dmItems.find(i => i.id === row.id);
-        if (!it) continue;
-        const idx = next.findIndex(m => m.srcId === row.id);
-        const q = idx >= 0 ? Math.min(next[idx].qty + qty, it.qty) : qty;
-        // Масса в шихту по умолчанию — лигатурный вес взятых изделий
-        const maxVes = r2((it.ligWeight * q) / (it.qty || 1));
-        const rec: MatRow = {
-          key: idx >= 0 ? next[idx].key : newKey(), kind: "sklad", mat: it.name, nomenkl: it.nomenkl, klass: it.klass, proba: it.proba, qty: q,
-          loc: it.location, sklad: it.sklad, share: shareOf(it.chem, it.ligWeight), ves: str2(maxVes), maxVes, posLig: it.ligWeight, srcId: it.id,
-        };
-        if (idx >= 0) next[idx] = rec; else next.push(rec);
+      for (const { it, qty } of accepted) {
+        const idx = next.findIndex(m => m.srcId === it.id);
+        if (idx >= 0) next[idx] = stockRowOf(it, Math.min(next[idx].qty + qty, it.qty), next[idx].key);
+        else next.push(stockRowOf(it, qty));
       }
       return next;
     });
-    setShowFromSklad(false);
-    if (rejected.length) show(`Не добавлено — ${rejected.join("; ")}`);
-    else show(`Добавлено позиций: ${accepted.length}. Резерв — при сохранении карты`);
+    closePicker();
+    if (accepted.length === picked.length) show(`Добавлено позиций: ${accepted.length}. Резерв — при сохранении карты`);
+  };
+
+  // Замена строки-подсказки позициями склада: масса подсказки распределяется по выбранным позициям
+  // (каждой — не больше её веса); если выбранного не хватает, подсказка остаётся с недостающей массой
+  const replaceHint = (picked: { row: StockRow; qty: number }[]) => {
+    if (!replaceRow) return closePicker();
+    let rest = num(replaceRow.ves);
+    const rows: MatRow[] = [];
+    for (const { it, qty } of acceptPicked(picked)) {
+      if (rest <= 0.005) break;
+      const row = stockRowOf(it, qty);
+      const mass = Math.min(rest, row.maxVes ?? rest);
+      rows.push({ ...row, ves: str2(mass) });
+      rest = r2(rest - mass);
+    }
+    const hintKey = replaceRow.key;
+    setMaterials(prev => prev.flatMap(m => (m.key !== hintKey ? [m] : [...rows, ...(rest > 0.005 ? [{ ...m, ves: str2(rest) }] : [])])));
+    closePicker();
+    if (rows.length) show(rest > 0.005 ? `Подсказка заменена частично — не хватает ${str2(rest)} г` : "Подсказка заменена позициями склада");
   };
 
   // Остаток позиции на складе при взятии в шихту её части: вес позиции − масса в шихту (нет части — null)
@@ -383,12 +418,22 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const calc = useMemo(() => new ShihtaCalc(materials.map(lineOf), grade), [materials, grade]);
   const chemOfKey = useMemo(() => new Map(materials.map((m, i) => [m.key, calc.chems[i]])), [materials, calc]);
   const idxOfKey = useMemo(() => new Map(materials.map((m, i) => [m.key, i])), [materials]);
-  const warnings = shihtaWarnings(calc, { oborot, minAffinage: minAffinageOf(naznachenie) });
-  const violations = materials.map(m => ({ m, why: banReason(m, grade, naznachenie) })).filter(x => x.why);
   const badMass = materials.filter(m => massError(m));
+  // Позиции, выданные в другой операции (карта возвращена в «На редактировании»): их нужно заменить
+  const issuedNomenkl = new Set((karta?.vydannyePozicii ?? []).map(v => v.nomenkl));
+  const isIssued = (m: MatRow) => m.kind === "sklad" && issuedNomenkl.has(m.nomenkl);
+  // Предупреждения — подсказки, оформление не блокируют; пересчитываются при любом изменении карты
+  const warnings = [
+    ...shihtaWarnings(calc, { oborot, minAffinage: minAffinageOf(naznachenie) }),
+    ...(oborotValid(oborot) ? [] : ["Оборот — число или «чистая»"]),
+    ...materials.filter(m => m.kind === "granuly").map(m => `Строка «${m.mat}» не со склада — материал не будет зарезервирован`),
+    ...[...new Set(materials.map(m => banReason(m, grade, naznachenie)).filter((w): w is string => !!w))],
+  ];
   const rangeOf = (e: string) => grade?.ranges.find(r => r.element === e);
 
   const pctCell = (e: string) => {
+    // Фосфор выгорает и в базу не входит — его доля не показывается
+    if (e === "p") return "—";
     const t = calc.total(e);
     if (!(t > 0) || calc.base <= 0) return "—";
     return fmt2(calc.pct(e));
@@ -400,9 +445,8 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     materials.length === 0 ? "Добавьте хотя бы один материал"
     : !grade ? "Выберите марку сплава"
     : !naznachenie ? "Выберите назначение слитков"
-    : badMass.length ? "Проверьте массу в шихту"
-    : violations.length ? violations[0].why
-    : !oborotValid(oborot) ? "Оборот — число или «чистая»"
+    : !plavkaNo.trim() ? "Укажите номер плавки"
+    : materials.some(isIssued) ? "Замените позиции, выданные в другой операции"
     : calc.complies ? null
     : !grade.allowDeviation ? `Состав не соответствует марке ${grade.name}: ${failText}`
     : !note.trim() ? `Состав не соответствует марке ${grade.name}: ${failText}. Для марки допускается отклонение — заполните «Примечание»`
@@ -442,9 +486,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
   // Сохранить — карта «На редактировании»; Оформить — «Новая»: доступна для плавки, редактирование закрыто
   const save = (oformit = false) => {
-    if (badMass.length) { show(`Проверьте массу в шихту: ${badMass.map(m => `${m.mat} (${massError(m)})`).join(", ")}`); return; }
-    if (!/^\d+$/.test(plavkaNo.trim())) { show("Номер плавки — целое число"); return; }
-    if (!oborotValid(oborot)) { show("Оборот — число или «чистая»"); return; }
+    if (badMass.length) { show(massError(badMass[0])); return; }
     if (oformit && oformitBlock) { show(oformitBlock); return; }
     // Выбранные позиции склада должны быть всё ещё доступны в нужном количестве
     const plan: TakePlan[] = materials.filter(m => m.srcId).map(m => ({ id: m.srcId!, qty: m.qty, mass: num(m.ves) }));
@@ -475,10 +517,11 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       date: docDate.trim() || karta?.date || new Date().toLocaleDateString("ru-RU"),
       materials: mats, files,
     };
-    // Оформление снимает пометку о выданных позициях — карта снова доступна для плавки.
+    // Пометка о выданных позициях остаётся, пока такие позиции есть в карте; оформление её снимает.
     const status = oformit ? "Новая" as const : "На редактировании" as const;
+    const stillIssued = (karta?.vydannyePozicii ?? []).filter(v => materials.some(m => isIssued(m) && m.nomenkl === v.nomenkl));
     const k: ShihtovayaKarta = karta
-      ? { ...karta, ...head, status, ...(oformit ? { vydannyePozicii: undefined } : {}) }
+      ? { ...karta, ...head, status, vydannyePozicii: !oformit && stillIssued.length ? stillIssued : undefined }
       : {
         id: `sk-${Date.now()}`, ...head, status,
         createdAt: new Date().toISOString(),
@@ -489,7 +532,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
   const subline = (m: MatRow) => {
     if (m.kind === "cup") return `P = ${str2(m.phosphorPct ?? 0)} %`;
-    if (m.kind === "granuly") return "чистота 99,99 % · из подбора";
+    if (m.kind === "granuly") return "подобрать со склада";
     if (m.kind !== "sklad") return "";
     return [m.nomenkl, m.proba > 0 ? `проба ${probaPctText(m.proba)} %` : "", m.loc && m.loc !== "-" ? m.loc : ""].filter(Boolean).join(" · ");
   };
@@ -502,28 +545,34 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
       onClose={onClose}
       fullWide
       footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
-        <>
-          <div className="mr-auto flex items-center gap-3 min-w-0">
-            <span title={oformitBlock ?? undefined}><Btn variant="success" onClick={() => save(true)} disabled={!!oformitBlock}>Оформить</Btn></span>
-            {oformitBlock && materials.length > 0 && <span className="text-xs text-red-600 truncate max-w-2xl" title={oformitBlock}>{oformitBlock}</span>}
+        <div className="w-full">
+          {/* Зона сообщений: ошибки массы блокируют сохранение, причина — оформление */}
+          {(badMass.length > 0 || (oformitBlock && materials.length > 0)) && (
+            <div className="mb-3 space-y-1 text-xs">
+              {badMass.map(m => <div key={m.key} className="text-red-600">⛔ {massError(m)}</div>)}
+              {oformitBlock && materials.length > 0 && <div className="text-red-600">Оформление недоступно: {oformitBlock}</div>}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <div className="mr-auto"><Btn variant="success" onClick={() => save(true)} disabled={!!oformitBlock || badMass.length > 0}>Оформить</Btn></div>
+            <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+            <Btn onClick={() => save()} disabled={badMass.length > 0}>Сохранить</Btn>
           </div>
-          <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-          <Btn onClick={() => save()}>Сохранить</Btn>
-        </>
+        </div>
       )}
     >
       {karta && (
         <div className="flex items-center gap-2 mb-4">
           <Badge label={karta.status} group="shihta" />
-          {karta.status === "Новая" && <span className="text-xs text-gray-500">Карта оформлена — доступна для выдачи на плавку, редактирование закрыто</span>}
-          {karta.status === "На редактировании" && !karta.vydannyePozicii?.length && <span className="text-xs text-gray-500">Черновик — недоступен для плавки до оформления</span>}
+          {karta.status === "Новая" && <span className="text-xs text-gray-500">Карта оформлена — доступна для выдачи на плавку</span>}
+          {karta.status === "На редактировании" && !karta.vydannyePozicii?.length && <span className="text-xs text-gray-500">Карта сохранена, но не оформлена — недоступна для выдачи в плавку</span>}
         </div>
       )}
       {karta?.status === "На редактировании" && !!karta.vydannyePozicii?.length && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 mb-5 text-sm text-orange-800">
-          <div className="font-medium mb-0.5">⚠ Карта возвращена в редактирование — недоступна для плавки</div>
-          Зарезервированные позиции выданы в другой операции: {karta.vydannyePozicii.join(", ")}.
-          {!ro && " Замените их и оформите карту — она перейдёт в статус «Новая»."}
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5 text-sm text-red-800 space-y-1">
+          {karta.vydannyePozicii.map(v => (
+            <div key={v.nomenkl}>⚠ Позиция {v.name}, № {v.nomenkl} выдана в другой операции ({v.doc}) — замените позицию и оформите карту</div>
+          ))}
         </div>
       )}
 
@@ -555,7 +604,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Шихтовые материалы</h3>
           {!ro && (
             <div className="flex gap-2">
-              <Btn size="sm" onClick={() => setShowFromSklad(true)}><Plus className="w-4 h-4" />Добавить со склада</Btn>
+              <Btn size="sm" onClick={() => openPicker(null)}><Plus className="w-4 h-4" />Добавить со склада</Btn>
               <Btn size="sm" variant="secondary" onClick={() => setShowAddDop(true)}><Plus className="w-4 h-4" />Добавить доп. материал</Btn>
             </div>
           )}
@@ -593,11 +642,15 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                 const ch = chemOfKey.get(m.key) ?? {};
                 const err = massError(m);
                 const ban = banReason(m, grade, naznachenie);
+                const issued = isIssued(m);
+                const hint = m.kind === "granuly";
                 return (
-                  <tr key={m.key} className={`hover:bg-gray-50 ${ban ? "bg-red-50/60" : ""}`}>
+                  <tr key={m.key} className={`hover:bg-gray-50 ${ban || issued ? "bg-red-50/60" : ""}`}>
                     <td className="px-3 py-2">
-                      <div className="font-medium">{m.mat}</div>
-                      {subline(m) && <div className="text-xs text-gray-400">{subline(m)}</div>}
+                      <div className={hint ? "italic text-gray-400" : "font-medium"}>{m.mat}</div>
+                      {subline(m) && <div className={`text-xs text-gray-400 ${hint ? "italic" : ""}`}>{subline(m)}</div>}
+                      {hint && !ro && <button onClick={() => openPicker(m.key)} className="mt-0.5 text-xs text-blue-600 hover:underline">Выбрать со склада</button>}
+                      {issued && <div className="text-xs text-red-600">Выдана в другой операции — замените позицию</div>}
                       {ban && <div className="text-xs text-red-600">{ban}</div>}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">{m.sklad ?? <span className="text-gray-400">—</span>}</td>
@@ -664,7 +717,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
         {!ro && (
           <div className="flex gap-2">
-            <Btn size="sm" variant="secondary" onClick={() => setShowResult(true)}>
+            <Btn size="sm" variant="secondary" onClick={() => { setShowResult(true); show("Расчёт обновлён"); }}>
               <Calculator className="w-4 h-4" /> Рассчитать
             </Btn>
             <span title={canPodbor ? undefined : "Выберите марку сплава и добавьте хотя бы один материал со склада"}>
@@ -675,7 +728,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           </div>
         )}
 
-        {(showResult || ro) && (
+        {(showResult || ro || materials.length > 0) && (
           <div className="mt-4">
             {warnings.map(w => (
               <div key={w} className="mb-2 flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-sm text-yellow-800">
@@ -726,13 +779,13 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
       {showFromSklad && (
         <StockPickerModal
-          title="Добавить материал со склада"
+          title={replaceRow ? `Выбрать со склада: ${replaceRow.mat} (${replaceRow.ves} г)` : "Добавить материал со склада"}
           toolbar={
             <div className="w-64">
               <Field label="Склад" required><Select value={pickSklad} options={sklady} onChange={setPickSklad} /></Field>
             </div>
           }
-          rows={skladRows}
+          rows={pickerRows}
           skladFilter={pickSklad}
           already={already}
           showWeights
@@ -741,8 +794,8 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           qtyLabel="Количество к выдаче"
           emptyText={`Нет доступных позиций на складе «${pickSklad}»`}
           addLabel="Добавить выбранные"
-          onClose={() => setShowFromSklad(false)}
-          onAdd={addFromSklad}
+          onClose={closePicker}
+          onAdd={replaceRow ? replaceHint : addFromSklad}
         />
       )}
 
