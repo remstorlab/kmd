@@ -259,7 +259,6 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
 
       <div className="flex items-center justify-between mb-1">
         <div className="text-xs text-gray-500">Подотчётные лица / Карточка подотчётного лица</div>
-        <span className="text-xs text-gray-400">Обновлено: {new Date().toLocaleDateString("ru-RU")}</span>
       </div>
 
       {/* Dark header card */}

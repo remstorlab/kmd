@@ -353,7 +353,6 @@ function RolesPage({ onBack }: { onBack: () => void }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="text-xs text-gray-500">Администрирование / Роли и разрешения</div>
-        <span className="text-xs text-gray-400">Обновлено: {new Date().toLocaleDateString("ru-RU")}</span>
       </div>
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -469,7 +468,6 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="text-xs text-gray-500">Администрирование / Настройки</div>
-        <span className="text-xs text-gray-400">Обновлено: {new Date().toLocaleDateString("ru-RU")}</span>
       </div>
       <div className="flex items-start justify-between mb-6">
         <div>

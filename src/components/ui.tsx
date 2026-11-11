@@ -817,16 +817,13 @@ export function PageHeader({
   actions?: React.ReactNode;
   breadcrumb?: string[];
 }) {
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-
   return (
     <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        {breadcrumb && <Breadcrumb parts={breadcrumb} />}
-        <span className="text-xs text-gray-400 ml-auto">Обновлено: {dateStr}, {timeStr}</span>
-      </div>
+      {breadcrumb && (
+        <div className="flex items-center justify-between mb-4">
+          <Breadcrumb parts={breadcrumb} />
+        </div>
+      )}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
