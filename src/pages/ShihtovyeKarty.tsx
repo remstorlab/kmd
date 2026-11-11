@@ -14,7 +14,7 @@ import {
   ShihtaCalc, ShihtaLine, chemStrings, fmt2, normText, r2, shareOf, shihtaWarnings, lineChem, kindOf,
 } from "../data/shihta";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
-import { ChemPercent, gramsFrom, num0 } from "../data/chem";
+import { ChemPercent, gramsFrom, num0, pctFrom } from "../data/chem";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
 import { Plus, X, Calculator, AlertTriangle } from "lucide-react";
 import { useScreen } from "../router";
@@ -185,18 +185,23 @@ const dopKindOf = (type: string): ShihtaMatKind => {
   return code === DOP_TYPE_CUP ? "cup" : code === DOP_TYPE_MED_MO ? "medMO" : "prochee";
 };
 
-function DopMaterialModal({ onClose, onAdd }: { onClose: () => void; onAdd: (row: MatRow) => void }) {
+// Тип справочника для строки при редактировании: лигатура / медь — по коду, «прочее» — первый тип с ручным составом
+const dopTypeOf = (m: MatRow, types: string[]) => types.find(t => dopKindOf(t) === m.kind) ?? types[0] ?? "";
+
+// Окно доп. материала: добавление (initial не задан) и редактирование строки карты (initial — строка).
+// Масса — в граммах; состав «Прочего» — граммы / % элементов.
+function DopMaterialModal({ initial, onClose, onSave }: { initial?: MatRow; onClose: () => void; onSave: (row: MatRow) => void }) {
   const types = spravValues("Типы доп. материалов шихты");
-  // Единицы измерения — коды активных записей справочника «Единицы измерения»
-  const units = spravochniki["Единицы измерения"].items.filter(i => i.status === "Активно").map(i => i.code);
-  const [type, setType] = useState(types[0] ?? "");
+  const initChem: ChemComposition = initial
+    ? Object.fromEntries(Object.entries(initial.share).map(([k, v]) => [k, r2(v * num(initial.ves)).toFixed(2)]))
+    : {};
+  const [type, setType] = useState(() => (initial ? dopTypeOf(initial, types) : types[0] ?? ""));
   const kind = dopKindOf(type);
-  const [name, setName] = useState("");
-  const [unit, setUnit] = useState(units[0] ?? "г");
-  const [ves, setVes] = useState("");
-  const [pPct, setPPct] = useState("");
-  const [chem, setChem] = useState<ChemComposition>({});
-  const [pct, setPct] = useState<ChemPercent>({});
+  const [name, setName] = useState(initial?.kind === "prochee" ? initial.mat : "");
+  const [ves, setVes] = useState(initial?.ves ?? "");
+  const [pPct, setPPct] = useState(initial?.phosphorPct != null ? str2(initial.phosphorPct) : "");
+  const [chem, setChem] = useState<ChemComposition>(initChem);
+  const [pct, setPct] = useState<ChemPercent>(() => pctFrom(initChem, num(initial?.ves)));
   const mass = num(ves);
   const p = num(pPct);
   const cupChem = kind === "cup" && mass > 0 && p > 0 && p < 100 ? lineChem({ kind: "cup", mass, phosphorPct: p }) : null;
@@ -206,23 +211,22 @@ function DopMaterialModal({ onClose, onAdd }: { onClose: () => void; onAdd: (row
     : "";
   const decimal = (set: (v: string) => void) => (v: string) => set(v.replace(/[^\d.,]/g, ""));
 
-  const add = () => {
+  const save = () => {
     if (error) return;
-    const base = { key: newKey(), nomenkl: "", klass: "", proba: 0, qty: 1, loc: "", ves: str2(mass) };
-    if (kind === "cup") onAdd({ ...base, kind: "cup", mat: type, share: {}, phosphorPct: r2(p) });
-    else if (kind === "medMO") onAdd({ ...base, kind: "medMO", mat: type, share: { cu: 1 } });
-    else onAdd({ ...base, kind: "prochee", mat: name.trim(), share: shareOf(chem, mass) });
+    const base = { key: initial?.key ?? newKey(), nomenkl: "", klass: "", proba: 0, qty: 1, loc: "", ves: str2(mass) };
+    if (kind === "cup") onSave({ ...base, kind: "cup", mat: type, share: {}, phosphorPct: r2(p) });
+    else if (kind === "medMO") onSave({ ...base, kind: "medMO", mat: type, share: { cu: 1 } });
+    else onSave({ ...base, kind: "prochee", mat: name.trim(), share: shareOf(chem, mass) });
   };
 
   return (
-    <Modal title="Добавить дополнительный материал" wide onClose={onClose} footer={
-      <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={add} disabled={!!error}>Добавить</Btn></>
+    <Modal title={initial ? "Редактировать дополнительный материал" : "Добавить дополнительный материал"} wide onClose={onClose} footer={
+      <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={save} disabled={!!error}>{initial ? "Сохранить" : "Добавить"}</Btn></>
     }>
       <div className="grid grid-cols-3 gap-4">
         <Field label="Тип" required><Select value={type} options={types} onChange={setType} /></Field>
         {kind === "prochee" && <>
           <Field label="Наименование материала" required><Input value={name} onChange={setName} placeholder="Название" /></Field>
-          <Field label="Ед. измерения" required><Select value={unit} options={units} onChange={setUnit} /></Field>
         </>}
         <Field label={kind === "prochee" ? "Масса лигатурная, г" : "Масса, г"} required>
           <Input value={ves} onChange={decimal(v => { setVes(v); if (kind === "prochee") setChem(gramsFrom(pct, num0(v))); })} placeholder="0,00" />
@@ -268,6 +272,11 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const nested = (n: string) => [screen.has(n), (open: boolean) => (open ? screen.open(n) : screen.close(n))] as const;
   const [showFromSklad, setShowFromSklad] = nested("from-sklad");
   const [showAddDop, setShowAddDop] = nested("dop-material");
+  // Редактируемая строка доп. материала (null — окно открыто на добавление)
+  const [dopEditKey, setDopEditKey] = useState<string | null>(null);
+  const dopEditRow = materials.find(m => m.key === dopEditKey && m.kind !== "sklad");
+  const openDop = (key: string | null) => { setDopEditKey(key); setShowAddDop(true); };
+  const closeDop = () => { setDopEditKey(null); setShowAddDop(false); };
   const showResult = screen.has("raschet");
   const setShowResult = (on: boolean) => screen.toggle("raschet", on);
   const { toast, show, clear } = useToast();
@@ -285,9 +294,9 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   const sklady = spravValues("Склады").filter(s => s !== SGP);
   const [pickSklad, setPickSklad] = useState(PRIHOD_SKLAD);
   const skladRows = useMemo<StockRow[]>(() => dmItems
-    .filter(i => i.status === "На складе" && i.qty > 0 && !isGPKlass(i.klass) && !isStoneKlass(i.klass))
+    .filter(i => i.status !== "Закрыта" && i.qty > 0 && !isGPKlass(i.klass) && !isStoneKlass(i.klass))
     // Чистый вес — сохранённый у позиции (тот же, по которому считается состав строки карты)
-    .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem })),
+    .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem, status: i.status })),
   [dmItems]);
 
 
@@ -505,7 +514,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           {!ro && (
             <div className="flex gap-2">
               <Btn size="sm" onClick={() => setShowFromSklad(true)}><Plus className="w-4 h-4" />Добавить со склада</Btn>
-              <Btn size="sm" variant="secondary" onClick={() => setShowAddDop(true)}><Plus className="w-4 h-4" />Добавить доп. материал</Btn>
+              <Btn size="sm" variant="secondary" onClick={() => openDop(null)}><Plus className="w-4 h-4" />Добавить доп. материал</Btn>
             </div>
           )}
         </div>
@@ -538,7 +547,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                   <SortTh key={e.id} sortKey={`el-${e.id}`} sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">{e.shortName}</SortTh>
                 ))}
                 <SortTh sortKey="dola" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Доля, %</SortTh>
-                {!ro && <th className="w-10"></th>}
+                {!ro && <th className="w-16"></th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -573,8 +582,12 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                       <td key={e.id} className="px-3 py-2 text-right text-gray-600">{(ch[e.id] ?? 0) > 0 ? str2(ch[e.id]) : "—"}</td>
                     ))}
                     <td className="px-3 py-2 text-right text-blue-600">{fmt2(calc.dola(idxOfKey.get(m.key) ?? 0))}</td>
-                    {!ro && <td className="px-3 py-2 text-center">
-                      <button onClick={() => setMaterials(prev => prev.filter(x => x.key !== m.key))} className="text-gray-400 hover:text-red-500 transition-colors" title="Убрать из карты"><X className="w-3.5 h-3.5" /></button>
+                    {!ro && <td className="px-3 py-2">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Доп. материал правится целиком: тип, фосфор лигатуры, наименование и состав «Прочего» */}
+                        {!sklad && <EditIcon onClick={() => openDop(m.key)} title="Редактировать строку" />}
+                        <button onClick={() => setMaterials(prev => prev.filter(x => x.key !== m.key))} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Убрать из карты"><X className="w-3.5 h-3.5" /></button>
+                      </div>
                     </td>}
                   </tr>
                 );
@@ -691,6 +704,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
           already={already}
           showWeights
           probaPct
+          withStatus
           excludeKlass={[STONE_KLASS]}
           qtyLabel="Количество к выдаче"
           emptyText={`Нет доступных позиций на складе «${pickSklad}»`}
@@ -702,8 +716,14 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
 
       {showAddDop && (
         <DopMaterialModal
-          onClose={() => setShowAddDop(false)}
-          onAdd={row => { setMaterials(prev => [...prev, row]); setShowAddDop(false); show("Материал добавлен"); }}
+          key={dopEditRow?.key ?? "new"}
+          initial={dopEditRow}
+          onClose={closeDop}
+          onSave={row => {
+            setMaterials(prev => (dopEditRow ? prev.map(m => (m.key === row.key ? row : m)) : [...prev, row]));
+            closeDop();
+            show(dopEditRow ? "Строка обновлена" : "Материал добавлен");
+          }}
         />
       )}
 

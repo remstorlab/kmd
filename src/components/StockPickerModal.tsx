@@ -1,13 +1,18 @@
 import React, { useState } from "react";
-import { Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort, useMaterialCodeLabel, probaText, NetAuAg, NET_AU_AG, usePaged, FillerRows,
+import { Badge, Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort, useMaterialCodeLabel, probaText, NetAuAg, NET_AU_AG, usePaged, FillerRows,
 } from "./ui";
 import { VydachaDocPosition } from "../data/mock";
+import { useApp } from "../store/AppContext";
 
 // ── Подбор позиций со склада (чекбокс + количество по каждой позиции) ─────────
 // Общий для выдачи со склада (ГП/ДМ) и шихтовых карт.
 
 // Позиция склада в едином виде (из учёта ГП или ДМ)
-export type StockRow = Omit<VydachaDocPosition, "issue">;
+export type StockRow = Omit<VydachaDocPosition, "issue"> & { status?: string };
+
+// Добавлять можно только позиции в этом статусе (остальные видны при смене фильтра, но не выбираются)
+const STOCK_STATUS = "На складе";
+const ALL_STATUSES = "Все статусы";
 
 const ALL_KLASS = "Все классы";
 const ALL_CODES = "Все коды";
@@ -19,6 +24,7 @@ export default function StockPickerModal({
   already = {},
   showWeights = false,
   probaPct = false,
+  withStatus = false,
   excludeKlass,
   qtyLabel = "Количество к выдаче",
   qtyInput = true,
@@ -39,6 +45,8 @@ export default function StockPickerModal({
   probaPct?: boolean;
   // Классы, которые не предлагаются в фильтре (позиции этих классов не передаются в rows)
   excludeKlass?: string[];
+  // Столбец и фильтр «Статус» (значения — справочник «Статусы позиций»), по умолчанию — «На складе»
+  withStatus?: boolean;
   qtyLabel?: string;
   // false — без ввода количества: позиция берётся целиком (весь доступный остаток).
   // Функция — ввод количества только для подходящих позиций.
@@ -58,6 +66,11 @@ export default function StockPickerModal({
   const [loc, setLoc] = useState(ALL_LOCS);
   const [onlySelected, setOnlySelected] = useState(false);
   const [selectedQty, setSelectedQty] = useState<Record<string, string>>({});
+  const { statusDicts } = useApp();
+  const statusOptions = [ALL_STATUSES, ...(statusDicts.find(d => d.group === "pozicii")?.items.map(i => i.name).filter(n => n !== "Закрыта") ?? [STOCK_STATUS])];
+  const [status, setStatus] = useState(STOCK_STATUS);
+  // Выбрать можно только позицию на складе
+  const selectable = (r: StockRow) => !withStatus || !r.status || r.status === STOCK_STATUS;
 
   const left = (r: StockRow) => r.qty - (already[r.id] ?? 0);
   const hasInput = (r: StockRow) => (typeof qtyInput === "function" ? qtyInput(r) : qtyInput);
@@ -75,7 +88,8 @@ export default function StockPickerModal({
       && (code === ALL_CODES || r.code === code)
       && (loc === ALL_LOCS || r.location === loc)
       && (!skladFilter || onlySelected || r.sklad === skladFilter)
-      && (!onlySelected || r.id in selectedQty);
+      && (!onlySelected || r.id in selectedQty)
+      && (!withStatus || onlySelected || status === ALL_STATUSES || r.status === status);
   });
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
@@ -91,7 +105,7 @@ export default function StockPickerModal({
   });
 
   const selectedCount = Object.keys(selectedQty).length;
-  const allChecked = filtered.length > 0 && filtered.every(r => r.id in selectedQty);
+  const allChecked = filtered.some(selectable) && filtered.filter(selectable).every(r => r.id in selectedQty);
 
   // При отметке позиции подставляется всё доступное количество — его можно уменьшить
   const initQty = (r: StockRow) => String(left(r));
@@ -103,12 +117,12 @@ export default function StockPickerModal({
   const toggleAll = () => setSelectedQty(prev => {
     const next = { ...prev };
     if (allChecked) filtered.forEach(r => delete next[r.id]);
-    else filtered.forEach(r => { if (!(r.id in next)) next[r.id] = initQty(r); });
+    else filtered.filter(selectable).forEach(r => { if (!(r.id in next)) next[r.id] = initQty(r); });
     return next;
   });
   const setQty = (id: string, v: string) => setSelectedQty(prev => (id in prev ? { ...prev, [id]: v.replace(/[^\d]/g, "") } : prev));
 
-  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setCode(ALL_CODES); setLoc(ALL_LOCS); setOnlySelected(false); };
+  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setCode(ALL_CODES); setLoc(ALL_LOCS); setOnlySelected(false); setStatus(STOCK_STATUS); };
 
   const add = () => {
     const picked = available
@@ -136,9 +150,10 @@ export default function StockPickerModal({
         </div>
         <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} exclude={excludeKlass} /></Field>
         <Field label="Код материала"><Select value={code} options={codes} onChange={setCode} optionLabel={v => (v === ALL_CODES ? v : codeLabel(v))} /></Field>
-        <div className="col-span-2">
+        <div className={withStatus ? "" : "col-span-2"}>
           <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
         </div>
+        {withStatus && <Field label="Статус"><Select value={status} options={statusOptions} onChange={setStatus} /></Field>}
         <label className="flex items-center gap-2 text-sm text-gray-700 h-9 cursor-pointer">
           <input type="checkbox" checked={onlySelected} onChange={e => setOnlySelected(e.target.checked)} className="w-4 h-4 accent-blue-600" />
           Только выбранные
@@ -170,6 +185,7 @@ export default function StockPickerModal({
                 <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{probaPct ? "Чистый вес, г" : NET_AU_AG}</SortTh>
               </>}
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
+              {withStatus && <th className="px-3 py-2 text-left">Статус</th>}
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
               {anyInput && <th className="px-3 py-2 text-left w-28">{qtyLabel}</th>}
             </tr></thead>
@@ -178,7 +194,7 @@ export default function StockPickerModal({
                 const checked = r.id in selectedQty;
                 return (
                   <tr key={r.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
-                    <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(r)} className="w-4 h-4 accent-blue-600" /></td>
+                    <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(r)} disabled={!selectable(r)} title={selectable(r) ? undefined : `Позиция в статусе «${r.status}» — добавить нельзя`} className="w-4 h-4 accent-blue-600 disabled:opacity-30" /></td>
                     <td className="px-3 py-2 text-gray-500">{r.nomenkl}</td>
                     <td className="px-3 py-2 font-medium">{r.name}</td>
                     <td className="px-3 py-2"><KlassCode value={r.klass} /></td>
@@ -189,6 +205,7 @@ export default function StockPickerModal({
                       <td className="px-3 py-2">{probaPct ? (r.net != null ? r.net.toFixed(2).replace(".", ",") : "—") : <NetAuAg chem={r.chem} />}</td>
                     </>}
                     <td className="px-3 py-2 text-gray-500">{r.location}</td>
+                    {withStatus && <td className="px-3 py-2">{r.status ? <Badge label={r.status} group="pozicii" /> : "—"}</td>}
                     <td className="px-3 py-2 text-gray-500">{left(r) || "—"}</td>
                     {anyInput && <td className="px-3 py-2">{hasInput(r) ? <Input value={selectedQty[r.id] ?? String(left(r))} onChange={v => setQty(r.id, v)} placeholder={String(left(r))} disabled={!checked} /> : <span className="text-xs text-gray-400">целиком</span>}</td>}
                   </tr>
