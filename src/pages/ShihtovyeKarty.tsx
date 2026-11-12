@@ -18,7 +18,7 @@ import {
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { ChemPercent, gramsFrom, num0, pctFrom } from "../data/chem";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
-import { Plus, X, Calculator, AlertTriangle, ChevronRight, ChevronDown, Sigma } from "lucide-react";
+import { Plus, X, Calculator, AlertTriangle, Sigma } from "lucide-react";
 import { useScreen } from "../router";
 
 // ── Шихтовая карта: конструктор ─────────────────────────────────────────────────
@@ -712,37 +712,6 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   );
 }
 
-// ── Приказ на плавку: шапка записи ──────────────────────────────────────────────
-function PrikazModal({ prikaz, onClose, onSave }: { prikaz?: PrikazPlavka | null; onClose: () => void; onSave: (p: PrikazPlavka) => void }) {
-  const { currentUser } = useApp();
-  const [number, setNumber] = useState(prikaz?.number ?? "");
-  const [date, setDate] = useState(prikaz?.date ?? new Date().toLocaleDateString("ru-RU"));
-  const [name, setName] = useState(prikaz?.name ?? "");
-  const [note, setNote] = useState(prikaz?.note ?? "");
-  const error = !number.trim() ? "Укажите номер приказа" : !date.trim() ? "Укажите дату приказа" : !name.trim() ? "Укажите наименование" : "";
-  const save = () => {
-    if (error) return;
-    const head = { number: number.trim(), date: date.trim(), name: name.trim(), note: note.trim() || undefined };
-    onSave(prikaz
-      ? { ...prikaz, ...head }
-      : { id: `pp-${Date.now()}`, ...head, createdAt: new Date().toISOString(), createdBy: currentUser?.fullName || currentUser?.name || "—" });
-  };
-  return (
-    <Modal title={prikaz ? "Приказ на плавку" : "Новый приказ на плавку"} wide onClose={onClose} footer={
-      <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={save} disabled={!!error}>{prikaz ? "Сохранить" : "Создать"}</Btn></>
-    }>
-      <div className="grid grid-cols-3 gap-4">
-        <Field label="Номер приказа" required><Input value={number} onChange={setNumber} placeholder="№" /></Field>
-        <Field label="Дата приказа" required><Input value={date} onChange={setDate} placeholder="дд.мм.гггг" /></Field>
-        <div />
-        <Field label="Наименование" required full><Input value={name} onChange={setName} placeholder="Например: слитки СрМ 92,5 для монет пруф-качества" /></Field>
-        <Field label="Примечание" full><Textarea value={note} onChange={setNote} rows={2} /></Field>
-      </div>
-      {!prikaz && <p className="mt-3 text-xs text-gray-500">После создания добавьте в приказ шихтовые карты — каждая карта на свою плавку. Итоговый набор материалов по всем картам выдаётся со склада по кнопке «Выдать по ШК».</p>}
-    </Modal>
-  );
-}
-
 // ── Итого по приказу ────────────────────────────────────────────────────────────
 // Сумма шихтовых материалов всех карт приказа: одинаковые материалы складываются, состав рассчитывается заново
 // по итоговым массам (как лист «ИТОГО» книги шихтовых карт).
@@ -872,26 +841,231 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
   );
 }
 
-// ── Общая информация по приказу (внутри раскрытой строки реестра) ─────────────────
-function PrikazInfo({ prikaz, karty, mass, actions }: { prikaz: PrikazPlavka; karty: ShihtovayaKarta[]; mass: number; actions: React.ReactNode }) {
+// ── Приказ на плавку: окно записи ───────────────────────────────────────────────
+// Шапка приказа, общая информация, шихтовые карты приказа и «Добавить ШК» — карта создаётся в конструкторе
+// поверх окна. Вложенные экраны: …/karta-new, …/view/:id, …/edit/:id, …/itogo.
+// Новый приказ: карты добавляются после создания — «Добавить ШК» сначала создаёт приказ.
+
+// Снятие резерва с позиций ДМ невыполненных карт
+function releaseKarty(setDmItems: React.Dispatch<React.SetStateAction<DMItem[]>>, karty: ShihtovayaKarta[]) {
+  const nomenkl = new Set(karty.filter(k => k.status !== "Выполнена").flatMap(k => k.materials.map(m => m.nomenkl)).filter(Boolean));
+  if (nomenkl.size) setDmItems(prev => reserveDm(prev, new Set(prev.filter(i => i.status === "Резерв" && nomenkl.has(i.nomenkl)).map(i => i.id)), new Set()));
+}
+
+// Карты приказа — по номеру плавки
+const kartyOfPrikaz = (all: ShihtovayaKarta[], id: string) =>
+  all.filter(k => k.prikazId === id).sort((a, b) => (parseInt(a.plavkaNo, 10) || 0) - (parseInt(b.plavkaNo, 10) || 0));
+
+function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd }: {
+  prikaz?: PrikazPlavka | null;
+  readOnly?: boolean;
+  onClose: () => void;
+  onSave: (p: PrikazPlavka) => void;
+  // Новый приказ: создать и сразу открыть конструктор первой карты
+  onCreateAndAdd: (p: PrikazPlavka) => void;
+}) {
+  const { currentUser, shihtovyeKarty, setShihtovyeKarty, setDmItems, alloyGrades } = useApp();
+  const screen = useScreen();
+  const { toast, show, clear } = useToast();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
+  const [number, setNumber] = useState(prikaz?.number ?? "");
+  const [date, setDate] = useState(prikaz?.date ?? new Date().toLocaleDateString("ru-RU"));
+  const [name, setName] = useState(prikaz?.name ?? "");
+  const [note, setNote] = useState(prikaz?.note ?? "");
+
+  const karty = prikaz ? kartyOfPrikaz(shihtovyeKarty, prikaz.id) : [];
+  const status = prikazStatus(karty);
+  const done = !!prikaz && status === "Выполнена";
+  const ro = readOnly || done;
+  const mass = r2(karty.reduce((s, k) => s + kartaMass(k), 0));
+  const gradeName = (k: ShihtovayaKarta) => alloyGrades.find(g => g.id === k.alloyId)?.name ?? "";
+
+  const error = !number.trim() ? "Укажите номер приказа" : !date.trim() ? "Укажите дату приказа" : !name.trim() ? "Укажите наименование" : "";
+  const build = (): PrikazPlavka => {
+    const head = { number: number.trim(), date: date.trim(), name: name.trim(), note: note.trim() || undefined };
+    return prikaz
+      ? { ...prikaz, ...head }
+      : { id: `pp-${Date.now()}`, ...head, createdAt: new Date().toISOString(), createdBy: currentUser?.fullName || currentUser?.name || "—" };
+  };
+  const save = () => { if (error) { show(error); return; } onSave(build()); };
+  const addKarta = () => {
+    if (prikaz) { screen.open("karta-new"); return; }
+    if (error) { show(`${error} — затем добавьте ШК`); return; }
+    onCreateAndAdd(build());
+  };
+
+  // Вложенные экраны карты
+  const viewKarta = karty.find(k => k.id === screen.after("view")) ?? null;
+  const editKarta = karty.find(k => k.id === screen.after("edit")) ?? null;
+  const showNewKarta = !!prikaz && screen.has("karta-new");
+  const showItogo = !!prikaz && screen.has("itogo");
+
+  // Новая карта приказа: шапка — из последней карты приказа, основание — сам приказ
+  const defaults = (): Partial<ShihtovayaKarta> => {
+    const last = karty[karty.length - 1];
+    return {
+      name: last?.name ?? "", alloyId: last?.alloyId, oborot: last?.oborot, naznachenie: last?.naznachenie,
+      osnovanie: prikaz ? `Приказ № ${prikaz.number} от ${prikaz.date}` : "",
+    };
+  };
+  const removeKarta = (k: ShihtovayaKarta) => {
+    releaseKarty(setDmItems, [k]);
+    setShihtovyeKarty(prev => prev.filter(s => s.id !== k.id));
+    show(`Шихтовая карта плавки № ${k.plavkaNo} удалена, резерв позиций снят`);
+  };
+  const dash = <span className="text-gray-400">—</span>;
+
+  return (
+    <Modal
+      title={prikaz ? `Приказ на плавку № ${prikaz.number}` : "Новый приказ на плавку"}
+      fullWide
+      onClose={onClose}
+      footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : <>
+        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+        <Btn onClick={save} disabled={!!error}>{prikaz ? "Сохранить" : "Создать"}</Btn>
+      </>}
+    >
+      {prikaz && (
+        <div className="flex items-center gap-2 mb-4">
+          <Badge label={status} group="shihta" />
+          {done && <span className="text-xs text-gray-500">Карты приказа выданы на плавку — изменения недоступны</span>}
+        </div>
+      )}
+      <div className="grid grid-cols-4 gap-4 mb-5">
+        <Field label="Номер приказа" required={!ro}><Input value={number} onChange={setNumber} placeholder="№" disabled={ro} /></Field>
+        <Field label="Дата приказа" required={!ro}><Input value={date} onChange={setDate} placeholder="дд.мм.гггг" disabled={ro} /></Field>
+        <Field label="Наименование" required={!ro} full><Input value={name} onChange={setName} placeholder="Например: слитки СрМ 92,5 для монет пруф-качества" disabled={ro} /></Field>
+        <Field label="Примечание" full><Textarea value={note} onChange={setNote} rows={2} disabled={ro} /></Field>
+      </div>
+
+      {prikaz && karty.length > 0 && <PrikazSummary karty={karty} mass={mass} />}
+
+      <div className="border-t border-gray-200 pt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Шихтовые карты</h3>
+          <div className="flex gap-2">
+            {prikaz && karty.length > 0 && <Btn size="sm" variant="secondary" onClick={() => screen.open("itogo")}><Sigma className="w-4 h-4" />Итого по приказу</Btn>}
+            {!ro && <Btn size="sm" onClick={addKarta}><Plus className="w-4 h-4" />Добавить ШК</Btn>}
+          </div>
+        </div>
+        {karty.length === 0 ? (
+          <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
+            {prikaz ? "В приказе нет шихтовых карт. Нажмите «+ Добавить ШК»" : "Заполните шапку приказа и нажмите «+ Добавить ШК» — приказ будет создан, откроется конструктор шихтовой карты"}
+          </div>
+        ) : (
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
+                  <th className="px-3 py-2 text-left font-medium">№ плавки</th>
+                  <th className="px-3 py-2 text-left font-medium">Дата документа</th>
+                  <th className="px-3 py-2 text-left font-medium">Наименование</th>
+                  <th className="px-3 py-2 text-left font-medium">Марка сплава</th>
+                  <th className="px-3 py-2 text-left font-medium">Оборот</th>
+                  <th className="px-3 py-2 text-right font-medium">Позиций</th>
+                  <th className="px-3 py-2 text-right font-medium">Масса шихты, г</th>
+                  <th className="px-3 py-2 text-left font-medium">Статус</th>
+                  <th className="w-24"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {karty.map(k => {
+                  // Редактировать и удалять карту можно, пока она не оформлена
+                  const draft = !ro && k.status === "На редактировании";
+                  return (
+                    <tr key={k.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-blue-600 font-medium">{k.plavkaNo}</td>
+                      <td className="px-3 py-2 text-gray-500">{k.date}</td>
+                      <td className="px-3 py-2 text-gray-900">{k.name}</td>
+                      <td className="px-3 py-2 text-gray-700">{gradeName(k) || dash}</td>
+                      <td className="px-3 py-2 text-gray-600">{k.oborot || dash}</td>
+                      <td className="px-3 py-2 text-right">{k.materials.length}</td>
+                      <td className="px-3 py-2 text-right">{str2(kartaMass(k))}</td>
+                      <td className="px-3 py-2"><Badge label={k.status} group="shihta" /></td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1">
+                          <EyeIcon onClick={() => screen.open("view", k.id)} />
+                          {!ro && <>
+                            <EditIcon onClick={() => screen.open("edit", k.id)} disabled={!draft} title={draft ? "Редактировать" : "Карта оформлена — редактирование недоступно"} />
+                            <DeleteIcon
+                              onClick={() => confirm(`Удалить шихтовую карту плавки № ${k.plavkaNo} «${k.name}»? Резерв позиций будет снят.`, () => removeKarta(k))}
+                              disabled={!draft}
+                              title={draft ? "Удалить" : "Карта оформлена — удаление недоступно"}
+                            />
+                          </>}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="border-t-2 border-gray-200 bg-gray-50">
+                <tr className="font-medium">
+                  <td className="px-3 py-2" colSpan={5}>Итого по приказу <span className="text-xs font-normal text-gray-400">({karty.length} карт)</span></td>
+                  <td className="px-3 py-2 text-right">{karty.reduce((s, k) => s + k.materials.length, 0)}</td>
+                  <td className="px-3 py-2 text-right font-semibold">{str2(mass)}</td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {showItogo && prikaz && <PrikazItogoModal prikaz={prikaz} karty={karty} onClose={() => screen.close("itogo")} />}
+      {viewKarta && <ShihtaConstructor key={viewKarta.id} karta={viewKarta} prikaz={prikaz ?? undefined} onClose={() => screen.close("view")} onSave={() => screen.close("view")} readOnly />}
+      {editKarta && (
+        <ShihtaConstructor
+          key={editKarta.id}
+          karta={editKarta}
+          prikaz={prikaz ?? undefined}
+          // Оформленная карта не редактируется — даже если открыта по прямой ссылке
+          readOnly={ro || editKarta.status !== "На редактировании"}
+          onClose={() => screen.close("edit")}
+          onSave={k => {
+            setShihtovyeKarty(prev => prev.map(s => (s.id === k.id ? k : s)));
+            screen.close("edit");
+            show(k.status === "Новая" ? "Карта оформлена — доступна для выдачи на плавку в составе приказа" : "Карта сохранена");
+          }}
+        />
+      )}
+      {showNewKarta && !ro && (
+        <ShihtaConstructor
+          prikaz={prikaz ?? undefined}
+          defaults={defaults()}
+          onClose={() => screen.close("karta-new")}
+          onSave={k => {
+            setShihtovyeKarty(prev => [k, ...prev]);
+            screen.close("karta-new");
+            show(k.status === "Новая" ? "Шихтовая карта оформлена, позиции зарезервированы" : "Шихтовая карта сохранена в статусе «На редактировании»");
+          }}
+        />
+      )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
+      {toast && <Toast message={toast} onDone={clear} />}
+    </Modal>
+  );
+}
+
+// ── Общая информация по приказу (в окне приказа) ────────────────────────────────
+function PrikazSummary({ karty, mass }: { karty: ShihtovayaKarta[]; mass: number }) {
   const { alloyGrades, chemElements } = useApp();
   const grade = prikazGrade(karty, alloyGrades);
   const mats = useMemo(() => itogoMaterials(karty), [karty]);
   const calc = useMemo(() => new ShihtaCalc(mats.map(lineOfMaterial), grade), [mats, grade]);
   const shortName = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
   const skl = mats.filter(isSkladMaterial);
-  const sum = (pred: (k: ShihtovayaKarta) => boolean) => karty.filter(pred).length;
+  const count = (pred: (k: ShihtovayaKarta) => boolean) => karty.filter(pred).length;
   const item = (label: string, value: React.ReactNode) => (
     <div><div className="text-xs text-gray-500">{label}</div><div className="text-sm text-gray-900 font-medium">{value}</div></div>
   );
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {item("Приказ", `№ ${prikaz.number} от ${prikaz.date}`)}
-        {item("Марка сплава", grade ? `${grade.name} (${grade.nd})` : karty.length ? "разные" : "—")}
-        {item("Шихтовых карт", `${karty.length}${karty.length ? ` (оформлено ${sum(k => k.status !== "На редактировании")}, выполнено ${sum(k => k.status === "Выполнена")})` : ""}`)}
-        {item("Плавки", karty.length ? karty.map(k => k.plavkaNo).join(", ") : "—")}
-        {item("Масса шихты, г", karty.length ? str2(mass) : "—")}
+    <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mb-5">
+      <div className="grid grid-cols-5 gap-4">
+        {item("Марка сплава", grade ? `${grade.name} (${grade.nd})` : "разные")}
+        {item("Шихтовых карт", `${karty.length} (оформлено ${count(k => k.status !== "На редактировании")}, выполнено ${count(k => k.status === "Выполнена")})`)}
+        {item("Плавки", karty.map(k => k.plavkaNo).join(", "))}
+        {item("Масса шихты, г", str2(mass))}
         {item("Позиций со склада", skl.length ? `${skl.length} · ${str2(skl.reduce((s, m) => s + m.ves, 0))} г` : "—")}
       </div>
       {grade && calc.checks.length > 0 && (
@@ -902,8 +1076,6 @@ function PrikazInfo({ prikaz, karty, mass, actions }: { prikaz: PrikazPlavka; ka
           <Badge label={calc.complies ? "Соответствует" : "Не соответствует"} group="gost" />
         </div>
       )}
-      {prikaz.note && <div className="mt-2 text-xs text-gray-500">Примечание: {prikaz.note}</div>}
-      <div className="mt-3 flex flex-wrap gap-2">{actions}</div>
     </div>
   );
 }
@@ -916,60 +1088,27 @@ export function ShihtovyeKarty() {
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
-  // Экраны: /new (новый приказ), /prikaz/:id (шапка приказа), /itogo/:id (итого по приказу),
-  // /karta-new/:prikazId (новая карта в приказе), /view/:id, /edit/:id (карта)
+  // Экраны: /new (новый приказ), /prikaz/:id (редактирование), /prikaz-view/:id (просмотр);
+  // карты — внутри окна приказа (…/karta-new, …/view/:id, …/edit/:id, …/itogo)
   const screen = useScreen();
-  const viewKarta = shihtovyeKarty.find(k => k.id === screen.after("view")) ?? null;
-  const editKarta = shihtovyeKarty.find(k => k.id === screen.after("edit")) ?? null;
   const showNew = screen.has("new");
   const editPrikaz = shihtaPrikazy.find(p => p.id === screen.after("prikaz")) ?? null;
-  const itogoPrikaz = shihtaPrikazy.find(p => p.id === screen.after("itogo")) ?? null;
-  const newKartaPrikaz = shihtaPrikazy.find(p => p.id === screen.after("karta-new")) ?? null;
-  const setViewKarta = (k: ShihtovayaKarta | null) => (k ? screen.openTop("view", k.id) : screen.close("view"));
-  const setEditKarta = (k: ShihtovayaKarta | null) => (k ? screen.openTop("edit", k.id) : screen.close("edit"));
+  const viewPrikaz = shihtaPrikazy.find(p => p.id === screen.after("prikaz-view")) ?? null;
   const [perPage, setPerPage] = usePerPage("shihtovye-karty", 8);
-  const gradeName = (k: ShihtovayaKarta) => alloyGrades.find(g => g.id === k.alloyId)?.name ?? "";
-  const prikazOf = (k: ShihtovayaKarta | null) => (k ? shihtaPrikazy.find(p => p.id === k.prikazId) : undefined);
 
-  // Карты приказа — по номеру плавки
-  const kartyOf = (id: string) => shihtovyeKarty.filter(k => k.prikazId === id).sort((a, b) => (parseInt(a.plavkaNo, 10) || 0) - (parseInt(b.plavkaNo, 10) || 0));
   const rows = shihtaPrikazy.map(p => {
-    const karty = kartyOf(p.id);
-    const grades = [...new Set(karty.map(gradeName).filter(Boolean))];
-    return { id: p.id, p, karty, status: prikazStatus(karty), grade: grades.join(", "), mass: r2(karty.reduce((s, k) => s + kartaMass(k), 0)) };
+    const karty = kartyOfPrikaz(shihtovyeKarty, p.id);
+    const grades = [...new Set(karty.map(k => alloyGrades.find(g => g.id === k.alloyId)?.name).filter(Boolean))];
+    return { id: p.id, p, karty, status: prikazStatus(karty), grade: grades.join(", ") };
   });
 
-  // Раскрытые записи: по умолчанию — приказы в работе
-  const [open, setOpen] = useState<Set<string>>(() => new Set(rows.filter(r => r.status !== "Выполнена").map(r => r.id)));
-  const toggleOpen = (id: string) => setOpen(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-
-  // Снятие резерва с позиций ДМ невыполненных карт
-  const releaseOf = (karty: ShihtovayaKarta[]) => {
-    const nomenkl = new Set(karty.filter(k => k.status !== "Выполнена").flatMap(k => k.materials.map(m => m.nomenkl)).filter(Boolean));
-    if (nomenkl.size) setDmItems(prev => reserveDm(prev, new Set(prev.filter(i => i.status === "Резерв" && nomenkl.has(i.nomenkl)).map(i => i.id)), new Set()));
-  };
-  const removeKarta = (karta: ShihtovayaKarta) => {
-    releaseOf([karta]);
-    setShihtovyeKarty(prev => prev.filter(s => s.id !== karta.id));
-    show(`Шихтовая карта «${karta.name}» (плавка № ${karta.plavkaNo}) удалена`);
-  };
   const removePrikaz = (p: PrikazPlavka) => {
-    const karty = kartyOf(p.id);
-    releaseOf(karty);
+    const karty = kartyOfPrikaz(shihtovyeKarty, p.id);
+    releaseKarty(setDmItems, karty);
     const ids = new Set(karty.map(k => k.id));
     setShihtovyeKarty(prev => prev.filter(k => !ids.has(k.id)));
     setShihtaPrikazy(prev => prev.filter(x => x.id !== p.id));
     show(`Приказ № ${p.number} удалён${karty.length ? ` вместе с картами (${karty.length})` : ""}`);
-  };
-
-  // Новая карта приказа: шапка — из последней карты приказа, основание — сам приказ
-  const defaultsFor = (p: PrikazPlavka): Partial<ShihtovayaKarta> => {
-    const all = kartyOf(p.id);
-    const last = all[all.length - 1];
-    return {
-      name: last?.name ?? "", alloyId: last?.alloyId, oborot: last?.oborot, naznachenie: last?.naznachenie,
-      osnovanie: `Приказ № ${p.number} от ${p.date}`,
-    };
   };
 
   const { sorted, sort, toggleSort } = useSort(rows, {
@@ -980,7 +1119,6 @@ export function ShihtovyeKarty() {
     status: r => r.status,
     createdAt: r => new Date(r.p.createdAt).getTime(),
   });
-  const COLS = 7;
   const dash = <span className="text-gray-400">—</span>;
 
   return (
@@ -996,122 +1134,44 @@ export function ShihtovyeKarty() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="w-10"></th>
               <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата приказа</SortTh>
               <SortTh sortKey="number" sort={sort} onSort={toggleSort}>№ приказа</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="grade" sort={sort} onSort={toggleSort}>Марка сплава</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <SortTh sortKey="createdAt" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
+              <th className="w-28"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {sorted.slice((page - 1) * perPage, page * perPage).map(({ p, karty, status, grade, mass }) => {
-              const isOpen = open.has(p.id);
+            {sorted.slice((page - 1) * perPage, page * perPage).map(({ p, karty, status, grade }) => {
               const done = status === "Выполнена";
               // Приказ, по которому уже выдавались карты, не удаляется
               const canDelete = !karty.some(k => k.status === "Выполнена");
               return (
-                <React.Fragment key={p.id}>
-                  {/* Строка приказа — только основные данные; состав и действия — внутри */}
-                  <tr className={`hover:bg-gray-50 transition-colors cursor-pointer ${isOpen ? "bg-blue-50/40" : ""}`} onClick={() => toggleOpen(p.id)}>
-                    <td className="pl-4 py-3 text-gray-400">{isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</td>
-                    <td className="px-4 py-3 text-gray-500">{p.date}</td>
-                    <td className="px-4 py-3 text-blue-600 font-medium">{p.number}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
-                    <td className="px-4 py-3 text-gray-700">{grade || dash}</td>
-                    <td className="px-4 py-3"><Badge label={status} group="shihta" /></td>
-                    <CreatedCell row={p} />
-                  </tr>
-                  {isOpen && (
-                    <tr className="bg-gray-50/60">
-                      <td></td>
-                      <td colSpan={COLS - 1} className="px-4 pb-4 pt-2 space-y-3">
-                        <PrikazInfo
-                          prikaz={p}
-                          karty={karty}
-                          mass={mass}
-                          actions={<>
-                            <Btn size="sm" variant="secondary" onClick={() => screen.openTop("itogo", p.id)} disabled={!karty.length}><Sigma className="w-4 h-4" />Итого по приказу</Btn>
-                            {!done && <Btn size="sm" variant="secondary" onClick={() => screen.openTop("prikaz", p.id)}>Редактировать приказ</Btn>}
-                            {canDelete && <Btn size="sm" variant="secondary" onClick={() => confirm(
-                              karty.length ? `Удалить приказ № ${p.number} и его шихтовые карты (${karty.length})? Резерв позиций будет снят.` : `Удалить приказ № ${p.number}?`,
-                              () => removePrikaz(p),
-                            )}>Удалить приказ</Btn>}
-                          </>}
-                        />
-
-                        {karty.length === 0 ? (
-                          <div className="text-sm text-gray-500 bg-white rounded-lg p-4 border border-dashed border-gray-200 text-center">В приказе нет шихтовых карт</div>
-                        ) : (
-                          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
-                                  <th className="px-3 py-2 text-left font-medium">№ плавки</th>
-                                  <th className="px-3 py-2 text-left font-medium">Дата документа</th>
-                                  <th className="px-3 py-2 text-left font-medium">Наименование</th>
-                                  <th className="px-3 py-2 text-left font-medium">Марка сплава</th>
-                                  <th className="px-3 py-2 text-left font-medium">Оборот</th>
-                                  <th className="px-3 py-2 text-right font-medium">Позиций</th>
-                                  <th className="px-3 py-2 text-right font-medium">Масса шихты, г</th>
-                                  <th className="px-3 py-2 text-left font-medium">Статус</th>
-                                  <th className="w-24"></th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100">
-                                {karty.map(k => {
-                                  // Редактировать и удалять карту можно, пока она не оформлена
-                                  const draft = k.status === "На редактировании";
-                                  return (
-                                    <tr key={k.id} className="hover:bg-gray-50">
-                                      <td className="px-3 py-2 text-blue-600 font-medium">{k.plavkaNo}</td>
-                                      <td className="px-3 py-2 text-gray-500">{k.date}</td>
-                                      <td className="px-3 py-2 text-gray-900">{k.name}</td>
-                                      <td className="px-3 py-2 text-gray-700">{gradeName(k) || dash}</td>
-                                      <td className="px-3 py-2 text-gray-600">{k.oborot || dash}</td>
-                                      <td className="px-3 py-2 text-right">{k.materials.length}</td>
-                                      <td className="px-3 py-2 text-right">{str2(kartaMass(k))}</td>
-                                      <td className="px-3 py-2"><Badge label={k.status} group="shihta" /></td>
-                                      <td className="px-3 py-2">
-                                        <div className="flex items-center gap-1">
-                                          <EyeIcon onClick={() => setViewKarta(k)} />
-                                          <EditIcon onClick={() => setEditKarta(k)} disabled={!draft} title={draft ? "Редактировать" : "Карта оформлена — редактирование недоступно"} />
-                                          <DeleteIcon
-                                            onClick={() => confirm(`Удалить шихтовую карту плавки № ${k.plavkaNo} «${k.name}»? Резерв позиций будет снят.`, () => removeKarta(k))}
-                                            disabled={!draft}
-                                            title={draft ? "Удалить" : "Карта оформлена — удаление недоступно"}
-                                          />
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                              <tfoot className="border-t-2 border-gray-200 bg-gray-50">
-                                <tr className="font-medium">
-                                  <td className="px-3 py-2" colSpan={5}>Итого по приказу <span className="text-xs font-normal text-gray-400">({karty.length} карт)</span></td>
-                                  <td className="px-3 py-2 text-right">{karty.reduce((s, k) => s + k.materials.length, 0)}</td>
-                                  <td className="px-3 py-2 text-right font-semibold">{str2(mass)}</td>
-                                  <td colSpan={2}></td>
-                                </tr>
-                              </tfoot>
-                            </table>
-                          </div>
-                        )}
-
-                        {!done && (
-                          <div>
-                            <Btn size="sm" onClick={() => screen.openTop("karta-new", p.id)}><Plus className="w-4 h-4" />Добавить ШК</Btn>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
+                <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 text-gray-500">{p.date}</td>
+                  <td className="px-4 py-3 text-blue-600">{p.number}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
+                  <td className="px-4 py-3 text-gray-700">{grade || dash}</td>
+                  <td className="px-4 py-3"><Badge label={status} group="shihta" /></td>
+                  <CreatedCell row={p} />
+                  <td className="px-4 py-3 flex items-center gap-1">
+                    <EyeIcon onClick={() => screen.openTop("prikaz-view", p.id)} />
+                    <EditIcon onClick={() => screen.openTop("prikaz", p.id)} disabled={done} title={done ? "Приказ выполнен — редактирование недоступно" : "Редактировать"} />
+                    <DeleteIcon
+                      onClick={() => confirm(
+                        karty.length ? `Удалить приказ № ${p.number} и его шихтовые карты (${karty.length})? Резерв позиций будет снят.` : `Удалить приказ № ${p.number}?`,
+                        () => removePrikaz(p),
+                      )}
+                      disabled={!canDelete}
+                      title={canDelete ? "Удалить" : "Карты приказа выданы на плавку — удаление недоступно"}
+                    />
+                  </td>
+                </tr>
               );
             })}
-            <FillerRows count={fillerCount(rows.length, page, perPage)} cols={COLS} />
+            <FillerRows count={fillerCount(rows.length, page, perPage)} cols={7} />
           </tbody>
         </table>
         <Pagination page={page} total={rows.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
@@ -1122,9 +1182,13 @@ export function ShihtovyeKarty() {
           onClose={() => screen.close("new")}
           onSave={p => {
             setShihtaPrikazy(prev => [p, ...prev]);
-            setOpen(prev => new Set(prev).add(p.id));
             screen.close("new");
-            show(`Приказ № ${p.number} создан — добавьте шихтовые карты`);
+            show(`Приказ № ${p.number} создан`);
+          }}
+          onCreateAndAdd={p => {
+            setShihtaPrikazy(prev => [p, ...prev]);
+            // Окно приказа переходит в редактирование, поверх — конструктор новой карты
+            screen.openTop("prikaz", p.id, "karta-new");
           }}
         />
       )}
@@ -1138,39 +1202,11 @@ export function ShihtovyeKarty() {
             screen.close("prikaz");
             show("Приказ сохранён");
           }}
+          onCreateAndAdd={() => {}}
         />
       )}
-      {itogoPrikaz && <PrikazItogoModal prikaz={itogoPrikaz} karty={kartyOf(itogoPrikaz.id)} onClose={() => screen.close("itogo")} />}
-
-      {viewKarta && <ShihtaConstructor key={viewKarta.id} karta={viewKarta} prikaz={prikazOf(viewKarta)} onClose={() => setViewKarta(null)} onSave={() => setViewKarta(null)} readOnly />}
-      {editKarta && (
-        <ShihtaConstructor
-          key={editKarta.id}
-          karta={editKarta}
-          prikaz={prikazOf(editKarta)}
-          // Оформленная карта не редактируется — даже если открыта по прямой ссылке /edit/:id
-          readOnly={editKarta.status !== "На редактировании"}
-          onClose={() => setEditKarta(null)}
-          onSave={k => {
-            setShihtovyeKarty(prev => prev.map(s => s.id === k.id ? k : s));
-            setEditKarta(null);
-            show(k.status === "Новая" ? "Карта оформлена — доступна для выдачи на плавку в составе приказа" : "Карта сохранена");
-          }}
-        />
-      )}
-      {newKartaPrikaz && (
-        <ShihtaConstructor
-          key={`new-${newKartaPrikaz.id}`}
-          prikaz={newKartaPrikaz}
-          defaults={defaultsFor(newKartaPrikaz)}
-          onClose={() => screen.close("karta-new")}
-          onSave={k => {
-            setShihtovyeKarty(prev => [k, ...prev]);
-            setOpen(prev => new Set(prev).add(newKartaPrikaz.id));
-            screen.close("karta-new");
-            show(k.status === "Новая" ? "Шихтовая карта оформлена, позиции зарезервированы" : "Шихтовая карта сохранена в статусе «На редактировании»");
-          }}
-        />
+      {viewPrikaz && (
+        <PrikazModal key={viewPrikaz.id} prikaz={viewPrikaz} readOnly onClose={() => screen.close("prikaz-view")} onSave={() => {}} onCreateAndAdd={() => {}} />
       )}
       {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
