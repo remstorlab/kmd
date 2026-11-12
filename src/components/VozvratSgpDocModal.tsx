@@ -5,10 +5,10 @@ import {
   InfoField,
   NetAuAg, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
-import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, SGP, PRIHOD_SKLAD, DOC_VOZVRAT_SGP } from "../data/mock";
+import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, MovedRecord, spravValues, SGP, PRIHOD_SKLAD, DOC_VOZVRAT_SGP } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow } from "./StockPickerModal";
-import { takeFromStock, partLigMap } from "../data/stock";
+import { takeFromStock, partLigMap, returnToStock } from "../data/stock";
 import { useIssuePositions } from "./IssueInputs";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
@@ -16,7 +16,7 @@ import { Plus } from "lucide-react";
 // ── Возврат СГП №2: возврат позиций со склада СГП №2 на склад СДМ ────────────────
 // Поля — как у накладной прихода; отправитель — всегда склад СГП №2, получатель — склад из справочника «Склады»
 // (по умолчанию склад приёмки СДМ1). Позиции подбираются со склада СГП №2 с количеством к перемещению.
-// При оформлении позиции встают на склад-получатель «На складе» без места хранения («-») — размещаются потом
+// При каждом сохранении позиции встают на склад-получатель «На складе» без места хранения («-») — размещаются потом
 // через «Изменить место хранения»; заказчик и признак собственности позиций сохраняются.
 
 type VsPosition = VydachaDocPosition;
@@ -104,25 +104,50 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
     net: p => p.net ?? 0,
   });
 
+  // Позиции перемещаются на склад-получатель при каждом сохранении («Сохранить» и «Оформить»).
+  // Перед повторным перемещением отменяется перемещение прошлого сохранения (doc.moved): записи возвращаются
+  // на СГП №2 и объединяются с остатком, затем позиции перемещаются заново по текущему составу документа.
+  // Запись, которую на складе-получателе уже зарезервировали или выдали, не возвращается — её позиция не меняется.
   const save = (status: DocStatus) => {
-    const err = iss.validate(status === "Оформлено" && !posted, "к возврату");
+    if (posted) return;
+    const err = iss.validate(true, "к возврату");
     if (err) { show(err); return; }
-    if (status === "Оформлено" && !posted) {
-      if (positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
-      const lacking = positions.filter(p => {
-        const it = itemOf(p);
-        return !it || it.sklad !== SGP || it.status !== "На складе" || Math.max(it.qty, 1) < p.issue;
-      });
-      if (lacking.length) { show(`Позиции недоступны на складе «${SGP}»: ${lacking.map(p => p.name).join(", ")}`); return; }
-      const stamp = Date.now();
-      const move = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: head.receiver, status: "На складе", location: NO_LOC });
-      const partId = (it: { id: string }) => `${it.id}-vs${stamp}`;
-      const gpTake = new Map(positions.filter(p => p.src === "gp").map(p => [p.id, p.issue]));
-      const dmTake = new Map(positions.filter(p => p.src === "dm").map(p => [p.id, p.issue]));
-      if (gpTake.size) setGpItems(prev => takeFromStock(prev, gpTake, move, partId, partLigMap(positions)).items);
-      if (dmTake.size) setDmItems(prev => takeFromStock(prev, dmTake, move, partId, partLigMap(positions)).items);
-    }
+    if (status === "Оформлено" && positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
+    const kept: MovedRecord[] = [];
+    const undo = <T extends GPItem | DMItem>(items: T[], src: MovedRecord["src"]): T[] => {
+      let out = items;
+      for (const m of (doc?.moved ?? []).filter(x => x.src === src)) {
+        const it = out.find(i => i.id === m.to);
+        if (!it || it.sklad === SGP) continue;
+        if (it.status !== "На складе") { kept.push(m); continue; }
+        out = out.map(i => (i.id === m.to ? { ...i, sklad: SGP, location: NO_LOC } : i));
+        if (m.to !== m.from) out = returnToStock(out, new Set([m.to]), "На складе");
+      }
+      return out;
+    };
+    const gp0 = undo(gpItems, "gp");
+    const dm0 = undo(dmItems, "dm");
+    const locked = new Set(kept.map(m => m.from));
+    const active = positions.filter(p => !locked.has(p.id));
+    const lacking = active.filter(p => {
+      const it = p.src === "gp" ? gp0.find(i => i.id === p.id) : dm0.find(i => i.id === p.id);
+      return !it || it.sklad !== SGP || it.status !== "На складе" || Math.max(it.qty, 1) < p.issue;
+    });
+    if (lacking.length) { show(`Позиции недоступны на складе «${SGP}»: ${lacking.map(p => p.name).join(", ")}`); return; }
+    const stamp = Date.now();
+    const move = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: head.receiver, status: "На складе", location: NO_LOC });
+    const partId = (it: { id: string }) => `${it.id}-vs${stamp}`;
+    const gpRes = takeFromStock(gp0, new Map(active.filter(p => p.src === "gp").map(p => [p.id, p.issue])), move, partId, partLigMap(active));
+    const dmRes = takeFromStock(dm0, new Map(active.filter(p => p.src === "dm").map(p => [p.id, p.issue])), move, partId, partLigMap(active));
+    setGpItems(gpRes.items);
+    setDmItems(dmRes.items);
+    const moved: MovedRecord[] = [
+      ...kept,
+      ...[...gpRes.taken].map(([from, to]) => ({ src: "gp" as const, from, to })),
+      ...[...dmRes.taken].map(([from, to]) => ({ src: "dm" as const, from, to })),
+    ];
     onSave({
+      moved,
       id: doc?.id ?? `sd-${Date.now()}`,
       ...(doc?.createdAt ? { createdAt: doc.createdAt, createdBy: doc.createdBy } : createdStamp()),
       date: head.date,
@@ -153,9 +178,13 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
         <Btn onClick={() => save("В работе")}>Сохранить</Btn>
       </>}
     >
-      {posted && (
+      {posted ? (
         <div className="mb-4 text-sm bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5">
-          Документ оформлен: позиции возвращены со склада «{SGP}» на склад «{head.receiver}» без места хранения. Состав позиций изменить нельзя.
+          Документ оформлен: позиции возвращены со склада «{SGP}» на склад «{head.receiver}» без места хранения. Редактирование документа недоступно.
+        </div>
+      ) : !ro && (
+        <div className="mb-4 text-sm bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5">
+          Позиции перемещаются на склад «{head.receiver}» при каждом сохранении документа. После «Оформить» документ закрывается для редактирования.
         </div>
       )}
       <div className="grid grid-cols-4 gap-4 mb-5">

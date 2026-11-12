@@ -15,7 +15,7 @@ import { returnToStock } from "../data/stock";
 import {
   ShihtaCalc, ShihtaLine, chemStrings, fmt2, normText, r2, shareOf, shihtaWarnings, lineChem, kindOf,
   normCell, impuritiesText, fmtNorm, prikazStatus, itogoMaterials, lineOfMaterial, prikazGrade, isSkladMaterial,
-  shihtaOborot, oborotHintText, oborotWarnings, oborotInfoText,
+  shihtaOborot, oborotHintText, oborotWarnings, oborotInfoText, kartaOborot,
 } from "../data/shihta";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { ChemPercent, gramsFrom, num0, pctFrom } from "../data/chem";
@@ -325,6 +325,15 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   const isIssued = (m: MatRow) => m.kind === "sklad" && issuedNomenkl.has(m.nomenkl);
   // Оборот шихты — расчётный: максимум оборотов материалов (без оборота — 0); проверки — только для СрМ 92,5
   const ob = useMemo(() => shihtaOborot(asMaterials(materials)), [materials]);
+  // Оборот шихты редактируется всегда; по умолчанию подставляется расчётный и пересчитывается при изменении
+  // материалов, пока значение не изменено вручную (ручное значение сохраняется в карте)
+  const [oborotManual, setOborotManual] = useState<string | null>(() => {
+    if (!karta?.oborot || !/^\d+$/.test(karta.oborot.trim())) return null;
+    return karta.oborot.trim() !== String(shihtaOborot(karta.materials).max) ? karta.oborot.trim() : null;
+  });
+  const oborotValue = oborotManual ?? String(ob.max);
+  // Пустое поле — расчётное значение
+  const oborotNum = oborotValue.trim() === "" ? ob.max : parseInt(oborotValue, 10) || 0;
   const oborotInfo = oborotInfoText(ob, grade);
   // Предупреждения — подсказки, оформление не блокируют; пересчитываются при любом изменении карты
   const warnings = [
@@ -401,7 +410,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
     }));
     const head = {
       name: name.trim() || karta?.name || "Новая шихтовая карта",
-      plavkaNo: plavkaNo.trim(), alloyId: alloyId || undefined, oborot: String(ob.max), naznachenie, osnovanie: osnovanie.trim(), note: note.trim(),
+      plavkaNo: plavkaNo.trim(), alloyId: alloyId || undefined, oborot: String(oborotNum), naznachenie, osnovanie: osnovanie.trim(), note: note.trim(),
       date: docDate.trim() || karta?.date || new Date().toLocaleDateString("ru-RU"),
       materials: mats, files,
     };
@@ -477,12 +486,15 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
         <Field label="Номер плавки" required={!ro}><Input value={plavkaNo} onChange={v => setPlavkaNo(v.replace(/[^\d]/g, ""))} placeholder="1" disabled={ro} /></Field>
         <Field label="Дата документа" required={!ro}><Input value={docDate} onChange={setDocDate} placeholder="дд.мм.гггг" disabled={ro} /></Field>
         {/* Оборот шихты — расчётный (максимум оборотов материалов), не редактируется */}
-        <Field label="Оборот (расчётный)">
-          <div className={oborotOver(ob.max) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(ob.max) ? `${oborotHintText(ob)}. ${OBOROT_HINT}` : oborotHintText(ob)}>
-            <Input value={String(ob.max)} disabled />
+        {/* Оборот шихты: по умолчанию — расчётный (максимум оборотов материалов), можно изменить вручную */}
+        <Field label="Оборот">
+          <div className={oborotOver(oborotNum) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(oborotNum) ? `${oborotHintText(ob)}. ${OBOROT_HINT}` : oborotHintText(ob)}>
+            <Input value={oborotValue} onChange={v => setOborotManual(v.replace(/[^\d]/g, ""))} placeholder={String(ob.max)} disabled={ro} />
           </div>
-          <div className={`text-xs mt-1 ${oborotOver(ob.max) ? "text-red-600" : "text-gray-500"}`}>
-            {ob.max > 0 ? `Макс. — ${ob.maxAt.map(m => m.name).join(", ")}` : "Максимум оборотов материалов шихты"}
+          <div className={`text-xs mt-1 ${oborotOver(oborotNum) ? "text-red-600" : "text-gray-500"}`}>
+            {oborotManual !== null && oborotManual !== String(ob.max) ? (
+              <>Изменён вручную · расчётный {ob.max}{!ro && <button type="button" onClick={() => setOborotManual(null)} className="ml-1 text-blue-600 hover:underline">подставить</button>}</>
+            ) : ob.max > 0 ? `Расчётный: макс. — ${ob.maxAt.map(m => m.name).join(", ")}` : "Расчётный: максимум оборотов материалов шихты"}
           </div>
         </Field>
         <Field label="Назначение слитков" required={!ro}>
@@ -1006,7 +1018,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
                       <td className="px-3 py-2 text-gray-500">{k.date}</td>
                       <td className="px-3 py-2 text-gray-900">{k.name}</td>
                       <td className="px-3 py-2 text-gray-700">{gradeName(k) || dash}</td>
-                      <td className="px-3 py-2"><OborotValue value={shihtaOborot(k.materials).max} /></td>
+                      <td className="px-3 py-2"><OborotValue value={kartaOborot(k)} /></td>
                       <td className="px-3 py-2 text-right">{k.materials.length}</td>
                       <td className="px-3 py-2 text-right">{str2(kartaMass(k))}</td>
                       <td className="px-3 py-2"><Badge label={k.status} group="shihta" /></td>

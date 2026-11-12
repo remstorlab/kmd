@@ -205,7 +205,7 @@ function DocList({
                 <CreatedCell row={doc} />
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
-                  <EditIcon onClick={() => screen.openTop("edit", doc.id)} />
+                  <EditIcon onClick={() => screen.openTop("edit", doc.id)} disabled={doc.status === "Оформлено"} title={doc.status === "Оформлено" ? "Документ оформлен — редактирование недоступно" : "Редактировать"} />
                   <DeleteIcon onClick={() => confirm(`Удалить документ ${doc.number}?`, () => { onDelete(doc.id); show(`Документ ${doc.number} удалён`); })} />
                   <PrintIcon
                     title={canPrintXlsx(doc) ? "Печать (Excel)" : "Печать"}
@@ -327,7 +327,7 @@ export function VydachaList() {
                 <CreatedCell row={doc} />
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
-                  <EditIcon onClick={() => screen.openTop("edit", doc.id)} />
+                  <EditIcon onClick={() => screen.openTop("edit", doc.id)} disabled={doc.status === "Оформлено"} title={doc.status === "Оформлено" ? "Документ оформлен — редактирование недоступно" : "Редактировать"} />
                   <DeleteIcon onClick={() => confirm(`Удалить документ ${doc.number}?`, () => setVydachaDocs(prev => prev.filter(d => d.id !== doc.id)))} />
                   <PrintIcon onClick={() => show(`Документ ${doc.number} отправлен на печать`)} />
                 </td>

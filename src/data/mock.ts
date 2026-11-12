@@ -36,6 +36,8 @@ export interface GPItem {
   ligWeight?: number;
   netWeight?: number;
   chem?: ChemComposition;
+  // Оборот (целое ≥ 0), как у позиций ДМ
+  oborot?: number;
   // Исходная запись, из которой выделена эта часть при частичной выдаче / резерве (см. data/stock.ts)
   parentId?: string;
 }
@@ -119,7 +121,12 @@ export interface SkladDoc {
   info?: string;
   // Позиции приходного ордера / накладной (приём на склад)
   prihodPositions?: PrihodPosition[];
+  // Возврат СГП №2: записи склада, перемещённые последним сохранением (from — запись СГП №2, to — запись на получателе)
+  moved?: MovedRecord[];
 }
+
+// Запись склада, перемещённая документом: при повторном сохранении перемещение отменяется и выполняется заново
+export interface MovedRecord { src: "gp" | "dm"; from: string; to: string }
 
 // Позиция выдачи: ссылка на позицию склада (id + учёт ГП/ДМ) и количество к выдаче.
 export interface VydachaDocPosition {

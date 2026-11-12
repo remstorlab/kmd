@@ -6,10 +6,10 @@ import {
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, probaText, NetAuAg, NET_AU_AG, ChemTip, usePaged,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
-import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses, OBOROT_CODE, oborotOf } from "../data/mock";
+import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses, OBOROT_CODE, oborotOf, DMItem } from "../data/mock";
 import { Plus } from "lucide-react";
 import { takeFromStock, returnToStock, IssueLine, scaleChem, addChem } from "../data/stock";
-import { isSkladMaterial, markIssuedElsewhere, itogoMaterials, prikazStatus, r2, shihtaOborot, isOborotGrade } from "../data/shihta";
+import { isSkladMaterial, markIssuedElsewhere, itogoMaterials, prikazStatus, r2, kartaOborot, isOborotGrade } from "../data/shihta";
 import { IssueQtyCell, IssueLigCell } from "../components/IssueInputs";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
@@ -1239,6 +1239,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [showShihtaPick, setShowShihtaPick] = nested("shihta-pick");
   // Карты приказа на плавку, выданные по «Выдать по ШК» — при сохранении операции переходят в «Выполнена»
   const [pickedKartaIds, setPickedKartaIds] = useState<string[]>([]);
+  // id операции — постоянный с открытия формы: по нему записи склада позиций возврата (vz-<id>-<№>)
+  const [opId] = useState(() => op?.id || `op-${Date.now()}`);
   const { dmItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, operations, currentUser, storageLocations, alloyGrades } = useApp();
   const createdStamp = useCreatedStamp();
   // Документы вкладок «Выдача» / «Возврат»
@@ -1379,7 +1381,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const maxVydanoOborot = Math.max(0, ...vydanoSrM.map(p => posView(p).oborot ?? 0));
   const vozvratOborot: { value: number; hint: string } | null = (() => {
     if (oborotKarty.length) {
-      const base = Math.max(0, ...oborotKarty.map(k => shihtaOborot(k.materials).max));
+      const base = Math.max(0, ...oborotKarty.map(kartaOborot));
       const pl = oborotKarty.map(k => k.plavkaNo).join(", ");
       return { value: base + 1, hint: `Плавка по ШК СрМ 92,5 (плавка № ${pl}): оборот ШК ${base} + 1 = ${base + 1}. Рассчитан автоматически, можно изменить` };
     }
@@ -1430,14 +1432,55 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [confirmOformit, setConfirmOformit] = useState(false);
   const oformit = () => (inNorm || type === "Выдача" || type === "Возврат" ? save(true) : setConfirmOformit(true));
 
+  // ── Возврат на склад при каждом сохранении ──
+  // Позиции вкладки «Возврат» встают на склад «СДМ №2» («На складе», место хранения — из позиции) при каждом
+  // сохранении операции («Сохранить» и «Оформить»):
+  //  • позиция из выдачи (не попавшая в работу) — на склад возвращается сама выданная запись с атрибутами
+  //    позиции возврата (количество, веса, состав, оборот); позиция возврата ссылается на неё (srcId);
+  //  • новая позиция — запись склада vz-<операция>-<№ строки>; повторное сохранение обновляет её.
+  // Новая позиция, убранная из возврата, снимается со склада; позиция из выдачи, убранная из возврата,
+  // снова выдаётся в работу (applyVydacha). Запись, которую на складе уже зарезервировали или выдали, не меняется.
+  const vzId = (p: OperPosition) => `vz-${opId}-${p.n}`;
+  const postVozvrat = (items: DMItem[], vydPos: OperPosition[]): { items: DMItem[]; vozvratPos: OperPosition[] } => {
+    let out = [...items];
+    const stamp = createdStamp();
+    // Запись выдачи, к которой относится позиция возврата
+    const fromVydacha = (q: OperPosition): string | undefined => {
+      const i = vydacha.findIndex(p => (q.srcId ? p.srcId === q.srcId : p.nomenkl === q.nomenkl));
+      if (i >= 0) return vydPos[i].srcId ?? out.find(r => r.nomenkl === q.nomenkl && (r.status === "В подотчёте" || r.status === "На складе"))?.id;
+      return q.srcId && out.some(r => r.id === q.srcId) ? q.srcId : undefined;
+    };
+    const attrs = (q: OperPosition, r?: DMItem) => ({
+      name: q.name, nomenkl: q.nomenkl, klass: q.klass, metal: q.metal ?? r?.metal ?? "", qty: q.qty ?? r?.qty ?? 0, proba: q.proba,
+      ligWeight: q.lig ?? r?.ligWeight ?? q.ves, netWeight: q.net ?? r?.netWeight ?? 0, chem: q.chem ?? r?.chem,
+      location: q.loc, sklad: DM_SKLAD, status: "На складе" as const, info: q.info ?? r?.info,
+      ...(q.oborot ? { oborot: q.oborot } : { oborot: undefined }),
+    });
+    const vozvratPos = vozvrat.map(q => {
+      const src = fromVydacha(q);
+      const id = src ?? vzId(q);
+      const r = out.find(x => x.id === id);
+      if (!r) out.push({ id, ...attrs(q), zakazchik: head.zakazchik || undefined, ...stamp });
+      else if (r.status === "На складе" || (src && r.status === "В подотчёте")) out = out.map(x => (x.id === id ? { ...x, ...attrs(q, x) } : x));
+      return src ? { ...q, srcId: src } : q;
+    });
+    // Новые позиции, убранные из возврата с прошлого сохранения, — со склада
+    const keep = new Set(vozvratPos.map(q => q.srcId ?? vzId(q)));
+    const removed = new Set((op?.vozvratPos ?? []).filter(q => !q.srcId).map(vzId).filter(id => !keep.has(id)));
+    out = out.filter(r => !(removed.has(r.id) && r.status === "На складе"));
+    return { items: out, vozvratPos };
+  };
+
   // Выданные позиции ДМ уходят в подотчёт. Если позиция была в резерве чужой шихтовой карты,
   // эта карта возвращается в «На редактировании» и пропадает из выбора ШК для плавки (там только «Новая»).
   // Выдача проводится при каждом сохранении: позиции, убранные из выдачи, возвращаются на склад.
   // При выдаче части количества запись склада делится (data/stock.ts): остаток остаётся на складе,
   // выданная часть — отдельная запись «В подотчёте»; позиция операции ссылается на неё (srcId).
   // Возвращает позиции выдачи с проставленными ссылками на записи склада.
-  const applyVydacha = (): OperPosition[] => {
+  const applyVydacha = (): { vydachaPos: OperPosition[]; vozvratPos: OperPosition[] } => {
     const rows = vydacha.filter(p => !isGPKlass(p.klass));
+    // Выданные записи, уже возвращённые на склад вкладкой «Возврат» прошлого сохранения, — не выдаются заново
+    const returnedIds = new Set(vozvrat.map(q => q.srcId).filter((id): id is string => !!id));
     const prevIds = new Set((op ? opVydacha(op) : []).filter(p => !isGPKlass(p.klass)).map(p => srcOf(p)?.id).filter((id): id is string => !!id));
     const linked = new Map<number, string>();
     const pending = new Map<number, string>();
@@ -1459,6 +1502,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     for (const p of rows) {
       const it = srcOf(p);
       if (!it) continue;
+      if (returnedIds.has(it.id)) { linked.set(p.n, it.id); continue; }
       if (it.status === "В подотчёте" && (differs(it.qty > 0 ? p.qty : undefined, it.qty) || differs(p.lig, it.ligWeight))) {
         reissued.push({ p, it });
         relocate.set(it.id, p.loc);
@@ -1485,23 +1529,25 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       i => `${i.id}-p${stamp}`,
       partLig,
     );
-    setDmItems(items);
     const withSrc = vydacha.map(p => {
       const id = linked.get(p.n) ?? (pending.has(p.n) ? taken.get(pending.get(p.n)!) : undefined);
       return id ? { ...p, srcId: id } : p;
     });
-    if (izRezerva.length === 0) return withSrc;
+    const posted = postVozvrat(items, withSrc);
+    setDmItems(posted.items);
+    const result = { vydachaPos: withSrc, vozvratPos: posted.vozvratPos };
+    if (izRezerva.length === 0) return result;
     const rezNomenkl = new Set(izRezerva.map(i => i.nomenkl));
     const doc = `${vid}, ${head.docType || "документ"} № ${head.document}`;
     const mark = (k: ShihtovayaKarta) => (pickedKartaIds.includes(k.id) ? k : markIssuedElsewhere(k, rezNomenkl, doc));
     const zatronuty = shihtovyeKarty.filter(k => mark(k) !== k).map(k => k.name);
     setShihtovyeKarty(prev => prev.map(mark));
     if (zatronuty.length) show(`Шихтовая карта ${zatronuty.map(n => `«${n}»`).join(", ")} переведена в «На редактировании»`);
-    return withSrc;
+    return result;
   };
 
-  const buildOp = (next: OperStage, vydachaPos = vydacha): Operation => ({
-    id: op?.id || `op-${Date.now()}`,
+  const buildOp = (next: OperStage, vydachaPos = vydacha, vozvratPos = vozvrat): Operation => ({
+    id: opId,
     // Отметка создания — при первом сохранении операции
     ...(op?.createdAt ? { createdAt: op.createdAt, createdBy: op.createdBy } : createdStamp()),
     date: head.date,
@@ -1517,7 +1563,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     statusVozvrat: next === "Завершено" ? "Полностью" : vozvrat.length > 0 ? "Частично" : "Не начат",
     statusClose: next !== "Завершено" ? "Не закрыто" : "Закрыто",
     vydachaPos,
-    vozvratPos: vozvrat,
+    vozvratPos,
     vydachaFiles,
     vozvratFiles,
     losses,
@@ -1541,7 +1587,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     const pos = applyVydacha();
     // Карта выдана в плавку — «Выполнена»
     if (pickedKartaIds.length) setShihtovyeKarty(prev => prev.map(k => (pickedKartaIds.includes(k.id) ? { ...k, status: "Выполнена", vydannyePozicii: undefined } : k)));
-    onSave(buildOp(next, pos));
+    onSave(buildOp(next, pos.vydachaPos, pos.vozvratPos));
   };
 
   // Печать доступна для сохранённой операции — печатается текущее состояние формы.
@@ -1642,6 +1688,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
             <div className="flex gap-2 mb-3">
               <Btn size="sm" onClick={() => setShowVozvratNew(true)}><Plus className="w-4 h-4" />Добавить новую</Btn>
               <Btn size="sm" variant="secondary" onClick={() => setShowVozvratFromVyd(true)} disabled={vydacha.length === 0}><Plus className="w-4 h-4" />Добавить из Выдачи</Btn>
+              <span className="self-center text-xs text-gray-500">Позиции возврата ставятся на склад «{DM_SKLAD}» при каждом сохранении; после «Оформить» операция не редактируется</span>
             </div>
           )}
           <PositionsSummary rows={vozvrat} view={posView} />
@@ -1932,7 +1979,7 @@ export function DvizhenieMateriаla() {
                 <CreatedCell row={op} />
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => setViewOp(op)} />
-                  <EditIcon onClick={() => setEditOp(op)} />
+                  <EditIcon onClick={() => setEditOp(op)} disabled={op.stage === "Завершено"} title={op.stage === "Завершено" ? "Операция оформлена — редактирование недоступно" : "Редактировать"} />
                   <PrintIcon title="Печать (PDF)" onClick={() => printOperation(op, opWeights(op).spisanie)} />
                   <DeleteIcon onClick={() => confirm("Удалить операцию?", () => setOperations(prev => prev.filter(o => o.id !== op.id)))} />
                 </td>

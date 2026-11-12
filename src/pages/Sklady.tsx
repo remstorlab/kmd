@@ -6,14 +6,14 @@ import {
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, probaText, NetAuAg, NET_AU_AG,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
-import { GPItem, DMItem, SDM1, SDM2, SGP, oborotOf, OBOROT_LIMIT } from "../data/mock";
+import { GPItem, DMItem, SDM1, SDM2, SGP, oborotOf, OBOROT_LIMIT, OBOROT_HINT, oborotOver } from "../data/mock";
 import { Coins } from "lucide-react";
 import DMPositionViewModal from "../components/DMPositionViewModal";
 import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, parseLoc, NO_LOC, oborotFromForm } from "../components/DMPositionFormModal";
 import { useScreen } from "../router";
 
 // Позиции учёта ГП в виде позиций склада ДМ — склад один, показываются все классы.
-const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, sklad: i.sklad, status: i.status, chem: i.chem, zakazchik: i.zakazchik, ownProperty: i.ownProperty, createdAt: i.createdAt, createdBy: i.createdBy });
+const gpToDm = (i: GPItem): DMItem => ({ id: i.id, name: i.name, nomenkl: i.nomenkl, klass: i.klass, metal: i.code, qty: i.qty, proba: i.proba ?? 0, ligWeight: i.ligWeight ?? 0, netWeight: i.netWeight ?? 0, location: i.location, sklad: i.sklad, status: i.status, chem: i.chem, zakazchik: i.zakazchik, ownProperty: i.ownProperty, createdAt: i.createdAt, createdBy: i.createdBy, oborot: i.oborot });
 
 // ── Склады ХАБ ───────────────────────────────────────────────────────────────
 
@@ -45,10 +45,12 @@ export function SkladyHub() {
   );
 }
 
-// ── Смена места хранения позиции ──────────────────────────────────────────────
+// ── Изменение позиции: место хранения, наименование, оборот ───────────────────
+// Наименование и оборот редактируются у любой незакрытой позиции; место хранения — только у позиции на складе
+// (в статусе «На складе» / «Резерв» и на складе с местами хранения).
 
 
-function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: () => void; onSave: (location: string, name: string) => void }) {
+function MoveLocationModal({ item, canMoveLoc, onClose, onSave }: { item: DMItem; canMoveLoc: boolean; onClose: () => void; onSave: (location: string, name: string, oborot: number) => void }) {
   const { storageLocations: locs } = useApp();
   const codeLabel = useMaterialCodeLabel();
   const cur = parseLoc(item.location);
@@ -62,8 +64,12 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
   const same = cur.seyf !== NO_LOC && cur.seyf === seyf && cur.polka === polka;
   const [name, setName] = useState(item.name);
   const nameChanged = name.trim() !== item.name;
-  // Сохранить можно, если изменено место хранения и/или наименование
-  const canSave = !!name.trim() && (nameChanged || (!!next && !same));
+  const [oborot, setOborot] = useState(String(oborotOf(item)));
+  const oborotNum = parseInt(oborot, 10) || 0;
+  const oborotChanged = oborotNum !== oborotOf(item);
+  const locChanged = canMoveLoc && !!next && !same;
+  // Сохранить можно, если изменены место хранения, наименование или оборот
+  const canSave = !!name.trim() && (nameChanged || oborotChanged || locChanged);
 
   const attrs: [string, React.ReactNode][] = [
     ["Номенкл. №", item.nomenkl],
@@ -75,11 +81,11 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
 
   return (
     <Modal
-      title="Изменение места хранения"
+      title="Изменение позиции"
       onClose={onClose}
       footer={<>
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={() => onSave(same || !next ? item.location : next, name.trim())} disabled={!canSave}>Сохранить</Btn>
+        <Btn onClick={() => onSave(locChanged ? next : item.location, name.trim(), oborotNum)} disabled={!canSave}>Сохранить</Btn>
       </>}
     >
       {/* Позиция, у которой меняется место хранения */}
@@ -92,8 +98,14 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
         ))}
       </div>
 
-      <div className="mb-5">
-        <Field label="Наименование" required><Input value={name} onChange={setName} placeholder="Наименование позиции" /></Field>
+      <div className="mb-5 grid grid-cols-4 gap-4">
+        <div className="col-span-3"><Field label="Наименование" required><Input value={name} onChange={setName} placeholder="Наименование позиции" /></Field></div>
+        <Field label="Оборот">
+          <div className={oborotOver(oborotNum) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(oborotNum) ? OBOROT_HINT : undefined}>
+            <Input value={oborot} onChange={v => setOborot(v.replace(/[^\d]/g, ""))} placeholder="0" />
+          </div>
+          {oborotOver(oborotNum) && <div className="text-xs text-red-600 mt-1">{OBOROT_HINT}</div>}
+        </Field>
       </div>
 
       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Текущее место хранения</h4>
@@ -107,6 +119,7 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
         )}
       </div>
 
+      {canMoveLoc ? <>
       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Новое место хранения</h4>
       <div className="grid grid-cols-3 gap-4">
         <Field label="Склад"><Input value={item.sklad} disabled /></Field>
@@ -117,7 +130,10 @@ function MoveLocationModal({ item, onClose, onSave }: { item: DMItem; onClose: (
           {polkas.length ? <Select value={polka} options={polkas} onChange={setPolka} /> : <Input value="—" disabled />}
         </Field>
       </div>
-      {same && !nameChanged && <div className="mt-3 text-xs text-gray-500">Измените наименование или выберите место хранения, отличное от текущего</div>}
+      {same && !nameChanged && !oborotChanged && <div className="mt-3 text-xs text-gray-500">Измените наименование, оборот или выберите место хранения, отличное от текущего</div>}
+      </> : (
+        <div className="text-xs text-gray-500">{item.sklad === SGP ? `На складе «${SGP}» места хранения не ведутся` : "Позиция не на складе — место хранения не меняется"}; можно изменить наименование и оборот</div>
+      )}
     </Modal>
   );
 }
@@ -251,12 +267,15 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
   // На СГП №2 мест хранения нет — позиции хранятся без места («-»)
   const noLocations = sklad === SGP;
   const canMove = (it: DMItem) => !noLocations && (it.status === "На складе" || it.status === "Резерв");
-  const saveLocation = (it: DMItem, location: string, name: string) => {
+  // Изменить позицию (наименование, оборот) можно у любой незакрытой позиции
+  const canEdit = (it: DMItem) => it.status !== "Закрыта";
+  const saveLocation = (it: DMItem, location: string, name: string, oborot: number) => {
+    const upd = { location, name, oborot: oborot || undefined };
     // Позиция хранится в учёте ДМ или ГП — меняем там, где она есть
-    if (dmItems.some(d => d.id === it.id)) setDmItems(prev => prev.map(d => (d.id === it.id ? { ...d, location, name } : d)));
-    else setGpItems(prev => prev.map(g => (g.id === it.id ? { ...g, location, name } : g)));
+    if (dmItems.some(d => d.id === it.id)) setDmItems(prev => prev.map(d => (d.id === it.id ? { ...d, ...upd } : d)));
+    else setGpItems(prev => prev.map(g => (g.id === it.id ? { ...g, ...upd } : g)));
     screen.close("mesto");
-    show(location !== it.location ? `Место хранения изменено: ${location}` : `Наименование изменено: ${name}`);
+    show(location !== it.location ? `Место хранения изменено: ${location}` : oborot !== oborotOf(it) ? `Оборот изменён: ${oborot}` : `Наименование изменено: ${name}`);
   };
 
   const [perPage, setPerPage] = usePerPage("sklad-dm", 8);
@@ -430,8 +449,8 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
                     <EyeIcon onClick={() => screen.openTop("view", item.id)} />
                     <EditIcon
                       onClick={() => screen.openTop("mesto", item.id)}
-                      disabled={!canMove(item)}
-                      title={canMove(item) ? "Изменить место хранения" : noLocations ? `На складе «${SGP}» места хранения не ведутся` : "Позиция не на складе — место хранения не меняется"}
+                      disabled={!canEdit(item)}
+                      title={!canEdit(item) ? "Позиция закрыта — изменение недоступно" : canMove(item) ? "Изменить место хранения, наименование, оборот" : "Изменить наименование, оборот"}
                     />
                   </div>
                 </td>
@@ -447,7 +466,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
         <DMPositionViewModal item={viewItem} onClose={() => screen.close("view")} />
       )}
       {moveItem && (
-        <MoveLocationModal key={moveItem.id} item={moveItem} onClose={() => screen.close("mesto")} onSave={(loc, name) => saveLocation(moveItem, loc, name)} />
+        <MoveLocationModal key={moveItem.id} item={moveItem} canMoveLoc={canMove(moveItem)} onClose={() => screen.close("mesto")} onSave={(loc, name, ob) => saveLocation(moveItem, loc, name, ob)} />
       )}
       {showMerge && mergeItems.length >= 2 && <MergeModal items={mergeItems} onClose={() => screen.close("merge")} onConfirm={doMerge} />}
       {toast && <Toast message={toast} onDone={clear} />}

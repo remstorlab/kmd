@@ -236,6 +236,12 @@ export function shihtaOborot(materials: ShihtaMaterial[]): ShihtaOborot {
   };
 }
 
+// Оборот карты: указанный в карте (может быть изменён вручную), без него — расчётный
+export function kartaOborot(k: Pick<ShihtovayaKarta, "oborot" | "materials">): number {
+  const n = parseInt(String(k.oborot ?? "").trim(), 10);
+  return Number.isFinite(n) && n >= 0 ? n : shihtaOborot(k.materials).max;
+}
+
 // Подсказка к полю «Оборот» шапки карты: у какой позиции максимум
 export function oborotHintText(o: ShihtaOborot): string {
   if (o.max === 0) return "Оборот шихты рассчитывается: максимум оборотов материалов шихты. Материалы без оборота (аффинированное серебро, медь МО, лигатура) — 0";

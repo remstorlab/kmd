@@ -42,7 +42,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   // Позиции, отмеченные на складе перед «Выдать со склада», — сразу в позициях новой накладной
   preselectIds?: string[];
 }) {
-  const ro = readOnly;
+  // Оформленный документ больше не редактируется — только просмотр
+  const ro = readOnly || doc?.status === "Оформлено";
   // Оформленная накладная: позиции уже выданы и закрыты — состав менять нельзя
   const issued = doc?.status === "Оформлено";
   const lockPos = ro || issued;

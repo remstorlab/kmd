@@ -31,7 +31,10 @@ type Props = {
 const TYPE_FLAGS: Record<string, string> = { [DOC_PRIHOD_NAKLAD]: "nakladnaya", [DOC_PRIHOD_AKT]: "akt", [DOC_TREBOVANIE]: "trebovanie", [DOC_VOZVRAT_SGP]: "vozvrat-sgp" };
 
 export default function PrihodDocModal(props: Props) {
-  const { doc, readOnly: ro = false } = props;
+  const { doc } = props;
+  // Оформленный документ больше не редактируется — открывается только для просмотра
+  const ro = !!props.readOnly || doc?.status === "Оформлено";
+  props = { ...props, readOnly: ro };
   const screen = useScreen();
   // Тип документа — из справочника «Типы документов приёмки»
   const docType: PrihodDocType = doc
@@ -79,7 +82,7 @@ export const ORDER_HEAD_DEFAULTS = {
 
 function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelect }: Props & { docType: PrihodDocType; typeSelect: React.ReactNode }) {
   const ro = readOnly;
-  const { storageLocations, setDmItems, setGpItems } = useApp();
+  const { storageLocations, dmItems, gpItems, setDmItems, setGpItems } = useApp();
   const stamp = useCreatedStamp();
   // Вложенные экраны: …/position-new, …/position/:id, …/position-edit/:id
   const screen = useScreen();
@@ -175,9 +178,12 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     loc: p => locOf(p),
   });
 
-  // Постановка на склад-получатель при первом оформлении: позиции класса «Готовая продукция» — в учёт ГП,
-  // остальные — в учёт ДМ; статус «На складе», место хранения — из позиции документа
-  const postToStock = () => {
+  // Постановка на склад-получатель при каждом сохранении документа («Сохранить» и «Оформить»): позиции класса
+  // «Готовая продукция» — в учёт ГП, остальные — в учёт ДМ; статус «На складе», место хранения — из позиции документа.
+  // Запись склада привязана к позиции документа (id dm-<id> / gp-<id>): повторное сохранение обновляет её,
+  // позиция, удалённая из документа, снимается со склада. Записи, которые уже зарезервированы или выданы, не меняются.
+  // Возвращает наименования позиций, которые изменить на складе нельзя.
+  const postToStock = (): string[] => {
     const kol = (p: PrihodPosition) => parseInt(p.kol, 10) || 0;
     const n = (v: string) => parseFloat(String(v).replace(",", ".")) || 0;
     // Заказчик — отправитель документа; признак «Собственность заказчика» — из шапки
@@ -193,13 +199,40 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
       // Оборот — из позиции документа (по умолчанию при приёмке — 0)
       ...(oborotFromForm(p.oborot) ? { oborot: oborotFromForm(p.oborot) } : {}),
     }));
-    if (gp.length) setGpItems(prev => [...prev.filter(i => !gp.some(x => x.id === i.id)), ...gp]);
-    if (dm.length) setDmItems(prev => [...prev.filter(i => !dm.some(x => x.id === i.id)), ...dm]);
+    const keepIds = new Set([...gp, ...dm].map(i => i.id));
+    const prevIds = new Set((doc?.prihodPositions ?? []).flatMap(p => [`gp-${p.id}`, `dm-${p.id}`]));
+    const busy: string[] = [];
+    const sync = <T extends GPItem | DMItem>(items: T[], next: T[]): T[] => {
+      const free = (i: T) => i.status === "На складе";
+      // Удалённые из документа позиции снимаются со склада (если ещё не использованы)
+      const out = items.filter(i => {
+        if (!prevIds.has(i.id) || keepIds.has(i.id)) return true;
+        if (free(i)) return false;
+        busy.push(i.name);
+        return true;
+      });
+      for (const n of next) {
+        const idx = out.findIndex(i => i.id === n.id);
+        if (idx < 0) out.push(n);
+        // Запись, уже зарезервированная или выданная, остаётся как есть
+        else if (free(out[idx])) out[idx] = { ...n, createdAt: out[idx].createdAt ?? n.createdAt, createdBy: out[idx].createdBy ?? n.createdBy };
+      }
+      return out;
+    };
+    const nextGp = sync(gpItems, gp);
+    const nextDm = sync(dmItems, dm);
+    if (busy.length) return busy;
+    setGpItems(nextGp);
+    setDmItems(nextDm);
+    return busy;
   };
 
   // Документ сохраняется и оформляется в том числе без позиций
   const save = (status: DocStatus) => {
-    if (status === "Оформлено" && !posted) postToStock();
+    if (posted) return;
+    const busy = postToStock();
+    // Позиция, уже зарезервированная или выданная со склада, в документе не меняется и не удаляется
+    if (busy.length) { show(`Позиции уже зарезервированы или выданы со склада — изменить или удалить их нельзя: ${busy.join(", ")}`); return; }
     // Отметка создания — при первом сохранении документа, при редактировании сохраняется прежняя
     const created = doc?.createdAt ? { createdAt: doc.createdAt, createdBy: doc.createdBy } : stamp();
     const base = { id: doc?.id ?? `sd-${Date.now()}`, ...created, status, receiver: sklad, info: info.trim() || undefined, prihodPositions: positions };
@@ -235,9 +268,13 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
         </>
       )}
     >
-      {posted && (
+      {posted ? (
         <div className="mb-4 text-sm bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5">
-          Документ оформлен: позиции приняты на склад «{sklad}». Состав позиций и склад-получатель изменить нельзя.
+          Документ оформлен: позиции приняты на склад «{sklad}». Редактирование документа недоступно.
+        </div>
+      ) : !ro && (
+        <div className="mb-4 text-sm bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5">
+          Позиции ставятся на склад «{sklad}» при каждом сохранении документа. После «Оформить» документ закрывается для редактирования.
         </div>
       )}
       {isOrder ? (
