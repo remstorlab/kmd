@@ -104,7 +104,6 @@ function MoveLocationModal({ item, canMoveLoc, onClose, onSave }: { item: DMItem
           <div className={oborotOver(oborotNum) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(oborotNum) ? OBOROT_HINT : undefined}>
             <Input value={oborot} onChange={v => setOborot(v.replace(/[^\d]/g, ""))} placeholder="0" />
           </div>
-          {oborotOver(oborotNum) && <div className="text-xs text-red-600 mt-1">{OBOROT_HINT}</div>}
         </Field>
       </div>
 

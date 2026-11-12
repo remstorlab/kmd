@@ -43,7 +43,6 @@ export default function DMPositionViewModal({ item, onClose }: { item: DMPositio
           <div className={oborotOver(item.oborot) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(item.oborot) ? OBOROT_HINT : undefined}>
             <Input value={String(item.oborot ?? 0)} disabled />
           </div>
-          {oborotOver(item.oborot) && <div className="text-xs text-red-600 mt-1">{OBOROT_HINT}</div>}
         </Field>
         <Field label="Место хранения" full><Input value={item.location || "—"} disabled /></Field>
         <Field label="Доп. информация" full><Input value={item.info || "—"} disabled /></Field>

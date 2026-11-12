@@ -219,11 +219,12 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         <Field label="Вес лигатурный, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={changeLig} placeholder="0.00" disabled={ro || lockWeights} /></Field>
         {/* Оборот — целое ≥ 0, необязательно (пусто — 0); при ≥ 5 — подсказка о передаче на аффинаж */}
         <Field label="Оборот">
-          <div className={oborotOver(oborotFromForm(form.oborot)) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(oborotFromForm(form.oborot)) ? OBOROT_HINT : undefined}>
+          <div
+            className={oborotOver(oborotFromForm(form.oborot)) ? "rounded-lg ring-1 ring-red-400" : ""}
+            title={[oborotHint, oborotOver(oborotFromForm(form.oborot)) ? OBOROT_HINT : ""].filter(Boolean).join("\n") || undefined}
+          >
             <Input value={form.oborot ?? ""} onChange={v => set("oborot")(v.replace(/[^\d]/g, ""))} placeholder="0" disabled={ro} />
           </div>
-          {oborotOver(oborotFromForm(form.oborot)) && <div className="text-xs text-red-600 mt-1">{OBOROT_HINT}</div>}
-          {oborotHint && <div className="text-xs text-gray-500 mt-1">{oborotHint}</div>}
         </Field>
         {/* Чистый вес не вводится — рассчитывается (граммы основного металла в блоке «Химический состав») */}
         <Field label="Склад"><Input value={sklad} disabled /></Field>

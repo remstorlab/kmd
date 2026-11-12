@@ -20,7 +20,7 @@ import {
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { ChemPercent, gramsFrom, num0, pctFrom } from "../data/chem";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
-import { Plus, X, Calculator, AlertTriangle, Sigma, Info } from "lucide-react";
+import { Plus, X, Calculator, AlertTriangle, Sigma, Info, RotateCcw } from "lucide-react";
 import { useScreen } from "../router";
 
 // ── Шихтовая карта: конструктор ─────────────────────────────────────────────────
@@ -332,6 +332,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
     return karta.oborot.trim() !== String(shihtaOborot(karta.materials).max) ? karta.oborot.trim() : null;
   });
   const oborotValue = oborotManual ?? String(ob.max);
+  const oborotManualSet = oborotManual !== null && oborotManual !== String(ob.max);
   // Пустое поле — расчётное значение
   const oborotNum = oborotValue.trim() === "" ? ob.max : parseInt(oborotValue, 10) || 0;
   const oborotInfo = oborotInfoText(ob, grade);
@@ -488,13 +489,21 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
         {/* Оборот шихты — расчётный (максимум оборотов материалов), не редактируется */}
         {/* Оборот шихты: по умолчанию — расчётный (максимум оборотов материалов), можно изменить вручную */}
         <Field label="Оборот">
-          <div className={oborotOver(oborotNum) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(oborotNum) ? `${oborotHintText(ob)}. ${OBOROT_HINT}` : oborotHintText(ob)}>
+          <div
+            className={`relative ${oborotOver(oborotNum) ? "rounded-lg ring-1 ring-red-400" : ""}`}
+            title={[
+              oborotManualSet ? `Изменён вручную, расчётный оборот — ${ob.max}` : "Расчётный оборот — максимум оборотов материалов шихты",
+              oborotHintText(ob),
+              oborotOver(oborotNum) ? OBOROT_HINT : "",
+            ].filter(Boolean).join("\n")}
+          >
             <Input value={oborotValue} onChange={v => setOborotManual(v.replace(/[^\d]/g, ""))} placeholder={String(ob.max)} disabled={ro} />
-          </div>
-          <div className={`text-xs mt-1 ${oborotOver(oborotNum) ? "text-red-600" : "text-gray-500"}`}>
-            {oborotManual !== null && oborotManual !== String(ob.max) ? (
-              <>Изменён вручную · расчётный {ob.max}{!ro && <button type="button" onClick={() => setOborotManual(null)} className="ml-1 text-blue-600 hover:underline">подставить</button>}</>
-            ) : ob.max > 0 ? `Расчётный: макс. — ${ob.maxAt.map(m => m.name).join(", ")}` : "Расчётный: максимум оборотов материалов шихты"}
+            {/* Ручное значение: вернуть расчётный оборот */}
+            {!ro && oborotManualSet && (
+              <button type="button" onClick={() => setOborotManual(null)} title={`Подставить расчётный оборот (${ob.max})`} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-blue-600">
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </Field>
         <Field label="Назначение слитков" required={!ro}>
@@ -1139,7 +1148,8 @@ export function ShihtovyeKarty() {
   const rows = shihtaPrikazy.map(p => {
     const karty = kartyOfPrikaz(shihtovyeKarty, p.id);
     const grades = [...new Set(karty.map(k => alloyGrades.find(g => g.id === k.alloyId)?.name).filter(Boolean))];
-    return { id: p.id, p, karty, status: prikazStatus(karty), grade: grades.join(", ") };
+    // Итоговая масса шихты — сумма масс всех шихтовых карт приказа
+    return { id: p.id, p, karty, status: prikazStatus(karty), grade: grades.join(", "), mass: r2(karty.reduce((s, k) => s + kartaMass(k), 0)) };
   });
 
   const removePrikaz = (p: PrikazPlavka) => {
@@ -1156,6 +1166,8 @@ export function ShihtovyeKarty() {
     number: r => parseInt(r.p.number, 10) || 0,
     name: r => r.p.name,
     grade: r => r.grade,
+    kartyCount: r => r.karty.length,
+    mass: r => r.mass,
     status: r => r.status,
     createdAt: r => new Date(r.p.createdAt).getTime(),
   });
@@ -1178,13 +1190,15 @@ export function ShihtovyeKarty() {
               <SortTh sortKey="number" sort={sort} onSort={toggleSort}>№ приказа</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="grade" sort={sort} onSort={toggleSort}>Марка сплава</SortTh>
+              <SortTh sortKey="kartyCount" sort={sort} onSort={toggleSort} align="right">ШК</SortTh>
+              <SortTh sortKey="mass" sort={sort} onSort={toggleSort} align="right">Итоговая масса, г.</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <SortTh sortKey="createdAt" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
               <th className="w-28"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {sorted.slice((page - 1) * perPage, page * perPage).map(({ p, karty, status, grade }) => {
+            {sorted.slice((page - 1) * perPage, page * perPage).map(({ p, karty, status, grade, mass }) => {
               const done = status === "Выполнена";
               // Приказ, по которому уже выдавались карты, не удаляется
               const canDelete = !karty.some(k => k.status === "Выполнена");
@@ -1194,6 +1208,8 @@ export function ShihtovyeKarty() {
                   <td className="px-4 py-3 text-blue-600">{p.number}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                   <td className="px-4 py-3 text-gray-700">{grade || dash}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{karty.length}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{karty.length ? str2(mass) : dash}</td>
                   <td className="px-4 py-3"><Badge label={status} group="shihta" /></td>
                   <CreatedCell row={p} />
                   <td className="px-4 py-3 flex items-center gap-1">
@@ -1211,7 +1227,7 @@ export function ShihtovyeKarty() {
                 </tr>
               );
             })}
-            <FillerRows count={fillerCount(rows.length, page, perPage)} cols={7} />
+            <FillerRows count={fillerCount(rows.length, page, perPage)} cols={9} />
           </tbody>
         </table>
         <Pagination page={page} total={rows.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
