@@ -4,21 +4,23 @@ import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   useToast, Toast, Field, Input, Select, Textarea, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, usePaged, CREATED_LABEL, CreatedCell, useMaterialCodeLabel,
+  OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
   PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO,
-  PrikazPlavka,
+  PrikazPlavka, OBOROT_HINT, oborotOver,
 } from "../data/mock";
 import { returnToStock } from "../data/stock";
 import {
   ShihtaCalc, ShihtaLine, chemStrings, fmt2, normText, r2, shareOf, shihtaWarnings, lineChem, kindOf,
   normCell, impuritiesText, fmtNorm, prikazStatus, itogoMaterials, lineOfMaterial, prikazGrade, isSkladMaterial,
+  shihtaOborot, oborotHintText, oborotWarnings, oborotInfoText,
 } from "../data/shihta";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { ChemPercent, gramsFrom, num0, pctFrom } from "../data/chem";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
-import { Plus, X, Calculator, AlertTriangle, Sigma } from "lucide-react";
+import { Plus, X, Calculator, AlertTriangle, Sigma, Info } from "lucide-react";
 import { useScreen } from "../router";
 
 // ── Шихтовая карта: конструктор ─────────────────────────────────────────────────
@@ -48,6 +50,8 @@ interface MatRow {
   ves: string;
   // id позиции склада ДМ, выбранной в этой сессии — резервируется целиком при сохранении карты
   srcId?: string;
+  // Оборот позиции склада (у доп. материалов — нет, в расчёте оборота шихты — 0)
+  oborot?: number;
 }
 
 let rowSeq = 0;
@@ -68,8 +72,13 @@ const toRow = (m: ShihtaMaterial, dm: DMItem[]): MatRow => {
     key: newKey(), kind, mat: m.name, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, qty: m.qty ?? 1, loc: m.loc,
     code: m.code ?? (m.nomenkl ? dm.find(i => i.nomenkl === m.nomenkl)?.metal : undefined),
     sklad: rez?.sklad ?? m.sklad, share: shareOf(m.chem, m.ves), phosphorPct: m.phosphorPct, ves: str2(m.ves),
+    ...(kind === "sklad" ? { oborot: m.oborot ?? (m.nomenkl ? dm.find(i => i.nomenkl === m.nomenkl)?.oborot : undefined) ?? 0 } : {}),
   };
 };
+
+// Строки конструктора в виде материалов карты — для расчёта оборота шихты
+const asMaterials = (rows: MatRow[]): ShihtaMaterial[] =>
+  rows.map(m => ({ kind: m.kind, name: m.mat, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, ves: num(m.ves), loc: m.loc, code: m.code, oborot: m.oborot }));
 
 const lineOf = (m: MatRow): ShihtaLine => ({ kind: m.kind, mass: num(m.ves), share: m.share, phosphorPct: m.phosphorPct, klass: m.klass });
 
@@ -84,6 +93,7 @@ const massError = (m: MatRow): string => {
 const stockRowOf = (it: DMItem, key = newKey()): MatRow => ({
   key, kind: "sklad", mat: it.name, nomenkl: it.nomenkl, klass: it.klass, proba: it.proba, code: it.metal, qty: it.qty,
   loc: it.location, sklad: it.sklad, share: shareOf(it.chem, it.ligWeight), ves: str2(it.ligWeight), srcId: it.id,
+  oborot: it.oborot ?? 0,
 });
 
 // Следующий номер плавки в году (сквозная нумерация с 1 января)
@@ -94,8 +104,6 @@ export function nextPlavkaNo(karty: ShihtovayaKarta[], year = new Date().getFull
   return String(max + 1);
 }
 
-const OBOROT_CLEAN = "чистая";
-const oborotValid = (v: string) => !v.trim() || /^\d+$/.test(v.trim()) || v.trim().toLowerCase() === OBOROT_CLEAN;
 
 // ── Резерв позиций ДМ под шихтовую карту ──
 // Позиция склада (СДМ1 или СДМ2) берётся в карту целиком и целиком переводится в «Резерв» — без ввода части
@@ -237,7 +245,6 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   const [name, setName] = useState(init?.name || "");
   const [alloyId, setAlloyId] = useState(init?.alloyId ?? "");
   const [plavkaNo, setPlavkaNo] = useState(() => karta?.plavkaNo ?? nextPlavkaNo(shihtovyeKarty));
-  const [oborot, setOborot] = useState(init?.oborot ?? "");
   // Дата документа — задаётся вручную, по умолчанию сегодняшняя
   const [docDate, setDocDate] = useState(karta?.date || new Date().toLocaleDateString("ru-RU"));
   const [naznachenie, setNaznachenie] = useState(init?.naznachenie ?? "");
@@ -274,7 +281,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   const skladRows = useMemo<StockRow[]>(() => dmItems
     .filter(i => i.status !== "Закрыта" && i.qty > 0 && !isGPKlass(i.klass) && !isStoneKlass(i.klass))
     // Чистый вес — сохранённый у позиции (тот же, по которому считается состав строки карты)
-    .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem, status: i.status })),
+    .map(i => ({ id: i.id, src: "dm" as const, nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem, status: i.status, oborot: i.oborot ?? 0 })),
   [dmItems]);
 
 
@@ -316,10 +323,13 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   // Позиции, выданные в другой операции (карта возвращена в «На редактировании»): их нужно заменить
   const issuedNomenkl = new Set((karta?.vydannyePozicii ?? []).map(v => v.nomenkl));
   const isIssued = (m: MatRow) => m.kind === "sklad" && issuedNomenkl.has(m.nomenkl);
+  // Оборот шихты — расчётный: максимум оборотов материалов (без оборота — 0); проверки — только для СрМ 92,5
+  const ob = useMemo(() => shihtaOborot(asMaterials(materials)), [materials]);
+  const oborotInfo = oborotInfoText(ob, grade);
   // Предупреждения — подсказки, оформление не блокируют; пересчитываются при любом изменении карты
   const warnings = [
-    ...shihtaWarnings(calc, { oborot, minAffinage: minAffinageOf(naznachenie) }),
-    ...(oborotValid(oborot) ? [] : ["Оборот — число или «чистая»"]),
+    ...shihtaWarnings(calc, { minAffinage: minAffinageOf(naznachenie) }),
+    ...oborotWarnings(ob, grade),
     ...[...new Set(materials.map(m => banReason(m, grade, naznachenie)).filter((w): w is string => !!w))],
   ];
   // Норма элемента в строках «Норма мин / макс»: число — из диапазона или предела примеси; элемент-остаток — «Остальное»
@@ -359,6 +369,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
     code: m => m.code ?? "",
     proba: m => m.proba,
     loc: m => m.loc,
+    oborot: m => m.oborot ?? -1,
     sklad: m => m.sklad ?? "",
     klass: m => m.klass,
     ves: m => num(m.ves),
@@ -386,10 +397,11 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
     const mats: ShihtaMaterial[] = materials.map((m, i) => ({
       kind: m.kind, name: m.mat, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, ves: r2(num(m.ves)), loc: m.loc, qty: m.qty,
       chem: chemStrings(calc.chems[i]), phosphorPct: m.phosphorPct, sklad: m.sklad, code: m.code,
+      ...(m.kind === "sklad" ? { oborot: m.oborot ?? 0 } : {}),
     }));
     const head = {
       name: name.trim() || karta?.name || "Новая шихтовая карта",
-      plavkaNo: plavkaNo.trim(), alloyId: alloyId || undefined, oborot: oborot.trim(), naznachenie, osnovanie: osnovanie.trim(), note: note.trim(),
+      plavkaNo: plavkaNo.trim(), alloyId: alloyId || undefined, oborot: String(ob.max), naznachenie, osnovanie: osnovanie.trim(), note: note.trim(),
       date: docDate.trim() || karta?.date || new Date().toLocaleDateString("ru-RU"),
       materials: mats, files,
     };
@@ -411,7 +423,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   const matName = (m: MatRow) => (m.kind === "cup" ? `${m.mat} (P = ${str2(m.phosphorPct ?? 0)} %)` : m.mat);
   const dash = <span className="text-gray-400">—</span>;
   // Колонки атрибутов позиции (до «Массы в шихту»)
-  const LEAD = 7;
+  const LEAD = 8;
   const cols = LEAD + 1 + shkEls.length + 1 + (ro ? 0 : 1);
   const pg9 = usePaged(sortedMaterials, "shihta-materials");
   return (
@@ -464,9 +476,14 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
         </Field>
         <Field label="Номер плавки" required={!ro}><Input value={plavkaNo} onChange={v => setPlavkaNo(v.replace(/[^\d]/g, ""))} placeholder="1" disabled={ro} /></Field>
         <Field label="Дата документа" required={!ro}><Input value={docDate} onChange={setDocDate} placeholder="дд.мм.гггг" disabled={ro} /></Field>
-        <Field label="Оборот">
-          <Input value={oborot} onChange={setOborot} placeholder="число или «чистая»" disabled={ro} />
-          {!oborotValid(oborot) && <div className="text-xs text-red-600 mt-1">Число или «чистая»</div>}
+        {/* Оборот шихты — расчётный (максимум оборотов материалов), не редактируется */}
+        <Field label="Оборот (расчётный)">
+          <div className={oborotOver(ob.max) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(ob.max) ? `${oborotHintText(ob)}. ${OBOROT_HINT}` : oborotHintText(ob)}>
+            <Input value={String(ob.max)} disabled />
+          </div>
+          <div className={`text-xs mt-1 ${oborotOver(ob.max) ? "text-red-600" : "text-gray-500"}`}>
+            {ob.max > 0 ? `Макс. — ${ob.maxAt.map(m => m.name).join(", ")}` : "Максимум оборотов материалов шихты"}
+          </div>
         </Field>
         <Field label="Назначение слитков" required={!ro}>
           <Select value={naznachenie} options={naznOptions} optionLabel={v => v || "Не выбрано"} onChange={setNaznachenie} disabled={ro} />
@@ -514,6 +531,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
                 <SortTh sortKey="proba" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Проба, %</SortTh>
                 <SortTh sortKey="sklad" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Склад</SortTh>
                 <SortTh sortKey="loc" sort={matSort} onSort={toggleMatSort} className="px-3 py-2">Место хранения</SortTh>
+                <SortTh sortKey="oborot" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">{OBOROT_LABEL}</SortTh>
                 <SortTh sortKey="ves" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Масса в шихту, г</SortTh>
                 {shkEls.map(e => (
                   <SortTh key={e.id} sortKey={`el-${e.id}`} sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">{e.shortName}</SortTh>
@@ -530,7 +548,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
                 const issued = isIssued(m);
                 const sklad = m.kind === "sklad";
                 return (
-                  <tr key={m.key} className={`hover:bg-gray-50 ${ban || issued ? "bg-red-50/60" : ""}`}>
+                  <tr key={m.key} className={`hover:bg-gray-50 ${ban || issued ? "bg-red-50/60" : sklad ? oborotRowCls(m.oborot) : ""}`}>
                     <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{m.nomenkl || dash}</td>
                     <td className="px-3 py-2">
                       <div className="font-medium">{matName(m)}</div>
@@ -542,6 +560,8 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
                     <td className="px-3 py-2 text-right">{sklad && m.proba > 0 ? probaPctText(m.proba) : dash}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{m.sklad ?? dash}</td>
                     <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{sklad && m.loc && m.loc !== "-" ? m.loc : dash}</td>
+                    {/* Оборот — у позиций склада; доп. материалы без оборота (в расчёте — 0) */}
+                    <td className="px-3 py-2 text-right">{sklad ? <OborotValue value={m.oborot} /> : dash}</td>
                     <td className="px-3 py-2 text-right font-medium">
                       {/* Позиция склада берётся целиком — масса = вес позиции, без ввода; доп. материал — ввод массы */}
                       {ro || sklad ? (
@@ -628,6 +648,12 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />{w}
               </div>
             ))}
+            {/* Разные обороты материалов — информация, оформление не блокирует */}
+            {oborotInfo && (
+              <div className="mb-2 flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-800">
+                <Info className="w-4 h-4 mt-0.5 shrink-0" />{oborotInfo}
+              </div>
+            )}
             <div className="border border-gray-200 rounded-xl overflow-hidden">
               <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                 {grade ? `Соответствие марке ${grade.name} (${grade.nd})` : "Соответствие марке"}
@@ -734,7 +760,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
   };
   const impText = impuritiesText(grade, shkEls.map(e => e.id), shortName);
   const matName = (m: ShihtaMaterial) => (kindOf(m) === "cup" ? `${m.name} (P = ${str2(m.phosphorPct ?? 0)} %)` : m.name);
-  const LEAD = 4;
+  const LEAD = 5;
   const cols = LEAD + 1 + shkEls.length;
   const dash = <span className="text-gray-400">—</span>;
   const skladCount = mats.filter(isSkladMaterial).length;
@@ -769,6 +795,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
                 <th className="px-3 py-2 text-left font-medium">Шихтовый материал</th>
                 <th className="px-3 py-2 text-left font-medium">Номенкл. № / код</th>
                 <th className="px-3 py-2 text-left font-medium">Плавки</th>
+                <th className="px-3 py-2 text-right font-medium">{OBOROT_LABEL}</th>
                 <th className="px-3 py-2 text-right font-medium">Масса лигатурная, г</th>
                 {shkEls.map(e => <th key={e.id} className="px-3 py-2 text-right font-medium">{e.shortName}</th>)}
               </tr>
@@ -783,6 +810,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
                     {m.code && <span className="ml-2 text-blue-600">{codeLabel(m.code)}</span>}
                   </td>
                   <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{m.plavki.join(", ")}</td>
+                  <td className="px-3 py-2 text-right">{isSkladMaterial(m) ? <OborotValue value={m.oborot} /> : <span className="text-gray-400">—</span>}</td>
                   <td className="px-3 py-2 text-right font-medium">{str2(m.ves)}</td>
                   {shkEls.map(e => {
                     const v = calc.chems[i][e.id] ?? 0;
@@ -904,7 +932,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
   const defaults = (): Partial<ShihtovayaKarta> => {
     const last = karty[karty.length - 1];
     return {
-      name: last?.name ?? "", alloyId: last?.alloyId, oborot: last?.oborot, naznachenie: last?.naznachenie,
+      name: last?.name ?? "", alloyId: last?.alloyId, naznachenie: last?.naznachenie,
       osnovanie: prikaz ? `Приказ № ${prikaz.number} от ${prikaz.date}` : "",
     };
   };
@@ -978,7 +1006,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
                       <td className="px-3 py-2 text-gray-500">{k.date}</td>
                       <td className="px-3 py-2 text-gray-900">{k.name}</td>
                       <td className="px-3 py-2 text-gray-700">{gradeName(k) || dash}</td>
-                      <td className="px-3 py-2 text-gray-600">{k.oborot || dash}</td>
+                      <td className="px-3 py-2"><OborotValue value={shihtaOborot(k.materials).max} /></td>
                       <td className="px-3 py-2 text-right">{k.materials.length}</td>
                       <td className="px-3 py-2 text-right">{str2(kartaMass(k))}</td>
                       <td className="px-3 py-2"><Badge label={k.status} group="shihta" /></td>

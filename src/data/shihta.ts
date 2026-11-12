@@ -1,4 +1,5 @@
 import type { AlloyGrade, AlloyRange, ChemComposition, ShihtaMatKind, ShihtaMaterial, ShihtovayaKarta } from "./mock";
+import { OBOROT_CODE, OBOROT_LIMIT } from "./mock";
 
 // ── Строки карты ──
 // Вид строки: у старых записей без kind — по номенкл. № (позиция склада) или «прочее»
@@ -36,7 +37,6 @@ export const CUP_SHARE_MAX = 0.19;
 // Фосфор лигатуры по ГОСТ 4515, %
 export const P_MIN = 8.0;
 export const P_MAX = 11.0;
-export const OBOROT_MAX = 5;
 
 const numOf = (v: string | number | undefined) => {
   const n = typeof v === "number" ? v : parseFloat(String(v ?? "").replace(",", "."));
@@ -148,10 +148,9 @@ export class ShihtaCalc {
 export const baseElement = (g: AlloyGrade) => g.base.toLowerCase();
 
 // Предупреждения (не блокируют оформление)
-export function shihtaWarnings(calc: ShihtaCalc, opts: { oborot?: string; minAffinage?: number }): string[] {
+// Проверки по обороту — только для марки с оборотом (СрМ 92,5), см. oborotWarnings
+export function shihtaWarnings(calc: ShihtaCalc, opts: { minAffinage?: number }): string[] {
   const out: string[] = [];
-  const ob = parseInt(opts.oborot ?? "", 10);
-  if (Number.isFinite(ob) && ob > OBOROT_MAX) out.push(`Оборот превышает ${OBOROT_MAX} (ТИ 10.65-25)`);
   const g = calc.grade;
   if (g && opts.minAffinage != null && calc.mass > 0) {
     const n = calc.affinagePct(baseElement(g));
@@ -209,6 +208,52 @@ export function impuritiesText(g: AlloyGrade | undefined, shown: string[], label
     .join(" · ");
 }
 
+// ── Оборот шихты ─────────────────────────────────────────────────────────────
+// Оборот ведётся для марки сплава с кодом материала OBOROT_CODE (СрМ 92,5). Оборот шихты — максимум оборотов
+// её материалов; материалы без оборота (аффинированное серебро, медь МО, лигатура) считаются как 0.
+export const isOborotGrade = (g: Pick<AlloyGrade, "materialCode"> | undefined) => g?.materialCode === OBOROT_CODE;
+export const oborotOfMaterial = (m: Pick<ShihtaMaterial, "oborot" | "kind" | "nomenkl">) => (kindOf(m) === "sklad" ? m.oborot ?? 0 : 0);
+
+export interface ShihtaOborot {
+  // Итоговый оборот шихты
+  max: number;
+  // Материалы с максимальным оборотом (при max > 0)
+  maxAt: ShihtaMaterial[];
+  // Различные обороты материалов СрМ 925 шихты (по возрастанию)
+  levels: number[];
+  // Материалы с предельным оборотом (≥ OBOROT_LIMIT)
+  over: ShihtaMaterial[];
+}
+
+export function shihtaOborot(materials: ShihtaMaterial[]): ShihtaOborot {
+  const max = Math.max(0, ...materials.map(oborotOfMaterial));
+  const tracked = materials.filter(m => kindOf(m) === "sklad" && (m.code === OBOROT_CODE || (m.oborot ?? 0) > 0));
+  return {
+    max,
+    maxAt: max > 0 ? materials.filter(m => oborotOfMaterial(m) === max) : [],
+    levels: [...new Set(tracked.map(oborotOfMaterial))].sort((a, b) => a - b),
+    over: materials.filter(m => oborotOfMaterial(m) >= OBOROT_LIMIT),
+  };
+}
+
+// Подсказка к полю «Оборот» шапки карты: у какой позиции максимум
+export function oborotHintText(o: ShihtaOborot): string {
+  if (o.max === 0) return "Оборот шихты рассчитывается: максимум оборотов материалов шихты. Материалы без оборота (аффинированное серебро, медь МО, лигатура) — 0";
+  return `Максимальный оборот ${o.max} — ${o.maxAt.map(m => `«${m.name}»${m.nomenkl ? ` (${m.nomenkl})` : ""}`).join(", ")}`;
+}
+
+// Предупреждения по обороту (не блокируют оформление) — только для марки СрМ 92,5
+export function oborotWarnings(o: ShihtaOborot, g: AlloyGrade | undefined): string[] {
+  if (!isOborotGrade(g) || o.over.length === 0) return [];
+  return [`В шихте позиции с предельным оборотом (${OBOROT_LIMIT} и более): ${o.over.map(m => `«${m.name}» — ${oborotOfMaterial(m)}`).join(", ")}. Рекомендуется передать на аффинаж`];
+}
+
+// Информационная строка: в шихте материалы разных оборотов
+export function oborotInfoText(o: ShihtaOborot, g: AlloyGrade | undefined): string | null {
+  if (!isOborotGrade(g) || o.levels.length < 2) return null;
+  return `В шихте материалы оборотов: ${o.levels.join(", ")} — итоговый оборот ${o.max}`;
+}
+
 // ── Приказ на плавку: несколько шихтовых карт ─────────────────────────────────
 // Статус приказа по картам: есть карта на редактировании (или карт нет) — «На редактировании»;
 // все выполнены — «Выполнена»; иначе — «Новая» (оформлен, доступен для выдачи на плавку).
@@ -244,6 +289,7 @@ export function itogoMaterials(karty: ShihtovayaKarta[]): ItogoMaterial[] {
       for (const [e, v] of Object.entries(m.chem ?? {})) chem[e] = r2(numOf(chem[e]) + numOf(v)).toFixed(2);
       out.set(key, {
         ...cur, ves: r2(cur.ves + m.ves), qty: (cur.qty ?? 0) + (m.qty ?? 0) || undefined, chem,
+        ...(cur.oborot != null || m.oborot != null ? { oborot: Math.max(cur.oborot ?? 0, m.oborot ?? 0) } : {}),
         plavki: cur.plavki.includes(k.plavkaNo) ? cur.plavki : [...cur.plavki, k.plavkaNo],
       });
     }

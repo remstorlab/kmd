@@ -4,12 +4,12 @@ import {
   Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, usePaged, PageHeader,
   ExportBtn, SearchInput, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, probaText, NetAuAg, NET_AU_AG,
-  CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp,
+  CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
-import { GPItem, DMItem, SDM1, SDM2, SGP } from "../data/mock";
+import { GPItem, DMItem, SDM1, SDM2, SGP, oborotOf, OBOROT_LIMIT } from "../data/mock";
 import { Coins } from "lucide-react";
 import DMPositionViewModal from "../components/DMPositionViewModal";
-import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, parseLoc, NO_LOC } from "../components/DMPositionFormModal";
+import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, parseLoc, NO_LOC, oborotFromForm } from "../components/DMPositionFormModal";
 import { useScreen } from "../router";
 
 // Позиции учёта ГП в виде позиций склада ДМ — склад один, показываются все классы.
@@ -144,6 +144,8 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
     klass: same(i => i.klass) ?? "Слиток", code: same(i => i.metal) ?? items[0].metal,
     kol: "1", unit: "шт", proba: "",
     lig: totalLig.toFixed(2), net: totalNet.toFixed(2), seyf: loc.seyf, polka: loc.polka, chem,
+    // Оборот объединённой позиции — максимальный среди объединяемых
+    oborot: String(Math.max(0, ...items.map(oborotOf))),
   }));
 
   const codeLabel = useMaterialCodeLabel();
@@ -165,12 +167,13 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
           <th className={th}>Проба</th>
           <th className="px-3 py-1.5 text-right font-medium">Вес лигат.</th>
           <th className="px-3 py-1.5 text-right font-medium">{NET_AU_AG}</th>
+          <th className={th}>{OBOROT_LABEL}</th>
           <th className={th}>Место хранения</th>
           <th className={th}>Статус</th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {pageItems.map(it => (
-            <tr key={it.id} className="h-8">
+            <tr key={it.id} className={`h-8 ${oborotRowCls(oborotOf(it))}`}>
               <td className="px-3 py-1.5 text-gray-500">{it.nomenkl}</td>
               <td className="px-3 py-1.5 font-medium text-gray-900">{it.name}</td>
               <td className="px-3 py-1.5">{it.qty || "—"}</td>
@@ -179,17 +182,18 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
               <td className="px-3 py-1.5">{probaText(it.proba)}</td>
               <td className="px-3 py-1.5 text-right">{it.ligWeight.toFixed(2)}</td>
               <td className="px-3 py-1.5 text-right"><NetAuAg chem={it.chem} /></td>
+              <td className="px-3 py-1.5"><OborotValue value={oborotOf(it)} /></td>
               <td className="px-3 py-1.5 text-gray-500">{it.location}</td>
               <td className="px-3 py-1.5"><PosStatusBadge status={it.status} nomenkl={it.nomenkl} /></td>
             </tr>
           ))}
-          {Array.from({ length: fillers }, (_, i) => <tr key={`f${i}`} className="h-8"><td colSpan={10}></td></tr>)}
+          {Array.from({ length: fillers }, (_, i) => <tr key={`f${i}`} className="h-8"><td colSpan={11}></td></tr>)}
         </tbody>
         <tfoot><tr className="bg-gray-50 font-semibold border-t border-gray-200">
           <td colSpan={6} className="px-3 py-1.5 text-xs uppercase text-gray-600">Итого</td>
           <td className="px-3 py-1.5 text-right">{totalLig.toFixed(2)}</td>
           <td className="px-3 py-1.5 text-right">{totalNet.toFixed(2)}</td>
-          <td colSpan={2}></td>
+          <td colSpan={3}></td>
         </tr></tfoot>
       </table>
       {pager}
@@ -213,6 +217,9 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
   );
 }
 
+// Значение фильтра «Оборот»: позиции с предельным оборотом
+const OBOROT_LIMIT_OPT = `≥ ${OBOROT_LIMIT}`;
+
 // ── Остатки на складе (СДМ №1 / СДМ №2) ─────────────────────────────────────
 // Экран одного склада: только позиции со значением «Склад» = sklad. Приём и выдача здесь не оформляются —
 // только в «Складских операциях» (Приход / Выдача); на экране — просмотр, смена места хранения и объединение.
@@ -230,6 +237,8 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
   // Код материала (по подписи из справочника) и проба — множественный выбор
   const [filterCode, setFilterCode] = useState<string[]>([]);
   const [filterProba, setFilterProba] = useState<string[]>([]);
+  // Оборот — множественный выбор значений; «≥ 5» — позиции с предельным оборотом
+  const [filterOborot, setFilterOborot] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Экраны: /sklady/sdmN/view/:id, /sklady/sdmN/merge, /sklady/sdmN/mesto/:id
@@ -257,11 +266,14 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
     const matchStatus = filterStatus.length === 0 || filterStatus.includes(it.status);
     const matchCode = filterCode.length === 0 || filterCode.includes(codeLabel(it.metal));
     const matchProba = filterProba.length === 0 || filterProba.includes(String(it.proba));
-    return matchSearch && matchKlass && matchStatus && matchCode && matchProba;
+    const ob = oborotOf(it);
+    const matchOborot = filterOborot.length === 0 || filterOborot.includes(String(ob)) || (filterOborot.includes(OBOROT_LIMIT_OPT) && ob >= OBOROT_LIMIT);
+    return matchSearch && matchKlass && matchStatus && matchCode && matchProba && matchOborot;
   });
   // Варианты фильтров — из позиций этого склада
   const codeOptions = Array.from(new Set(skladItems.filter(it => it.metal).map(it => codeLabel(it.metal)))).sort();
   const probaOptions = Array.from(new Set(skladItems.filter(it => it.proba).map(it => String(it.proba)))).sort((a, b) => Number(a) - Number(b));
+  const oborotOptions = [...Array.from(new Set(skladItems.map(it => String(oborotOf(it))))).sort((a, b) => Number(a) - Number(b)), OBOROT_LIMIT_OPT];
   const { sorted, sort, toggleSort } = useSort(filtered, {
     name: it => it.name,
     nomenkl: it => it.nomenkl,
@@ -271,6 +283,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
     proba: it => it.proba,
     ligWeight: it => it.ligWeight,
     netWeight: it => it.netWeight,
+    oborot: it => oborotOf(it),
     location: it => it.location,
     sklad: it => it.sklad,
     status: it => it.status,
@@ -311,6 +324,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
       status: "На складе",
       chem: p.chem,
       info: p.info || undefined,
+      ...(oborotFromForm(p.oborot) ? { oborot: oborotFromForm(p.oborot) } : {}),
       ...(new Set(mergeItems.map(it => it.zakazchik)).size === 1 && mergeItems[0].zakazchik
         ? { zakazchik: mergeItems[0].zakazchik, ownProperty: mergeItems.every(it => it.ownProperty) }
         : {}),
@@ -355,11 +369,15 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
           <label className="block text-xs font-medium text-gray-500 mb-1">Проба</label>
           <MultiSelect values={filterProba} options={probaOptions} onChange={setFilterProba} allLabel="Все пробы" />
         </div>
+        <div className="min-w-28">
+          <label className="block text-xs font-medium text-gray-500 mb-1">{OBOROT_LABEL}</label>
+          <MultiSelect values={filterOborot} options={oborotOptions} onChange={setFilterOborot} allLabel="Все" />
+        </div>
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
           <MultiSelect values={filterStatus} options={["На складе", "Резерв", "В подотчёте", "Закрыта"]} onChange={setFilterStatus} allLabel="Все статусы" />
         </div>
-        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus([]); setFilterCode([]); setFilterProba([]); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+        <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus([]); setFilterCode([]); setFilterProba([]); setFilterOborot([]); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
           Сбросить фильтры
         </button>
       </div>
@@ -382,6 +400,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort}>Проба</SortTh>
               <SortTh sortKey="ligWeight" sort={sort} onSort={toggleSort}>Вес лигат.</SortTh>
               <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort}>{NET_AU_AG}</SortTh>
+              <SortTh sortKey="oborot" sort={sort} onSort={toggleSort}>{OBOROT_LABEL}</SortTh>
               <SortTh sortKey="sklad" sort={sort} onSort={toggleSort}>Склад</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort}>Место хранения</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
@@ -391,7 +410,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {pageItems.map(item => (
-              <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${oborotRowCls(oborotOf(item))}`}>
                 <td className="px-4 py-3"><input type="checkbox" checked={selected.has(item.id) && canMerge(item)} onChange={() => toggleSelect(item.id)} disabled={!canMerge(item)} title={canMerge(item) ? undefined : `Позиция «${item.status}» — объединение недоступно`} /></td>
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
@@ -401,6 +420,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
                 <td className="px-4 py-3">{probaText(item.proba)}</td>
                 <td className="px-4 py-3">{item.ligWeight}</td>
                 <td className="px-4 py-3"><NetAuAg chem={item.chem} /></td>
+                <td className="px-4 py-3"><OborotValue value={oborotOf(item)} /></td>
                 <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{item.sklad}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><PosStatusBadge status={item.status} nomenkl={item.nomenkl} /></td>
@@ -417,7 +437,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
                 </td>
               </tr>
             ))}
-            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={14} />
+            <FillerRows count={fillerCount(filtered.length, page, perPage)} cols={15} />
           </tbody>
         </table>
         <Pagination page={page} total={filtered.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />

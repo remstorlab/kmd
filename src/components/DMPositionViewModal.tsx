@@ -1,6 +1,6 @@
 import React from "react";
 import { Badge, PosStatusBadge, Btn, Modal, Field, Input, useMaterialCodeLabel } from "./ui";
-import { ChemComposition, isStoneKlass } from "../data/mock";
+import { ChemComposition, isStoneKlass, OBOROT_HINT, oborotOver } from "../data/mock";
 import { mainElementOf } from "../data/chem";
 import { useApp } from "../store/AppContext";
 import ChemCompositionBlock from "./ChemCompositionBlock";
@@ -19,6 +19,8 @@ export interface DMPositionView {
   status?: string;
   chem?: ChemComposition;
   info?: string;
+  // Оборот позиции (не задан — 0)
+  oborot?: number | null;
 }
 
 const val = (v: number | null | undefined) => (v === null || v === undefined ? "—" : String(v));
@@ -37,6 +39,12 @@ export default function DMPositionViewModal({ item, onClose }: { item: DMPositio
         <Field label="Количество"><Input value={val(item.qty)} disabled /></Field>
         <Field label="Проба"><Input value={val(item.proba)} disabled /></Field>
         <Field label="Лигатурный вес г"><Input value={val(item.ligWeight)} disabled /></Field>
+        <Field label="Оборот">
+          <div className={oborotOver(item.oborot) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(item.oborot) ? OBOROT_HINT : undefined}>
+            <Input value={String(item.oborot ?? 0)} disabled />
+          </div>
+          {oborotOver(item.oborot) && <div className="text-xs text-red-600 mt-1">{OBOROT_HINT}</div>}
+        </Field>
         <Field label="Место хранения" full><Input value={item.location || "—"} disabled /></Field>
         <Field label="Доп. информация" full><Input value={item.info || "—"} disabled /></Field>
         <Field label="Статус">{item.status ? <PosStatusBadge status={item.status} nomenkl={item.nomenkl} /> : <Input value="—" disabled />}</Field>

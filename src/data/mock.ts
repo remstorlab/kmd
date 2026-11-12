@@ -45,9 +45,25 @@ export type Metal = "Au" | "Ag" | "Pt" | "Pd";
 // Извлекает базовый металл (Au/Ag/Pt/Pd) по значению поля «Код материала»:
 // поле хранит код из справочника «Коды материалов», металл — префикс его краткого наименования.
 export function baseMetal(code: string, codes: MaterialCode[] = initialMaterialCodes): Metal {
-  const prefix = (codes.find(c => c.code === code)?.shortName ?? code).slice(0, 2);
-  return prefix === "Au" || prefix === "Ag" || prefix === "Pt" || prefix === "Pd" ? prefix : "Au";
+  const c = codes.find(x => x.code === code);
+  const prefix = (c?.shortName ?? code).slice(0, 2);
+  if (prefix === "Au" || prefix === "Ag" || prefix === "Pt" || prefix === "Pd") return prefix;
+  // Сплав с кратким наименованием по ГОСТ (СрМ 925): металл — первый элемент состава кода
+  const main = Object.keys(c?.composition ?? {})[0];
+  return main === "ag" ? "Ag" : main === "pt" ? "Pt" : main === "pd" ? "Pd" : "Au";
 }
+
+// ── Оборот позиции ДМ ──
+// Оборот — сколько раз металл прошёл переплав. Ведётся для позиций СрМ 925 (код материала OBOROT_CODE, он же
+// марка сплава «СрМ 92,5» шихтовых карт) и для продукции, полученной из них в операциях движения материала;
+// у остальных материалов — 0. При возврате с плавки по ШК марки СрМ 92,5 новые позиции получают оборот ШК + 1,
+// в прочих операциях новые позиции наследуют оборот выданного СрМ 925 (максимальный).
+export const OBOROT_CODE = "0925";
+// Предельный оборот: при нём и выше металл рекомендуется передать на аффинаж
+export const OBOROT_LIMIT = 5;
+export const OBOROT_HINT = `Достигнут предельный оборот (${OBOROT_LIMIT}). Рекомендуется передать на аффинаж`;
+export const oborotOf = (x: { oborot?: number } | null | undefined) => x?.oborot ?? 0;
+export const oborotOver = (v: number | null | undefined) => (v ?? 0) >= OBOROT_LIMIT;
 
 export interface DMItem {
   // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
@@ -72,6 +88,8 @@ export interface DMItem {
   chem?: ChemComposition;
   // Доп. информация из формы позиции ДМ
   info?: string;
+  // Оборот (целое ≥ 0): число переплавов металла СрМ 925; у остальных материалов — 0 (не задан)
+  oborot?: number;
   // Исходная запись, из которой выделена эта часть при частичной выдаче / резерве (см. data/stock.ts)
   parentId?: string;
 }
@@ -121,6 +139,8 @@ export interface VydachaDocPosition {
   sklad?: string;
   // Химический состав (для подсказки у чистого веса)
   chem?: ChemComposition;
+  // Оборот позиции склада ДМ
+  oborot?: number;
   issue: number;
   // Частичная выдача (issue < qty): лигатурный вес выдаваемой части, г (вводится вручную);
   // остаток на складе = lig − issueLig (см. IssueLine в data/stock.ts)
@@ -145,6 +165,9 @@ export const lossWeight = (l: OperLoss) =>
 export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string; metal?: string; lig?: number; net?: number;
   // id записи склада ДМ, из которой выдана позиция (при частичной выдаче — выделенная часть)
   srcId?: string;
+  // Оборот позиции (СрМ 925): выдача — оборот записи склада; возврат — из выдачи сохраняется,
+  // новая позиция — оборот ШК + 1 (плавка СрМ 92,5) или оборот выданного СрМ 925 (прочие операции)
+  oborot?: number;
   // Доп. информация из формы позиции ДМ
   info?: string };
 
@@ -180,6 +203,8 @@ export interface Operation {
   docType?: string;
   zakazchik?: string;
   plavkaNo?: string;
+  // Плавка: шихтовые карты, выданные по «Выдать по ШК» (для расчёта оборота позиций возврата)
+  shihtaIds?: string[];
   vydal?: string;
   poluchil?: string;
 }
@@ -207,6 +232,8 @@ export interface ShihtaMaterial {
   sklad?: string;
   // Код материала позиции склада (справочник «Коды материалов»)
   code?: string;
+  // Оборот позиции склада (у доп. материалов и материалов без оборота — 0)
+  oborot?: number;
 }
 
 // Позиция карты, выданная в другой операции: наименование, номенкл. № и документ выдачи
@@ -221,7 +248,7 @@ export interface ShihtovayaKarta {
   status: ShihtaStatus;
   // Марка сплава — id записи справочника «Марки сплавов»
   alloyId?: string;
-  // Оборот: число или «чистая»
+  // Оборот шихты — расчётный: максимум оборотов материалов шихты (data/shihta.ts, shihtaOborot); хранится числом-строкой
   oborot?: string;
   // Назначение слитков — значение справочника «Назначение слитков»
   naznachenie?: string;
@@ -375,6 +402,7 @@ const CODE_COMPOSITION: Record<string, Record<string, number>> = {
   "0800": { au: 95, ag: 2.5, cu: 2.5 },               // ЗлСрМ 950
   "8000": { au: 37.5, ag: 2, cu: 60.5 },              // ЗлСрМ 375-20
   "7000": { au: 37.5, ag: 10, cu: 52.5 },             // ЗлСрМ 375-100
+  "0925": { ag: 92.5, cu: 7.5 },                      // СрМ 925 (марка сплава СрМ 92,5)
 };
 const mainOf = (code: string) => Object.keys(CODE_COMPOSITION[code] ?? {})[0] ?? "au";
 
@@ -515,7 +543,7 @@ export const initialDMItems: DMItem[] = [
   // Резерв шихтовой карты плавки № 47 (СрМ 92,5) — перемещены на СДМ2, карта доступна для плавки
   dmX("dm40", "Слиток серебра СрА-1", "5015420", "Слиток", "2000", 999.9, 22500.00, { ag: 22497.75 }, L(1, 2), "Резерв", SDM2),
   dmX("dm41", "Отходы Ср 99,99", "5015421", "Отходы", "2000", 999.9, 20463.80, { ag: 20461.76 }, L(3, 1), "Резерв", SDM2),
-  dmX("dm42", "Отходы СрМ 92,5", "5015422", "Отходы", "2000", 925, 28578.70, { ag: 26435.32 }, L(3, 2), "Резерв", SDM2),
+  dmX("dm42", "Отходы СрМ 92,5", "5015422", "Отходы", "0925", 925, 28578.70, { ag: 26435.32 }, L(3, 2), "Резерв", SDM2),
   // Резерв шихтовой карты плавки № 13 (ЗлСрМ 750-150, черновик) — на СДМ1 (требование ТР-0013 в работе)
   dmX("dm43", "Н/п чеканки «Барс»", "5015423", "НП чеканки", "0500", 589.5, 3431.59, { au: 2022.95, ag: 261.04 }, L(2, 2), "Резерв", SDM1),
   dmX("dm44", "Отходы Зл 99,99", "5015424", "Отходы", "1000", 999.9, 4000.00, { au: 3999.60 }, L(1, 1), "Резерв", SDM1),
@@ -523,17 +551,23 @@ export const initialDMItems: DMItem[] = [
   // Остатки для шихтовых карт: серебро и золото с фактическими пробами (99,99; 92,50; 92,52)
   dmX("dm46", "Слиток серебра СрА-5", "5015426", "Слиток", "2000", 999.9, 22500.00, { ag: 22497.75 }, L(1, 2)),
   dmX("dm47", "Отходы Ср 99,99", "5015427", "Отходы", "2000", 999.9, 20463.80, { ag: 20461.76 }, L(3, 1)),
-  dmX("dm48", "Отходы СрМ 92,5", "5015428", "Отходы", "2000", 925, 28578.70, { ag: 26435.32 }, L(3, 2)),
+  dmX("dm48", "Отходы СрМ 92,5", "5015428", "Отходы", "0925", 925, 28578.70, { ag: 26435.32 }, L(3, 2)),
   dmX("dm49", "Отходы Зл 999", "5015429", "Отходы", "1000", 999.9, 3010.00, { au: 3009.70 }, L(2, 1)),
-  dm1("dm50", "Стружка серебряная СрМ 92,52", "5015430", "Стружка", "2000", 925.2, 1250.40, L(4, 1)),
+  dm1("dm50", "Стружка серебряная СрМ 92,52", "5015430", "Стружка", "0925", 925.2, 1250.40, L(4, 1)),
   dm1("dm51", "Отходы ЗлСрМ 585-80", "5015431", "Отходы", "0500", 585, 512.30, L(4, 2)),
   dm("dm52", "Гранулы серебра Ag 99,99", "5015432", "Гранулы", "2000", 999.9, 800.00, L(2, 1)),
   // Карта плавки № 46: СрА-6 в резерве; отходы СрМ 92,5 выданы в операцию «Отбор пробы» (№ 1235) — карта на редактировании
   dmX("dm53", "Слиток серебра СрА-6", "5015433", "Слиток", "2000", 999.9, 1500.00, { ag: 1499.85 }, L(1, 2), "Резерв", SDM2),
-  dmX("dm54", "Отходы СрМ 92,5", "5015434", "Отходы", "2000", 925, 2000.00, { ag: 1850.00 }, "-", "В подотчёте", SDM2),
+  dmX("dm54", "Отходы СрМ 92,5", "5015434", "Отходы", "0925", 925, 2000.00, { ag: 1850.00 }, "-", "В подотчёте", SDM2),
   // Резерв шихтовой карты плавки № 48 (СрМ 92,5, приказ № 1240) — на СДМ2
   dmX("dm55", "Слиток серебра СрА-1", "5015435", "Слиток", "2000", 999.9, 70000.00, { ag: 69993.00 }, L(1, 2), "Резерв", SDM2),
+  // Перфолента СрМ 92,5 после вырубки — возврат в шихту
+  dmX("dm56", "Перфолента СрМ 92,5", "5015436", "Перфолента", "0925", 925, 4200.00, { ag: 3885.00 }, L(2, 2), "На складе", SDM2),
 ];
+
+// Оборот позиций СрМ 925 (демо): у остальных материалов не задан (0)
+const DEMO_OBOROT: Record<string, number> = { dm42: 3, dm48: 4, dm50: 5, dm54: 2, dm56: 2 };
+for (const it of initialDMItems) if (DEMO_OBOROT[it.id] != null) it.oborot = DEMO_OBOROT[it.id];
 
 // Заказчик и признак собственности заказчика — из документов приёма. По умолчанию — «Монетный двор»
 // (собственный материал); давальческий материал Национального банка — собственность заказчика.
@@ -605,7 +639,7 @@ const opPos = (n: number, id: string, loc: string, over: Partial<OperPosition> =
   const lig = over.lig ?? i.ligWeight;
   const chem = chemOf(i.metal, lig, i.proba);
   const net = netOf(i.metal, chem);
-  return { n, name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: i.qty, ves: lig, ag: chem.ag ?? "-", cu: chem.cu ?? "-", chem, loc, metal: i.metal, lig, net, ...over };
+  return { n, name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: i.qty, ves: lig, ag: chem.ag ?? "-", cu: chem.cu ?? "-", chem, loc, metal: i.metal, lig, net, ...(i.oborot ? { oborot: i.oborot } : {}), ...over };
 };
 // Новая позиция возврата (создана при возврате, на склад ещё не поставлена)
 const newPos = (n: number, name: string, nomenkl: string, klass: string, metal: string, proba: number, lig: number, loc: string, qty?: number): OperPosition => {
@@ -675,7 +709,7 @@ export const initialOperations: Operation[] = [
 // Позиция склада в карте: масса в шихту = лигатурный вес позиции, состав — из записи склада
 const shMat = (id: string): ShihtaMaterial => {
   const i = initialDMItems.find(x => x.id === id)!;
-  return { kind: "sklad", name: i.name, nomenkl: i.nomenkl, klass: i.klass, code: i.metal, proba: i.proba, ves: i.ligWeight, loc: i.location, qty: i.qty, chem: i.chem, sklad: i.sklad };
+  return { kind: "sklad", name: i.name, nomenkl: i.nomenkl, klass: i.klass, code: i.metal, proba: i.proba, ves: i.ligWeight, loc: i.location, qty: i.qty, chem: i.chem, sklad: i.sklad, oborot: i.oborot ?? 0 };
 };
 // Позиция, уже израсходованная в плавке (выполненная карта): содержание драгметаллов, г; Cu — остаток
 const shDone = (name: string, nomenkl: string, klass: string, code: string, proba: number, ves: number, metals: Record<string, number>): ShihtaMaterial => {
@@ -693,13 +727,13 @@ const shMedMO = (ves: number): ShihtaMaterial => ({ kind: "medMO", name: "Мед
 export const initialShihtovyeKarty: ShihtovayaKarta[] = [
   {
     id: "sk1", date: "20.08.2026", name: "Шихта СрМ 92,5 (монеты коллекционные)", plavkaNo: "47", status: "Новая",
-    alloyId: "agm-925", oborot: "7", naznachenie: "Монеты коллекционные (пруф, пруф-лайк)",
+    alloyId: "agm-925", naznachenie: "Монеты коллекционные (пруф, пруф-лайк)",
     materials: [shCuP(127.55, 8.51), shMat("dm40"), shMat("dm41"), shMat("dm42"), shMedMO(3360)],
     prikazId: "pp1", createdAt: "2026-08-20T11:20:00", createdBy: "Бекова Айгуль Маратовна",
   },
   {
     id: "sk6", date: "20.08.2026", name: "Шихта СрМ 92,5 (монеты коллекционные)", plavkaNo: "48", status: "Новая",
-    alloyId: "agm-925", oborot: "чистая", naznachenie: "Монеты коллекционные (пруф, пруф-лайк)", osnovanie: "Приказ № 1240 от 20.08.2026",
+    alloyId: "agm-925", naznachenie: "Монеты коллекционные (пруф, пруф-лайк)", osnovanie: "Приказ № 1240 от 20.08.2026",
     materials: [shCuP(129, 8.51), shMat("dm55"), shMedMO(5550)],
     prikazId: "pp1", createdAt: "2026-08-20T11:45:00", createdBy: "Бекова Айгуль Маратовна",
   },
@@ -730,7 +764,7 @@ export const initialShihtovyeKarty: ShihtovayaKarta[] = [
   },
   {
     id: "sk4", date: "13.01.2026", name: "Шихта Ср 99,99 (инвестиционные монеты)", plavkaNo: "1", status: "Выполнена",
-    alloyId: "ag-9999", oborot: "чистая", naznachenie: "Инвестиционные монеты",
+    alloyId: "ag-9999", naznachenie: "Инвестиционные монеты",
     materials: [
       shDone("Слиток серебра СрА 99,99", "5015360", "Слиток", "2000", 999.9, 92000.00, { ag: 91990.80 }),
       shDone("Отходы Ср 99,99", "5015364", "Отходы", "2000", 999.9, 48983.00, { ag: 48978.11 }),
@@ -738,6 +772,9 @@ export const initialShihtovyeKarty: ShihtovayaKarta[] = [
     prikazId: "pp5", createdAt: "2026-01-13T08:30:00", createdBy: "Петров Сергей Владимирович",
   },
 ];
+
+// Оборот шихты — максимум оборотов её материалов (материалы без оборота — 0)
+for (const k of initialShihtovyeKarty) k.oborot = String(Math.max(0, ...k.materials.map(m => m.oborot ?? 0)));
 
 export const initialPrikazy: PrikazPlavka[] = [
   { id: "pp1", number: "1240", date: "20.08.2026", name: "Слитки СрМ 92,5 для монет пруф-качества", createdAt: "2026-08-20T11:00:00", createdBy: "Бекова Айгуль Маратовна" },
@@ -1175,6 +1212,7 @@ export const initialAlloyGrades: AlloyGrade[] = [
   grade("ag-9999", "Ср 99,99", "Ag", "ГОСТ 6836-2002", [ag(99.99, undefined, 99.99)], undefined, { materialCode: "2000" }),
   grade("ag-999", "Ср 99,9", "Ag", "ГОСТ 6836-2002", [ag(99.9, undefined, 99.9)], undefined, { materialCode: "2000" }),
   grade("agm-925", "СрМ 92,5", "Ag", "ГОСТ 6836-2002", [ag(92.2, 92.8, 92.5)], "cu", {
+    materialCode: "0925",
     impurities: { pb: 0.004, fe: 0.1, sb: 0.002, bi: 0.002, total: 0.11 },
   }),
   grade("agm-80", "СрМ 80", "Ag", "ГОСТ 6836-2002", [ag(79.7, 80.3, 80)], "cu"),
@@ -1308,6 +1346,7 @@ export const initialMaterialCodes: MaterialCode[] = [
   { code: "8000", name: "Сплав ЗлСрМ 375-20", shortName: "ЗлСрМ 375-20", composition: CODE_COMPOSITION["8000"] },
   { code: "7000", name: "Сплав ЗлСрМ 375-100", shortName: "ЗлСрМ 375-100", composition: CODE_COMPOSITION["7000"] },
   { code: "0050", name: "Бриллиантовые вставки", shortName: "Брилл. вставки" },
+  { code: "0925", name: "Сплав СрМ 925", shortName: "СрМ 925", composition: CODE_COMPOSITION["0925"] },
 ];
 
 // --- Классы материалов ---

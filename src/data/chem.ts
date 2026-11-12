@@ -27,8 +27,11 @@ export type ChemPercent = Record<string, string>;
 // Основной металл кода (au / ag / pt / pd) — к нему относится проба: префикс краткого наименования кода
 // (как baseMetal в data/mock.ts), по умолчанию — золото
 export const mainElementOf = (code: string, codes: MaterialCode[]) => {
-  const prefix = (codes.find(c => c.code === code)?.shortName ?? code).slice(0, 2);
-  return prefix === "Au" || prefix === "Ag" || prefix === "Pt" || prefix === "Pd" ? prefix.toLowerCase() : "au";
+  const c = codes.find(x => x.code === code);
+  const prefix = (c?.shortName ?? code).slice(0, 2);
+  if (prefix === "Au" || prefix === "Ag" || prefix === "Pt" || prefix === "Pd") return prefix.toLowerCase();
+  // Сплав с кратким наименованием по ГОСТ (СрМ 925) — первый элемент состава кода
+  return Object.keys(c?.composition ?? {})[0] ?? "au";
 };
 
 // Справочное содержание кода материала, % (пусто — у кода состав не задан)

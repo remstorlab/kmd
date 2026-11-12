@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Eye, Pencil, Trash2, Printer, Search, X, FileDown, Paperclip, Download, Check, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Plus } from "lucide-react";
-import { initialMaterialClasses, MaterialCode, StatusColor, StatusGroup, ChemComposition } from "../data/mock";
+import { initialMaterialClasses, MaterialCode, StatusColor, StatusGroup, ChemComposition, OBOROT_HINT, oborotOver } from "../data/mock";
 import { useApp } from "../store/AppContext";
 
 // ── Badge ────────────────────────────────────────────────────────────────────
@@ -86,6 +86,18 @@ export function Badge({ label, group }: { label: string; group?: StatusGroup }) 
     </span>
   );
 }
+
+// ── Оборот позиции в таблицах ────────────────────────────────────────────────
+// Целое ≥ 0 (не задан — 0). При обороте ≥ OBOROT_LIMIT значение выделяется красным с подсказкой
+// «Достигнут предельный оборот…»; строку таблицы подсвечивает oborotRowCls.
+export const OBOROT_LABEL = "Оборот";
+export function OborotValue({ value }: { value?: number | null }) {
+  const v = value ?? 0;
+  return oborotOver(v)
+    ? <span className="inline-flex items-center px-1.5 rounded bg-red-100 text-red-700 font-semibold tabular-nums cursor-help" title={OBOROT_HINT}>{v}</span>
+    : <span className="tabular-nums">{v}</span>;
+}
+export const oborotRowCls = (value?: number | null) => (oborotOver(value) ? "bg-red-50/70" : "");
 
 // ── Проба в таблицах позиций ─────────────────────────────────────────────────
 export const probaText = (proba: number | string | null | undefined) =>

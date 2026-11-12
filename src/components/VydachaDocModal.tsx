@@ -3,7 +3,7 @@ import {
   Badge, Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
   InfoField,
-  NetAuAg, NET_AU_AG,
+  NetAuAg, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, MAIN_SKLAD, SGP, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -76,7 +76,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   // Выдача формируется только со СДМ2: позиции склада приёмки сначала перемещаются по требованию.
   const stock = useMemo<StockRow[]>(() => {
     const fromGp: StockRow[] = gpItems.filter(i => i.sklad === MAIN_SKLAD).map(i => ({ id: i.id, src: "gp", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.code, qty: i.qty, unit: i.unit, proba: i.proba ?? null, lig: i.ligWeight ?? null, net: i.netWeight ?? null, location: i.location, sklad: i.sklad, chem: i.chem }));
-    const fromDm: StockRow[] = dmItems.filter(i => i.sklad === MAIN_SKLAD).map(i => ({ id: i.id, src: "dm", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem }));
+    const fromDm: StockRow[] = dmItems.filter(i => i.sklad === MAIN_SKLAD).map(i => ({ id: i.id, src: "dm", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт", proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem, oborot: i.oborot ?? 0 }));
     const available = [
       ...gpItems.filter(i => canIssue(i.status)).map(i => i.id),
       ...dmItems.filter(i => canIssue(i.status)).map(i => i.id),
@@ -133,6 +133,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     klass: p => p.klass,
     code: p => codeLabel(p.code),
     issue: p => p.issue,
+    oborot: p => p.oborot ?? 0,
     lig: p => p.lig ?? 0,
     net: p => p.net ?? 0,
     location: p => p.location,
@@ -259,12 +260,13 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               <SortTh sortKey="issue" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
               <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
+              <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
               {!lockPos && <th className="w-12"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {pg12.pageItems.map(p => (
-                <tr key={p.id} className="hover:bg-gray-50">
+                <tr key={p.id} className={`hover:bg-gray-50 ${oborotRowCls(p.oborot)}`}>
                   <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
@@ -272,11 +274,12 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                   <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos)}</td>
                   <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos)}</td>
                   <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
+                  <td className="px-3 py-2"><OborotValue value={p.oborot} /></td>
                   <td className="px-3 py-2 text-gray-500">{p.location}</td>
                   {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
                 </tr>
               ))}
-              <FillerRows count={pg12.fill} cols={9} />
+              <FillerRows count={pg12.fill} cols={10} />
             </tbody>
             <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>

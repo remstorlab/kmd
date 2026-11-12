@@ -4,17 +4,17 @@ import {
   Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, probaText, NetAuAg, NET_AU_AG, ChemTip, usePaged,
-  CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip,
+  CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
-import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
+import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses, OBOROT_CODE, oborotOf } from "../data/mock";
 import { Plus } from "lucide-react";
 import { takeFromStock, returnToStock, IssueLine, scaleChem, addChem } from "../data/stock";
-import { isSkladMaterial, markIssuedElsewhere, itogoMaterials, prikazStatus, r2 } from "../data/shihta";
+import { isSkladMaterial, markIssuedElsewhere, itogoMaterials, prikazStatus, r2, shihtaOborot, isOborotGrade } from "../data/shihta";
 import { IssueQtyCell, IssueLigCell } from "../components/IssueInputs";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
-import DMPositionFormModal, { PrihodPosition, emptyPosition, locOf, parseLoc, NO_LOC } from "../components/DMPositionFormModal";
+import DMPositionFormModal, { PrihodPosition, emptyPosition, locOf, parseLoc, NO_LOC, oborotFromForm } from "../components/DMPositionFormModal";
 
 // ── Добавить позицию ДМ со склада ─────────────────────────────────────────────
 
@@ -81,6 +81,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
     klass: i => i.klass,
     proba: i => i.proba,
     netWeight: i => i.netWeight,
+    oborot: i => oborotOf(i),
     location: i => i.location,
     qty: i => i.qty,
     ligWeight: i => i.ligWeight,
@@ -116,6 +117,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
         name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: line.issue || undefined, ves: lig,
         ag: chem?.ag || "-", cu: chem?.cu || "-", chem, loc: i.location, metal: i.metal, lig, net: line.part(i.netWeight) ?? undefined,
         srcId: i.id,
+        ...(i.oborot ? { oborot: i.oborot } : {}),
       };
     }));
   };
@@ -167,6 +169,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
               <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
+              <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <th className="px-3 py-2 text-left">Статус</th>
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
@@ -177,13 +180,14 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                 const checked = selected.has(i.id);
                 const karta = i.status === "Резерв" ? reservedBy(i.nomenkl) : undefined;
                 return (
-                  <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
+                  <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : oborotRowCls(oborotOf(i))}`}>
                     <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(i.id)} className="w-4 h-4 accent-blue-600" /></td>
                     <td className="px-3 py-2 font-medium">{i.name}</td>
                     <td className="px-3 py-2 text-gray-500">{i.nomenkl}</td>
                     <td className="px-3 py-2"><KlassCode value={i.klass} /></td>
                     <td className="px-3 py-2">{probaText(i.proba)}</td>
                     <td className="px-3 py-2"><NetAuAg chem={i.chem} /></td>
+                    <td className="px-3 py-2"><OborotValue value={oborotOf(i)} /></td>
                     <td className="px-3 py-2 text-gray-500">{i.location}</td>
                     <td className="px-3 py-2">
                       <PosStatusBadge status={i.status} nomenkl={i.nomenkl} />
@@ -202,7 +206,7 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                   </tr>
                 );
               })}
-              <FillerRows count={pg5.fill} cols={10} />
+              <FillerRows count={pg5.fill} cols={11} />
             </tbody>
           </table>
           {pg5.pager}
@@ -244,6 +248,7 @@ const operFromForm = (p: PrihodPosition, n: number, srcId?: string): OperPositio
     chem: p.chem,
     loc: locOf(p),
     info: p.info || undefined,
+    oborot: oborotFromForm(p.oborot),
     ...(srcId ? { srcId } : {}),
   };
 };
@@ -267,6 +272,7 @@ const formFromOper = (p: OperPosition, v: DMPositionView): PrihodPosition => {
     polka,
     chem: { ...(v.chem ?? {}) },
     info: v.info ?? "",
+    oborot: String(p.oborot ?? v.oborot ?? 0),
   };
 };
 
@@ -297,6 +303,7 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
     proba: p => p.proba,
     lig: p => view(p).ligWeight ?? 0,
     net: p => view(p).netWeight ?? 0,
+    oborot: p => view(p).oborot ?? 0,
     loc: p => p.loc,
   });
   const allChecked = filtered.length > 0 && filtered.every(p => selected.has(p.n));
@@ -318,7 +325,8 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
     onAdd(chosen.map(p => {
       const v = view(p);
       const { n: _n, ...rest } = p;
-      return { ...rest, metal: v.metal || rest.metal, lig: v.ligWeight ?? rest.lig, net: v.netWeight ?? rest.net, chem: v.chem ?? rest.chem };
+      // Позиция, не попавшая в плавку / операцию, сохраняет свой оборот
+      return { ...rest, metal: v.metal || rest.metal, lig: v.ligWeight ?? rest.lig, net: v.netWeight ?? rest.net, chem: v.chem ?? rest.chem, oborot: rest.oborot ?? v.oborot ?? 0 };
     }));
   };
   const th = "px-3 py-2";
@@ -361,6 +369,7 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
               <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
               <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>{NET_AU_AG}</SortTh>
+              <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className={th}>{OBOROT_LABEL}</SortTh>
               <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -368,7 +377,7 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
                 const v = view(p);
                 const checked = selected.has(p.n);
                 return (
-                  <tr key={p.n} onClick={() => toggle(p.n)} className={`cursor-pointer hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
+                  <tr key={p.n} onClick={() => toggle(p.n)} className={`cursor-pointer hover:bg-gray-50 ${checked ? "bg-blue-50/50" : oborotRowCls(v.oborot)}`}>
                     <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(p.n)} onClick={e => e.stopPropagation()} className="w-4 h-4 accent-blue-600" /></td>
                     <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                     <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -378,11 +387,12 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
                     <td className="px-3 py-2">{probaText(p.proba)}</td>
                     <td className="px-3 py-2">{dash(v.ligWeight)}</td>
                     <td className="px-3 py-2"><NetAuAg chem={v.chem} /></td>
+                <td className="px-3 py-2"><OborotValue value={v.oborot} /></td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                   </tr>
                 );
               })}
-              <FillerRows count={pg.fill} cols={10} />
+              <FillerRows count={pg.fill} cols={11} />
             </tbody>
           </table>
           {pg.pager}
@@ -679,6 +689,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
     proba: p => p.proba,
     lig: p => view(p).ligWeight ?? 0,
     net: p => view(p).netWeight ?? 0,
+    oborot: p => view(p).oborot ?? 0,
     loc: p => p.loc,
   });
   const th = "px-3 py-2";
@@ -696,6 +707,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
           <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>{probaPct ? "Проба, %" : "Проба"}</SortTh>
           <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
           <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>{NET_AU_AG}</SortTh>
+              <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className={th}>{OBOROT_LABEL}</SortTh>
           <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
           <th className={readOnly ? "w-10" : onEdit ? "w-28" : "w-20"}></th>
         </tr></thead>
@@ -704,7 +716,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
             const v = view(p);
             const line = lineOf(p);
             return (
-              <tr key={p.n} className="hover:bg-gray-50">
+              <tr key={p.n} className={`hover:bg-gray-50 ${oborotRowCls(v.oborot)}`}>
                 <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                 <td className="px-3 py-2 font-medium">{p.name}</td>
                 <td className="px-3 py-2 align-top">
@@ -717,6 +729,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
                   {line && issue ? <IssueLigCell line={line} editable value={issue.ligValue(p)} onChange={val => issue.setLig(p, val)} /> : dash(v.ligWeight)}
                 </td>
                 <td className="px-3 py-2"><NetAuAg chem={v.chem} /></td>
+                <td className="px-3 py-2"><OborotValue value={v.oborot} /></td>
                 <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">
@@ -729,9 +742,9 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
             );
           })}
           {sorted.length === 0 && (
-            <tr><td colSpan={10} className="px-3 py-6 text-center text-sm text-gray-400">Позиции не добавлены</td></tr>
+            <tr><td colSpan={11} className="px-3 py-6 text-center text-sm text-gray-400">Позиции не добавлены</td></tr>
           )}
-          <FillerRows count={pg7.fill} cols={10} />
+          <FillerRows count={pg7.fill} cols={11} />
         </tbody>
       </table>
       {pg7.pager}
@@ -1226,7 +1239,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [showShihtaPick, setShowShihtaPick] = nested("shihta-pick");
   // Карты приказа на плавку, выданные по «Выдать по ШК» — при сохранении операции переходят в «Выполнена»
   const [pickedKartaIds, setPickedKartaIds] = useState<string[]>([]);
-  const { dmItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, operations, currentUser, storageLocations } = useApp();
+  const { dmItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, operations, currentUser, storageLocations, alloyGrades } = useApp();
   const createdStamp = useCreatedStamp();
   // Документы вкладок «Выдача» / «Возврат»
   const [vydachaFiles, setVydachaFiles] = useState<File[]>(() =>
@@ -1257,6 +1270,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.metal ?? dm?.metal ?? "",
       qty: p.qty ?? null, proba: p.proba, ligWeight: p.lig ?? null, netWeight: p.net ?? null,
       location: p.loc, status: dm?.status, chem: p.chem ?? dm?.chem, info: p.info ?? dm?.info,
+      oborot: p.oborot ?? dm?.oborot ?? 0,
     };
   };
   // ── Количество и вес выдаваемой части (вкладка «Выдача») ──
@@ -1351,6 +1365,29 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     vydal: op ? (op.vydal ?? "Ким Александр Юрьевич") : (currentUser?.fullName ?? ""),
     poluchil: op ? (op.poluchil ?? op.responsible) : "",
   }));
+
+  // ── Оборот новых позиций возврата («Добавить новую») ──
+  // Плавка по ШК марки СрМ 92,5: оборот ШК + 1 (по нескольким картам — максимальный); прочие операции:
+  // наследуется оборот выданного СрМ 925 без +1 (по нескольким позициям — максимальный). Значение можно поправить в форме.
+  // Позиции, возвращённые «Добавить из Выдачи», сохраняют свой оборот.
+  const plavkaKartaIds = pickedKartaIds.length ? pickedKartaIds : op?.shihtaIds ?? [];
+  const plavkaKarty = vid !== "Плавка" ? [] : plavkaKartaIds.length
+    ? shihtovyeKarty.filter(k => plavkaKartaIds.includes(k.id))
+    : shihtovyeKarty.filter(k => head.plavkaNo.split(/[,\s]+/).filter(Boolean).includes(k.plavkaNo));
+  const oborotKarty = plavkaKarty.filter(k => isOborotGrade(alloyGrades.find(g => g.id === k.alloyId)));
+  const vydanoSrM = vydacha.filter(p => posView(p).metal === OBOROT_CODE);
+  const maxVydanoOborot = Math.max(0, ...vydanoSrM.map(p => posView(p).oborot ?? 0));
+  const vozvratOborot: { value: number; hint: string } | null = (() => {
+    if (oborotKarty.length) {
+      const base = Math.max(0, ...oborotKarty.map(k => shihtaOborot(k.materials).max));
+      const pl = oborotKarty.map(k => k.plavkaNo).join(", ");
+      return { value: base + 1, hint: `Плавка по ШК СрМ 92,5 (плавка № ${pl}): оборот ШК ${base} + 1 = ${base + 1}. Рассчитан автоматически, можно изменить` };
+    }
+    if (vid === "Плавка" && plavkaKarty.length) return null;
+    if (vydanoSrM.length === 0) return null;
+    if (vid === "Плавка") return { value: maxVydanoOborot + 1, hint: `Переплав выданного СрМ 925: оборот ${maxVydanoOborot} + 1 = ${maxVydanoOborot + 1}. Можно изменить` };
+    return { value: maxVydanoOborot, hint: `Наследуется оборот выданного СрМ 925: ${maxVydanoOborot}${vydanoSrM.length > 1 ? " (максимальный среди выданных позиций)" : ""}. Можно изменить` };
+  })();
 
   // Blank options list for a brand-new operation so pickers start unselected.
   const withBlank = (opts: string[]) => (op ? opts : ["", ...opts]);
@@ -1488,6 +1525,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     docType: head.docType,
     zakazchik: head.zakazchik,
     plavkaNo: vid === "Плавка" ? head.plavkaNo : undefined,
+    shihtaIds: vid === "Плавка" && plavkaKartaIds.length ? plavkaKartaIds : undefined,
     vydal: head.vydal,
     poluchil: head.poluchil,
   });
@@ -1676,7 +1714,12 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <DMPositionFormModal
           mode="add"
           sklad={DM_SKLAD}
-          initial={emptyPosition(storageLocations, DM_SKLAD, "Слиток", "1000")}
+          initial={{
+            // Продукция из СрМ 925 — код материала СрМ 925 и рассчитанный оборот
+            ...emptyPosition(storageLocations, DM_SKLAD, "Слиток", vozvratOborot ? OBOROT_CODE : "1000"),
+            oborot: String(vozvratOborot?.value ?? 0),
+          }}
+          oborotHint={vozvratOborot?.hint}
           reservedNomenkl={[...vydacha, ...vozvrat].map(p => p.nomenkl)}
           onClose={() => setShowVozvratNew(false)}
           onSave={p => addVozvratNew([p])}
@@ -1726,7 +1769,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
                 const part = dm && dm.qty > 0 ? (m.qty ?? 1) / dm.qty : 1;
                 return [{ ...m, ag: "-", cu: "-", metal: dm?.metal, lig: m.ves, net: dm ? +(dm.netWeight * part).toFixed(2) : undefined, chem: m.chem ?? dm?.chem }];
               }
-              return take.map(r => ({ ...m, qty: r.qty, ves: r.ligWeight, ag: "-", cu: "-", metal: r.metal, lig: r.ligWeight, net: r.netWeight, chem: r.chem ?? m.chem, srcId: r.id }));
+              return take.map(r => ({ ...m, qty: r.qty, ves: r.ligWeight, ag: "-", cu: "-", metal: r.metal, lig: r.ligWeight, net: r.netWeight, chem: r.chem ?? m.chem, srcId: r.id, oborot: r.oborot ?? m.oborot ?? 0 }));
             });
             appendPositions("vydacha", rows);
             setHead(h => ({ ...h, plavkaNo: karty.map(k => k.plavkaNo).join(", ") }));

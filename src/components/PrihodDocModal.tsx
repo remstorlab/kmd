@@ -3,9 +3,10 @@ import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
   Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, probaText, NetAuAg, NET_AU_AG, usePaged, FillerRows, useCreatedStamp,
   InfoField,
+  OborotValue, OBOROT_LABEL,
 } from "./ui";
 import { SkladDoc, DocStatus, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_PRIHOD_AKT, DOC_TREBOVANIE, DOC_VOZVRAT_SGP, SGP } from "../data/mock";
-import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition } from "./DMPositionFormModal";
+import DMPositionFormModal, { PrihodPosition, locOf, emptyPosition, oborotFromForm } from "./DMPositionFormModal";
 import TrebovanieDocModal from "./TrebovanieDocModal";
 import VozvratSgpDocModal from "./VozvratSgpDocModal";
 import { useApp } from "../store/AppContext";
@@ -170,6 +171,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     proba: p => parseFloat(p.proba) || 0,
     lig: p => parseFloat(p.lig) || 0,
     net: p => parseFloat(p.net) || 0,
+    oborot: p => oborotFromForm(p.oborot),
     loc: p => locOf(p),
   });
 
@@ -188,6 +190,8 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     const dm: DMItem[] = positions.filter(p => !isGPKlass(p.klass)).map(p => ({
       id: `dm-${p.id}`, name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.code, qty: kol(p), proba: n(p.proba),
       ligWeight: n(p.lig), netWeight: n(p.net), location: locOf(p), sklad, status: "На складе", chem: p.chem, info: p.info || undefined, zakazchik, ownProperty, ...created,
+      // Оборот — из позиции документа (по умолчанию при приёмке — 0)
+      ...(oborotFromForm(p.oborot) ? { oborot: oborotFromForm(p.oborot) } : {}),
     }));
     if (gp.length) setGpItems(prev => [...prev.filter(i => !gp.some(x => x.id === i.id)), ...gp]);
     if (dm.length) setDmItems(prev => [...prev.filter(i => !dm.some(x => x.id === i.id)), ...dm]);
@@ -312,6 +316,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
                 <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
                 <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
                 <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
+                <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
               </>}
               <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <th className="w-24"></th>
@@ -328,6 +333,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
                     <td className="px-3 py-2">{probaText(p.proba)}</td>
                     <td className="px-3 py-2 font-medium">{p.lig}</td>
                     <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} /></td>
+                    <td className="px-3 py-2"><OborotValue value={oborotFromForm(p.oborot)} /></td>
                   </>}
                   <td className="px-3 py-2 text-gray-500">{locOf(p)}</td>
                   <td className="px-3 py-2">
@@ -339,7 +345,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
                   </td>
                 </tr>
               ))}
-              <FillerRows count={pg10.fill} cols={10} />
+              <FillerRows count={pg10.fill} cols={11} />
             </tbody>
           </table>
           {pg10.pager}

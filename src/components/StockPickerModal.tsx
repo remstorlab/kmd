@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Badge, Btn, Modal, Field, Input, Select, KlassSelect, KlassCode, SearchInput, SortTh, useSort, useMaterialCodeLabel, probaText, NetAuAg, NET_AU_AG, usePaged, FillerRows,
+  OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
 import { VydachaDocPosition } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -100,6 +101,7 @@ export default function StockPickerModal({
     proba: r => r.proba ?? 0,
     lig: r => r.lig ?? 0,
     net: r => r.net ?? 0,
+    oborot: r => r.oborot ?? 0,
     location: r => r.location,
     qty: r => left(r),
   });
@@ -183,6 +185,7 @@ export default function StockPickerModal({
                 <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">{probaPct ? "Проба, %" : "Проба"}</SortTh>
                 <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
                 <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{probaPct ? "Чистый вес, г" : NET_AU_AG}</SortTh>
+                <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
               </>}
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
               {withStatus && <th className="px-3 py-2 text-left">Статус</th>}
@@ -193,7 +196,7 @@ export default function StockPickerModal({
               {pg11.pageItems.map(r => {
                 const checked = r.id in selectedQty;
                 return (
-                  <tr key={r.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : ""}`}>
+                  <tr key={r.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : oborotRowCls(r.oborot)}`}>
                     <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(r)} disabled={!selectable(r)} title={selectable(r) ? undefined : `Позиция в статусе «${r.status}» — добавить нельзя`} className="w-4 h-4 accent-blue-600 disabled:opacity-30" /></td>
                     <td className="px-3 py-2 text-gray-500">{r.nomenkl}</td>
                     <td className="px-3 py-2 font-medium">{r.name}</td>
@@ -203,6 +206,7 @@ export default function StockPickerModal({
                       <td className="px-3 py-2">{probaPct && r.proba ? (r.proba / 10).toFixed(2).replace(".", ",") : probaText(r.proba)}</td>
                       <td className="px-3 py-2">{r.lig}</td>
                       <td className="px-3 py-2">{probaPct ? (r.net != null ? r.net.toFixed(2).replace(".", ",") : "—") : <NetAuAg chem={r.chem} />}</td>
+                      <td className="px-3 py-2"><OborotValue value={r.oborot} /></td>
                     </>}
                     <td className="px-3 py-2 text-gray-500">{r.location}</td>
                     {withStatus && <td className="px-3 py-2">{r.status ? <Badge label={r.status} group="pozicii" /> : "—"}</td>}
@@ -211,7 +215,7 @@ export default function StockPickerModal({
                   </tr>
                 );
               })}
-              <FillerRows count={pg11.fill} cols={11} />
+              <FillerRows count={pg11.fill} cols={12} />
             </tbody>
           </table>
           {pg11.pager}

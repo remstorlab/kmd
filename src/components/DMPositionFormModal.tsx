@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Btn, Modal, Field, Input, Select, KlassSelect, MaterialCodeSelect } from "./ui";
-import { StorageLocation, ChemComposition, spravValues, isStoneKlass } from "../data/mock";
+import { StorageLocation, ChemComposition, spravValues, isStoneKlass, OBOROT_HINT, oborotOver } from "../data/mock";
 import ChemCompositionBlock from "./ChemCompositionBlock";
 import { ChemPercent, compositionOf, applyProba, gramsFrom, pctFrom, mainElementOf, num0, r2 } from "../data/chem";
 import { useApp } from "../store/AppContext";
@@ -24,7 +24,15 @@ export interface PrihodPosition {
   chem: ChemComposition;
   // Доп. информация — произвольный текст, необязательно
   info?: string;
+  // Оборот — целое ≥ 0, необязательно (пусто — 0); при приёмке на СДМ1 — 0
+  oborot?: string;
 }
+
+// Оборот из поля формы: целое ≥ 0, пусто — 0
+export const oborotFromForm = (v: string | undefined) => {
+  const n = parseInt(String(v ?? "").trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
 
 // «-» — место хранения не задано (сейф / полка не выбраны, позиция в подотчёте)
 export const NO_LOC = "-";
@@ -68,11 +76,11 @@ const newPosId = () => `pp-${Date.now()}-${posSeq++}`;
 export function emptyPosition(_locs: StorageLocation[], _sklad: string, klass: string, code: string): PrihodPosition {
   return {
     id: newPosId(), nomenkl: "", name: "", klass, code, kol: "", unit: "шт", proba: "", lig: "", net: "",
-    seyf: NO_LOC, polka: NO_LOC, chem: {}, info: "",
+    seyf: NO_LOC, polka: NO_LOC, chem: {}, info: "", oborot: "0",
   };
 }
 
-export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany, title: titleProp, saveLabel, lockWeights = false, header, extraWide = false, fixedHeight = false }: {
+export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany, title: titleProp, saveLabel, lockWeights = false, header, extraWide = false, fixedHeight = false, oborotHint }: {
   mode: "add" | "edit" | "view";
   sklad: string;
   initial: PrihodPosition;
@@ -92,6 +100,8 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   // Ширина окна первого уровня (как у документов)
   extraWide?: boolean;
   fixedHeight?: boolean;
+  // Подсказка под полем «Оборот» (напр. как рассчитан оборот позиции возврата с плавки)
+  oborotHint?: string;
 }) {
   const ro = mode === "view";
   const { storageLocations: locs, materialCodes } = useApp();
@@ -145,7 +155,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
     ? { ...f, klass, lig: "0.00", net: "0.00", chem: {} }
     : { ...f, klass, chem: gramsFrom(pct, num0(f.lig)) }));
   // Позиция к сохранению: у камней хим. состав пустой
-  const toSave = (p: PrihodPosition): PrihodPosition => ({ ...p, net: netStr, chem: isStone ? {} : { ...p.chem } });
+  const toSave = (p: PrihodPosition): PrihodPosition => ({ ...p, net: netStr, chem: isStone ? {} : { ...p.chem }, oborot: String(oborotFromForm(p.oborot)) });
   const noKol = isStone && !(parseInt(form.kol, 10) > 0);
   const [tried, setTried] = useState(false);
   const kolError = !ro && tried && noKol;
@@ -207,6 +217,14 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
           {probaError && <div className="text-xs text-red-600 mt-1">Укажите пробу</div>}
         </Field>
         <Field label="Вес лигатурный, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={changeLig} placeholder="0.00" disabled={ro || lockWeights} /></Field>
+        {/* Оборот — целое ≥ 0, необязательно (пусто — 0); при ≥ 5 — подсказка о передаче на аффинаж */}
+        <Field label="Оборот">
+          <div className={oborotOver(oborotFromForm(form.oborot)) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(oborotFromForm(form.oborot)) ? OBOROT_HINT : undefined}>
+            <Input value={form.oborot ?? ""} onChange={v => set("oborot")(v.replace(/[^\d]/g, ""))} placeholder="0" disabled={ro} />
+          </div>
+          {oborotOver(oborotFromForm(form.oborot)) && <div className="text-xs text-red-600 mt-1">{OBOROT_HINT}</div>}
+          {oborotHint && <div className="text-xs text-gray-500 mt-1">{oborotHint}</div>}
+        </Field>
         {/* Чистый вес не вводится — рассчитывается (граммы основного металла в блоке «Химический состав») */}
         <Field label="Склад"><Input value={sklad} disabled /></Field>
         {/* Необязательные: «-» — место хранения не задано */}
