@@ -665,7 +665,10 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
   // Проба в процентах с 2 знаками (плавка — как в шихтовой карте)
   probaPct?: boolean;
 }) {
-  const lineOf = (p: OperPosition) => (issue && !readOnly ? issue.line(p) : null);
+  const { dmItems } = useApp();
+  // Позиция из резерва шихтовой карты выдаётся целиком — без ввода количества и веса
+  const isRezerv = (p: OperPosition) => !!p.srcId && dmItems.find(i => i.id === p.srcId)?.status === "Резерв";
+  const lineOf = (p: OperPosition) => (issue && !readOnly && !isRezerv(p) ? issue.line(p) : null);
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(rows, {
     nomenkl: p => p.nomenkl,

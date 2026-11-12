@@ -315,9 +315,9 @@ export function EditIcon({ onClick, disabled = false, title = "Редактир�
   );
 }
 
-export function DeleteIcon({ onClick }: { onClick: () => void }) {
+export function DeleteIcon({ onClick, disabled = false, title = "Удалить" }: { onClick: () => void; disabled?: boolean; title?: string }) {
   return (
-    <button onClick={onClick} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Удалить">
+    <button onClick={onClick} disabled={disabled} className="text-gray-400 hover:text-red-500 transition-colors p-1 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-gray-400" title={title}>
       <Trash2 className="w-4 h-4" />
     </button>
   );

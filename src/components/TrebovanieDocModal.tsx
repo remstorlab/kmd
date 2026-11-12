@@ -35,7 +35,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   // Оформленное требование: позиции уже перемещены — состав и склады менять нельзя
   const posted = doc?.status === "Оформлено";
   const lockPos = ro || posted;
-  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty } = useApp();
+  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, shihtaPrikazy } = useApp();
   const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
   // Вложенный экран: …/pick (подбор со склада-отправителя)
@@ -54,7 +54,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     sender: doc?.sender || SDM1,
     receiver: doc?.receiver || SDM2,
     sotrudnik: "Ким Александр Юрьевич",
-    shihtaId: doc?.shihtaId ?? "",
+    // Приказ на плавку (у старых документов — приказ шихтовой карты)
+    prikazId: doc?.prikazId ?? shihtovyeKarty.find(k => k.id === doc?.shihtaId)?.prikazId ?? "",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
   const [ownProperty, setOwnProperty] = useState(doc?.ownProperty ?? true);
@@ -72,27 +73,29 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const itemOf = (p: TrebPosition): GPItem | DMItem | undefined =>
     p.src === "gp" ? gpItems.find(i => i.id === p.id) : dmItems.find(i => i.id === p.id);
 
-  // Шихтовые карты (кроме выполненных) — их зарезервированные позиции на складе-отправителе
-  const karty = shihtovyeKarty.filter(k => k.status !== "Выполнена" || k.id === head.shihtaId);
-  const kartaLabel = (id: string) => {
-    const k = shihtovyeKarty.find(x => x.id === id);
-    return k ? `${k.plavkaNo} · ${k.name}` : NO_KARTA;
+  // Приказы на плавку (кроме выполненных): перемещаются зарезервированные позиции всех их шихтовых карт
+  const kartyOf = (id: string) => shihtovyeKarty.filter(k => k.prikazId === id && k.status !== "Выполнена");
+  const prikazy = shihtaPrikazy.filter(p => kartyOf(p.id).length > 0 || p.id === head.prikazId);
+  const prikazLabel = (id: string) => {
+    const p = shihtaPrikazy.find(x => x.id === id);
+    if (!p) return NO_KARTA;
+    const pl = kartyOf(id).map(k => k.plavkaNo);
+    return `Приказ № ${p.number} от ${p.date} · ${p.name}${pl.length ? ` (ШК плавок № ${pl.join(", ")})` : ""}`;
   };
-  const rezervOf = (kartaId: string) => {
-    const k = shihtovyeKarty.find(x => x.id === kartaId);
-    const nomenkl = new Set((k?.materials ?? []).map(m => m.nomenkl).filter(Boolean));
+  const rezervOf = (prikazId: string) => {
+    const nomenkl = new Set(kartyOf(prikazId).flatMap(k => k.materials.map(m => m.nomenkl)).filter(Boolean));
     return stock.filter(r => nomenkl.has(r.nomenkl) && itemOf({ ...r, issue: 0 })?.status === "Резерв");
   };
-  // Выбор шихтовой карты заполняет требование её зарезервированными позициями со склада-отправителя
-  // (позиции ранее выбранной карты заменяются)
-  const chooseKarta = (id: string) => {
-    setHead(x => ({ ...x, shihtaId: id }));
+  // Выбор приказа заполняет требование зарезервированными позициями всех его шихтовых карт со склада-отправителя
+  // (позиции целиком; позиции ранее выбранного приказа заменяются)
+  const choosePrikaz = (id: string) => {
+    setHead(x => ({ ...x, prikazId: id }));
     if (!id) return;
     const rows = rezervOf(id);
     if (rows.length) {
       setPositions(rows.map(r => ({ ...r, issue: r.qty })));
-      show(`Добавлены позиции резерва шихтовой карты: ${rows.length}`);
-    } else show(`У шихтовой карты нет позиций в резерве на складе «${head.sender}»`);
+      show(`Добавлены позиции резерва шихтовых карт приказа (${kartyOf(id).length} карт): ${rows.length}`);
+    } else show(`У шихтовых карт приказа нет позиций в резерве на складе «${head.sender}»`);
   };
 
   // Заказчик и «Собственность заказчика» после выбора позиций берутся из них (из документов приёма)
@@ -170,7 +173,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       status,
       sender: head.sender,
       receiver: head.receiver,
-      shihtaId: head.shihtaId || undefined,
+      prikazId: head.prikazId || undefined,
       zakazchik,
       ownProperty: isOwn,
       info: info.trim() || undefined,
@@ -205,12 +208,12 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         </Field>
         <Field label="Отправитель" required={!ro}><Select value={head.sender} options={skladOptions(head.sender)} onChange={changeSender} disabled={lockPos} /></Field>
         <Field label="Получатель" required={!ro}><Select value={head.receiver} options={skladOptions(head.receiver)} onChange={h("receiver")} disabled={lockPos} /></Field>
-        <Field label="Шихтовая карта" full>
+        <Field label="Приказ на плавку (все шихтовые карты)" full>
           <Select
-            value={head.shihtaId}
-            options={["", ...karty.map(k => k.id)]}
-            optionLabel={v => (v ? kartaLabel(v) : NO_KARTA)}
-            onChange={chooseKarta}
+            value={head.prikazId}
+            options={["", ...prikazy.map(p => p.id)]}
+            optionLabel={v => (v ? prikazLabel(v) : NO_KARTA)}
+            onChange={choosePrikaz}
             disabled={lockPos}
           />
         </Field>
@@ -265,8 +268,9 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
                     <td className="px-3 py-2 font-medium">{p.name}</td>
                     <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                     <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
-                    <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos)}</td>
-                    <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos)}</td>
+                    {/* Позиция в резерве шихтовой карты перемещается целиком — без ввода количества и веса */}
+                    <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos && status !== "Резерв")}</td>
+                    <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos && status !== "Резерв")}</td>
                     <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
                     <td className="px-3 py-2 text-gray-500">{p.location}</td>
                     <td className="px-3 py-2">{status ? <PosStatusBadge status={status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>

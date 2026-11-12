@@ -90,8 +90,10 @@ export interface SkladDoc {
   receiver: string;
   // Позиции накладной на отгрузку (выдача со склада) / требования (перемещение со склада на склад)
   positions?: VydachaDocPosition[];
-  // Требование: шихтовая карта, под которую перемещаются позиции
+  // Требование: шихтовая карта, под которую перемещаются позиции (старые документы — до приказов на плавку)
   shihtaId?: string;
+  // Требование: приказ на плавку — перемещаются зарезервированные позиции всех его шихтовых карт
+  prikazId?: string;
   // Требование: заказчик и признак собственности — по позициям шихтовой карты
   zakazchik?: string;
   ownProperty?: boolean;
@@ -587,7 +589,7 @@ const vpos = (src: "gp" | "dm", id: string): VydachaDocPosition => {
 
 // Требование ТР-0013 (в работе) — резерв карты П-2026-0088, позиции ещё на СДМ1
 initialSkladDocs.unshift(
-  { id: "sd7", date: "20.08.2026", type: DOC_TREBOVANIE, number: "ТР-0013", status: "В работе", sender: SDM1, receiver: SDM2, shihtaId: "sk3", positions: [vpos("dm", "dm43"), vpos("dm", "dm44"), vpos("dm", "dm45")] },
+  { id: "sd7", date: "20.08.2026", type: DOC_TREBOVANIE, number: "ТР-0013", status: "В работе", sender: SDM1, receiver: SDM2, prikazId: "pp3", positions: [vpos("dm", "dm43"), vpos("dm", "dm44"), vpos("dm", "dm45")] },
 );
 
 export const initialVydachaDocs: SkladDoc[] = [

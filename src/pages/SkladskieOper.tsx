@@ -138,7 +138,7 @@ function DocList({
   onDelete: (id: string) => void;
 }) {
   const { toast, show, clear } = useToast();
-  const { shihtovyeKarty } = useApp();
+  const { shihtovyeKarty, shihtaPrikazy } = useApp();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
   const { filtered, bar } = useDocFilters(docs, () => setPage(1), true);
@@ -211,7 +211,7 @@ function DocList({
                     title={canPrintXlsx(doc) ? "Печать (Excel)" : "Печать"}
                     onClick={() => {
                       if (!canPrintXlsx(doc)) { show(`Документ ${doc.number} отправлен на печать`); return; }
-                      printDocXlsx(doc, { karty: shihtovyeKarty });
+                      printDocXlsx(doc, { karty: shihtovyeKarty, prikazy: shihtaPrikazy });
                       show(`Печатная форма документа ${doc.number} сохранена в Excel`);
                     }}
                   />

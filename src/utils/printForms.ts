@@ -3,7 +3,7 @@
 // документов и позиций системы. Значения, которых нет в системе (цена в требовании, вид операции,
 // кор. счёт), оставлены пустыми для заполнения вручную; подписи — пустые строки.
 
-import { SkladDoc, ShihtovayaKarta, DOC_PRIHOD_ORDER, DOC_TREBOVANIE } from "../data/mock";
+import { SkladDoc, ShihtovayaKarta, PrikazPlavka, DOC_PRIHOD_ORDER, DOC_TREBOVANIE } from "../data/mock";
 import { DEMO_ORDER, ORDER_HEAD_DEFAULTS } from "../components/PrihodDocModal";
 import { issueShare } from "../data/stock";
 import { Sheet, S, downloadXlsx } from "./xlsx";
@@ -27,8 +27,8 @@ const yearOf = (date: string) => date.split(".")[2] ?? String(new Date().getFull
 // Печать доступна для этих типов документов
 export const canPrintXlsx = (d: SkladDoc) => d.type === DOC_TREBOVANIE || d.type === DOC_PRIHOD_ORDER;
 
-export function printDocXlsx(d: SkladDoc, ctx: { karty: ShihtovayaKarta[] }) {
-  if (d.type === DOC_TREBOVANIE) downloadXlsx(trebovanieSheet(d, ctx.karty), `Требование ${d.number} от ${d.date}.xlsx`);
+export function printDocXlsx(d: SkladDoc, ctx: { karty: ShihtovayaKarta[]; prikazy: PrikazPlavka[] }) {
+  if (d.type === DOC_TREBOVANIE) downloadXlsx(trebovanieSheet(d, ctx.karty, ctx.prikazy), `Требование ${d.number} от ${d.date}.xlsx`);
   else if (d.type === DOC_PRIHOD_ORDER) downloadXlsx(prihodOrderSheet(d), `Приходный ордер ${d.number} от ${d.date}.xlsx`);
 }
 
@@ -42,7 +42,7 @@ const METALS = [
   { id: "pt", label: "Платины" },
 ];
 
-function trebovanieSheet(d: SkladDoc, karty: ShihtovayaKarta[]): Sheet {
+function trebovanieSheet(d: SkladDoc, karty: ShihtovayaKarta[], prikazy: PrikazPlavka[]): Sheet {
   const sh = new Sheet(`Требование ${d.number}`);
   // №, Код материала, Номенкл. №, Наименование, Кол-во, Проба, Вес лиг., Au, Ag, Pd, Rh, Pt, Цена, Сумма
   sh.cols = [5, 10, 11, 36, 8, 8, 12, 11, 11, 11, 11, 11, 10, 13];
@@ -56,8 +56,13 @@ function trebovanieSheet(d: SkladDoc, karty: ShihtovayaKarta[]): Sheet {
 
   sh.merge(6, 1, 6, LAST, `Требование № ${d.number} от ${d.date}г.`, S.title);
   sh.height(6, 22);
+  // Основание — приказ на плавку и шихтовые карты в его составе (старые документы — одна шихтовая карта)
+  const prikaz = prikazy.find(p => p.id === d.prikazId);
   const karta = karty.find(k => k.id === d.shihtaId);
-  const osnovanie = karta ? `шихтовая карта № ${karta.plavkaNo} «${karta.name}» от ${karta.date}` : "—";
+  const plavki = prikaz ? karty.filter(k => k.prikazId === prikaz.id).map(k => k.plavkaNo) : [];
+  const osnovanie = prikaz
+    ? `приказ на плавку № ${prikaz.number} от ${prikaz.date}${plavki.length ? `, шихтовые карты плавок № ${plavki.join(", ")}` : ""}`
+    : karta ? `шихтовая карта № ${karta.plavkaNo} «${karta.name}» от ${karta.date}` : "—";
   sh.merge(7, 1, 7, LAST, `Основание: ${osnovanie}        Склад-отправитель: ${d.sender}        Склад-получатель: ${d.receiver}`, S.center);
   if (d.zakazchik) sh.merge(8, 1, 8, LAST, `Заказчик: ${d.zakazchik}${d.ownProperty === false ? " (не собственность заказчика)" : ""}`, S.center);
 

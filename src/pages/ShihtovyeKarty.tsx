@@ -10,7 +10,7 @@ import {
   PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO,
   PrikazPlavka,
 } from "../data/mock";
-import { returnToStock, splitRecord } from "../data/stock";
+import { returnToStock } from "../data/stock";
 import {
   ShihtaCalc, ShihtaLine, chemStrings, fmt2, normText, r2, shareOf, shihtaWarnings, lineChem, kindOf,
   normCell, impuritiesText, fmtNorm, prikazStatus, itogoMaterials, lineOfMaterial, prikazGrade, isSkladMaterial,
@@ -44,17 +44,10 @@ interface MatRow {
   share: Record<string, number>;
   // Лигатура Cu-P: фосфор, %
   phosphorPct?: number;
-  // Масса в шихту, г (поле ввода)
+  // Масса в шихту, г: у позиции склада — лигатурный вес всей позиции (берётся целиком), у доп. материала — ввод
   ves: string;
-  // Позиция склада: наибольшая масса в шихту — вес позиции
-  maxVes?: number;
-  // Позиция склада: лигатурный вес всей позиции (взятая часть + то, что уже на складе) — для расчёта остатка
-  posLig?: number;
-  // id позиции склада ДМ, выбранной в этой сессии — резервируется при сохранении карты
+  // id позиции склада ДМ, выбранной в этой сессии — резервируется целиком при сохранении карты
   srcId?: string;
-  // Запись склада, уже зарезервированная под карту (при изменении массы резерв пересчитывается)
-  rezId?: string;
-  rezVes?: number;
 }
 
 let rowSeq = 0;
@@ -71,17 +64,10 @@ const isWeightPart = (it: { id: string }) => /-rw\d+$/.test(it.id);
 const toRow = (m: ShihtaMaterial, dm: DMItem[]): MatRow => {
   const kind = kindOf(m);
   const rez = kind === "sklad" && m.nomenkl ? dm.find(i => i.nomenkl === m.nomenkl && i.status === "Резерв") : undefined;
-  // Часть слитка, отрезанная по массе: можно вернуть массу до веса исходной записи на складе
-  const parent = rez && isWeightPart(rez) ? dm.find(i => i.id === rez.parentId && i.status === "На складе" && i.sklad === rez.sklad) : undefined;
-  // Исходная позиция, от которой отделён резерв и которая осталась на складе (остаток позиции)
-  const stockParent = rez?.parentId ? dm.find(i => i.id === rez.parentId && i.status === "На складе" && i.sklad === rez.sklad) : undefined;
   return {
     key: newKey(), kind, mat: m.name, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, qty: m.qty ?? 1, loc: m.loc,
     code: m.code ?? (m.nomenkl ? dm.find(i => i.nomenkl === m.nomenkl)?.metal : undefined),
     sklad: rez?.sklad ?? m.sklad, share: shareOf(m.chem, m.ves), phosphorPct: m.phosphorPct, ves: str2(m.ves),
-    maxVes: kind === "sklad" ? (rez ? r2(rez.ligWeight + (parent?.ligWeight ?? 0)) : m.ves) : undefined,
-    posLig: rez ? r2(rez.ligWeight + (stockParent?.ligWeight ?? 0)) : undefined,
-    rezId: rez?.id, rezVes: rez?.ligWeight,
   };
 };
 
@@ -91,18 +77,14 @@ const lineOf = (m: MatRow): ShihtaLine => ({ kind: m.kind, mass: num(m.ves), sha
 const massError = (m: MatRow): string => {
   const v = num(m.ves);
   if (!(v > 0)) return `Масса в шихту не указана: ${m.mat}`;
-  if (m.maxVes != null && v > m.maxVes + 0.005) return `Масса в шихту больше веса позиции: ${m.mat} (${str2(m.maxVes)} г)`;
   return "";
 };
 
-// Строка карты из позиции склада: q изделий, масса в шихту по умолчанию — их лигатурный вес
-const stockRowOf = (it: DMItem, q: number, key = newKey()): MatRow => {
-  const maxVes = r2((it.ligWeight * q) / (it.qty || 1));
-  return {
-    key, kind: "sklad", mat: it.name, nomenkl: it.nomenkl, klass: it.klass, proba: it.proba, code: it.metal, qty: q,
-    loc: it.location, sklad: it.sklad, share: shareOf(it.chem, it.ligWeight), ves: str2(maxVes), maxVes, posLig: it.ligWeight, srcId: it.id,
-  };
-};
+// Строка карты из позиции склада: позиция берётся целиком — все изделия, масса в шихту = лигатурный вес позиции
+const stockRowOf = (it: DMItem, key = newKey()): MatRow => ({
+  key, kind: "sklad", mat: it.name, nomenkl: it.nomenkl, klass: it.klass, proba: it.proba, code: it.metal, qty: it.qty,
+  loc: it.location, sklad: it.sklad, share: shareOf(it.chem, it.ligWeight), ves: str2(it.ligWeight), srcId: it.id,
+});
 
 // Следующий номер плавки в году (сквозная нумерация с 1 января)
 export function nextPlavkaNo(karty: ShihtovayaKarta[], year = new Date().getFullYear()): string {
@@ -116,48 +98,20 @@ const OBOROT_CLEAN = "чистая";
 const oborotValid = (v: string) => !v.trim() || /^\d+$/.test(v.trim()) || v.trim().toLowerCase() === OBOROT_CLEAN;
 
 // ── Резерв позиций ДМ под шихтовую карту ──
-// Полностью взятая позиция переводится в «Резерв». При выборе части изделий или части массы зарезервированная
-// часть выделяется в отдельную запись: по количеству — data/stock.ts (splitRecord), по массе (часть слитка) —
-// запись «-rw»: то же количество изделий, масса и состав — в доле взятой массы.
-// Позиции, убранные из карты, возвращаются на склад — часть объединяется с исходной записью.
-interface TakePlan { id: string; qty: number; mass: number }
-
-function reserveDm(items: DMItem[], release: Set<string>, plan: TakePlan[], remass: { id: string; mass: number }[], stamp: number): DMItem[] {
-  // 1) Возврат на склад: снятые с резерва записи и записи с изменённой массой (перерезервируются ниже)
-  const back = new Set([...release, ...remass.map(r => r.id)]);
-  // Часть слитка по массе при объединении не добавляет изделий к исходной записи
+// Позиция склада (СДМ1 или СДМ2) берётся в карту целиком и целиком переводится в «Резерв» — без ввода части
+// количества или веса, запись не делится. Позиции, убранные из карты, возвращаются на склад («На складе»).
+// Части, выделенные ранее (старые карты с частичным резервом), при возврате объединяются с исходной записью.
+function reserveDm(items: DMItem[], release: Set<string>, reserve: Set<string>): DMItem[] {
+  // 1) Возврат на склад. Часть слитка по массе при объединении не добавляет изделий к исходной записи
   const wQty = new Map<string, number>();
   let out = items.map(it => {
-    if (!back.has(it.id) || !isWeightPart(it)) return it;
+    if (!release.has(it.id) || !isWeightPart(it)) return it;
     wQty.set(it.id, it.qty);
     return { ...it, qty: 0 };
   });
-  out = returnToStock(out, back, "На складе").map(it => (wQty.has(it.id) ? { ...it, qty: wQty.get(it.id)! } : it));
-
-  const all = [...plan];
-  for (const r of remass) {
-    const rec = items.find(i => i.id === r.id);
-    if (!rec) continue;
-    const origin = out.find(i => i.id === rec.id && i.status === "На складе") ?? out.find(i => i.id === rec.parentId && i.status === "На складе");
-    if (origin) all.push({ id: origin.id, qty: rec.qty, mass: r.mass });
-  }
-  // 2) Резерв
-  for (const t of all) {
-    const it = out.find(i => i.id === t.id);
-    if (!it) continue;
-    const q = Math.min(t.qty, it.qty);
-    const portion = it.qty > 0 ? r2((it.ligWeight * q) / it.qty) : it.ligWeight;
-    const byMass = t.mass < portion - 0.005;
-    const wholePieces = q >= it.qty;
-    if (wholePieces && !byMass) {
-      out = out.map(i => (i.id === it.id ? { ...i, status: "Резерв" as const } : i));
-      continue;
-    }
-    const [rest, part] = splitRecord(it, wholePieces ? 0 : q, `${it.id}-${wholePieces ? "rw" : "r"}${stamp}`, byMass ? t.mass : undefined);
-    const reserved: DMItem = { ...part, qty: wholePieces ? it.qty : q, status: "Резерв" };
-    out = out.flatMap(i => (i.id === it.id ? [rest, reserved] : [i]));
-  }
-  return out;
+  out = returnToStock(out, release, "На складе").map(it => (wQty.has(it.id) ? { ...it, qty: wQty.get(it.id)! } : it));
+  // 2) Резерв позиций целиком
+  return out.map(i => (reserve.has(i.id) && i.status === "На складе" ? { ...i, status: "Резерв" as const } : i));
 }
 
 // Нарушения допуска материалов в шихту (те же правила, что при добавлении со склада)
@@ -344,26 +298,12 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
     return accepted;
   };
 
+  // Позиция добавляется целиком (все изделия, весь лигатурный вес); повторно одна позиция не добавляется
   const addFromSklad = (picked: { row: StockRow; qty: number }[]) => {
     const accepted = acceptPicked(picked);
-    setMaterials(prev => {
-      const next = [...prev];
-      for (const { it, qty } of accepted) {
-        const idx = next.findIndex(m => m.srcId === it.id);
-        if (idx >= 0) next[idx] = stockRowOf(it, Math.min(next[idx].qty + qty, it.qty), next[idx].key);
-        else next.push(stockRowOf(it, qty));
-      }
-      return next;
-    });
+    setMaterials(prev => [...prev, ...accepted.filter(({ it }) => !prev.some(m => m.srcId === it.id)).map(({ it }) => stockRowOf(it))]);
     setShowFromSklad(false);
-    if (accepted.length === picked.length) show(`Добавлено позиций: ${accepted.length}. Резерв — при сохранении карты`);
-  };
-
-  // Остаток позиции на складе при взятии в шихту её части: вес позиции − масса в шихту (нет части — null)
-  const stockRest = (m: MatRow): number | null => {
-    if (m.kind !== "sklad" || m.posLig == null || massError(m)) return null;
-    const rest = r2(m.posLig - num(m.ves));
-    return rest > 0.005 ? rest : null;
+    if (accepted.length === picked.length) show(`Добавлено позиций: ${accepted.length}. Позиции резервируются целиком при сохранении карты`);
   };
 
   const setVes = (key: string, v: string) => setMaterials(prev => prev.map(m => (m.key === key ? { ...m, ves: v } : m)));
@@ -430,24 +370,18 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   const save = (oformit = false) => {
     if (badMass.length) { show(massError(badMass[0])); return; }
     if (oformit && oformitBlock) { show(oformitBlock); return; }
-    // Выбранные позиции склада должны быть всё ещё доступны в нужном количестве
-    const plan: TakePlan[] = materials.filter(m => m.srcId).map(m => ({ id: m.srcId!, qty: m.qty, mass: num(m.ves) }));
-    const lacking = plan.filter(t => {
-      const it = dmItems.find(i => i.id === t.id);
-      return !it || it.status !== "На складе" || it.qty < t.qty;
-    });
+    // Выбранные позиции склада должны быть всё ещё на складе (резервируются целиком)
+    const reserve = new Set(materials.filter(m => m.srcId).map(m => m.srcId!));
+    const lacking = [...reserve].filter(id => dmItems.find(i => i.id === id)?.status !== "На складе");
     if (lacking.length) {
-      show(`Позиции уже недоступны на складе: ${lacking.map(t => materials.find(m => m.srcId === t.id)?.mat).join(", ")}`);
+      show(`Позиции уже недоступны на складе: ${lacking.map(id => materials.find(m => m.srcId === id)?.mat).join(", ")}`);
       return;
     }
-    // Позиции, убранные из карты, снимаются с резерва; у зарезервированных с изменённой массой — резерв пересчитывается
+    // Позиции, убранные из карты, снимаются с резерва
     const kept = new Set(materials.map(m => m.nomenkl));
     const releaseNomenkl = new Set((karta?.materials ?? []).map(m => m.nomenkl).filter(n => n && !kept.has(n)));
     const release = new Set(dmItems.filter(i => i.status === "Резерв" && releaseNomenkl.has(i.nomenkl)).map(i => i.id));
-    const remass = materials
-      .filter(m => m.rezId && m.rezVes != null && Math.abs(num(m.ves) - m.rezVes) > 0.005)
-      .map(m => ({ id: m.rezId!, mass: num(m.ves) }));
-    if (plan.length || release.size || remass.length) setDmItems(prev => reserveDm(prev, release, plan, remass, Date.now()));
+    if (reserve.size || release.size) setDmItems(prev => reserveDm(prev, release, reserve));
 
     const mats: ShihtaMaterial[] = materials.map((m, i) => ({
       kind: m.kind, name: m.mat, nomenkl: m.nomenkl, klass: m.klass, proba: m.proba, ves: r2(num(m.ves)), loc: m.loc, qty: m.qty,
@@ -609,11 +543,14 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
                     <td className="px-3 py-2 whitespace-nowrap">{m.sklad ?? dash}</td>
                     <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{sklad && m.loc && m.loc !== "-" ? m.loc : dash}</td>
                     <td className="px-3 py-2 text-right font-medium">
-                      {ro ? str2(num(m.ves)) : (
-                        <div className="inline-block text-right">
-                          <MassInput value={m.ves} onChange={v => setVes(m.key, v)} error={err} hint={m.maxVes != null ? `Вес позиции ${str2(m.maxVes)} г — можно взять часть` : undefined} />
-                          {stockRest(m) != null && <div className="text-xs text-gray-500 mt-0.5 whitespace-nowrap font-normal">остаток на складе: {str2(stockRest(m)!)} г</div>}
-                        </div>
+                      {/* Позиция склада берётся целиком — масса = вес позиции, без ввода; доп. материал — ввод массы */}
+                      {ro || sklad ? (
+                        <span title={sklad ? "Позиция берётся целиком" : undefined}>
+                          {str2(num(m.ves))}
+                          {sklad && m.qty > 1 && <span className="block text-xs font-normal text-gray-400">{m.qty} шт</span>}
+                        </span>
+                      ) : (
+                        <MassInput value={m.ves} onChange={v => setVes(m.key, v)} error={err} />
                       )}
                     </td>
                     {shkEls.map(e => (
@@ -748,7 +685,8 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
           probaPct
           withStatus
           excludeKlass={[STONE_KLASS]}
-          qtyLabel="Количество к выдаче"
+          // Позиция берётся целиком — без ввода количества и веса
+          qtyInput={false}
           emptyText={`Нет доступных позиций на складе «${pickSklad}»`}
           addLabel="Добавить выбранные"
           onClose={() => setShowFromSklad(false)}
@@ -934,6 +872,42 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
   );
 }
 
+// ── Общая информация по приказу (внутри раскрытой строки реестра) ─────────────────
+function PrikazInfo({ prikaz, karty, mass, actions }: { prikaz: PrikazPlavka; karty: ShihtovayaKarta[]; mass: number; actions: React.ReactNode }) {
+  const { alloyGrades, chemElements } = useApp();
+  const grade = prikazGrade(karty, alloyGrades);
+  const mats = useMemo(() => itogoMaterials(karty), [karty]);
+  const calc = useMemo(() => new ShihtaCalc(mats.map(lineOfMaterial), grade), [mats, grade]);
+  const shortName = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
+  const skl = mats.filter(isSkladMaterial);
+  const sum = (pred: (k: ShihtovayaKarta) => boolean) => karty.filter(pred).length;
+  const item = (label: string, value: React.ReactNode) => (
+    <div><div className="text-xs text-gray-500">{label}</div><div className="text-sm text-gray-900 font-medium">{value}</div></div>
+  );
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {item("Приказ", `№ ${prikaz.number} от ${prikaz.date}`)}
+        {item("Марка сплава", grade ? `${grade.name} (${grade.nd})` : karty.length ? "разные" : "—")}
+        {item("Шихтовых карт", `${karty.length}${karty.length ? ` (оформлено ${sum(k => k.status !== "На редактировании")}, выполнено ${sum(k => k.status === "Выполнена")})` : ""}`)}
+        {item("Плавки", karty.length ? karty.map(k => k.plavkaNo).join(", ") : "—")}
+        {item("Масса шихты, г", karty.length ? str2(mass) : "—")}
+        {item("Позиций со склада", skl.length ? `${skl.length} · ${str2(skl.reduce((s, m) => s + m.ves, 0))} г` : "—")}
+      </div>
+      {grade && calc.checks.length > 0 && (
+        <div className="mt-3 text-sm">
+          Итоговый состав: {calc.checks.map(c => (
+            <span key={c.element} className={`mr-3 ${c.ok ? "text-gray-800" : "text-red-600 font-medium"}`}>{shortName(c.element)} {fmt2(c.fact)} % <span className="text-gray-400">({normText(c)})</span></span>
+          ))}
+          <Badge label={calc.complies ? "Соответствует" : "Не соответствует"} group="gost" />
+        </div>
+      )}
+      {prikaz.note && <div className="mt-2 text-xs text-gray-500">Примечание: {prikaz.note}</div>}
+      <div className="mt-3 flex flex-wrap gap-2">{actions}</div>
+    </div>
+  );
+}
+
 // Масса шихты карты, г
 const kartaMass = (k: ShihtovayaKarta) => r2(k.materials.reduce((s, m) => s + m.ves, 0));
 
@@ -972,7 +946,7 @@ export function ShihtovyeKarty() {
   // Снятие резерва с позиций ДМ невыполненных карт
   const releaseOf = (karty: ShihtovayaKarta[]) => {
     const nomenkl = new Set(karty.filter(k => k.status !== "Выполнена").flatMap(k => k.materials.map(m => m.nomenkl)).filter(Boolean));
-    if (nomenkl.size) setDmItems(prev => reserveDm(prev, new Set(prev.filter(i => i.status === "Резерв" && nomenkl.has(i.nomenkl)).map(i => i.id)), [], [], Date.now()));
+    if (nomenkl.size) setDmItems(prev => reserveDm(prev, new Set(prev.filter(i => i.status === "Резерв" && nomenkl.has(i.nomenkl)).map(i => i.id)), new Set()));
   };
   const removeKarta = (karta: ShihtovayaKarta) => {
     releaseOf([karta]);
@@ -1003,14 +977,11 @@ export function ShihtovyeKarty() {
     number: r => parseInt(r.p.number, 10) || 0,
     name: r => r.p.name,
     grade: r => r.grade,
-    karty: r => r.karty.length,
-    mass: r => r.mass,
     status: r => r.status,
     createdAt: r => new Date(r.p.createdAt).getTime(),
   });
-  const COLS = 10;
+  const COLS = 7;
   const dash = <span className="text-gray-400">—</span>;
-  const iconBtn = "p-1 text-gray-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed";
 
   return (
     <div>
@@ -1030,50 +1001,48 @@ export function ShihtovyeKarty() {
               <SortTh sortKey="number" sort={sort} onSort={toggleSort}>№ приказа</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="grade" sort={sort} onSort={toggleSort}>Марка сплава</SortTh>
-              <SortTh sortKey="karty" sort={sort} onSort={toggleSort} align="right">Карт</SortTh>
-              <SortTh sortKey="mass" sort={sort} onSort={toggleSort} align="right">Масса шихты, г</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <SortTh sortKey="createdAt" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
-              <th className="w-36"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {sorted.slice((page - 1) * perPage, page * perPage).map(({ p, karty, status, grade, mass }) => {
               const isOpen = open.has(p.id);
               const done = status === "Выполнена";
+              // Приказ, по которому уже выдавались карты, не удаляется
+              const canDelete = !karty.some(k => k.status === "Выполнена");
               return (
                 <React.Fragment key={p.id}>
+                  {/* Строка приказа — только основные данные; состав и действия — внутри */}
                   <tr className={`hover:bg-gray-50 transition-colors cursor-pointer ${isOpen ? "bg-blue-50/40" : ""}`} onClick={() => toggleOpen(p.id)}>
                     <td className="pl-4 py-3 text-gray-400">{isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</td>
                     <td className="px-4 py-3 text-gray-500">{p.date}</td>
                     <td className="px-4 py-3 text-blue-600 font-medium">{p.number}</td>
                     <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                     <td className="px-4 py-3 text-gray-700">{grade || dash}</td>
-                    <td className="px-4 py-3 text-right">{karty.length}</td>
-                    <td className="px-4 py-3 text-right font-medium">{karty.length ? str2(mass) : dash}</td>
                     <td className="px-4 py-3"><Badge label={status} group="shihta" /></td>
                     <CreatedCell row={p} />
-                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => screen.openTop("itogo", p.id)} disabled={!karty.length} className={`${iconBtn} hover:text-blue-600`} title="Итого по приказу"><Sigma className="w-4 h-4" /></button>
-                        <EditIcon onClick={() => screen.openTop("prikaz", p.id)} disabled={done} title={done ? "Приказ выполнен" : "Редактировать приказ"} />
-                        <button onClick={() => screen.openTop("karta-new", p.id)} disabled={done} className={`${iconBtn} hover:text-green-600`} title="Добавить шихтовую карту"><Plus className="w-4 h-4" /></button>
-                        <DeleteIcon onClick={() => confirm(
-                          karty.length ? `Удалить приказ № ${p.number} и его шихтовые карты (${karty.length})? Резерв позиций будет снят.` : `Удалить приказ № ${p.number}?`,
-                          () => removePrikaz(p),
-                        )} />
-                      </div>
-                    </td>
                   </tr>
                   {isOpen && (
                     <tr className="bg-gray-50/60">
                       <td></td>
-                      <td colSpan={COLS - 1} className="px-4 pb-4 pt-1">
+                      <td colSpan={COLS - 1} className="px-4 pb-4 pt-2 space-y-3">
+                        <PrikazInfo
+                          prikaz={p}
+                          karty={karty}
+                          mass={mass}
+                          actions={<>
+                            <Btn size="sm" variant="secondary" onClick={() => screen.openTop("itogo", p.id)} disabled={!karty.length}><Sigma className="w-4 h-4" />Итого по приказу</Btn>
+                            {!done && <Btn size="sm" variant="secondary" onClick={() => screen.openTop("prikaz", p.id)}>Редактировать приказ</Btn>}
+                            {canDelete && <Btn size="sm" variant="secondary" onClick={() => confirm(
+                              karty.length ? `Удалить приказ № ${p.number} и его шихтовые карты (${karty.length})? Резерв позиций будет снят.` : `Удалить приказ № ${p.number}?`,
+                              () => removePrikaz(p),
+                            )}>Удалить приказ</Btn>}
+                          </>}
+                        />
+
                         {karty.length === 0 ? (
-                          <div className="flex items-center justify-between text-sm text-gray-500 bg-white rounded-lg p-4 border border-dashed border-gray-200">
-                            В приказе нет шихтовых карт
-                            <Btn size="sm" onClick={() => screen.openTop("karta-new", p.id)}><Plus className="w-4 h-4" />Добавить шихтовую карту</Btn>
-                          </div>
+                          <div className="text-sm text-gray-500 bg-white rounded-lg p-4 border border-dashed border-gray-200 text-center">В приказе нет шихтовых карт</div>
                         ) : (
                           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                             <table className="w-full text-sm">
@@ -1091,44 +1060,49 @@ export function ShihtovyeKarty() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100">
-                                {karty.map(k => (
-                                  <tr key={k.id} className="hover:bg-gray-50">
-                                    <td className="px-3 py-2 text-blue-600 font-medium">{k.plavkaNo}</td>
-                                    <td className="px-3 py-2 text-gray-500">{k.date}</td>
-                                    <td className="px-3 py-2 text-gray-900">{k.name}</td>
-                                    <td className="px-3 py-2 text-gray-700">{gradeName(k) || dash}</td>
-                                    <td className="px-3 py-2 text-gray-600">{k.oborot || dash}</td>
-                                    <td className="px-3 py-2 text-right">{k.materials.length}</td>
-                                    <td className="px-3 py-2 text-right">{str2(kartaMass(k))}</td>
-                                    <td className="px-3 py-2"><Badge label={k.status} group="shihta" /></td>
-                                    <td className="px-3 py-2">
-                                      <div className="flex items-center gap-1">
-                                        <EyeIcon onClick={() => setViewKarta(k)} />
-                                        <EditIcon
-                                          onClick={() => setEditKarta(k)}
-                                          disabled={k.status !== "На редактировании"}
-                                          title={k.status === "На редактировании" ? "Редактировать" : "Карта оформлена — редактирование недоступно"}
-                                        />
-                                        <DeleteIcon onClick={() => confirm(`Удалить шихтовую карту плавки № ${k.plavkaNo} «${k.name}»?`, () => removeKarta(k))} />
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
+                                {karty.map(k => {
+                                  // Редактировать и удалять карту можно, пока она не оформлена
+                                  const draft = k.status === "На редактировании";
+                                  return (
+                                    <tr key={k.id} className="hover:bg-gray-50">
+                                      <td className="px-3 py-2 text-blue-600 font-medium">{k.plavkaNo}</td>
+                                      <td className="px-3 py-2 text-gray-500">{k.date}</td>
+                                      <td className="px-3 py-2 text-gray-900">{k.name}</td>
+                                      <td className="px-3 py-2 text-gray-700">{gradeName(k) || dash}</td>
+                                      <td className="px-3 py-2 text-gray-600">{k.oborot || dash}</td>
+                                      <td className="px-3 py-2 text-right">{k.materials.length}</td>
+                                      <td className="px-3 py-2 text-right">{str2(kartaMass(k))}</td>
+                                      <td className="px-3 py-2"><Badge label={k.status} group="shihta" /></td>
+                                      <td className="px-3 py-2">
+                                        <div className="flex items-center gap-1">
+                                          <EyeIcon onClick={() => setViewKarta(k)} />
+                                          <EditIcon onClick={() => setEditKarta(k)} disabled={!draft} title={draft ? "Редактировать" : "Карта оформлена — редактирование недоступно"} />
+                                          <DeleteIcon
+                                            onClick={() => confirm(`Удалить шихтовую карту плавки № ${k.plavkaNo} «${k.name}»? Резерв позиций будет снят.`, () => removeKarta(k))}
+                                            disabled={!draft}
+                                            title={draft ? "Удалить" : "Карта оформлена — удаление недоступно"}
+                                          />
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                               <tfoot className="border-t-2 border-gray-200 bg-gray-50">
                                 <tr className="font-medium">
                                   <td className="px-3 py-2" colSpan={5}>Итого по приказу <span className="text-xs font-normal text-gray-400">({karty.length} карт)</span></td>
                                   <td className="px-3 py-2 text-right">{karty.reduce((s, k) => s + k.materials.length, 0)}</td>
                                   <td className="px-3 py-2 text-right font-semibold">{str2(mass)}</td>
-                                  <td className="px-3 py-2" colSpan={2}>
-                                    <div className="flex justify-end gap-2">
-                                      <Btn size="sm" variant="secondary" onClick={() => screen.openTop("itogo", p.id)}><Sigma className="w-4 h-4" />Итого</Btn>
-                                      {!done && <Btn size="sm" onClick={() => screen.openTop("karta-new", p.id)}><Plus className="w-4 h-4" />Карта</Btn>}
-                                    </div>
-                                  </td>
+                                  <td colSpan={2}></td>
                                 </tr>
                               </tfoot>
                             </table>
+                          </div>
+                        )}
+
+                        {!done && (
+                          <div>
+                            <Btn size="sm" onClick={() => screen.openTop("karta-new", p.id)}><Plus className="w-4 h-4" />Добавить ШК</Btn>
                           </div>
                         )}
                       </td>
