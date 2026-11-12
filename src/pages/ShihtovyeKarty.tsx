@@ -8,15 +8,17 @@ import {
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
   PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO,
+  PrikazPlavka,
 } from "../data/mock";
 import { returnToStock, splitRecord } from "../data/stock";
 import {
   ShihtaCalc, ShihtaLine, chemStrings, fmt2, normText, r2, shareOf, shihtaWarnings, lineChem, kindOf,
+  normCell, impuritiesText, fmtNorm, prikazStatus, itogoMaterials, lineOfMaterial, prikazGrade, isSkladMaterial,
 } from "../data/shihta";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { ChemPercent, gramsFrom, num0, pctFrom } from "../data/chem";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
-import { Plus, X, Calculator, AlertTriangle } from "lucide-react";
+import { Plus, X, Calculator, AlertTriangle, ChevronRight, ChevronDown, Sigma } from "lucide-react";
 import { useScreen } from "../router";
 
 // ── Шихтовая карта: конструктор ─────────────────────────────────────────────────
@@ -249,21 +251,43 @@ function DopMaterialModal({ initial, onClose, onSave }: { initial?: MatRow; onCl
   );
 }
 
-function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta?: ShihtovayaKarta | null; onClose: () => void; onSave: (k: ShihtovayaKarta) => void; readOnly?: boolean }) {
+// Обозначение элемента-остатка марки: текст, а не число (в расчётах не участвует)
+function RestLabel({ value }: { value?: string }) {
+  return (
+    <span className="inline-flex flex-col items-end leading-tight" title="Элемент-остаток марки: доля = 100 % − остальные элементы">
+      <span className="italic text-gray-700">Остальное</span>
+      {value && value !== "—" && <span className="text-[11px] text-gray-400">{value}</span>}
+    </span>
+  );
+}
+
+// Значение нормы: число, «Остальное» или прочерк
+function NormValue({ v }: { v: number | "rest" | null }) {
+  if (v === "rest") return <RestLabel />;
+  if (v == null) return <span className="text-gray-400">—</span>;
+  return <>{fmtNorm(v)}</>;
+}
+
+// prikaz — приказ на плавку, в который входит карта; defaults — шапка новой карты (из предыдущей карты приказа)
+function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly = false }: {
+  karta?: ShihtovayaKarta | null; prikaz?: PrikazPlavka; defaults?: Partial<ShihtovayaKarta>;
+  onClose: () => void; onSave: (k: ShihtovayaKarta) => void; readOnly?: boolean;
+}) {
   const { currentUser, dmItems, setDmItems, chemElements, alloyGrades, shihtovyeKarty } = useApp();
+  const init = karta ?? defaults;
   // Колонки «Содержание в чистоте, г» — элементы справочника с признаком «Отображать в ШК»
   const shkEls = chemElements.filter(e => e.showShk);
   const shortName = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
   const elName = (id: string) => { const e = chemElements.find(x => x.id === id); return e ? `${e.name} (${e.shortName})` : id; };
 
-  const [name, setName] = useState(karta?.name || "");
-  const [alloyId, setAlloyId] = useState(karta?.alloyId ?? "");
+  const [name, setName] = useState(init?.name || "");
+  const [alloyId, setAlloyId] = useState(init?.alloyId ?? "");
   const [plavkaNo, setPlavkaNo] = useState(() => karta?.plavkaNo ?? nextPlavkaNo(shihtovyeKarty));
-  const [oborot, setOborot] = useState(karta?.oborot ?? "");
+  const [oborot, setOborot] = useState(init?.oborot ?? "");
   // Дата документа — задаётся вручную, по умолчанию сегодняшняя
   const [docDate, setDocDate] = useState(karta?.date || new Date().toLocaleDateString("ru-RU"));
-  const [naznachenie, setNaznachenie] = useState(karta?.naznachenie ?? "");
-  const [osnovanie, setOsnovanie] = useState(karta?.osnovanie ?? "");
+  const [naznachenie, setNaznachenie] = useState(init?.naznachenie ?? "");
+  const [osnovanie, setOsnovanie] = useState(init?.osnovanie ?? "");
   const [note, setNote] = useState(karta?.note ?? "");
   const [files, setFiles] = useState<File[]>(() => karta?.files ?? []);
   const [materials, setMaterials] = useState<MatRow[]>(() => (karta?.materials ?? []).map(m => toRow(m, dmItems)));
@@ -358,7 +382,15 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     ...(oborotValid(oborot) ? [] : ["Оборот — число или «чистая»"]),
     ...[...new Set(materials.map(m => banReason(m, grade, naznachenie)).filter((w): w is string => !!w))],
   ];
-  const rangeOf = (e: string) => grade?.ranges.find(r => r.element === e);
+  // Норма элемента в строках «Норма мин / макс»: число — из диапазона или предела примеси; элемент-остаток — «Остальное»
+  const normOf = (e: string, k: "min" | "max") => {
+    const c = normCell(grade, e);
+    if (!c) return null;
+    if (c.kind === "rest") return "rest" as const;
+    if (c.kind === "impurity") return k === "max" ? c.max : null;
+    return c[k] ?? null;
+  };
+  const impText = impuritiesText(grade, shkEls.map(e => e.id), shortName);
 
   const pctCell = (e: string) => {
     // Фосфор выгорает и в базу не входит — его доля не показывается
@@ -433,7 +465,7 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
     const k: ShihtovayaKarta = karta
       ? { ...karta, ...head, status, vydannyePozicii: !oformit && stillIssued.length ? stillIssued : undefined }
       : {
-        id: `sk-${Date.now()}`, ...head, status,
+        id: `sk-${Date.now()}`, ...head, status, prikazId: prikaz?.id,
         createdAt: new Date().toISOString(),
         createdBy: currentUser?.fullName || currentUser?.name || "—",
       };
@@ -470,6 +502,12 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
         </div>
       )}
     >
+      {prikaz && (
+        <div className="mb-4 text-sm text-gray-600">
+          Приказ на плавку № <span className="font-medium text-gray-900">{prikaz.number}</span> от {prikaz.date}
+          <span className="text-gray-400"> · {prikaz.name}</span>
+        </div>
+      )}
       {karta && (
         <div className="flex items-center gap-2 mb-4">
           <Badge label={karta.status} group="shihta" />
@@ -613,6 +651,8 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                 <td className="px-3 py-2 text-right text-gray-400">—</td>
                 {shkEls.map(e => {
                   const v = pctCell(e.id);
+                  // Элемент-остаток марки — обозначение «Остальное»; расчётная доля — справочно
+                  if (grade?.rest === e.id) return <td key={e.id} className="px-3 py-2 text-right"><RestLabel value={v} /></td>;
                   return <td key={e.id} className={`px-3 py-2 text-right ${v === "—" ? "text-gray-400" : "font-semibold"}`}>{v}</td>;
                 })}
                 <td colSpan={ro ? 1 : 2}></td>
@@ -621,13 +661,15 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
                 <tr key={k} className="text-gray-600">
                   <td className="px-3 py-2 font-medium" colSpan={LEAD}>{k === "min" ? "Норма мин, %" : "Норма макс, %"} <span className="text-xs font-normal text-gray-400">({grade.name})</span></td>
                   <td className="px-3 py-2 text-right text-gray-400">—</td>
-                  {shkEls.map(e => {
-                    const v = rangeOf(e.id)?.[k];
-                    return <td key={e.id} className="px-3 py-2 text-right">{v != null ? fmt2(v) : <span className="text-gray-400">—</span>}</td>;
-                  })}
+                  {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right"><NormValue v={normOf(e.id, k)} /></td>)}
                   <td colSpan={ro ? 1 : 2}></td>
                 </tr>
               ))}
+              {grade && impText && (
+                <tr className="text-gray-600">
+                  <td className="px-3 py-2 text-xs" colSpan={cols}>Примеси, не более, % <span className="text-gray-400">({grade.nd})</span>: {impText}</td>
+                </tr>
+              )}
             </tfoot>
           </table>
           {pg9.pager}
@@ -732,110 +774,426 @@ function ShihtaConstructor({ karta, onClose, onSave, readOnly = false }: { karta
   );
 }
 
+// ── Приказ на плавку: шапка записи ──────────────────────────────────────────────
+function PrikazModal({ prikaz, onClose, onSave }: { prikaz?: PrikazPlavka | null; onClose: () => void; onSave: (p: PrikazPlavka) => void }) {
+  const { currentUser } = useApp();
+  const [number, setNumber] = useState(prikaz?.number ?? "");
+  const [date, setDate] = useState(prikaz?.date ?? new Date().toLocaleDateString("ru-RU"));
+  const [name, setName] = useState(prikaz?.name ?? "");
+  const [note, setNote] = useState(prikaz?.note ?? "");
+  const error = !number.trim() ? "Укажите номер приказа" : !date.trim() ? "Укажите дату приказа" : !name.trim() ? "Укажите наименование" : "";
+  const save = () => {
+    if (error) return;
+    const head = { number: number.trim(), date: date.trim(), name: name.trim(), note: note.trim() || undefined };
+    onSave(prikaz
+      ? { ...prikaz, ...head }
+      : { id: `pp-${Date.now()}`, ...head, createdAt: new Date().toISOString(), createdBy: currentUser?.fullName || currentUser?.name || "—" });
+  };
+  return (
+    <Modal title={prikaz ? "Приказ на плавку" : "Новый приказ на плавку"} wide onClose={onClose} footer={
+      <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={save} disabled={!!error}>{prikaz ? "Сохранить" : "Создать"}</Btn></>
+    }>
+      <div className="grid grid-cols-3 gap-4">
+        <Field label="Номер приказа" required><Input value={number} onChange={setNumber} placeholder="№" /></Field>
+        <Field label="Дата приказа" required><Input value={date} onChange={setDate} placeholder="дд.мм.гггг" /></Field>
+        <div />
+        <Field label="Наименование" required full><Input value={name} onChange={setName} placeholder="Например: слитки СрМ 92,5 для монет пруф-качества" /></Field>
+        <Field label="Примечание" full><Textarea value={note} onChange={setNote} rows={2} /></Field>
+      </div>
+      {!prikaz && <p className="mt-3 text-xs text-gray-500">После создания добавьте в приказ шихтовые карты — каждая карта на свою плавку. Итоговый набор материалов по всем картам выдаётся со склада по кнопке «Выдать по ШК».</p>}
+    </Modal>
+  );
+}
+
+// ── Итого по приказу ────────────────────────────────────────────────────────────
+// Сумма шихтовых материалов всех карт приказа: одинаковые материалы складываются, состав рассчитывается заново
+// по итоговым массам (как лист «ИТОГО» книги шихтовых карт).
+function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; karty: ShihtovayaKarta[]; onClose: () => void }) {
+  const { chemElements, alloyGrades } = useApp();
+  const shkEls = chemElements.filter(e => e.showShk);
+  const shortName = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
+  const codeLabel = useMaterialCodeLabel();
+  const mats = useMemo(() => itogoMaterials(karty), [karty]);
+  const grade = prikazGrade(karty, alloyGrades);
+  const calc = useMemo(() => new ShihtaCalc(mats.map(lineOfMaterial), grade), [mats, grade]);
+  const status = prikazStatus(karty);
+  const pct = (e: string) => (e === "p" || !(calc.total(e) > 0) || calc.base <= 0 ? "—" : fmt2(calc.pct(e)));
+  const normOf = (e: string, k: "min" | "max") => {
+    const c = normCell(grade, e);
+    if (!c) return null;
+    if (c.kind === "rest") return "rest" as const;
+    if (c.kind === "impurity") return k === "max" ? c.max : null;
+    return c[k] ?? null;
+  };
+  const impText = impuritiesText(grade, shkEls.map(e => e.id), shortName);
+  const matName = (m: ShihtaMaterial) => (kindOf(m) === "cup" ? `${m.name} (P = ${str2(m.phosphorPct ?? 0)} %)` : m.name);
+  const LEAD = 4;
+  const cols = LEAD + 1 + shkEls.length;
+  const dash = <span className="text-gray-400">—</span>;
+  const skladCount = mats.filter(isSkladMaterial).length;
+
+  return (
+    <Modal title={`Итого по приказу № ${prikaz.number} от ${prikaz.date}`} fullWide onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Закрыть</Btn>}>
+      <div className="flex flex-wrap items-center gap-3 mb-4 text-sm">
+        <Badge label={status} group="shihta" />
+        <span className="text-gray-700">{prikaz.name}</span>
+        <span className="text-gray-400">·</span>
+        <span className="text-gray-600">Марка: {grade ? `${grade.name} (${grade.nd})` : karty.length ? "разные марки — сверка итога не выполняется" : "—"}</span>
+      </div>
+      <div className="flex flex-wrap gap-2 mb-4">
+        {karty.map(k => (
+          <span key={k.id} className="inline-flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1 text-xs text-gray-700">
+            Плавка № {k.plavkaNo} · {str2(kartaMass(k))} г <Badge label={k.status} group="shihta" />
+          </span>
+        ))}
+      </div>
+      {mats.length === 0 ? (
+        <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">В приказе нет шихтовых карт с материалами</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-gray-500 text-xs">
+                <th colSpan={LEAD + 1}></th>
+                <th colSpan={shkEls.length} className="px-3 pt-2 pb-1 text-center font-medium uppercase tracking-wide border-b border-gray-200">Содержание в чистоте, г</th>
+              </tr>
+              <tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
+                <th className="px-3 py-2 text-left font-medium w-10">№</th>
+                <th className="px-3 py-2 text-left font-medium">Шихтовый материал</th>
+                <th className="px-3 py-2 text-left font-medium">Номенкл. № / код</th>
+                <th className="px-3 py-2 text-left font-medium">Плавки</th>
+                <th className="px-3 py-2 text-right font-medium">Масса лигатурная, г</th>
+                {shkEls.map(e => <th key={e.id} className="px-3 py-2 text-right font-medium">{e.shortName}</th>)}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {mats.map((m, i) => (
+                <tr key={`${m.nomenkl}-${m.name}-${i}`} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-gray-500">{i + 1}</td>
+                  <td className="px-3 py-2 font-medium">{matName(m)}{!isSkladMaterial(m) && <span className="ml-2 text-xs font-normal text-gray-400">доп. материал</span>}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {m.nomenkl ? <span className="text-gray-500">{m.nomenkl}</span> : dash}
+                    {m.code && <span className="ml-2 text-blue-600">{codeLabel(m.code)}</span>}
+                  </td>
+                  <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{m.plavki.join(", ")}</td>
+                  <td className="px-3 py-2 text-right font-medium">{str2(m.ves)}</td>
+                  {shkEls.map(e => {
+                    const v = calc.chems[i][e.id] ?? 0;
+                    return <td key={e.id} className="px-3 py-2 text-right text-gray-600">{v > 0 ? str2(v) : "—"}</td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="border-t-2 border-gray-200 bg-gray-50 text-sm divide-y divide-gray-200">
+              <tr className="font-medium">
+                <td className="px-3 py-2" colSpan={LEAD}>Масса шихты, г <span className="text-xs font-normal text-gray-400">({mats.length} поз., из них со склада — {skladCount})</span></td>
+                <td className="px-3 py-2 text-right font-semibold">{str2(calc.mass)}</td>
+                {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right text-gray-400">—</td>)}
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium" colSpan={LEAD}>Содержание в шихте, г</td>
+                <td className="px-3 py-2 text-right text-gray-400">—</td>
+                {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right">{calc.total(e.id) > 0 ? str2(calc.total(e.id)) : "—"}</td>)}
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-medium" colSpan={LEAD}>Содержание в шихте, % <span className="text-xs font-normal text-gray-400">(к массе без фосфора {str2(calc.base)} г)</span></td>
+                <td className="px-3 py-2 text-right text-gray-400">—</td>
+                {shkEls.map(e => {
+                  const v = pct(e.id);
+                  if (grade?.rest === e.id) return <td key={e.id} className="px-3 py-2 text-right"><RestLabel value={v} /></td>;
+                  return <td key={e.id} className={`px-3 py-2 text-right ${v === "—" ? "text-gray-400" : "font-semibold"}`}>{v}</td>;
+                })}
+              </tr>
+              {grade && (["min", "max"] as const).map(k => (
+                <tr key={k} className="text-gray-600">
+                  <td className="px-3 py-2 font-medium" colSpan={LEAD}>{k === "min" ? "Норма мин, %" : "Норма макс, %"} <span className="text-xs font-normal text-gray-400">({grade.name}, {grade.nd})</span></td>
+                  <td className="px-3 py-2 text-right text-gray-400">—</td>
+                  {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right"><NormValue v={normOf(e.id, k)} /></td>)}
+                </tr>
+              ))}
+              {grade && impText && (
+                <tr className="text-gray-600">
+                  <td className="px-3 py-2 text-xs" colSpan={cols}>Примеси, не более, %: {impText}</td>
+                </tr>
+              )}
+            </tfoot>
+          </table>
+          {grade && calc.checks.length > 0 && (
+            <div className={`mt-3 px-4 py-2 rounded-lg text-sm border ${calc.complies ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+              {calc.complies
+                ? `Итоговый состав соответствует марке ${grade.name}`
+                : `Итоговый состав не соответствует марке ${grade.name}: ${calc.failed.map(c => `${shortName(c.element)} ${fmt2(c.fact)} % при норме ${normText(c)}`).join("; ")}`}
+            </div>
+          )}
+          <p className="mt-3 text-xs text-gray-500">
+            Со склада по кнопке «Выдать по ШК» (Движение материала, операция «Плавка») выдаются позиции склада всех карт приказа; доп. материалы (лигатура, медь МО) выдаёт распределитель работ участка.
+          </p>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// Масса шихты карты, г
+const kartaMass = (k: ShihtovayaKarta) => r2(k.materials.reduce((s, m) => s + m.ves, 0));
+
 export function ShihtovyeKarty() {
-  const { shihtovyeKarty, setShihtovyeKarty, setDmItems, alloyGrades } = useApp();
+  const { shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, setShihtaPrikazy, setDmItems, alloyGrades } = useApp();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
-  // Экраны: /shihtovye-karty/new, /view/:id, /edit/:id
+  // Экраны: /new (новый приказ), /prikaz/:id (шапка приказа), /itogo/:id (итого по приказу),
+  // /karta-new/:prikazId (новая карта в приказе), /view/:id, /edit/:id (карта)
   const screen = useScreen();
   const viewKarta = shihtovyeKarty.find(k => k.id === screen.after("view")) ?? null;
   const editKarta = shihtovyeKarty.find(k => k.id === screen.after("edit")) ?? null;
   const showNew = screen.has("new");
+  const editPrikaz = shihtaPrikazy.find(p => p.id === screen.after("prikaz")) ?? null;
+  const itogoPrikaz = shihtaPrikazy.find(p => p.id === screen.after("itogo")) ?? null;
+  const newKartaPrikaz = shihtaPrikazy.find(p => p.id === screen.after("karta-new")) ?? null;
   const setViewKarta = (k: ShihtovayaKarta | null) => (k ? screen.openTop("view", k.id) : screen.close("view"));
   const setEditKarta = (k: ShihtovayaKarta | null) => (k ? screen.openTop("edit", k.id) : screen.close("edit"));
-  const setShowNew = (open: boolean) => (open ? screen.openTop("new") : screen.close("new"));
   const [perPage, setPerPage] = usePerPage("shihtovye-karty", 8);
   const gradeName = (k: ShihtovayaKarta) => alloyGrades.find(g => g.id === k.alloyId)?.name ?? "";
+  const prikazOf = (k: ShihtovayaKarta | null) => (k ? shihtaPrikazy.find(p => p.id === k.prikazId) : undefined);
 
-  // Удаление невыполненной карты снимает резерв с её позиций ДМ
+  // Карты приказа — по номеру плавки
+  const kartyOf = (id: string) => shihtovyeKarty.filter(k => k.prikazId === id).sort((a, b) => (parseInt(a.plavkaNo, 10) || 0) - (parseInt(b.plavkaNo, 10) || 0));
+  const rows = shihtaPrikazy.map(p => {
+    const karty = kartyOf(p.id);
+    const grades = [...new Set(karty.map(gradeName).filter(Boolean))];
+    return { id: p.id, p, karty, status: prikazStatus(karty), grade: grades.join(", "), mass: r2(karty.reduce((s, k) => s + kartaMass(k), 0)) };
+  });
+
+  // Раскрытые записи: по умолчанию — приказы в работе
+  const [open, setOpen] = useState<Set<string>>(() => new Set(rows.filter(r => r.status !== "Выполнена").map(r => r.id)));
+  const toggleOpen = (id: string) => setOpen(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  // Снятие резерва с позиций ДМ невыполненных карт
+  const releaseOf = (karty: ShihtovayaKarta[]) => {
+    const nomenkl = new Set(karty.filter(k => k.status !== "Выполнена").flatMap(k => k.materials.map(m => m.nomenkl)).filter(Boolean));
+    if (nomenkl.size) setDmItems(prev => reserveDm(prev, new Set(prev.filter(i => i.status === "Резерв" && nomenkl.has(i.nomenkl)).map(i => i.id)), [], [], Date.now()));
+  };
   const removeKarta = (karta: ShihtovayaKarta) => {
-    if (karta.status !== "Выполнена") {
-      const nomenkl = new Set(karta.materials.map(m => m.nomenkl).filter(Boolean));
-      setDmItems(prev => reserveDm(prev, new Set(prev.filter(i => i.status === "Резерв" && nomenkl.has(i.nomenkl)).map(i => i.id)), [], [], Date.now()));
-    }
+    releaseOf([karta]);
     setShihtovyeKarty(prev => prev.filter(s => s.id !== karta.id));
-    show(`Шихтовая карта «${karta.name}» удалена`);
+    show(`Шихтовая карта «${karta.name}» (плавка № ${karta.plavkaNo}) удалена`);
+  };
+  const removePrikaz = (p: PrikazPlavka) => {
+    const karty = kartyOf(p.id);
+    releaseOf(karty);
+    const ids = new Set(karty.map(k => k.id));
+    setShihtovyeKarty(prev => prev.filter(k => !ids.has(k.id)));
+    setShihtaPrikazy(prev => prev.filter(x => x.id !== p.id));
+    show(`Приказ № ${p.number} удалён${karty.length ? ` вместе с картами (${karty.length})` : ""}`);
   };
 
-  const { sorted, sort, toggleSort } = useSort(shihtovyeKarty, {
-    date: k => parseRuDate(k.date),
-    name: k => k.name,
-    grade: k => gradeName(k),
-    plavkaNo: k => parseInt(k.plavkaNo, 10) || 0,
-    status: k => k.status,
-    createdAt: k => new Date(k.createdAt).getTime(),
+  // Новая карта приказа: шапка — из последней карты приказа, основание — сам приказ
+  const defaultsFor = (p: PrikazPlavka): Partial<ShihtovayaKarta> => {
+    const all = kartyOf(p.id);
+    const last = all[all.length - 1];
+    return {
+      name: last?.name ?? "", alloyId: last?.alloyId, oborot: last?.oborot, naznachenie: last?.naznachenie,
+      osnovanie: `Приказ № ${p.number} от ${p.date}`,
+    };
+  };
+
+  const { sorted, sort, toggleSort } = useSort(rows, {
+    date: r => parseRuDate(r.p.date),
+    number: r => parseInt(r.p.number, 10) || 0,
+    name: r => r.p.name,
+    grade: r => r.grade,
+    karty: r => r.karty.length,
+    mass: r => r.mass,
+    status: r => r.status,
+    createdAt: r => new Date(r.p.createdAt).getTime(),
   });
+  const COLS = 10;
+  const dash = <span className="text-gray-400">—</span>;
+  const iconBtn = "p-1 text-gray-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed";
 
   return (
     <div>
       <PageHeader
         title="Шихтовые карты"
-        subtitle="Расчёт состава шихты для плавки слитков"
+        subtitle="Приказы на плавку и шихтовые карты в их составе"
         breadcrumb={["Шихтовые карты"]}
-        actions={<Btn onClick={() => setShowNew(true)}><Plus className="w-4 h-4" />Новая шихтовая карта</Btn>}
+        actions={<Btn onClick={() => screen.openTop("new")}><Plus className="w-4 h-4" />Новый приказ на плавку</Btn>}
       />
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата документа</SortTh>
+              <th className="w-10"></th>
+              <SortTh sortKey="date" sort={sort} onSort={toggleSort}>Дата приказа</SortTh>
+              <SortTh sortKey="number" sort={sort} onSort={toggleSort}>№ приказа</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
               <SortTh sortKey="grade" sort={sort} onSort={toggleSort}>Марка сплава</SortTh>
-              <SortTh sortKey="plavkaNo" sort={sort} onSort={toggleSort}>№ плавки</SortTh>
+              <SortTh sortKey="karty" sort={sort} onSort={toggleSort} align="right">Карт</SortTh>
+              <SortTh sortKey="mass" sort={sort} onSort={toggleSort} align="right">Масса шихты, г</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <SortTh sortKey="createdAt" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
-              <th className="w-28"></th>
+              <th className="w-36"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {sorted.slice((page - 1) * perPage, page * perPage).map(karta => (
-              <tr key={karta.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-gray-500">{karta.date}</td>
-                <td className="px-4 py-3 font-medium text-gray-900">{karta.name}</td>
-                <td className="px-4 py-3 text-gray-700">{gradeName(karta) || <span className="text-gray-400">—</span>}</td>
-                <td className="px-4 py-3 text-blue-600">{karta.plavkaNo}</td>
-                <td className="px-4 py-3"><Badge label={karta.status} group="shihta" /></td>
-                <CreatedCell row={karta} />
-                <td className="px-4 py-3 flex items-center gap-1">
-                  <EyeIcon onClick={() => setViewKarta(karta)} />
-                  <EditIcon
-                    onClick={() => setEditKarta(karta)}
-                    disabled={karta.status !== "На редактировании"}
-                    title={karta.status === "На редактировании" ? "Редактировать" : "Карта оформлена — редактирование недоступно"}
-                  />
-                  <DeleteIcon onClick={() => confirm(`Удалить шихтовую карту «${karta.name}»?`, () => removeKarta(karta))} />
-                </td>
-              </tr>
-            ))}
-            <FillerRows count={fillerCount(shihtovyeKarty.length, page, perPage)} cols={7} />
+            {sorted.slice((page - 1) * perPage, page * perPage).map(({ p, karty, status, grade, mass }) => {
+              const isOpen = open.has(p.id);
+              const done = status === "Выполнена";
+              return (
+                <React.Fragment key={p.id}>
+                  <tr className={`hover:bg-gray-50 transition-colors cursor-pointer ${isOpen ? "bg-blue-50/40" : ""}`} onClick={() => toggleOpen(p.id)}>
+                    <td className="pl-4 py-3 text-gray-400">{isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</td>
+                    <td className="px-4 py-3 text-gray-500">{p.date}</td>
+                    <td className="px-4 py-3 text-blue-600 font-medium">{p.number}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
+                    <td className="px-4 py-3 text-gray-700">{grade || dash}</td>
+                    <td className="px-4 py-3 text-right">{karty.length}</td>
+                    <td className="px-4 py-3 text-right font-medium">{karty.length ? str2(mass) : dash}</td>
+                    <td className="px-4 py-3"><Badge label={status} group="shihta" /></td>
+                    <CreatedCell row={p} />
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => screen.openTop("itogo", p.id)} disabled={!karty.length} className={`${iconBtn} hover:text-blue-600`} title="Итого по приказу"><Sigma className="w-4 h-4" /></button>
+                        <EditIcon onClick={() => screen.openTop("prikaz", p.id)} disabled={done} title={done ? "Приказ выполнен" : "Редактировать приказ"} />
+                        <button onClick={() => screen.openTop("karta-new", p.id)} disabled={done} className={`${iconBtn} hover:text-green-600`} title="Добавить шихтовую карту"><Plus className="w-4 h-4" /></button>
+                        <DeleteIcon onClick={() => confirm(
+                          karty.length ? `Удалить приказ № ${p.number} и его шихтовые карты (${karty.length})? Резерв позиций будет снят.` : `Удалить приказ № ${p.number}?`,
+                          () => removePrikaz(p),
+                        )} />
+                      </div>
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr className="bg-gray-50/60">
+                      <td></td>
+                      <td colSpan={COLS - 1} className="px-4 pb-4 pt-1">
+                        {karty.length === 0 ? (
+                          <div className="flex items-center justify-between text-sm text-gray-500 bg-white rounded-lg p-4 border border-dashed border-gray-200">
+                            В приказе нет шихтовых карт
+                            <Btn size="sm" onClick={() => screen.openTop("karta-new", p.id)}><Plus className="w-4 h-4" />Добавить шихтовую карту</Btn>
+                          </div>
+                        ) : (
+                          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
+                                  <th className="px-3 py-2 text-left font-medium">№ плавки</th>
+                                  <th className="px-3 py-2 text-left font-medium">Дата документа</th>
+                                  <th className="px-3 py-2 text-left font-medium">Наименование</th>
+                                  <th className="px-3 py-2 text-left font-medium">Марка сплава</th>
+                                  <th className="px-3 py-2 text-left font-medium">Оборот</th>
+                                  <th className="px-3 py-2 text-right font-medium">Позиций</th>
+                                  <th className="px-3 py-2 text-right font-medium">Масса шихты, г</th>
+                                  <th className="px-3 py-2 text-left font-medium">Статус</th>
+                                  <th className="w-24"></th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {karty.map(k => (
+                                  <tr key={k.id} className="hover:bg-gray-50">
+                                    <td className="px-3 py-2 text-blue-600 font-medium">{k.plavkaNo}</td>
+                                    <td className="px-3 py-2 text-gray-500">{k.date}</td>
+                                    <td className="px-3 py-2 text-gray-900">{k.name}</td>
+                                    <td className="px-3 py-2 text-gray-700">{gradeName(k) || dash}</td>
+                                    <td className="px-3 py-2 text-gray-600">{k.oborot || dash}</td>
+                                    <td className="px-3 py-2 text-right">{k.materials.length}</td>
+                                    <td className="px-3 py-2 text-right">{str2(kartaMass(k))}</td>
+                                    <td className="px-3 py-2"><Badge label={k.status} group="shihta" /></td>
+                                    <td className="px-3 py-2">
+                                      <div className="flex items-center gap-1">
+                                        <EyeIcon onClick={() => setViewKarta(k)} />
+                                        <EditIcon
+                                          onClick={() => setEditKarta(k)}
+                                          disabled={k.status !== "На редактировании"}
+                                          title={k.status === "На редактировании" ? "Редактировать" : "Карта оформлена — редактирование недоступно"}
+                                        />
+                                        <DeleteIcon onClick={() => confirm(`Удалить шихтовую карту плавки № ${k.plavkaNo} «${k.name}»?`, () => removeKarta(k))} />
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot className="border-t-2 border-gray-200 bg-gray-50">
+                                <tr className="font-medium">
+                                  <td className="px-3 py-2" colSpan={5}>Итого по приказу <span className="text-xs font-normal text-gray-400">({karty.length} карт)</span></td>
+                                  <td className="px-3 py-2 text-right">{karty.reduce((s, k) => s + k.materials.length, 0)}</td>
+                                  <td className="px-3 py-2 text-right font-semibold">{str2(mass)}</td>
+                                  <td className="px-3 py-2" colSpan={2}>
+                                    <div className="flex justify-end gap-2">
+                                      <Btn size="sm" variant="secondary" onClick={() => screen.openTop("itogo", p.id)}><Sigma className="w-4 h-4" />Итого</Btn>
+                                      {!done && <Btn size="sm" onClick={() => screen.openTop("karta-new", p.id)}><Plus className="w-4 h-4" />Карта</Btn>}
+                                    </div>
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+            <FillerRows count={fillerCount(rows.length, page, perPage)} cols={COLS} />
           </tbody>
         </table>
-        <Pagination page={page} total={shihtovyeKarty.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
+        <Pagination page={page} total={rows.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
-      {viewKarta && <ShihtaConstructor key={viewKarta.id} karta={viewKarta} onClose={() => setViewKarta(null)} onSave={() => setViewKarta(null)} readOnly />}
+      {showNew && (
+        <PrikazModal
+          onClose={() => screen.close("new")}
+          onSave={p => {
+            setShihtaPrikazy(prev => [p, ...prev]);
+            setOpen(prev => new Set(prev).add(p.id));
+            screen.close("new");
+            show(`Приказ № ${p.number} создан — добавьте шихтовые карты`);
+          }}
+        />
+      )}
+      {editPrikaz && (
+        <PrikazModal
+          key={editPrikaz.id}
+          prikaz={editPrikaz}
+          onClose={() => screen.close("prikaz")}
+          onSave={p => {
+            setShihtaPrikazy(prev => prev.map(x => (x.id === p.id ? p : x)));
+            screen.close("prikaz");
+            show("Приказ сохранён");
+          }}
+        />
+      )}
+      {itogoPrikaz && <PrikazItogoModal prikaz={itogoPrikaz} karty={kartyOf(itogoPrikaz.id)} onClose={() => screen.close("itogo")} />}
+
+      {viewKarta && <ShihtaConstructor key={viewKarta.id} karta={viewKarta} prikaz={prikazOf(viewKarta)} onClose={() => setViewKarta(null)} onSave={() => setViewKarta(null)} readOnly />}
       {editKarta && (
         <ShihtaConstructor
           key={editKarta.id}
           karta={editKarta}
+          prikaz={prikazOf(editKarta)}
           // Оформленная карта не редактируется — даже если открыта по прямой ссылке /edit/:id
           readOnly={editKarta.status !== "На редактировании"}
           onClose={() => setEditKarta(null)}
           onSave={k => {
             setShihtovyeKarty(prev => prev.map(s => s.id === k.id ? k : s));
             setEditKarta(null);
-            show(k.status === "Новая" ? "Карта оформлена — доступна для выдачи на плавку" : "Карта сохранена");
+            show(k.status === "Новая" ? "Карта оформлена — доступна для выдачи на плавку в составе приказа" : "Карта сохранена");
           }}
         />
       )}
-      {showNew && (
+      {newKartaPrikaz && (
         <ShihtaConstructor
-          onClose={() => setShowNew(false)}
+          key={`new-${newKartaPrikaz.id}`}
+          prikaz={newKartaPrikaz}
+          defaults={defaultsFor(newKartaPrikaz)}
+          onClose={() => screen.close("karta-new")}
           onSave={k => {
             setShihtovyeKarty(prev => [k, ...prev]);
-            setShowNew(false);
+            setOpen(prev => new Set(prev).add(newKartaPrikaz.id));
+            screen.close("karta-new");
             show(k.status === "Новая" ? "Шихтовая карта оформлена, позиции зарезервированы" : "Шихтовая карта сохранена в статусе «На редактировании»");
           }}
         />

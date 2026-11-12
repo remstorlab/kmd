@@ -14,7 +14,7 @@ type Screen = { title: string; path: string };
 type Group = { title: string; screens: Screen[] };
 
 export function useScreenGroups(): Group[] {
-  const { gpItems, dmItems, skladDocs, vydachaDocs, operations, shihtovyeKarty, podotchetniki, logs, users, roles, storageLocations } = useApp();
+  const { gpItems, dmItems, skladDocs, vydachaDocs, operations, shihtovyeKarty, shihtaPrikazy, podotchetniki, logs, users, roles, storageLocations } = useApp();
   const opVydano = operations.find(o => o.stage === "В работе") ?? operations[0];
   const opVozvrat = operations.find(o => o.stage === "В работе" && o.statusVozvrat !== "Не начат") ?? operations[0];
   const opDone = operations.find(o => o.stage === "Завершено") ?? operations[0];
@@ -26,6 +26,7 @@ export function useScreenGroups(): Group[] {
   const dm2 = dmItems.find(i => i.sklad === SDM2 && i.status !== "Закрыта");
   const karta = shihtovyeKarty.find(k => k.status === "Новая") ?? shihtovyeKarty[0];
   const kartaRed = shihtovyeKarty.find(k => k.status === "На редактировании");
+  const prikaz = shihtaPrikazy.find(p => p.id === karta?.prikazId) ?? shihtaPrikazy[0];
   const person = podotchetniki[0];
   const log = logs.find(l => (l.before?.length ?? 0) + (l.after?.length ?? 0) > 0) ?? logs[0];
   const S = SPRAV_SLUGS;
@@ -89,10 +90,13 @@ export function useScreenGroups(): Group[] {
       opDone && { title: "Операция: просмотр (завершено)", path: `${P["dvizhenie-mat"]}/view/${opDone.id}?tab=itogo` },
     ].filter(Boolean) as Screen[] },
     { title: "Шихтовые карты", screens: [
-      { title: "Реестр шихтовых карт", path: P["shihtovye-karty"] },
-      { title: "Новая шихтовая карта", path: `${P["shihtovye-karty"]}/new` },
-      { title: "Новая карта — добавить со склада", path: `${P["shihtovye-karty"]}/new/from-sklad` },
-      { title: "Новая карта — доп. материал", path: `${P["shihtovye-karty"]}/new/dop-material` },
+      { title: "Реестр приказов на плавку и шихтовых карт", path: P["shihtovye-karty"] },
+      { title: "Новый приказ на плавку", path: `${P["shihtovye-karty"]}/new` },
+      prikaz && { title: "Приказ: редактирование", path: `${P["shihtovye-karty"]}/prikaz/${prikaz.id}` },
+      prikaz && { title: "Приказ: итого по картам", path: `${P["shihtovye-karty"]}/itogo/${prikaz.id}` },
+      prikaz && { title: "Новая шихтовая карта в приказе", path: `${P["shihtovye-karty"]}/karta-new/${prikaz.id}` },
+      prikaz && { title: "Новая карта — добавить со склада", path: `${P["shihtovye-karty"]}/karta-new/${prikaz.id}/from-sklad` },
+      prikaz && { title: "Новая карта — доп. материал", path: `${P["shihtovye-karty"]}/karta-new/${prikaz.id}/dop-material` },
       karta && { title: "Карта: просмотр", path: `${P["shihtovye-karty"]}/view/${karta.id}` },
       kartaRed && { title: "Карта: редактирование (черновик)", path: `${P["shihtovye-karty"]}/edit/${kartaRed.id}` },
       kartaRed && { title: "Карта: результат расчёта", path: `${P["shihtovye-karty"]}/edit/${kartaRed.id}/raschet` },

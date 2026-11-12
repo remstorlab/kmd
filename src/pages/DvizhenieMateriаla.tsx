@@ -6,10 +6,10 @@ import {
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, probaText, NetAuAg, NET_AU_AG, ChemTip, usePaged,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip,
 } from "../components/ui";
-import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
+import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses } from "../data/mock";
 import { Plus } from "lucide-react";
 import { takeFromStock, returnToStock, IssueLine, scaleChem, addChem } from "../data/stock";
-import { isSkladMaterial, markIssuedElsewhere } from "../data/shihta";
+import { isSkladMaterial, markIssuedElsewhere, itogoMaterials, prikazStatus, r2 } from "../data/shihta";
 import { IssueQtyCell, IssueLigCell } from "../components/IssueInputs";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
@@ -392,42 +392,49 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
   );
 }
 
-// ── Выдача по шихтовой карте ──────────────────────────────────────────────────
+// ── Выдача по шихтовым картам приказа на плавку ──────────────────────────────
 
-// Карта выдаётся на плавку со склада выдачи (СДМ2): её позиции в резерве на складе приёмки (СДМ1)
-// нужно сначала переместить требованием — до этого карта недоступна для выбора.
-function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (k: ShihtovayaKarta) => void }) {
-  const { shihtovyeKarty, dmItems } = useApp();
-  const available = shihtovyeKarty.filter(k => k.status === "Новая");
-  const notMoved = (k: ShihtovayaKarta) => k.materials.filter(m => m.nomenkl && dmItems.some(i => i.nomenkl === m.nomenkl && i.status === "Резерв" && i.sklad !== MAIN_SKLAD));
+// Выдаётся итоговый набор позиций склада всех оформленных («Новая») карт приказа. Карты выдаются на плавку со склада
+// выдачи (СДМ2): позиции в резерве на складе приёмки (СДМ1) нужно сначала переместить требованием — до этого приказ
+// недоступен для выбора. Приказ с картой «На редактировании» не выдаётся (статус приказа — «На редактировании»).
+function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (p: PrikazPlavka, karty: ShihtovayaKarta[]) => void }) {
+  const { shihtovyeKarty, shihtaPrikazy, dmItems } = useApp();
+  const kartyOf = (id: string) => shihtovyeKarty.filter(k => k.prikazId === id).sort((a, b) => (parseInt(a.plavkaNo, 10) || 0) - (parseInt(b.plavkaNo, 10) || 0));
+  const available = shihtaPrikazy.map(p => ({ p, karty: kartyOf(p.id) })).filter(r => prikazStatus(r.karty) === "Новая");
+  const notMoved = (karty: ShihtovayaKarta[]) => karty.flatMap(k => k.materials).filter(m => m.nomenkl && dmItems.some(i => i.nomenkl === m.nomenkl && i.status === "Резерв" && i.sklad !== MAIN_SKLAD));
+  const fmtG = (v: number) => v.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <Modal title="Выдача по шихтовой карте" wide onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Отмена</Btn>}>
+    <Modal title="Выдача по шихтовым картам" wide onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Отмена</Btn>}>
       {available.length === 0 ? (
         <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-          Нет шихтовых карт в статусе «Новая»
+          Нет приказов на плавку с оформленными шихтовыми картами
         </div>
       ) : (
         <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
-          {available.map(k => {
-            const wait = notMoved(k);
+          {available.map(({ p, karty }) => {
+            const issue = karty.filter(k => k.status === "Новая");
+            const wait = notMoved(issue);
+            const skl = itogoMaterials(issue).filter(isSkladMaterial);
             return (
               <button
-                key={k.id}
-                onClick={() => onPick(k)}
+                key={p.id}
+                onClick={() => onPick(p, issue)}
                 disabled={wait.length > 0}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-blue-50 transition-colors text-left disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-between gap-4 px-4 py-3 hover:bg-blue-50 transition-colors text-left disabled:hover:bg-transparent disabled:cursor-not-allowed"
               >
-                <div>
-                  <div className={`text-sm font-medium ${wait.length ? "text-gray-400" : "text-gray-900"}`}>{k.name}</div>
-                  <div className="text-xs text-gray-400">{k.plavkaNo} · {k.date}</div>
+                <div className="min-w-0">
+                  <div className={`text-sm font-medium ${wait.length ? "text-gray-400" : "text-gray-900"}`}>Приказ № {p.number} от {p.date} · {p.name}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    Плавки № {issue.map(k => k.plavkaNo).join(", ")} · карт: {issue.length} · позиций со склада: {skl.length} · {fmtG(r2(skl.reduce((a, m) => a + m.ves, 0)))} г
+                  </div>
                   {wait.length > 0 && (
                     <div className="text-xs text-orange-600 mt-0.5">
                       Позиции не перемещены на «{MAIN_SKLAD}» ({wait.map(m => m.name).join(", ")}) — оформите требование
                     </div>
                   )}
                 </div>
-                <Badge label={k.status} group="shihta" />
+                <Badge label="Новая" group="shihta" />
               </button>
             );
           })}
@@ -1214,7 +1221,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [showVozvratNew, setShowVozvratNew] = nested("vozvrat-new");
   const [showVozvratFromVyd, setShowVozvratFromVyd] = nested("vozvrat-from-vydacha");
   const [showShihtaPick, setShowShihtaPick] = nested("shihta-pick");
-  const [pickedShihtaId, setPickedShihtaId] = useState<string | null>(null);
+  // Карты приказа на плавку, выданные по «Выдать по ШК» — при сохранении операции переходят в «Выполнена»
+  const [pickedKartaIds, setPickedKartaIds] = useState<string[]>([]);
   const { dmItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, operations, currentUser, storageLocations } = useApp();
   const createdStamp = useCreatedStamp();
   // Документы вкладок «Выдача» / «Возврат»
@@ -1445,7 +1453,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     if (izRezerva.length === 0) return withSrc;
     const rezNomenkl = new Set(izRezerva.map(i => i.nomenkl));
     const doc = `${vid}, ${head.docType || "документ"} № ${head.document}`;
-    const mark = (k: ShihtovayaKarta) => (k.id === pickedShihtaId ? k : markIssuedElsewhere(k, rezNomenkl, doc));
+    const mark = (k: ShihtovayaKarta) => (pickedKartaIds.includes(k.id) ? k : markIssuedElsewhere(k, rezNomenkl, doc));
     const zatronuty = shihtovyeKarty.filter(k => mark(k) !== k).map(k => k.name);
     setShihtovyeKarty(prev => prev.map(mark));
     if (zatronuty.length) show(`Шихтовая карта ${zatronuty.map(n => `«${n}»`).join(", ")} переведена в «На редактировании»`);
@@ -1491,7 +1499,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     const next: OperStage = oformit ? "Завершено" : "В работе";
     const pos = applyVydacha();
     // Карта выдана в плавку — «Выполнена»
-    if (pickedShihtaId) setShihtovyeKarty(prev => prev.map(k => (k.id === pickedShihtaId ? { ...k, status: "Выполнена", vydannyePozicii: undefined } : k)));
+    if (pickedKartaIds.length) setShihtovyeKarty(prev => prev.map(k => (pickedKartaIds.includes(k.id) ? { ...k, status: "Выполнена", vydannyePozicii: undefined } : k)));
     onSave(buildOp(next, pos));
   };
 
@@ -1695,19 +1703,33 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       {showShihtaPick && (
         <ShihtaPickModal
           onClose={() => setShowShihtaPick(false)}
-          onPick={k => {
-            // Со склада выдаются только позиции склада; доп. материалы (лигатура, медь МО) выдаёт распределитель работ участка
-            appendPositions("vydacha", k.materials.filter(isSkladMaterial).map(m => {
-              // Выдаётся запись склада, зарезервированная под карту (при частичном резерве — выделенная часть)
-              const rez = m.nomenkl ? dmItems.find(i => i.nomenkl === m.nomenkl && i.status === "Резерв") : undefined;
-              const dm = rez ?? dmItems.find(i => i.nomenkl === m.nomenkl);
-              const part = rez ? 1 : dm && dm.qty > 0 ? (m.qty ?? 1) / dm.qty : 1;
-              return { ...m, ag: "-", cu: "-", metal: dm?.metal, lig: m.ves, net: dm ? +(dm.netWeight * part).toFixed(2) : undefined, chem: m.chem ?? dm?.chem, srcId: rez?.id };
-            }));
-            setHead(h => ({ ...h, plavkaNo: k.plavkaNo }));
-            setPickedShihtaId(k.id);
+          onPick={(p, karty) => {
+            // Итоговый набор позиций склада всех карт приказа (одинаковые позиции суммированы). Со склада выдаются
+            // только позиции склада; доп. материалы (лигатура, медь МО) выдаёт распределитель работ участка.
+            // Выдаются записи склада, зарезервированные под карты (при частичном резерве — выделенные части).
+            const used = new Set<string>();
+            const rows = itogoMaterials(karty).filter(isSkladMaterial).flatMap(({ plavki: _pl, ...m }) => {
+              const rez = dmItems.filter(i => i.nomenkl === m.nomenkl && i.status === "Резерв" && !used.has(i.id));
+              const take: typeof rez = [];
+              let mass = 0;
+              for (const r of rez) {
+                if (mass >= m.ves - 0.005) break;
+                take.push(r);
+                used.add(r.id);
+                mass += r.ligWeight;
+              }
+              if (take.length === 0) {
+                const dm = dmItems.find(i => i.nomenkl === m.nomenkl);
+                const part = dm && dm.qty > 0 ? (m.qty ?? 1) / dm.qty : 1;
+                return [{ ...m, ag: "-", cu: "-", metal: dm?.metal, lig: m.ves, net: dm ? +(dm.netWeight * part).toFixed(2) : undefined, chem: m.chem ?? dm?.chem }];
+              }
+              return take.map(r => ({ ...m, qty: r.qty, ves: r.ligWeight, ag: "-", cu: "-", metal: r.metal, lig: r.ligWeight, net: r.netWeight, chem: r.chem ?? m.chem, srcId: r.id }));
+            });
+            appendPositions("vydacha", rows);
+            setHead(h => ({ ...h, plavkaNo: karty.map(k => k.plavkaNo).join(", ") }));
+            setPickedKartaIds(karty.map(k => k.id));
             setShowShihtaPick(false);
-            show(`Позиции шихтовой карты «${k.name}» добавлены`);
+            show(`Приказ № ${p.number}: добавлены позиции ${karty.length} шихтовых карт (${rows.length} поз.)`);
           }}
         />
       )}

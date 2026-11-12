@@ -2,10 +2,10 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { matchPage, pagePath, LOGIN_PATH } from "../router";
 import {
-  GPItem, DMItem, SkladDoc, Operation, ShihtovayaKarta,
+  GPItem, DMItem, SkladDoc, Operation, ShihtovayaKarta, PrikazPlavka,
   Podotchetnik, AppUser, Role, LogEntry, SecurityPolicy, StorageLocation, ChemElement, MaterialCode, StatusDict, MassTolerance, AlloyGrade,
   initialGPItems, initialDMItems, initialSkladDocs, initialVydachaDocs,
-  initialOperations, initialShihtovyeKarty, initialPodotchetniki,
+  initialOperations, initialShihtovyeKarty, initialPrikazy, initialPodotchetniki,
   initialUsers, initialRoles, initialLogs, initialSecurityPolicy, initialStorageLocations, initialChemElements, initialMaterialCodes, initialStatusDicts, initialMassTolerances, initialAlloyGrades,
 } from "../data/mock";
 
@@ -211,6 +211,9 @@ interface AppCtx {
   setOperations: React.Dispatch<React.SetStateAction<Operation[]>>;
   shihtovyeKarty: ShihtovayaKarta[];
   setShihtovyeKarty: React.Dispatch<React.SetStateAction<ShihtovayaKarta[]>>;
+  // Приказы на плавку — записи реестра шихтовых карт
+  shihtaPrikazy: PrikazPlavka[];
+  setShihtaPrikazy: React.Dispatch<React.SetStateAction<PrikazPlavka[]>>;
   podotchetniki: Podotchetnik[];
   setPodotchetniki: React.Dispatch<React.SetStateAction<Podotchetnik[]>>;
   users: AppUser[];
@@ -333,6 +336,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [vydachaDocs, setVydachaDocs] = useState(initialVydachaDocs);
   const [operations, setOperations] = useState(initialOperations);
   const [shihtovyeKarty, setShihtovyeKarty] = useState(initialShihtovyeKarty);
+  const [shihtaPrikazy, setShihtaPrikazy] = useState(initialPrikazy);
   const [podotchetniki, setPodotchetniki] = useState(initialPodotchetniki);
   const [users, setUsers] = useState(initialUsers);
   const [roles, setRoles] = useState(initialRoles);
@@ -358,6 +362,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       vydachaDocs, setVydachaDocs,
       operations, setOperations,
       shihtovyeKarty, setShihtovyeKarty,
+      shihtaPrikazy, setShihtaPrikazy,
       podotchetniki, setPodotchetniki,
       users, setUsers,
       roles, setRoles,

@@ -165,3 +165,100 @@ export function shihtaWarnings(calc: ShihtaCalc, opts: { oborot?: string; minAff
   }
   return out;
 }
+
+// ── Норма марки в строке «Состав сплава по НД, %» ──────────────────────────────
+// Текстовые обозначения («Остальное», «не более …») не хранятся в числовых полях и не участвуют в расчёте:
+// они выводятся из структуры марки — диапазоны (ranges), элемент-остаток (rest) и примеси (impurities).
+export type NormCell =
+  | { kind: "range"; min?: number; max?: number }
+  | { kind: "rest" }
+  | { kind: "impurity"; max: number };
+
+// Число нормы: не менее двух знаков после запятой, но без потери точности (0,002 → «0,002»)
+export const fmtNorm = (v: number) => {
+  const dec = Math.min(4, Math.max(2, (String(v).split(".")[1] ?? "").length));
+  return v.toFixed(dec).replace(".", ",");
+};
+
+export function normCell(g: AlloyGrade | undefined, el: string): NormCell | null {
+  if (!g) return null;
+  const r = g.ranges.find(x => x.element === el && (x.min != null || x.max != null));
+  if (r) return { kind: "range", min: r.min, max: r.max };
+  if (g.rest === el) return { kind: "rest" };
+  const imp = (g.impurities as Record<string, number | undefined>)[el];
+  if (imp != null) return { kind: "impurity", max: imp };
+  return null;
+}
+
+export function normCellText(c: NormCell | null): string {
+  if (!c) return "—";
+  if (c.kind === "rest") return "Остальное";
+  if (c.kind === "impurity") return `не более ${fmtNorm(c.max)}`;
+  if (c.min != null && c.max != null) return `${fmtNorm(c.min)} – ${fmtNorm(c.max)}`;
+  if (c.min != null) return `не менее ${fmtNorm(c.min)}`;
+  return `не более ${fmtNorm(c.max!)}`;
+}
+
+// Примеси марки, не выводимые колонками таблицы: «Fe 0,10 · Sb 0,002 · всего 0,11»
+export function impuritiesText(g: AlloyGrade | undefined, shown: string[], label: (el: string) => string): string {
+  const imp = Object.entries((g?.impurities ?? {}) as Record<string, number | undefined>)
+    .filter(([k, v]) => v != null && !shown.includes(k));
+  return imp
+    .sort(([a], [b]) => (a === "total" ? 1 : b === "total" ? -1 : 0))
+    .map(([k, v]) => `${k === "total" ? "всего" : label(k)} ${fmtNorm(v!)}`)
+    .join(" · ");
+}
+
+// ── Приказ на плавку: несколько шихтовых карт ─────────────────────────────────
+// Статус приказа по картам: есть карта на редактировании (или карт нет) — «На редактировании»;
+// все выполнены — «Выполнена»; иначе — «Новая» (оформлен, доступен для выдачи на плавку).
+export function prikazStatus(karty: Pick<ShihtovayaKarta, "status">[]): ShihtovayaKarta["status"] {
+  if (karty.length === 0 || karty.some(k => k.status === "На редактировании")) return "На редактировании";
+  if (karty.every(k => k.status === "Выполнена")) return "Выполнена";
+  return "Новая";
+}
+
+// Итоговая строка шихтовых материалов приказа: одинаковые материалы всех карт суммируются
+export interface ItogoMaterial extends ShihtaMaterial {
+  // Номера плавок карт, в которые входит материал
+  plavki: string[];
+}
+
+// Ключ суммирования: позиция склада — номенкл. №; лигатура Cu-P — содержание фосфора; медь МО — одна строка; прочее — наименование
+const itogoKey = (m: ShihtaMaterial) => {
+  const k = kindOf(m);
+  return k === "sklad" ? `s:${m.nomenkl}` : k === "cup" ? `cup:${m.phosphorPct ?? 0}` : k === "medMO" ? "medMO" : `pr:${m.name}`;
+};
+
+export function itogoMaterials(karty: ShihtovayaKarta[]): ItogoMaterial[] {
+  const out = new Map<string, ItogoMaterial>();
+  for (const k of karty) {
+    for (const m of k.materials) {
+      const key = itogoKey(m);
+      const cur = out.get(key);
+      if (!cur) {
+        out.set(key, { ...m, kind: kindOf(m), chem: { ...(m.chem ?? {}) }, plavki: [k.plavkaNo] });
+        continue;
+      }
+      const chem: ChemComposition = { ...(cur.chem ?? {}) };
+      for (const [e, v] of Object.entries(m.chem ?? {})) chem[e] = r2(numOf(chem[e]) + numOf(v)).toFixed(2);
+      out.set(key, {
+        ...cur, ves: r2(cur.ves + m.ves), qty: (cur.qty ?? 0) + (m.qty ?? 0) || undefined, chem,
+        plavki: cur.plavki.includes(k.plavkaNo) ? cur.plavki : [...cur.plavki, k.plavkaNo],
+      });
+    }
+  }
+  // Порядок строк как в карте: лигатура, позиции склада, прочее, медь МО
+  const order: Record<ShihtaMatKind, number> = { cup: 0, sklad: 1, prochee: 2, medMO: 3 };
+  return [...out.values()].sort((a, b) => order[kindOf(a)] - order[kindOf(b)]);
+}
+
+// Строка расчёта по сохранённому материалу (доли элементов — по его составу)
+export const lineOfMaterial = (m: ShihtaMaterial): ShihtaLine =>
+  ({ kind: kindOf(m), mass: m.ves, share: shareOf(m.chem, m.ves), phosphorPct: m.phosphorPct, klass: m.klass });
+
+// Марка приказа — общая для всех его карт (разные марки — сверка итога не выполняется)
+export function prikazGrade(karty: ShihtovayaKarta[], grades: AlloyGrade[]): AlloyGrade | undefined {
+  const ids = [...new Set(karty.map(k => k.alloyId).filter(Boolean))];
+  return ids.length === 1 ? grades.find(g => g.id === ids[0]) : undefined;
+}
