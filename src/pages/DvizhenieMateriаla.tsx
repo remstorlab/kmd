@@ -930,6 +930,8 @@ type TabName = "Выдача" | "Возврат" | "Списание" | "Ито�
 
 const VID_LKI = "Анализ в ЛКИ";
 const VID_NIOKR = "НИОКР";
+// Виды операций, для которых в новой операции тип по умолчанию — «Выдача-Возврат».
+const VID_DEFAULT_VYDACHA_VOZVRAT = ["Плавка", "Производство ГП", "Отбор пробы", "Гальванопокрытие"];
 // Типы документов, закреплённые за видом операции (только для него)
 const VID_DOC_TYPE: Record<string, string> = { [VID_LKI]: DOC_TYPE_LKI, [VID_NIOKR]: DOC_TYPE_NIOKR };
 const FIXED_DOC_TYPES = Object.values(VID_DOC_TYPE);
@@ -1405,6 +1407,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     if (VID_DOC_TYPE[v]) setHead(h => ({ ...h, docType: VID_DOC_TYPE[v] }));
     else if (FIXED_DOC_TYPES.includes(head.docType)) setHead(h => ({ ...h, docType: "" }));
     if (v === VID_NIOKR) changeType("Выдача");
+    // Новая операция: для этих видов по умолчанию подставляется тип «Выдача-Возврат».
+    else if (!op && VID_DEFAULT_VYDACHA_VOZVRAT.includes(v)) changeType("Выдача-Возврат");
   };
   // Тип «Выдача» — без возврата, «Возврат» — без выдачи: недоступная вкладка блокируется, её позиции очищаются.
   const changeType = (t: string) => {
