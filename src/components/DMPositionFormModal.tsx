@@ -223,7 +223,8 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
             className={oborotOver(oborotFromForm(form.oborot)) ? "rounded-lg ring-1 ring-red-400" : ""}
             title={[oborotHint, oborotOver(oborotFromForm(form.oborot)) ? OBOROT_HINT : ""].filter(Boolean).join("\n") || undefined}
           >
-            <Input value={form.oborot ?? ""} onChange={v => set("oborot")(v.replace(/[^\d]/g, ""))} placeholder="0" disabled={ro} />
+            {/* Только число; пусто — 0 (оборотов не было), ведущие нули убираются */}
+            <Input value={String(oborotFromForm(form.oborot))} onChange={v => set("oborot")(v.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "") || "0")} placeholder="0" disabled={ro} />
           </div>
         </Field>
         {/* Чистый вес не вводится — рассчитывается (граммы основного металла в блоке «Химический состав») */}
