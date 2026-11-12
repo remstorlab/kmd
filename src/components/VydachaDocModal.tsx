@@ -20,7 +20,8 @@ import { Plus } from "lucide-react";
 // Выдать можно любую позицию склада, независимо от класса. Заказчик / Организация — отдельное поле: по умолчанию
 // заказчик выдаваемых позиций (из документа приёма на СДМ1, сохраняется через требование и объединение).
 
-const ORGS = spravValues("Заказчики / Организации");
+// Читаем справочник при каждом обращении — чтобы видеть добавленные и отключённые записи
+const orgs = () => spravValues("Заказчики / Организации");
 
 type VydachaPosition = VydachaDocPosition;
 
@@ -103,7 +104,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     .map(p => (p.src === "gp" ? gpItems.find(i => i.id === p.id) : dmItems.find(i => i.id === p.id))?.zakazchik)
     .filter((z): z is string => !!z)));
   const zakazchik = zakazchikManual ?? posZakazchiki[0] ?? "";
-  const zakazchikOptions = Array.from(new Set(["", ...(zakazchik ? [zakazchik] : []), ...posZakazchiki, ...ORGS]));
+  const zakazchikOptions = Array.from(new Set(["", ...(zakazchik ? [zakazchik] : []), ...posZakazchiki, ...orgs()]));
 
   const already = Object.fromEntries(positions.map(p => [p.id, p.issue]));
 

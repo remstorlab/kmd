@@ -240,7 +240,9 @@ const OBOROT_LIMIT_OPT = `≥ ${OBOROT_LIMIT}`;
 // только в «Складских операциях» (Приход / Выдача); на экране — просмотр, смена места хранения и объединение.
 
 export function OstatokSklad({ sklad }: { sklad: string }) {
-  const { dmItems, setDmItems, gpItems, setGpItems } = useApp();
+  const { dmItems, setDmItems, gpItems, setGpItems, statusDicts } = useApp();
+  // Статусы позиций — из справочника «Статусы позиций»
+  const posStatuses = statusDicts.find(d => d.group === "pozicii")?.items.map(i => i.name) ?? [];
   const createdStamp = useCreatedStamp();
   // Позиции склада любого класса (в том числе «Готовая продукция») из учётов ДМ и ГП
   const skladItems = [...dmItems, ...gpItems.map(gpToDm)].filter(it => it.sklad === sklad);
@@ -393,7 +395,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
         </div>
         <div className="min-w-36">
           <label className="block text-xs font-medium text-gray-500 mb-1">Статус</label>
-          <MultiSelect values={filterStatus} options={["На складе", "Резерв", "В подотчёте", "Закрыта"]} onChange={setFilterStatus} allLabel="Все статусы" />
+          <MultiSelect values={filterStatus} options={posStatuses} onChange={setFilterStatus} allLabel="Все статусы" />
         </div>
         <button onClick={() => { setSearch(""); setFilterKlass("Все классы"); setFilterStatus([]); setFilterCode([]); setFilterProba([]); setFilterOborot([]); }} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
           Сбросить фильтры

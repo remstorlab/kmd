@@ -4,9 +4,9 @@ import {
   PageHeader, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Badge, Toggle,
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination, usePerPage, FillerRows, fillerCount, statusColorClass, usePaged,
-  CREATED_LABEL, CreatedCell, Created, createdSortKey, useCreatedStamp, RequiredMark,
+  CREATED_LABEL, CreatedCell, Created, createdSortKey, useCreatedStamp, RequiredMark, YES_NO_ALL, matchYesNo,
 } from "../components/ui";
-import { spravochniki, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
+import { spravochniki, spravValues, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
 import { ArrowLeft, ArrowDownUp, Gem, Target, Atom, X, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
@@ -95,6 +95,36 @@ const VALUE_LABEL: Partial<Record<SpravKey, string>> = {
 // Справочники только с номером строки и наименованием: номер присваивается автоматически, статуса нет
 const NUMBERED: SpravKey[] = ["Тип списания", "Пробы"];
 
+// ── Панель фильтров главного экрана справочника ──────────────────────────────
+
+const ALL = "Все";
+const qOf = (s: string) => s.trim().toLowerCase();
+const has = (v: string | undefined, q: string) => !q || (v ?? "").toLowerCase().includes(q);
+
+function FilterBar({ children, onReset, active }: { children: React.ReactNode; onReset: () => void; active: boolean }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-wrap items-end gap-3">
+      {children}
+      {active && <button onClick={onReset} className="h-[38px] px-2 text-sm text-blue-600 hover:text-blue-700">Сбросить</button>}
+    </div>
+  );
+}
+function FilterSearch({ label, value, onChange, placeholder, scope, w = "w-72" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; scope?: string; w?: string }) {
+  return (
+    <div className={w}>
+      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <SearchInput value={value} onChange={onChange} placeholder={placeholder ?? "Поиск..."} scope={scope} />
+    </div>
+  );
+}
+function FilterSelect({ label, value, options, onChange, optionLabel, w = "w-48" }: { label: string; value: string; options: string[]; onChange: (v: string) => void; optionLabel?: (v: string) => string; w?: string }) {
+  return (
+    <div className={w}>
+      <Field label={label}><Select value={value} options={[ALL, ...options]} onChange={onChange} optionLabel={v => (v === ALL ? ALL : optionLabel ? optionLabel(v) : v)} /></Field>
+    </div>
+  );
+}
+
 const emptyNorm: TechOpLossNorm = { unit: "", au: "", ag: "" };
 const normCell = (v: string) => v || <span className="text-gray-400">—</span>;
 
@@ -126,8 +156,12 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
     }
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
-  const { sorted, sort, toggleSort } = useSort(items, {
-    code: i => i.code,
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState(ALL);
+  const q = qOf(search);
+  const filtered = items.filter(i => (has(i.code, q) || has(i.value, q)) && (statusFilter === ALL || i.status === statusFilter));
+  const { sorted, sort, toggleSort } = useSort(filtered, {
+    code: i => (numbered ? parseInt(i.code, 10) || 0 : i.code),
     value: i => i.value,
     status: i => i.status,
     created: i => createdSortKey(dictCreatedOf(name, i.code)),
@@ -141,8 +175,8 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
     if (!editItem) dictCreated[`${name}|${form.code}`] = createdStamp();
     setItems(next);
     // Справочник — общий источник вариантов для полей форм, поэтому изменения пишем в него.
-    if (!editItem) dict.count += 1;
     dict.items = next;
+    dict.count = next.length;
     if (withNorms) {
       // Нормативы читает раздел «Списание», поэтому также пишем их в общий источник
       techOpLossNorms[form.code] = normForm;
@@ -169,9 +203,19 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
 
       <PageHeader
         title={name}
-        subtitle={`${dict.count} значений`}
+        subtitle={`${items.length} значений`}
         actions={<Btn onClick={openAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
       />
+
+      <FilterBar active={!!search || statusFilter !== ALL} onReset={() => { setSearch(""); setStatusFilter(ALL); }}>
+        <FilterSearch
+          label={`${numbered ? "№" : "Код"} / ${valueLabel}`}
+          value={search}
+          onChange={setSearch}
+          scope={`${numbered ? "№" : "Код"} · ${valueLabel}`}
+        />
+        {!numbered && <FilterSelect label="Статус" value={statusFilter} options={recordStatuses} onChange={setStatusFilter} />}
+      </FilterBar>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -204,6 +248,9 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                 <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
               </tr>
             ))}
+            {pg1.pageItems.length === 0 && (
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+            )}
             <FillerRows count={pg1.fill} cols={8} />
           </tbody>
         </table>
@@ -231,7 +278,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                 <Field label="Допустимые потери — Серебро, %"><Input value={normForm.ag} onChange={v => setNormForm(f => ({ ...f, ag: v }))} placeholder="Не установлен" /></Field>
               </div>
             </>}
-            {withAffinage && <Field label="Мин. доля аффинажа, %"><Input value={affForm} onChange={v => setAffForm(v.replace(/[^d.,]/g, ""))} placeholder="Не установлено" /></Field>}
+            {withAffinage && <Field label="Мин. доля аффинажа, %"><Input value={affForm} onChange={v => setAffForm(v.replace(/[^\d.,]/g, ""))} placeholder="Не установлено" /></Field>}
             {!numbered && <Field label="Статус" required><Select value={form.status} options={recordStatuses} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>}
           </div>
         </Modal>
@@ -257,7 +304,11 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
-  const { sorted, sort, toggleSort } = useSort(items, {
+  const [search, setSearch] = useState("");
+  const [colorFilter, setColorFilter] = useState(ALL);
+  const usedColors = STATUS_COLORS.map(c => c.value).filter(c => items.some(i => i.color === c));
+  const filtered = items.filter(i => has(i.name, qOf(search)) && (colorFilter === ALL || i.color === colorFilter));
+  const { sorted, sort, toggleSort } = useSort(filtered, {
     name: i => i.name,
     color: i => colorLabel(i.color),
   });
@@ -293,6 +344,11 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
         actions={<Btn onClick={goAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
       />
 
+      <FilterBar active={!!search || colorFilter !== ALL} onReset={() => { setSearch(""); setColorFilter(ALL); }}>
+        <FilterSearch label="Наименование" value={search} onChange={setSearch} placeholder="Поиск по наименованию..." />
+        <FilterSelect label="Цвет" value={colorFilter} options={usedColors} onChange={setColorFilter} optionLabel={v => colorLabel(v as StatusColor)} />
+      </FilterBar>
+
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
@@ -319,7 +375,7 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
               </tr>
             ))}
             {sorted.length === 0 && (
-              <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">Нет записей</td></tr>
+              <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">{items.length ? "Записи не найдены" : "Нет записей"}</td></tr>
             )}
             <FillerRows count={pg2.fill} cols={3} />
           </tbody>
@@ -391,10 +447,16 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
   const { toast, show, clear } = useToast();
   const [perPage, setPerPage] = usePerPage("sprav-codes", 10);
 
+  const [codeFilter, setCodeFilter] = useState("");
+  const [elFilter, setElFilter] = useState(ALL);
+  const usedEls = chemElements.map(e => e.id).filter(id => items.some(i => (i.composition?.[id] ?? 0) > 0));
   const filtered = items.filter(i => {
-    const q = search.trim().toLowerCase();
-    return !q || i.code.toLowerCase().includes(q) || i.name.toLowerCase().includes(q);
+    const q = qOf(search);
+    return has(i.code, qOf(codeFilter))
+      && (has(i.name, q) || has(i.shortName, q))
+      && (elFilter === ALL || (i.composition?.[elFilter] ?? 0) > 0);
   });
+  const resetPage = <T,>(set: (v: T) => void) => (v: T) => { set(v); setPage(1); };
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
     code: i => i.code,
@@ -433,12 +495,11 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
         actions={<Btn onClick={openAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <div className="max-w-xs">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
-          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Код, наименование..." />
-        </div>
-      </div>
+      <FilterBar active={!!search || !!codeFilter || elFilter !== ALL} onReset={() => { setSearch(""); setCodeFilter(""); setElFilter(ALL); setPage(1); }}>
+        <FilterSearch label="Код" value={codeFilter} onChange={resetPage(setCodeFilter)} placeholder="0000" w="w-40" />
+        <FilterSearch label="Наименование" value={search} onChange={resetPage(setSearch)} scope="Наим. · Краткое" />
+        <FilterSelect label="Содержит элемент" value={elFilter} options={usedEls} onChange={resetPage(setElFilter)} optionLabel={shortOf} w="w-44" />
+      </FilterBar>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -513,7 +574,13 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
 // ── Классы материалов ────────────────────────────────────────────────────────
 
 function MaterialClassesPage({ onBack }: { onBack: () => void }) {
-  const [items, setItems] = useState(initialMaterialClasses);
+  const [items, setItemsState] = useState(() => [...initialMaterialClasses]);
+  // Классы — общий источник для полей «Класс» (KlassSelect) и кодов класса в формах, поэтому изменения пишем в него.
+  const setItems = (upd: (prev: MaterialClass[]) => MaterialClass[]) => setItemsState(prev => {
+    const next = upd(prev);
+    initialMaterialClasses.splice(0, initialMaterialClasses.length, ...next);
+    return next;
+  });
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [form, setForm] = useState<MaterialClass>({ code: "", name: "" });
@@ -528,8 +595,8 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
   const [perPage, setPerPage] = usePerPage("sprav-classes", 10);
 
   const filtered = items.filter(i => {
-    const q = search.trim().toLowerCase();
-    return !q || i.name.toLowerCase().includes(q);
+    const q = qOf(search);
+    return has(i.code, q) || has(i.name, q);
   });
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
@@ -566,16 +633,14 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
         actions={<Btn onClick={openAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <div className="max-w-xs">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Наименование</label>
-          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Поиск по наименованию..." />
-        </div>
-      </div>
+      <FilterBar active={!!search} onReset={() => { setSearch(""); setPage(1); }}>
+        <FilterSearch label="Код / Наименование" value={search} onChange={v => { setSearch(v); setPage(1); }} scope="Код · Наименование" />
+      </FilterBar>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
+            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>Код</SortTh>
             <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
             <th className="w-24"></th>
           </tr></thead>
@@ -636,7 +701,7 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
 
 // ── Места хранения (Сейф/Полка, принадлежат складу из справочника «Склады») ──
 
-const SKLAD_OPTIONS = spravochniki["Склады"].items.map(i => i.value);
+const LOC_STATUS = { on: "Доступно", off: "Заблокировано" };
 
 function placeOf(loc: StorageLocation): string {
   return loc.polkaNum ? `Сейф №${loc.seyfNum}, Полка ${loc.polkaNum}` : `Сейф №${loc.seyfNum}`;
@@ -645,26 +710,34 @@ function placeOf(loc: StorageLocation): string {
 function StorageLocationsPage({ onBack }: { onBack: () => void }) {
   const { storageLocations: items, setStorageLocations: setItems } = useApp();
   const createdStamp = useCreatedStamp();
+  // Склады — из справочника «Склады» (активные записи); читаем при каждом рендере, чтобы видеть его изменения
+  const SKLAD_OPTIONS = spravValues("Склады");
   const [search, setSearch] = useState("");
+  const [skladFilter, setSkladFilter] = useState(ALL);
+  const [statusFilter, setStatusFilter] = useState(ALL);
   const [page, setPage] = useState(1);
   const [editAvailable, setEditAvailable] = useState(true);
-  const [form, setForm] = useState({ sklad: SKLAD_OPTIONS[0], seyfNum: "", polkaNum: "", available: true });
+  const [form, setForm] = useState({ sklad: SKLAD_OPTIONS[0] ?? "", seyfNum: "", polkaNum: "", available: true });
   const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, l => l.id);
   const setViewItem = (l: StorageLocation | null) => (l ? goView(l) : closeAll());
   const setEditItem = (l: StorageLocation | null) => (l ? goEdit(l) : closeAll());
   const setShowAdd = (open: boolean) => (open ? goAdd() : closeAll());
   useEffect(() => {
     if (editItem) setEditAvailable(editItem.available);
-    else if (showAdd) setForm({ sklad: SKLAD_OPTIONS[0], seyfNum: "", polkaNum: "", available: true });
+    else if (showAdd) setForm({ sklad: SKLAD_OPTIONS[0] ?? "", seyfNum: "", polkaNum: "", available: true });
   }, [editKey, showAdd]);
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [perPage, setPerPage] = usePerPage("sprav-locations", 10);
 
+  const usedSklady = Array.from(new Set([...SKLAD_OPTIONS, ...items.map(l => l.sklad)])).filter(s => items.some(l => l.sklad === s));
   const filtered = items.filter(loc => {
-    const q = search.trim().toLowerCase();
-    return !q || loc.sklad.toLowerCase().includes(q) || placeOf(loc).toLowerCase().includes(q);
+    const q = qOf(search);
+    return (skladFilter === ALL || loc.sklad === skladFilter)
+      && (statusFilter === ALL || (statusFilter === LOC_STATUS.on) === loc.available)
+      && (has(placeOf(loc), q) || has(loc.seyfNum, q) || has(loc.polkaNum, q));
   });
+  const resetPage = (set: (v: string) => void) => (v: string) => { set(v); setPage(1); };
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
     sklad: loc => loc.sklad,
@@ -716,12 +789,11 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
         actions={<Btn onClick={openAdd}><Plus className="w-4 h-4" />Добавить</Btn>}
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <div className="max-w-xs">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
-          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Склад, сейф, полка..." />
-        </div>
-      </div>
+      <FilterBar active={!!search || skladFilter !== ALL || statusFilter !== ALL} onReset={() => { setSearch(""); setSkladFilter(ALL); setStatusFilter(ALL); setPage(1); }}>
+        <FilterSelect label="Склад" value={skladFilter} options={usedSklady} onChange={resetPage(setSkladFilter)} />
+        <FilterSearch label="Место хранения" value={search} onChange={resetPage(setSearch)} placeholder="Номер сейфа или полки..." scope="Сейф · Полка" />
+        <FilterSelect label="Статус" value={statusFilter} options={[LOC_STATUS.on, LOC_STATUS.off]} onChange={resetPage(setStatusFilter)} />
+      </FilterBar>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -737,7 +809,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
               <tr key={loc.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 text-gray-900">{loc.sklad}</td>
                 <td className="px-4 py-3 text-gray-700">{placeOf(loc)}</td>
-                <td className="px-4 py-3"><Badge label={loc.available ? "Доступно" : "Заблокировано"} group="mesta-hraneniya" /></td>
+                <td className="px-4 py-3"><Badge label={loc.available ? LOC_STATUS.on : LOC_STATUS.off} group="mesta-hraneniya" /></td>
                 <CreatedCell row={loc} />
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
@@ -770,6 +842,7 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
         >
           <div className="space-y-4">
             <Field label="Склад" required><Select value={form.sklad} options={SKLAD_OPTIONS} onChange={v => setForm(f => ({ ...f, sklad: v }))} /></Field>
+            {SKLAD_OPTIONS.length === 0 && <div className="-mt-2 text-xs text-red-600">В справочнике «Склады» нет активных записей</div>}
             <Field label="Номер сейфа" required><Input value={form.seyfNum} onChange={v => setForm(f => ({ ...f, seyfNum: v }))} placeholder="2" /></Field>
             <Field label="Номер полки" required><Input value={form.polkaNum} onChange={v => setForm(f => ({ ...f, polkaNum: v }))} placeholder="5" /></Field>
             <Toggle checked={form.available} onChange={v => setForm(f => ({ ...f, available: v }))} label="Доступно для использования" />
@@ -833,10 +906,13 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
   // № — порядковый номер в справочнике (в этом порядке поля выводятся в формах)
   const numOf = (e: ChemElement) => items.indexOf(e) + 1;
 
+  const [dmFilter, setDmFilter] = useState(YES_NO_ALL);
+  const [shkFilter, setShkFilter] = useState(YES_NO_ALL);
   const filtered = items.filter(i => {
-    const q = search.trim().toLowerCase();
-    return !q || i.name.toLowerCase().includes(q) || i.shortName.toLowerCase().includes(q);
+    const q = qOf(search);
+    return (has(i.name, q) || has(i.shortName, q)) && matchYesNo(dmFilter, i.showDm) && matchYesNo(shkFilter, i.showShk);
   });
+  const resetPage = (set: (v: string) => void) => (v: string) => { set(v); setPage(1); };
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
     n: i => numOf(i),
@@ -882,12 +958,11 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
         actions={<Btn onClick={goAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <div className="max-w-xs">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
-          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Наименование, обозначение..." />
-        </div>
-      </div>
+      <FilterBar active={!!search || dmFilter !== YES_NO_ALL || shkFilter !== YES_NO_ALL} onReset={() => { setSearch(""); setDmFilter(YES_NO_ALL); setShkFilter(YES_NO_ALL); setPage(1); }}>
+        <FilterSearch label="Наименование" value={search} onChange={resetPage(setSearch)} placeholder="Золото, Au..." scope="Наим. · Краткое" />
+        <FilterSelect label="Отображать в ДМ" value={dmFilter} options={["Да", "Нет"]} onChange={resetPage(setDmFilter)} w="w-40" />
+        <FilterSelect label="Отображать в ШК" value={shkFilter} options={["Да", "Нет"]} onChange={resetPage(setShkFilter)} w="w-40" />
+      </FilterBar>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -969,7 +1044,6 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
 // ── Допустимые отклонения от массы (металл, диапазон взвешивания, допуск ±) ──
 
 type TolForm = { metal: string; minKg: string; maxKg: string; plusG: string; minusG: string };
-const ALL_TOL_METALS = "Все металлы";
 const numIn = (s: string) => parseFloat(String(s).replace(",", "."));
 const fmtNum = (v: number) => String(v).replace(".", ",");
 const rangeOf = (t: MassTolerance) => `${fmtNum(t.minKg)}–${fmtNum(t.maxKg)} кг`;
@@ -980,8 +1054,8 @@ function MassTolerancesPage({ onBack }: { onBack: () => void }) {
   const metalOptions = chemElements.map(e => e.id);
   const emptyForm = (): TolForm => ({ metal: chemElements[0]?.id ?? "", minKg: "", maxKg: "", plusG: "", minusG: "" });
   const [form, setForm] = useState<TolForm>(emptyForm);
-  const [search, setSearch] = useState("");
-  const [metalFilter, setMetalFilter] = useState(ALL_TOL_METALS);
+  const [massFilter, setMassFilter] = useState("");
+  const [metalFilter, setMetalFilter] = useState(ALL);
   const [page, setPage] = useState(1);
   const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, i => i.id);
   useEffect(() => {
@@ -993,11 +1067,14 @@ function MassTolerancesPage({ onBack }: { onBack: () => void }) {
   const [perPage, setPerPage] = usePerPage("sprav-tolerances", 10);
 
   const usedMetals = Array.from(new Set(items.map(i => i.metal)));
-  const filtered = items.filter(i => {
-    const q = search.trim().toLowerCase();
-    return (metalFilter === ALL_TOL_METALS || i.metal === metalFilter)
-      && (!q || metalName(i.metal).toLowerCase().includes(q) || rangeOf(i).includes(q));
-  });
+  // «Масса, кг» — находит диапазон, в который попадает масса (нижний предел входит, верхний — нет, кроме последнего диапазона металла)
+  const mass = numIn(massFilter);
+  const lastMax = (metal: string) => Math.max(...items.filter(t => t.metal === metal).map(t => t.maxKg));
+  const inRange = (t: MassTolerance) => mass >= t.minKg && (mass < t.maxKg || (mass === t.maxKg && t.maxKg === lastMax(t.metal)));
+  const filtered = items.filter(i =>
+    (metalFilter === ALL || i.metal === metalFilter)
+    && (!massFilter.trim() || (Number.isFinite(mass) && inRange(i))));
+  const resetPage = (set: (v: string) => void) => (v: string) => { set(v); setPage(1); };
   const { sorted, sort, toggleSort } = useSort(filtered, {
     metal: i => metalName(i.metal),
     range: i => i.minKg,
@@ -1042,17 +1119,10 @@ function MassTolerancesPage({ onBack }: { onBack: () => void }) {
         actions={<Btn onClick={goAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex items-end gap-3">
-        <div className="w-72">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
-          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Металл, диапазон..." />
-        </div>
-        <div className="w-56">
-          <Field label="Металл">
-            <Select value={metalFilter} options={[ALL_TOL_METALS, ...usedMetals]} onChange={v => { setMetalFilter(v); setPage(1); }} optionLabel={v => (v === ALL_TOL_METALS ? v : metalName(v))} />
-          </Field>
-        </div>
-      </div>
+      <FilterBar active={!!massFilter || metalFilter !== ALL} onReset={() => { setMassFilter(""); setMetalFilter(ALL); setPage(1); }}>
+        <FilterSelect label="Металл" value={metalFilter} options={usedMetals} onChange={resetPage(setMetalFilter)} optionLabel={metalName} w="w-56" />
+        <FilterSearch label="Масса, кг" value={massFilter} onChange={resetPage(v => setMassFilter(v.replace(/[^\d.,]/g, "")))} placeholder="Напр. 0,5" scope="Диапазон массы" w="w-64" />
+      </FilterBar>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -1249,7 +1319,10 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
   const createdStamp = useCreatedStamp();
   const [form, setForm] = useState<GradeForm>(emptyGrade);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("Все статусы");
+  const [statusFilter, setStatusFilter] = useState(ALL);
+  const [codeFilter, setCodeFilter] = useState(ALL);
+  const [baseFilter, setBaseFilter] = useState(ALL);
+  const { materialCodes } = useApp();
   const recordStatuses = useRecordStatuses();
   const [page, setPage] = useState(1);
   const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, g => g.id);
@@ -1262,11 +1335,16 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
 
   // Колонки диапазонов — все элементы формы записи (Au, Ag, Pd, Pt, Cu); мин и макс — отдельные колонки
   const rangeEls = ALLOY_RANGE_ELEMENTS;
+  const usedCodes = Array.from(new Set(items.map(g => g.materialCode).filter((c): c is string => !!c)));
+  const usedBases = ALLOY_BASES.filter(b => items.some(g => g.base === b));
   const filtered = items.filter(g => {
-    const q = search.trim().toLowerCase();
-    return (statusFilter === "Все статусы" || g.status === statusFilter)
-      && (!q || g.name.toLowerCase().includes(q) || g.nd.toLowerCase().includes(q));
+    const q = qOf(search);
+    return (statusFilter === ALL || g.status === statusFilter)
+      && (codeFilter === ALL || g.materialCode === codeFilter)
+      && (baseFilter === ALL || g.base === baseFilter)
+      && (has(g.name, q) || has(g.nd, q));
   });
+  const resetPage = (set: (v: string) => void) => (v: string) => { set(v); setPage(1); };
   const { sorted, sort, toggleSort } = useSort(filtered, {
     name: g => g.name,
     base: g => g.base,
@@ -1306,15 +1384,15 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
         actions={<Btn onClick={goAdd}><Plus className="w-4 h-4" />Добавить запись</Btn>}
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex items-end gap-3">
-        <div className="w-72">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Поиск</label>
-          <SearchInput value={search} onChange={v => { setSearch(v); setPage(1); }} placeholder="Марка, нормативный документ..." />
-        </div>
-        <div className="w-48">
-          <Field label="Статус"><Select value={statusFilter} options={["Все статусы", ...recordStatuses]} onChange={v => { setStatusFilter(v); setPage(1); }} /></Field>
-        </div>
-      </div>
+      <FilterBar
+        active={!!search || statusFilter !== ALL || codeFilter !== ALL || baseFilter !== ALL}
+        onReset={() => { setSearch(""); setStatusFilter(ALL); setCodeFilter(ALL); setBaseFilter(ALL); setPage(1); }}
+      >
+        <FilterSearch label="Марка / Нормативный документ" value={search} onChange={resetPage(setSearch)} placeholder="СрМ 92,5, ГОСТ..." scope="Марка · НД" />
+        <FilterSelect label="Код материала" value={codeFilter} options={usedCodes} onChange={resetPage(setCodeFilter)} optionLabel={c => `${c} · ${materialCodes.find(m => m.code === c)?.shortName ?? ""}`} w="w-56" />
+        <FilterSelect label="Основа" value={baseFilter} options={usedBases} onChange={resetPage(setBaseFilter)} w="w-32" />
+        <FilterSelect label="Статус" value={statusFilter} options={recordStatuses} onChange={resetPage(setStatusFilter)} w="w-40" />
+      </FilterBar>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         <table className="w-full text-sm">
@@ -1476,7 +1554,7 @@ export function Spravochniki() {
                 <Icon className="w-5 h-5" />
               </div>
               <h3 className="font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{key}</h3>
-              <p className="text-sm text-gray-400">{val.count} значений</p>
+              <p className="text-sm text-gray-400">{val.items.length} значений</p>
             </button>
           );
         })}

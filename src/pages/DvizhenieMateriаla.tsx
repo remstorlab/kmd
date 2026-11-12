@@ -1644,12 +1644,12 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         <Field label="Номер документа"><Input value={head.document} disabled /></Field>
         <Field label="Дата документа" required={!headRo}><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
         <Field label="Заказчик/Организация"><Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...spravValues("Заказчики / Организации")]))} optionLabel={v => v || "Не указан"} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={headRo} /></Field>
-        <Field label="Подотчётное лицо" required={!headRo} full><Select value={head.responsible} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович", "Иванова Мария Сергеевна"])} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={headRo} /></Field>
+        <Field label="Подотчётное лицо" required={!headRo} full><Select value={head.responsible} options={withBlank(withCurrent(spravValues("Подотчётные сотрудники"), head.responsible))} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={headRo} /></Field>
         {vid === "Плавка" && (
           <Field label="Номер плавки" required={!headRo}><Input value={head.plavkaNo} onChange={v => setHead(h => ({ ...h, plavkaNo: v }))} disabled={headRo} /></Field>
         )}
         <Field label="Выдал"><Input value={head.vydal} disabled /></Field>
-        <Field label="Получил" required={!headRo}><Select value={head.poluchil} options={withBlank(["Нурланов Асхат Бекович", "Петров Сергей Владимирович"])} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={headRo} /></Field>
+        <Field label="Получил" required={!headRo}><Select value={head.poluchil} options={withBlank(withCurrent(spravValues("Подотчётные сотрудники"), head.poluchil))} onChange={v => setHead(h => ({ ...h, poluchil: v }))} disabled={headRo} /></Field>
         {/* Доп. информация редактируется, пока операция не завершена */}
         <InfoField value={info} onChange={setInfo} disabled={ro} />
       </div>

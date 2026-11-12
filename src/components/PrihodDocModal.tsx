@@ -56,7 +56,8 @@ export default function PrihodDocModal(props: Props) {
 
 // Источник поля «Отправитель» зависит от типа документа: приходный ордер и накладная — общий справочник
 // «Заказчики / Организации», требование — «Склады» (см. TrebovanieDocModal)
-const ORGS = spravValues("Заказчики / Организации");
+// Читаем справочник при каждом обращении — чтобы видеть добавленные и отключённые записи
+const orgs = () => spravValues("Заказчики / Организации");
 
 // Демо-позиции для документов из демо-данных (без сохранённых позиций)
 export const DEMO_ORDER: PrihodPosition[] = [
@@ -100,7 +101,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
   const [head, setHead] = useState(() => ({
     number: doc?.number || "ПО-0342",
     date: doc?.date || today,
-    otpravitel: doc?.sender || ORGS[0],
+    otpravitel: doc?.sender || orgs()[0],
     // Получатель — склад из справочника «Склады»; по умолчанию склад приёмки (СДМ1)
     poluchatel: doc && sklady.includes(doc.receiver) ? doc.receiver : PRIHOD_SKLAD,
     ...ORDER_HEAD_DEFAULTS,
@@ -115,7 +116,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     nakladNumber: doc?.number || "НП-001234",
     aktNumber: doc?.number || "АКТ-0043",
     nakladDate: doc?.date || today,
-    zakazchik: doc?.sender || ORGS[0],
+    zakazchik: doc?.sender || orgs()[0],
     sotrudnik: "Ким Александр Юрьевич",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
@@ -282,7 +283,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
           {typeSelect}
           <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
           <Field label="Дата документа" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-          <Field label="Отправитель" required={!ro}><Select value={head.otpravitel} options={Array.from(new Set([head.otpravitel, ...ORGS]))} onChange={h("otpravitel")} disabled={ro} /></Field>
+          <Field label="Отправитель" required={!ro}><Select value={head.otpravitel} options={Array.from(new Set([head.otpravitel, ...orgs()]))} onChange={h("otpravitel")} disabled={ro} /></Field>
           {poluchatelSelect("Получатель")}
           <Field label="№ счёт-фактуры"><Input value={head.schetFaktura} onChange={h("schetFaktura")} disabled={ro} /></Field>
           <Field label="Дата счёт-фактуры"><Input value={head.schetFakturaData} onChange={h("schetFakturaData")} disabled={ro} /></Field>
@@ -309,7 +310,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
           {typeSelect}
           <Field label="Номер" required={!ro}><Input value={isAkt ? head.aktNumber : head.nakladNumber} onChange={h(isAkt ? "aktNumber" : "nakladNumber")} disabled={ro} /></Field>
           <Field label="Дата документа" required={!ro}><Input value={head.nakladDate} onChange={h("nakladDate")} disabled={ro} /></Field>
-          <Field label="Отправитель" required={!ro}><Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...ORGS]))} onChange={h("zakazchik")} disabled={ro} /></Field>
+          <Field label="Отправитель" required={!ro}><Select value={head.zakazchik} options={Array.from(new Set([head.zakazchik, ...orgs()]))} onChange={h("zakazchik")} disabled={ro} /></Field>
           {poluchatelSelect("Получатель")}
           <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные сотрудники")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
           <div>

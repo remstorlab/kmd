@@ -21,7 +21,8 @@ import { Plus } from "lucide-react";
 
 type VsPosition = VydachaDocPosition;
 const NO_LOC = "-";
-const ORGS = spravValues("Заказчики / Организации");
+// Читаем справочник при каждом обращении — чтобы видеть добавленные и отключённые записи
+const orgs = () => spravValues("Заказчики / Организации");
 
 export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = false, typeSelect }: {
   onClose: () => void;
@@ -47,7 +48,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
     number: doc?.number || `ВС-${String(Math.floor(Math.random() * 900 + 100)).padStart(4, "0")}`,
     date: doc?.date || today,
     receiver: doc?.receiver || PRIHOD_SKLAD,
-    zakazchik: doc?.zakazchik ?? ORGS[0],
+    zakazchik: doc?.zakazchik ?? orgs()[0],
     sotrudnik: "Ким Александр Юрьевич",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
@@ -198,7 +199,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
         <Field label="Заказчик/Организация">
           {lockZakazchik
             ? <Input value={zakazchik} disabled />
-            : <Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...ORGS]))} optionLabel={v => v || "Не указан"} onChange={h("zakazchik")} />}
+            : <Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...orgs()]))} optionLabel={v => v || "Не указан"} onChange={h("zakazchik")} />}
         </Field>
         <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные сотрудники")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
         <div>

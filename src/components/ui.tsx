@@ -802,7 +802,8 @@ export function Textarea({ value, onChange, placeholder = "", rows = 3, disabled
 
 // ── SearchInput ───────────────────────────────────────────────────────────────
 
-export function SearchInput({ value, onChange, placeholder = "Поиск..." }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+// scope — пояснение внутри поля, по каким колонкам идёт поиск (напр. «Наименование · Краткое»)
+export function SearchInput({ value, onChange, placeholder = "Поиск...", scope }: { value: string; onChange: (v: string) => void; placeholder?: string; scope?: string }) {
   return (
     <div className="relative">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -810,11 +811,21 @@ export function SearchInput({ value, onChange, placeholder = "Поиск..." }: 
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        title={scope ? `Поиск по: ${scope}` : undefined}
+        className={`w-full pl-9 ${scope ? "pr-36" : "pr-3"} py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
       />
+      {scope && (
+        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 max-w-[8.5rem] truncate rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500" title={`Поиск по: ${scope}`}>
+          {scope}
+        </span>
+      )}
     </div>
   );
 }
+
+// Фильтр «Да / Нет» для колонок-флагов
+export const YES_NO_ALL = "Все";
+export const matchYesNo = (filter: string, v: boolean) => filter === YES_NO_ALL || (filter === "Да") === v;
 
 // ── PageHeader ────────────────────────────────────────────────────────────────
 
