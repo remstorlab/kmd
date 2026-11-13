@@ -1225,7 +1225,7 @@ export interface AlloyGrade {
   // Нормативный документ
   nd: string;
   ranges: AlloyRange[];
-  // Элемент «Остальное» (в строке «Содержание в шихте, %» выводится текстом)
+  // Элемент-остаток марки: в шихтовой карте его доля и норма выводятся числом (норма — расчётная, см. restNorm)
   rest?: string;
   // Примеси, не более, %: fe / sb / bi / pb и всего
   impurities: Partial<Record<(typeof ALLOY_IMPURITIES)[number] | "total", number>>;

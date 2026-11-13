@@ -189,6 +189,17 @@ export function normCell(g: AlloyGrade | undefined, el: string): NormCell | null
   return null;
 }
 
+// Норма элемента-остатка марки числом (вместо текста «Остальное»): мин = 100 − сумма максимумов остальных
+// элементов диапазонов, макс = 100 − сумма их минимумов. Если у какого-то элемента граница не задана — null.
+export function restNorm(g: AlloyGrade | undefined, k: "min" | "max"): number | null {
+  if (!g?.rest) return null;
+  const others = g.ranges.filter(r => r.element !== g.rest);
+  const bounds = others.map(r => (k === "min" ? r.max : r.min));
+  if (others.length === 0 || bounds.some(b => b == null)) return null;
+  return r2(Math.max(0, 100 - bounds.reduce<number>((s, b) => s + (b ?? 0), 0)));
+}
+export const REST_HINT = "Элемент-остаток марки: доля = 100 % − остальные элементы; норма рассчитана по границам остальных элементов";
+
 export function normCellText(c: NormCell | null): string {
   if (!c) return "—";
   if (c.kind === "rest") return "Остальное";

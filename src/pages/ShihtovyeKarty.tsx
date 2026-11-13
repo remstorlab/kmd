@@ -14,7 +14,7 @@ import {
 import { returnToStock } from "../data/stock";
 import {
   ShihtaCalc, ShihtaLine, chemStrings, fmt2, normText, r2, shareOf, shihtaWarnings, lineChem, kindOf,
-  normCell, impuritiesText, fmtNorm, prikazStatus, itogoMaterials, lineOfMaterial, prikazGrade, isSkladMaterial,
+  normCell, impuritiesText, fmtNorm, restNorm, REST_HINT, prikazStatus, itogoMaterials, lineOfMaterial, prikazGrade, isSkladMaterial,
   shihtaOborot, oborotHintText, oborotWarnings, oborotInfoText, kartaOborot,
 } from "../data/shihta";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
@@ -213,21 +213,15 @@ function DopMaterialModal({ initial, onClose, onSave }: { initial?: MatRow; onCl
   );
 }
 
-// Обозначение элемента-остатка марки: текст, а не число (в расчётах не участвует)
-function RestLabel({ value }: { value?: string }) {
-  return (
-    <span className="inline-flex flex-col items-end leading-tight" title="Элемент-остаток марки: доля = 100 % − остальные элементы">
-      <span className="italic text-gray-700">Остальное</span>
-      {value && value !== "—" && <span className="text-[11px] text-gray-400">{value}</span>}
-    </span>
-  );
+// Значение нормы: только число или прочерк (у элемента-остатка марки — расчётная граница, с подсказкой)
+function NormValue({ v, rest = false }: { v: number | null; rest?: boolean }) {
+  if (v == null) return <span className="text-gray-400" title={rest ? REST_HINT : undefined}>—</span>;
+  return rest ? <span className="cursor-help" title={REST_HINT}>{fmtNorm(v)}</span> : <>{fmtNorm(v)}</>;
 }
 
-// Значение нормы: число, «Остальное» или прочерк
-function NormValue({ v }: { v: number | "rest" | null }) {
-  if (v === "rest") return <RestLabel />;
-  if (v == null) return <span className="text-gray-400">—</span>;
-  return <>{fmtNorm(v)}</>;
+// Заголовок колонки элемента: у элемента-остатка марки — пометка «ост.» (значения в колонке остаются числами)
+function ElHead({ short, rest }: { short: string; rest: boolean }) {
+  return rest ? <span className="cursor-help" title={REST_HINT}>{short} <span className="text-[10px] font-normal text-gray-400">ост.</span></span> : <>{short}</>;
 }
 
 // prikaz — приказ на плавку, в который входит карта; defaults — шапка новой карты (из предыдущей карты приказа)
@@ -342,11 +336,11 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
     ...oborotWarnings(ob, grade),
     ...[...new Set(materials.map(m => banReason(m, grade, naznachenie)).filter((w): w is string => !!w))],
   ];
-  // Норма элемента в строках «Норма мин / макс»: число — из диапазона или предела примеси; элемент-остаток — «Остальное»
+  // Норма элемента в строках «Норма мин / макс»: число — из диапазона или предела примеси; элемент-остаток — расчётная граница (restNorm)
   const normOf = (e: string, k: "min" | "max") => {
     const c = normCell(grade, e);
     if (!c) return null;
-    if (c.kind === "rest") return "rest" as const;
+    if (c.kind === "rest") return restNorm(grade, k);
     if (c.kind === "impurity") return k === "max" ? c.max : null;
     return c[k] ?? null;
   };
@@ -555,7 +549,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
                 <SortTh sortKey="oborot" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">{OBOROT_LABEL}</SortTh>
                 <SortTh sortKey="ves" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Масса в шихту, г</SortTh>
                 {shkEls.map(e => (
-                  <SortTh key={e.id} sortKey={`el-${e.id}`} sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">{e.shortName}</SortTh>
+                  <SortTh key={e.id} sortKey={`el-${e.id}`} sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2"><ElHead short={e.shortName} rest={grade?.rest === e.id} /></SortTh>
                 ))}
                 <SortTh sortKey="dola" sort={matSort} onSort={toggleMatSort} align="right" className="px-3 py-2">Доля, %</SortTh>
                 {!ro && <th className="w-16"></th>}
@@ -629,8 +623,8 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
                 <td className="px-3 py-2 text-right text-gray-400">—</td>
                 {shkEls.map(e => {
                   const v = pctCell(e.id);
-                  // Элемент-остаток марки — обозначение «Остальное»; расчётная доля — справочно
-                  if (grade?.rest === e.id) return <td key={e.id} className="px-3 py-2 text-right"><RestLabel value={v} /></td>;
+                  // Элемент-остаток марки — та же расчётная доля числом, пояснение в подсказке
+                  if (grade?.rest === e.id) return <td key={e.id} className={`px-3 py-2 text-right cursor-help ${v === "—" ? "text-gray-400" : "font-semibold"}`} title={REST_HINT}>{v}</td>;
                   return <td key={e.id} className={`px-3 py-2 text-right ${v === "—" ? "text-gray-400" : "font-semibold"}`}>{v}</td>;
                 })}
                 <td colSpan={ro ? 1 : 2}></td>
@@ -639,7 +633,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
                 <tr key={k} className="text-gray-600">
                   <td className="px-3 py-2 font-medium" colSpan={LEAD}>{k === "min" ? "Норма мин, %" : "Норма макс, %"} <span className="text-xs font-normal text-gray-400">({grade.name})</span></td>
                   <td className="px-3 py-2 text-right text-gray-400">—</td>
-                  {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right"><NormValue v={normOf(e.id, k)} /></td>)}
+                  {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right"><NormValue v={normOf(e.id, k)} rest={grade?.rest === e.id} /></td>)}
                   <td colSpan={ro ? 1 : 2}></td>
                 </tr>
               ))}
@@ -775,7 +769,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
   const normOf = (e: string, k: "min" | "max") => {
     const c = normCell(grade, e);
     if (!c) return null;
-    if (c.kind === "rest") return "rest" as const;
+    if (c.kind === "rest") return restNorm(grade, k);
     if (c.kind === "impurity") return k === "max" ? c.max : null;
     return c[k] ?? null;
   };
@@ -818,7 +812,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
                 <th className="px-3 py-2 text-left font-medium">Плавки</th>
                 <th className="px-3 py-2 text-right font-medium">{OBOROT_LABEL}</th>
                 <th className="px-3 py-2 text-right font-medium">Масса лигатурная, г</th>
-                {shkEls.map(e => <th key={e.id} className="px-3 py-2 text-right font-medium">{e.shortName}</th>)}
+                {shkEls.map(e => <th key={e.id} className="px-3 py-2 text-right font-medium"><ElHead short={e.shortName} rest={grade?.rest === e.id} /></th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -856,7 +850,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
                 <td className="px-3 py-2 text-right text-gray-400">—</td>
                 {shkEls.map(e => {
                   const v = pct(e.id);
-                  if (grade?.rest === e.id) return <td key={e.id} className="px-3 py-2 text-right"><RestLabel value={v} /></td>;
+                  if (grade?.rest === e.id) return <td key={e.id} className={`px-3 py-2 text-right cursor-help ${v === "—" ? "text-gray-400" : "font-semibold"}`} title={REST_HINT}>{v}</td>;
                   return <td key={e.id} className={`px-3 py-2 text-right ${v === "—" ? "text-gray-400" : "font-semibold"}`}>{v}</td>;
                 })}
               </tr>
@@ -864,7 +858,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
                 <tr key={k} className="text-gray-600">
                   <td className="px-3 py-2 font-medium" colSpan={LEAD}>{k === "min" ? "Норма мин, %" : "Норма макс, %"} <span className="text-xs font-normal text-gray-400">({grade.name}, {grade.nd})</span></td>
                   <td className="px-3 py-2 text-right text-gray-400">—</td>
-                  {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right"><NormValue v={normOf(e.id, k)} /></td>)}
+                  {shkEls.map(e => <td key={e.id} className="px-3 py-2 text-right"><NormValue v={normOf(e.id, k)} rest={grade?.rest === e.id} /></td>)}
                 </tr>
               ))}
               {grade && impText && (
