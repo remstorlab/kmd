@@ -291,7 +291,7 @@ export function VydachaList() {
     <div>
       <PageHeader
         title="Выдача со склада"
-        subtitle="Документы отгрузки ГП и ДМ сторонним получателям"
+        subtitle="Документы отгрузки ГП и ДМ"
         breadcrumb={["Складские операции", "Выдача со склада"]}
         actions={
           <>
