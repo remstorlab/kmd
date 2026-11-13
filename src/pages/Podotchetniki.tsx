@@ -22,57 +22,69 @@ const ALL_KLASS = "Все классы";
 const ALL_METALS = "Все металлы";
 const ALL_LOCS = "Все места хранения";
 const ALL_STATUSES = "Все статусы";
+const ALL_VIDS = "Все виды";
 
-function usePositionFilters<T extends PodotchetPosition>(rows: T[]) {
+function usePositionFilters(rows: ProcRow[]) {
   const codeLabel = useMaterialCodeLabel();
   const [search, setSearch] = useState("");
+  const [vid, setVid] = useState(ALL_VIDS);
   const [klass, setKlass] = useState(ALL_KLASS);
   const [metal, setMetal] = useState(ALL_METALS);
   const [loc, setLoc] = useState(ALL_LOCS);
   const [status, setStatus] = useState<string[]>([]);
 
+  const vids = [ALL_VIDS, ...Array.from(new Set(rows.map(r => r.vid))).sort((a, b) => vidOrder(a) - vidOrder(b))];
   const metals = [ALL_METALS, ...Array.from(new Set(rows.map(r => r.metal).filter(Boolean))).sort()];
   const locations = [ALL_LOCS, ...Array.from(new Set(rows.map(r => r.location).filter(Boolean))).sort()];
   const statuses = Array.from(new Set(rows.map(r => r.status).filter(Boolean)));
 
   const q = search.trim().toLowerCase();
-  const match = (r: T) =>
+  const match = (r: ProcRow) =>
     (!q || r.name.toLowerCase().includes(q) || r.nomenkl.toLowerCase().includes(q))
+    && (vid === ALL_VIDS || r.vid === vid)
     && (klass === ALL_KLASS || r.klass === klass)
     && (metal === ALL_METALS || r.metal === metal)
     && (loc === ALL_LOCS || r.location === loc)
     && (status.length === 0 || status.includes(r.status));
-  const active = !!q || klass !== ALL_KLASS || metal !== ALL_METALS || loc !== ALL_LOCS || status.length > 0;
-  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setStatus([]); };
+  const reset = () => { setSearch(""); setVid(ALL_VIDS); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setStatus([]); };
 
   const bar = (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 grid grid-cols-4 gap-3 items-end">
       <div className="col-span-2">
         <label className="block text-xs font-medium text-gray-500 mb-1">Наименование / Номенкл. №</label>
-        <SearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
+        <SearchInput value={search} onChange={setSearch} placeholder="Поиск..." scope="Наим. · Номенкл. №" />
       </div>
+      <Field label="Вид операции"><Select value={vid} options={vids} onChange={setVid} /></Field>
       <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
       <Field label="Код материала"><Select value={metal} options={metals} onChange={setMetal} optionLabel={v => (v === ALL_METALS ? v : codeLabel(v))} /></Field>
       <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
       <Field label="Статус"><MultiSelect values={status} options={statuses} onChange={setStatus} allLabel={ALL_STATUSES} /></Field>
-      <div className="col-start-4">
-        <button onClick={reset} className="w-full h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
-      </div>
+      <button onClick={reset} className="w-full h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
     </div>
   );
-  return { match, active, bar };
+  return { match, bar };
 }
 
-// ── Таблица позиций: те же столбцы, что у позиции ДМ ──────────────────────────
+// ── Единая таблица позиций подотчётника ──────────────────────────────────────
+// Одна строка — одна позиция; слева — вид операции (и изделие), по которой позиция передана / возвращена,
+// и сама операция движения материала. Одинакова для баланса и вкладок «Всего получено» / «Всего возвращено».
 
 // opId / opNo / opDate / opStage — операция движения материала, в которой позиция получена или возвращена
-type ProcRow = PodotchetPosition & { key: string; opId?: string; opNo?: string; opDate?: string; opStage?: string };
+// opTab — вкладка операции, открываемая по ссылке; vid / izdelie — вид операции и наименование изделия
+type ProcRow = PodotchetPosition & {
+  key: string; vid: string; izdelie?: string; date: string;
+  opId?: string; opNo?: string; opDate?: string; opStage?: string; opTab?: "vydacha" | "vozvrat";
+};
 
-function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows: ProcRow[]; showOperation?: boolean; onOpenOperation?: (r: ProcRow) => void }) {
+// Порядок по умолчанию: по справочнику «Виды операций», внутри вида — по дате (новые сверху)
+const byVidDate = (a: ProcRow, b: ProcRow) => vidOrder(a.vid) - vidOrder(b.vid) || parseRuDate(b.date) - parseRuDate(a.date);
+
+function PositionsTable({ rows, pageKey, onOpenOperation }: { rows: ProcRow[]; pageKey: string; onOpenOperation: (r: ProcRow) => void }) {
   const codeLabel = useMaterialCodeLabel();
   // Химический состав для подсказки у пробы — из позиции склада ДМ
   const { dmItems } = useApp();
   const { sorted, sort, toggleSort } = useSort(rows, {
+    vid: r => vidOrder(r.vid),
     op: r => parseInt(r.opNo ?? "", 10) || 0,
     nomenkl: r => r.nomenkl,
     name: r => r.name,
@@ -85,87 +97,79 @@ function PositionsTable({ rows, showOperation = false, onOpenOperation }: { rows
     loc: r => r.location,
     status: r => r.status,
   });
+  const ordered = sort ? sorted : [...rows].sort(byVidDate);
   const th = "px-3 py-2";
-  const pg3 = usePaged(sorted, "podotchet-positions");
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
-          {showOperation && <SortTh sortKey="op" sort={sort} onSort={toggleSort} className={th}>Операция</SortTh>}
-          <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className={th}>Номенкл. №</SortTh>
-          <SortTh sortKey="name" sort={sort} onSort={toggleSort} className={th}>Наименование</SortTh>
-          <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество</SortTh>
-          <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
-          <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
-          <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
-          <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
-          <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>{NET_AU_AG}</SortTh>
-          <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
-          <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
-        </tr></thead>
-        <tbody className="divide-y divide-gray-100">
-          {pg3.pageItems.map(r => (
-            <tr key={r.key} className="hover:bg-gray-50">
-              {showOperation && (
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <button onClick={() => onOpenOperation?.(r)} className="font-medium text-blue-600 hover:underline" title="Открыть операцию">№ {r.opNo}</button>
-                  <div className="text-xs text-gray-400">от {r.opDate}</div>
-                  {r.opStage && <div className="mt-0.5"><Badge label={r.opStage} group="operacii" /></div>}
-                </td>
-              )}
-              <td className="px-3 py-2 text-gray-500">{r.nomenkl}</td>
-              <td className="px-3 py-2 font-medium">{r.name}</td>
-              <td className="px-3 py-2">{r.qty}</td>
-              <td className="px-3 py-2"><KlassCode value={r.klass} /></td>
-              <td className="px-3 py-2 text-blue-600 font-medium">{r.metal ? codeLabel(r.metal) : "—"}</td>
-              <td className="px-3 py-2">{probaText(r.proba)}</td>
-              <td className="px-3 py-2">{r.ligWeight.toFixed(2)}</td>
-              <td className="px-3 py-2"><NetAuAg chem={dmItems.find(d => d.nomenkl === r.nomenkl)?.chem} /></td>
-              <td className="px-3 py-2 text-gray-500">{r.location}</td>
-              <td className="px-3 py-2"><PosStatusBadge status={r.status} nomenkl={r.nomenkl} /></td>
-            </tr>
-          ))}
-          {sorted.length === 0 && (
-            <tr><td colSpan={showOperation ? 11 : 10} className="px-3 py-4 text-center text-gray-400 text-xs">Позиции отсутствуют</td></tr>
-          )}
-          <FillerRows count={pg3.fill} cols={11} />
-        </tbody>
-      </table>
-      {pg3.pager}
-    </div>
-  );
-}
-
-// ── Блок операции: шапка «Вид операции — Наименование изделия», позиции операции ──
-
-function OpBlock({ vid, izdelie, rows, showOperation = false, onOpenOperation }: {
-  vid: string;
-  // Наименование изделия операции (поле «Наименование изделия» операции движения материала)
-  izdelie?: string;
-  rows: ProcRow[];
-  showOperation?: boolean;
-  onOpenOperation?: (r: ProcRow) => void;
-}) {
-  const Icon = vidIcon[vid] ?? Flame;
-  const totalLig = rows.reduce((s, r) => s + r.ligWeight, 0);
-  const name = izdelie?.trim();
+  const pg = usePaged(ordered, pageKey);
+  const cols = 12;
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">
-        <Icon className="w-5 h-5 text-gray-500 shrink-0" />
-        <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900 truncate" title={name ? `${vid} — ${name}` : vid}>
-          {vid}{name && <span className="font-normal text-gray-700"> — {name}</span>}
-        </div>
-        <div className="text-xs text-gray-500 shrink-0">
-          Позиций: {rows.length} · Вес лигат.: {totalLig.toFixed(2)} г
-        </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200 whitespace-nowrap">
+            <SortTh sortKey="vid" sort={sort} onSort={toggleSort} className={th}>Вид операции</SortTh>
+            <SortTh sortKey="op" sort={sort} onSort={toggleSort} className={th}>Операция</SortTh>
+            <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className={th}>Номенкл. №</SortTh>
+            <SortTh sortKey="name" sort={sort} onSort={toggleSort} className={th}>Наименование</SortTh>
+            <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className={th}>Количество</SortTh>
+            <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className={th}>Класс</SortTh>
+            <SortTh sortKey="metal" sort={sort} onSort={toggleSort} className={th}>Код материала</SortTh>
+            <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className={th}>Проба</SortTh>
+            <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className={th}>Вес лигат.</SortTh>
+            <SortTh sortKey="net" sort={sort} onSort={toggleSort} className={th}>{NET_AU_AG}</SortTh>
+            <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className={th}>Место хранения</SortTh>
+            <SortTh sortKey="status" sort={sort} onSort={toggleSort} className={th}>Статус</SortTh>
+          </tr></thead>
+          <tbody className="divide-y divide-gray-100">
+            {pg.pageItems.map(r => {
+              const Icon = vidIcon[r.vid] ?? Flame;
+              const izdelie = r.izdelie?.trim();
+              return (
+                <tr key={r.key} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 max-w-[16rem]">
+                    <div className="flex items-center gap-1.5 font-medium text-gray-900 whitespace-nowrap">
+                      <Icon className="w-4 h-4 text-gray-400 shrink-0" />{r.vid}
+                    </div>
+                    {izdelie && <div className="text-xs text-gray-500 truncate" title={izdelie}>{izdelie}</div>}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {r.opId ? (
+                      <>
+                        <button onClick={() => onOpenOperation(r)} className="font-medium text-blue-600 hover:underline" title="Открыть операцию">№ {r.opNo}</button>
+                        <span className="text-xs text-gray-400"> от {r.opDate}</span>
+                        {r.opStage && <div className="mt-0.5"><Badge label={r.opStage} group="operacii" /></div>}
+                      </>
+                    ) : <span className="text-gray-400">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-gray-500">{r.nomenkl}</td>
+                  <td className="px-3 py-2 font-medium">{r.name}</td>
+                  <td className="px-3 py-2">{r.qty}</td>
+                  <td className="px-3 py-2"><KlassCode value={r.klass} /></td>
+                  <td className="px-3 py-2 text-blue-600 font-medium">{r.metal ? codeLabel(r.metal) : "—"}</td>
+                  <td className="px-3 py-2">{probaText(r.proba)}</td>
+                  <td className="px-3 py-2">{r.ligWeight.toFixed(2)}</td>
+                  <td className="px-3 py-2"><NetAuAg chem={dmItems.find(d => d.nomenkl === r.nomenkl)?.chem} /></td>
+                  <td className="px-3 py-2 text-gray-500">{r.location}</td>
+                  <td className="px-3 py-2"><PosStatusBadge status={r.status} nomenkl={r.nomenkl} /></td>
+                </tr>
+              );
+            })}
+            {ordered.length === 0 && (
+              <tr><td colSpan={cols} className="px-3 py-6 text-center text-gray-400 text-sm">Позиции отсутствуют</td></tr>
+            )}
+            <FillerRows count={pg.fill} cols={cols} />
+          </tbody>
+        </table>
       </div>
-      <PositionsTable rows={rows} showOperation={showOperation} onOpenOperation={onOpenOperation} />
+      {pg.pager}
     </div>
   );
 }
 
-// Порядок блоков: по справочнику «Виды операций», внутри вида — по дате операции (новые сверху)
+// Итог по позициям под заголовком таблицы
+const summaryText = (rows: ProcRow[]) =>
+  `позиций: ${rows.length} · вес лигат.: ${rows.reduce((s, r) => s + r.ligWeight, 0).toFixed(2)} г`;
+
+// Порядок видов операций — как в справочнике «Виды операций»
 const vidOrder = (vid: string) => {
   const i = spravValues("Виды операций").indexOf(vid);
   return i < 0 ? 999 : i;
@@ -193,39 +197,33 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
     "Всего получено",
   );
   const received = tab === "Всего получено";
+  const openOperation = (r: ProcRow) => {
+    if (r.opId) routerNavigate(`${PAGE_PATHS["dvizhenie-mat"]}/view/${r.opId}?tab=${r.opTab ?? "vydacha"}`);
+  };
 
-  // Баланс: позиции в подотчёте; атрибуты позиции ДМ берутся из процессов, где она была выдана
-  const allPositions = [...person.currentProcesses, ...person.completedProcesses].flatMap(p => p.positions);
+  // Баланс: позиции в подотчёте; атрибуты позиции ДМ берутся из процессов, где она была выдана.
+  // Вид операции — по операции движения материала, в которой позиция выдана (не завершённая — приоритетно),
+  // иначе по процессу подотчётника, где позиция числится
+  const processes = [...person.currentProcesses, ...person.completedProcesses];
+  const allPositions = processes.flatMap(p => p.positions);
+  const allPersonOps = operations.filter(o => isPersonOp(o, person));
+  const sourceOf = (nomenkl: string): Pick<ProcRow, "vid" | "izdelie" | "date" | "opId" | "opNo" | "opDate" | "opStage" | "opTab"> => {
+    const withPos = allPersonOps.filter(o => opVydacha(o).some(p => p.nomenkl === nomenkl));
+    const op = withPos.find(o => !isReturned(o)) ?? withPos[0];
+    if (op) return { vid: op.vid, izdelie: op.description, date: op.date, opId: op.id, opNo: op.document, opDate: op.date, opStage: op.stage, opTab: "vydacha" };
+    const pr = processes.find(p => p.positions.some(x => x.nomenkl === nomenkl));
+    return pr ? { vid: pr.vid, izdelie: pr.name, date: pr.date } : { vid: "Без операции", date: "" };
+  };
   const balance: ProcRow[] = person.materials.map((m, i) => {
     const pos = allPositions.find(p => p.nomenkl === m.nomenkl);
-    return pos
-      ? { ...pos, key: `b-${i}` }
-      : { key: `b-${i}`, name: m.name, nomenkl: m.nomenkl, klass: "", metal: "", qty: 1, proba: 0, ligWeight: m.weight, netWeight: m.weight, location: "—", status: "В подотчёте" };
+    const base: PodotchetPosition = pos ?? { name: m.name, nomenkl: m.nomenkl, klass: "", metal: "", qty: 1, proba: 0, ligWeight: m.weight, netWeight: m.weight, location: "—", status: "В подотчёте" };
+    return { ...base, ...sourceOf(m.nomenkl), key: `b-${i}` };
   });
   const balanceF = usePositionFilters(balance);
   const balanceRows = balance.filter(balanceF.match);
-  // Операция, в которой позиция на руках выдана подотчётнику: операция движения материала (не завершённая —
-  // приоритетно), иначе процесс подотчётника, где позиция числится
-  const allPersonOps = operations.filter(o => isPersonOp(o, person));
-  const sourceOf = (nomenkl: string): { key: string; vid: string; izdelie?: string; date: string } => {
-    const withPos = allPersonOps.filter(o => opVydacha(o).some(p => p.nomenkl === nomenkl));
-    const op = withPos.find(o => !isReturned(o)) ?? withPos[0];
-    if (op) return { key: op.id, vid: op.vid, izdelie: op.description, date: op.date };
-    const pr = [...person.currentProcesses, ...person.completedProcesses].find(p => p.positions.some(x => x.nomenkl === nomenkl));
-    return pr ? { key: pr.id, vid: pr.vid, izdelie: pr.name, date: pr.date } : { key: "-", vid: "Без операции", date: "" };
-  };
-  const balanceGroups = (() => {
-    const map = new Map<string, { key: string; vid: string; izdelie?: string; date: string; rows: ProcRow[] }>();
-    for (const r of balanceRows) {
-      const src = sourceOf(r.nomenkl);
-      if (!map.has(src.key)) map.set(src.key, { ...src, rows: [] });
-      map.get(src.key)!.rows.push(r);
-    }
-    return [...map.values()].sort((a, b) => vidOrder(a.vid) - vidOrder(b.vid) || parseRuDate(b.date) - parseRuDate(a.date));
-  })();
 
   // Операции движения материала по подотчётнику: полученные (вкладка «Выдача») / возвращённые (вкладка «Возврат») позиции
-  const personOps = operations.filter(o => isPersonOp(o, person) && (received ? isIssued(o) : isReturned(o)));
+  const personOps = allPersonOps.filter(o => (received ? isIssued(o) : isReturned(o)));
   const toRow = (o: Operation, p: OperPosition, i: number): ProcRow => {
     const dm = dmItems.find(d => d.nomenkl === p.nomenkl);
     // Текущий статус — со склада ДМ; иначе: полученная в открытой операции — в подотчёте, возвращённая — на складе
@@ -233,20 +231,13 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
     return {
       key: `${o.id}-${i}`, name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.metal ?? dm?.metal ?? "",
       qty: p.qty ?? 1, proba: p.proba, ligWeight: p.lig ?? p.ves, netWeight: p.net ?? p.ves, location: p.loc, status,
-      opId: o.id, opNo: o.document, opDate: o.date, opStage: o.stage,
+      vid: o.vid, izdelie: o.description, date: o.date,
+      opId: o.id, opNo: o.document, opDate: o.date, opStage: o.stage, opTab: received ? "vydacha" : "vozvrat",
     };
   };
-  const opRows = (ops: Operation[]) => ops.flatMap(o => (received ? opVydacha(o) : opVozvrat(o)).map((p, i) => toRow(o, p, i)));
-  const rows = opRows(personOps);
+  const rows = personOps.flatMap(o => (received ? opVydacha(o) : opVozvrat(o)).map((p, i) => toRow(o, p, i)));
   const opF = usePositionFilters(rows);
-  // Блок на каждую операцию: «Вид операции — Наименование изделия»
-  const groups = [...personOps]
-    .sort((a, b) => vidOrder(a.vid) - vidOrder(b.vid) || parseRuDate(b.date) - parseRuDate(a.date))
-    .map(o => ({ op: o, rows: opRows([o]).filter(opF.match) }))
-    .filter(g => g.rows.length > 0);
-  const openOperation = (r: ProcRow) => {
-    if (r.opId) routerNavigate(`${PAGE_PATHS["dvizhenie-mat"]}/view/${r.opId}?tab=${received ? "vydacha" : "vozvrat"}`);
-  };
+  const opRows = rows.filter(opF.match);
 
   return (
     <div>
@@ -273,21 +264,15 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
         </div>
       </div>
 
-      {/* Balance */}
+      {/* Баланс: позиции, которые сейчас у подотчётника */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-        <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-3">В балансе у подотчётника</h3>
-        {balance.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">Материалы в балансе отсутствуют</p>
-        ) : (
-          <>
-            {balanceF.bar}
-            <div className="text-xs text-gray-500 mb-2">Найдено: {balanceRows.length} из {balance.length}</div>
-            <div className="space-y-3">
-              {balanceGroups.map(g => <OpBlock key={g.key} vid={g.vid} izdelie={g.izdelie} rows={g.rows} />)}
-              {balanceRows.length === 0 && <p className="text-center text-sm text-gray-400 py-4">Нет позиций по заданным фильтрам</p>}
-            </div>
-          </>
-        )}
+        <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">В балансе у подотчётника</h3>
+        <div className="text-xs text-gray-500 mb-3">
+          Позиции, которые сейчас находятся у подотчётника · {summaryText(balanceRows)}
+          {balanceRows.length !== balance.length && ` (из ${balance.length})`}
+        </div>
+        {balanceF.bar}
+        <PositionsTable rows={balanceRows} pageKey="podotchet-balance" onOpenOperation={openOperation} />
       </div>
 
       {/* Операции движения материала */}
@@ -295,20 +280,11 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
         <Tabs tabs={["Всего получено", "Всего возвращено"]} active={tab} onChange={t => setTab(t as typeof tab)} />
         <div className="text-xs text-gray-500 mb-3">
           {received ? "Позиции, выданные подотчётнику" : "Позиции, возвращённые подотчётником"} в операциях движения материала ·
-          операций: {personOps.length} · позиций: {rows.length} · чистый вес: {rows.reduce((s, r) => s + r.netWeight, 0).toFixed(2)} г
+          операций: {personOps.length} · {summaryText(opRows)}
+          {opRows.length !== rows.length && ` (из ${rows.length})`}
         </div>
-        {rows.length > 0 && opF.bar}
-        <div className="space-y-3">
-          {groups.map(g => (
-            <OpBlock key={g.op.id} vid={g.op.vid} izdelie={g.op.description} rows={g.rows} showOperation onOpenOperation={openOperation} />
-          ))}
-          {rows.length === 0 && (
-            <p className="text-center text-sm text-gray-400 py-4">{received ? "Полученных позиций нет" : "Возвращённых позиций нет"}</p>
-          )}
-          {rows.length > 0 && groups.length === 0 && (
-            <p className="text-center text-sm text-gray-400 py-4">Нет позиций по заданным фильтрам</p>
-          )}
-        </div>
+        {opF.bar}
+        <PositionsTable key={tab} rows={opRows} pageKey="podotchet-positions" onOpenOperation={openOperation} />
       </div>
     </div>
   );
@@ -333,7 +309,7 @@ export function Podotchetniki() {
   const { sorted, sort, toggleSort } = useSort(filtered, {
     name: p => p.name,
     tabelNo: p => p.tabelNo,
-    balance: p => (p.materials.length > 0 ? 1 : 0),
+    balance: p => p.materials.length,
   });
   const pg4 = usePaged(sorted, "podotchetniki");
 
@@ -367,7 +343,7 @@ export function Podotchetniki() {
             <tr className="bg-gray-50 border-b border-gray-200">
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>ФИО</SortTh>
               <SortTh sortKey="tabelNo" sort={sort} onSort={toggleSort}>Табельный №</SortTh>
-              <SortTh sortKey="balance" sort={sort} onSort={toggleSort}>В балансе</SortTh>
+              <SortTh sortKey="balance" sort={sort} onSort={toggleSort}>В балансе, позиций</SortTh>
               <th className="w-12"></th>
             </tr>
           </thead>
@@ -376,11 +352,9 @@ export function Podotchetniki() {
               <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                 <td className="px-4 py-3 text-blue-600">{p.tabelNo}</td>
-                <td className="px-4 py-3">
-                  {p.materials.length > 0
-                    ? <Badge label="В работе" group="podotchet" />
-                    : <span className="text-gray-400 text-xs">—</span>
-                  }
+                {/* Количество позиций, которые сейчас у подотчётника */}
+                <td className={`px-4 py-3 tabular-nums ${p.materials.length > 0 ? "font-medium text-gray-900" : "text-gray-400"}`}>
+                  {p.materials.length}
                 </td>
                 <td className="px-4 py-3"><EyeIcon onClick={() => setSelected(p)} /></td>
               </tr>
