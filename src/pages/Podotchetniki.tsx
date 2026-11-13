@@ -153,19 +153,33 @@ const summaryText = (rows: ProcRow[]) =>
 
 // ── Сводка баланса по коду материала: вес лигатурный и чистый ─────────────────
 
+// Граммы элемента из хим. состава позиции (как в столбце «Вес чист. Au/Ag» таблицы); нет значения — null
+const chemG = (v: string | undefined) => {
+  const n = parseFloat(String(v ?? "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+type CodeSum = { n: number; lig: number; au: number | null; ag: number | null };
+// Сумма с учётом «нет значения»: если ни у одной позиции элемента нет — «—»
+const addG = (a: number | null, b: number | null) => (a === null && b === null ? null : (a ?? 0) + (b ?? 0));
+
 function BalanceByCode({ rows }: { rows: ProcRow[] }) {
   const codeLabel = useMaterialCodeLabel();
-  const map = new Map<string, { n: number; lig: number; net: number }>();
+  const { dmItems } = useApp();
+  const map = new Map<string, CodeSum>();
   for (const r of rows) {
     const k = r.metal || "";
-    const s = map.get(k) ?? { n: 0, lig: 0, net: 0 };
-    s.n += 1; s.lig += r.ligWeight; s.net += r.netWeight;
+    const chem = dmItems.find(d => d.nomenkl === r.nomenkl)?.chem;
+    const s = map.get(k) ?? { n: 0, lig: 0, au: null, ag: null };
+    s.n += 1; s.lig += r.ligWeight;
+    s.au = addG(s.au, chemG(chem?.au));
+    s.ag = addG(s.ag, chemG(chem?.ag));
     map.set(k, s);
   }
   const groups = [...map.entries()].sort(([a], [b]) => (a || "~").localeCompare(b || "~"));
   if (groups.length === 0) return null;
-  const total = groups.reduce((t, [, s]) => ({ n: t.n + s.n, lig: t.lig + s.lig, net: t.net + s.net }), { n: 0, lig: 0, net: 0 });
+  const total = groups.reduce<CodeSum>((t, [, s]) => ({ n: t.n + s.n, lig: t.lig + s.lig, au: addG(t.au, s.au), ag: addG(t.ag, s.ag) }), { n: 0, lig: 0, au: null, ag: null });
   const g2 = (v: number) => v.toFixed(2);
+  const auAg = (s: CodeSum) => `${s.au === null ? "—" : g2(s.au)} / ${s.ag === null ? "—" : g2(s.ag)}`;
   const td = "px-3 py-1.5 text-right tabular-nums";
   return (
     <div className="mb-3 border border-gray-200 rounded-lg overflow-hidden">
@@ -174,7 +188,7 @@ function BalanceByCode({ rows }: { rows: ProcRow[] }) {
           <th className="px-3 py-1.5 text-left font-medium">Код материала</th>
           <th className="px-3 py-1.5 text-right font-medium">Позиций</th>
           <th className="px-3 py-1.5 text-right font-medium">Вес лигат., г</th>
-          <th className="px-3 py-1.5 text-right font-medium">Вес чистый, г</th>
+          <th className="px-3 py-1.5 text-right font-medium">{NET_AU_AG}, г</th>
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {groups.map(([code, s]) => (
@@ -182,14 +196,14 @@ function BalanceByCode({ rows }: { rows: ProcRow[] }) {
               <td className="px-3 py-1.5 text-blue-600 font-medium">{code ? codeLabel(code) : "Без кода"}</td>
               <td className={td}>{s.n}</td>
               <td className={td}>{g2(s.lig)}</td>
-              <td className={td}>{g2(s.net)}</td>
+              <td className={td}>{auAg(s)}</td>
             </tr>
           ))}
           <tr className="bg-gray-50 font-semibold text-gray-900">
             <td className="px-3 py-1.5">Итого</td>
             <td className={td}>{total.n}</td>
             <td className={td}>{g2(total.lig)}</td>
-            <td className={td}>{g2(total.net)}</td>
+            <td className={td}>{auAg(total)}</td>
           </tr>
         </tbody>
       </table>
