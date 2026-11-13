@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
-  Badge, Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode,
+  Badge, Btn, Modal, DeleteIcon, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
   InfoField,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
@@ -245,7 +245,6 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
           <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Позиции для выдачи</h3>
           <div className="flex gap-2">
             {!lockPos && <Btn size="sm" onClick={() => setShowPick(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>}
-            <ExportBtn onToast={show} />
           </div>
         </div>
         {positions.length === 0 ? (
