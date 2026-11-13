@@ -201,7 +201,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
             ? <Input value={zakazchik} disabled />
             : <Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...orgs()]))} optionLabel={v => v || "Не указан"} onChange={h("zakazchik")} />}
         </Field>
-        <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные сотрудники")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
+        <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные лица")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
           <Toggle checked={isOwn} onChange={setOwnProperty} disabled={lockZakazchik} label={isOwn ? "Да" : "Нет"} />

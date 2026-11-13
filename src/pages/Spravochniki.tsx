@@ -6,7 +6,7 @@ import {
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination, usePerPage, FillerRows, fillerCount, statusColorClass, usePaged,
   CREATED_LABEL, CreatedCell, Created, createdSortKey, useCreatedStamp, RequiredMark, YES_NO_ALL, matchYesNo,
 } from "../components/ui";
-import { spravochniki, spravValues, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
+import { spravochniki, spravValues, SpravItem, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
 import { ArrowLeft, ArrowDownUp, Gem, Target, Atom, X, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
@@ -23,7 +23,7 @@ const DICT_SLUG: Record<SpravKey, string> = {
   "Типы документов отгрузки": "tipy-dokumentov-otgruzki",
   "Типы документов движения материала": "tipy-dokumentov-dvizheniya",
   "Заказчики / Организации": "zakazchiki-organizacii",
-  "Подотчётные сотрудники": "podotchetnye-sotrudniki",
+  "Подотчётные лица": "podotchetnye-lica",
   "Типы операций": "tipy-operaciy",
   "Виды операций": "vidy-operaciy",
   "Склады": "sklady",
@@ -75,7 +75,7 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Типы документов отгрузки": FileText,
   "Типы документов движения материала": FileText,
   "Заказчики / Организации": Building2,
-  "Подотчётные сотрудники": UserRound,
+  "Подотчётные лица": UserRound,
   "Типы операций": Settings2,
   "Виды операций": Layers,
   "Склады": Warehouse,
@@ -91,6 +91,11 @@ const VALUE_LABEL: Partial<Record<SpravKey, string>> = {
   "Технологические операции": "Наименование",
   "Тип списания": "Наименование",
   "Пробы": "Проба",
+};
+// Подпись поля «Код» для справочников, где оно называется иначе
+const PODOTCHET_DICT: SpravKey = "Подотчётные лица";
+const CODE_LABEL: Partial<Record<SpravKey, string>> = {
+  [PODOTCHET_DICT]: "Табельный №",
 };
 // Справочники только с номером строки и наименованием: номер присваивается автоматически, статуса нет
 const NUMBERED: SpravKey[] = ["Тип списания", "Пробы"];
@@ -138,11 +143,14 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const [affinage, setAffinage] = useState(bullionAffinage);
   const [affForm, setAffForm] = useState("");
   const numbered = NUMBERED.includes(name);
+  const codeLabel = numbered ? "№" : CODE_LABEL[name] ?? "Код";
+  // У подотчётных лиц — должность (выводится в карточке подотчётного лица)
+  const withPosition = name === PODOTCHET_DICT;
   const recordStatuses = useRecordStatuses();
-  const [items, setItems] = useState(dict.items);
+  const [items, setItems] = useState<SpravItem[]>(dict.items);
   const [norms, setNorms] = useState(techOpLossNorms);
   const createdStamp = useCreatedStamp();
-  const [form, setForm] = useState({ code: "", value: "", status: "Активно" });
+  const [form, setForm] = useState<SpravItem>({ code: "", value: "", status: "Активно" });
   const [normForm, setNormForm] = useState(emptyNorm);
   const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.code);
   // Форма заполняется при открытии экрана добавления / редактирования (в т.ч. по прямой ссылке)
@@ -150,7 +158,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
     if (editItem) { setForm(editItem); setNormForm(norms[editItem.code] ?? emptyNorm); setAffForm(affinage[editItem.code] ?? ""); }
     else if (showAdd) {
       const nextNo = String(items.reduce((m, i) => Math.max(m, parseInt(i.code, 10) || 0), 0) + 1);
-      setForm({ code: numbered ? nextNo : "", value: "", status: "Активно" });
+      setForm({ code: numbered ? nextNo : "", value: "", status: "Активно", ...(withPosition ? { position: "" } : {}) });
       setNormForm(emptyNorm);
       setAffForm("");
     }
@@ -159,10 +167,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(ALL);
   const q = qOf(search);
-  const filtered = items.filter(i => (has(i.code, q) || has(i.value, q)) && (statusFilter === ALL || i.status === statusFilter));
+  const filtered = items.filter(i => (has(i.code, q) || has(i.value, q) || (withPosition && has(i.position, q))) && (statusFilter === ALL || i.status === statusFilter));
   const { sorted, sort, toggleSort } = useSort(filtered, {
     code: i => (numbered ? parseInt(i.code, 10) || 0 : i.code),
     value: i => i.value,
+    position: i => i.position ?? "",
     status: i => i.status,
     created: i => createdSortKey(dictCreatedOf(name, i.code)),
   });
@@ -171,7 +180,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const openEdit = goEdit;
 
   const save = () => {
-    const next = editItem ? items.map(i => i.code === editItem.code ? form : i) : [...items, form];
+    const code = form.code.trim(), value = form.value.trim();
+    if (!code || !value) { show(`Заполните поля «${codeLabel}» и «${valueLabel}»`); return; }
+    if (!editItem && items.some(i => i.code === code)) { show(`Запись с полем «${codeLabel}» = ${code} уже есть`); return; }
+    const rec: SpravItem = { ...form, code, value, ...(withPosition ? { position: (form.position ?? "").trim() } : {}) };
+    const next = editItem ? items.map(i => i.code === editItem.code ? rec : i) : [...items, rec];
     if (!editItem) dictCreated[`${name}|${form.code}`] = createdStamp();
     setItems(next);
     // Справочник — общий источник вариантов для полей форм, поэтому изменения пишем в него.
@@ -209,10 +222,10 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
 
       <FilterBar active={!!search || statusFilter !== ALL} onReset={() => { setSearch(""); setStatusFilter(ALL); }}>
         <FilterSearch
-          label={`${numbered ? "№" : "Код"} / ${valueLabel}`}
+          label={`${codeLabel} / ${valueLabel}${withPosition ? " / Должность" : ""}`}
           value={search}
           onChange={setSearch}
-          scope={`${numbered ? "№" : "Код"} · ${valueLabel}`}
+          scope={withPosition ? "Таб. № · ФИО · Должн." : `${codeLabel} · ${valueLabel}`}
         />
         {!numbered && <FilterSelect label="Статус" value={statusFilter} options={recordStatuses} onChange={setStatusFilter} />}
       </FilterBar>
@@ -220,8 +233,9 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
-            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>{numbered ? "№" : "Код"}</SortTh>
+            <SortTh sortKey="code" sort={sort} onSort={toggleSort}>{codeLabel}</SortTh>
             <SortTh sortKey="value" sort={sort} onSort={toggleSort}>{valueLabel}</SortTh>
+            {withPosition && <SortTh sortKey="position" sort={sort} onSort={toggleSort}>Должность</SortTh>}
             {withNorms && <>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Ед. изм. норматива</th>
               <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Потери Au, %</th>
@@ -237,6 +251,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
               <tr key={i} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.code}</td>
                 <td className="px-4 py-3 text-gray-900">{item.value}</td>
+                {withPosition && <td className="px-4 py-3 text-gray-700">{item.position || <span className="text-gray-400">—</span>}</td>}
                 {withNorms && <>
                   <td className="px-4 py-3 text-gray-500">{normCell(norms[item.code]?.unit ?? "")}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{normCell(norms[item.code]?.au ?? "")}</td>
@@ -269,8 +284,9 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
           }
         >
           <div className="space-y-4">
-            <Field label={numbered ? "№" : "Код"} required={!numbered}><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem || numbered} /></Field>
-            <Field label={valueLabel} required><Input value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} /></Field>
+            <Field label={codeLabel} required={!numbered}><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem || numbered} placeholder={withPosition ? "ТН-000" : ""} /></Field>
+            <Field label={valueLabel} required><Input value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} placeholder={withPosition ? "Фамилия Имя Отчество" : ""} /></Field>
+            {withPosition && <Field label="Должность"><Input value={form.position ?? ""} onChange={v => setForm(f => ({ ...f, position: v }))} placeholder="Выводится в карточке подотчётного лица" /></Field>}
             {withNorms && <>
               <Field label="Единицы измерения норматива"><Input value={normForm.unit} onChange={v => setNormForm(f => ({ ...f, unit: v }))} placeholder="% к массе навески" /></Field>
               <div className="grid grid-cols-2 gap-4">

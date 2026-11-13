@@ -386,7 +386,7 @@ export interface LogEntry {
 
 // --- Демо-данные ---
 // Все значения атрибутов — из справочников: «Классы материалов», «Коды материалов», «Пробы», «Места хранения»
-// (СДМ №1, СДМ №2), «Заказчики / Организации», «Подотчётные сотрудники», «Типы операций», «Виды операций», типы документов,
+// (СДМ №1, СДМ №2), «Заказчики / Организации», «Подотчётные лица», «Типы операций», «Виды операций», типы документов,
 // «Технологические операции», «Тип списания», статусы. Данные согласованы между разделами: позиции в подотчёте
 // выданы в операциях движения, резерв — в шихтовых картах, закрытые — по оформленным накладным.
 
@@ -984,7 +984,10 @@ export function opWeights(o: Operation) {
 }
 
 // --- Справочники ---
-export const spravochniki = {
+// Запись справочника; position — должность (только у справочника «Подотчётные лица»)
+export interface SpravItem { code: string; value: string; status: string; position?: string }
+export interface SpravDict { count: number; items: SpravItem[] }
+const spravData = {
   "Единицы измерения": {
     count: 6,
     items: [
@@ -1041,14 +1044,19 @@ export const spravochniki = {
       { code: "ОРГ-007", value: "Монетный двор", status: "Активно" },
     ]
   },
-  "Подотчётные сотрудники": {
+  // Подотчётные лица: код — табельный №, значение — ФИО, position — должность.
+  // Источник реестра раздела «Подотчётные лица» (баланс и процессы — initialPodotchetniki, связь по табельному №)
+  "Подотчётные лица": {
     count: 8,
     items: [
-      { code: "ТН-001", value: "Нурланов Асхат Бекович", status: "Активно" },
-      { code: "ТН-002", value: "Петров Сергей Владимирович", status: "Активно" },
-      { code: "ТН-003", value: "Смирнов Константин Дмитриевич", status: "Активно" },
-      { code: "ТН-004", value: "Иванова Мария Сергеевна", status: "Активно" },
-      { code: "ТН-005", value: "Ким Александр Юрьевич", status: "Активно" },
+      { code: "ТН-001", value: "Нурланов Асхат Бекович", position: "Плавильщик", status: "Активно" },
+      { code: "ТН-002", value: "Петров Сергей Владимирович", position: "Ювелир", status: "Активно" },
+      { code: "ТН-003", value: "Смирнов Константин Дмитриевич", position: "Лаборант", status: "Активно" },
+      { code: "ТН-004", value: "Иванова Мария Сергеевна", position: "Гальваник", status: "Активно" },
+      { code: "ТН-005", value: "Ким Александр Юрьевич", position: "Кладовщик", status: "Активно" },
+      { code: "ТН-006", value: "Бекова Айгуль Маратовна", position: "Технолог", status: "Активно" },
+      { code: "ТН-007", value: "Жумабаев Даурен Серикович", position: "Мастер-ювелир", status: "Активно" },
+      { code: "ТН-008", value: "Орынбекова Динара Кайратовна", position: "Контролёр ОТК", status: "Активно" },
     ]
   },
   "Типы операций": {
@@ -1138,6 +1146,23 @@ export const spravochniki = {
     ]
   },
 };
+export const spravochniki: Record<keyof typeof spravData, SpravDict> = spravData;
+
+// Подотчётные лица раздела «Подотчётные лица»: записи справочника «Подотчётные лица» (ФИО, табельный №, должность)
+// + баланс и процессы по табельному №. В реестре — активные записи и неактивные, у которых есть позиции в балансе.
+export type PodotchetnoeLico = Podotchetnik & { status: string };
+export function podotchetnyeLica(state: Podotchetnik[]): PodotchetnoeLico[] {
+  return spravochniki["Подотчётные лица"].items
+    .map(it => {
+      const p = state.find(x => x.tabelNo === it.code);
+      return {
+        id: p?.id ?? it.code, department: p?.department ?? "",
+        materials: p?.materials ?? [], currentProcesses: p?.currentProcesses ?? [], completedProcesses: p?.completedProcesses ?? [],
+        name: it.value, tabelNo: it.code, position: it.position ?? "", status: it.status,
+      };
+    })
+    .filter(p => p.status === "Активно" || p.materials.length > 0);
+}
 
 // Активные значения справочника — источник вариантов для полей выбора на формах.
 export function spravValues(name: keyof typeof spravochniki): string[] {

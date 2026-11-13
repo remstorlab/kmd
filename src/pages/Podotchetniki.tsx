@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useApp } from "../store/AppContext";
-import { PosStatusBadge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Select, KlassSelect, probaText, NetAuAg, NET_AU_AG, usePaged, FillerRows, parseRuDate,
+import { Btn, PosStatusBadge, PageHeader, EyeIcon, Tabs, SortTh, useSort, KlassCode, useMaterialCodeLabel, SearchInput, Select, KlassSelect, probaText, NetAuAg, NET_AU_AG, usePaged, FillerRows, parseRuDate,
 } from "../components/ui";
-import { Podotchetnik, PodotchetPosition, Operation, OperPosition, StatusDM, spravValues, opVydacha, opVozvrat } from "../data/mock";
-import { ArrowLeft } from "lucide-react";
+import { Podotchetnik, PodotchetPosition, Operation, OperPosition, StatusDM, spravValues, opVydacha, opVozvrat, podotchetnyeLica } from "../data/mock";
+import { ArrowLeft, BookUser } from "lucide-react";
 import { matchPage, useTabParam, PAGE_PATHS } from "../router";
 
 // ── Фильтры позиций: компактная строка ──────────────────────────────────────
@@ -298,7 +298,7 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
       <div className="bg-slate-900 rounded-xl p-6 mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white mb-1">{person.name}</h1>
-          <p className="text-slate-400 text-sm">{person.position}</p>
+          <p className="text-slate-400 text-sm">{person.position || "Должность не указана"}</p>
         </div>
         <div className="text-right">
           <div className="text-slate-400 text-xs mb-1">Табельный номер</div>
@@ -338,21 +338,25 @@ function PodotchetnikCard({ person, onBack }: { person: Podotchetnik; onBack: ()
 
 export function Podotchetniki() {
   const { podotchetniki, navigate } = useApp();
-  // Карточка — /podotchetniki/:id
+  // Реестр — записи справочника «Подотчётные лица» (ФИО, табельный №, должность) + баланс по табельному №
+  const people = podotchetnyeLica(podotchetniki);
+  // Карточка — /podotchetniki/:id (id позиции баланса или табельный № для новых записей справочника)
   const { pathname } = useLocation();
   const { page, segs } = matchPage(pathname);
-  const selected = page === "podotchetnik-card" ? podotchetniki.find(p => p.id === segs[1]) ?? null : null;
+  const cardId = segs[1] ? decodeURIComponent(segs[1]) : "";
+  const selected = page === "podotchetnik-card" ? people.find(p => p.id === cardId || p.tabelNo === cardId) ?? null : null;
   const setSelected = (p: Podotchetnik | null) => (p ? navigate("podotchetnik-card", { id: p.id }) : navigate("podotchetniki"));
 
   const [fio, setFio] = useState("");
   const [tabel, setTabel] = useState("");
-  const filtered = podotchetniki.filter(p =>
-    (!fio.trim() || p.name.toLowerCase().includes(fio.trim().toLowerCase()))
+  const filtered = people.filter(p =>
+    (!fio.trim() || [p.name, p.position].some(v => v.toLowerCase().includes(fio.trim().toLowerCase())))
     && (!tabel.trim() || p.tabelNo.toLowerCase().includes(tabel.trim().toLowerCase())));
 
   const { sorted, sort, toggleSort } = useSort(filtered, {
     name: p => p.name,
     tabelNo: p => p.tabelNo,
+    position: p => p.position,
     balance: p => p.materials.length,
   });
   const pg4 = usePaged(sorted, "podotchetniki");
@@ -365,14 +369,15 @@ export function Podotchetniki() {
     <div>
       <PageHeader
         title="Подотчётные лица"
-        subtitle="Реестр сотрудников, у которых находятся материалы на балансе"
+        subtitle="Реестр из справочника «Подотчётные лица»: ФИО, табельный №, должность и материалы на балансе"
         breadcrumb={["Подотчётные лица"]}
+        actions={<Btn variant="secondary" onClick={() => navigate("spravochnik-detail", { dict: "podotchetnye-lica" })}><BookUser className="w-4 h-4" />Справочник «Подотчётные лица»</Btn>}
       />
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 grid grid-cols-4 gap-3 items-end">
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">ФИО</label>
-          <SearchInput value={fio} onChange={setFio} placeholder="Поиск по ФИО..." />
+          <label className="block text-xs font-medium text-gray-500 mb-1">ФИО / Должность</label>
+          <SearchInput value={fio} onChange={setFio} placeholder="Поиск..." scope="ФИО · Должность" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Табельный №</label>
@@ -387,6 +392,7 @@ export function Podotchetniki() {
             <tr className="bg-gray-50 border-b border-gray-200">
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>ФИО</SortTh>
               <SortTh sortKey="tabelNo" sort={sort} onSort={toggleSort}>Табельный №</SortTh>
+              <SortTh sortKey="position" sort={sort} onSort={toggleSort}>Должность</SortTh>
               <SortTh sortKey="balance" sort={sort} onSort={toggleSort}>В балансе, позиций</SortTh>
               <th className="w-12"></th>
             </tr>
@@ -396,6 +402,7 @@ export function Podotchetniki() {
               <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                 <td className="px-4 py-3 text-blue-600">{p.tabelNo}</td>
+                <td className="px-4 py-3 text-gray-700">{p.position || <span className="text-gray-400">—</span>}</td>
                 {/* Количество позиций, которые сейчас у подотчётника */}
                 <td className={`px-4 py-3 tabular-nums ${p.materials.length > 0 ? "font-medium text-gray-900" : "text-gray-400"}`}>
                   {p.materials.length}
@@ -404,9 +411,9 @@ export function Podotchetniki() {
               </tr>
             ))}
             {sorted.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-400">Подотчётное лицо не найдено</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-400">Подотчётное лицо не найдено</td></tr>
             )}
-            <FillerRows count={pg4.fill} cols={4} />
+            <FillerRows count={pg4.fill} cols={5} />
           </tbody>
         </table>
         {pg4.pager}

@@ -1,7 +1,7 @@
 import React from "react";
 import { useApp } from "../store/AppContext";
 import { PageHeader, Badge } from "../components/ui";
-import { Metal, baseMetal } from "../data/mock";
+import { Metal, baseMetal, podotchetnyeLica } from "../data/mock";
 import { Coins, Repeat, Send, Activity, Clock } from "lucide-react";
 
 const metalName: Record<Metal, string> = {
@@ -81,7 +81,8 @@ export function Dashboard() {
   const maxDM = Math.max(...Object.values(dmByMetal), 1);
 
   // ── Часть 2: выдано в оборот (у подотчётных лиц) ─────────────────────────
-  const inCirculation = podotchetniki
+  // ФИО — из справочника «Подотчётные лица» (связь по табельному №)
+  const inCirculation = podotchetnyeLica(podotchetniki)
     .filter(p => p.materials.length > 0)
     .map(p => ({ name: p.name, weight: p.materials.reduce((s, m) => s + m.weight, 0) }))
     .sort((a, b) => b.weight - a.weight);
