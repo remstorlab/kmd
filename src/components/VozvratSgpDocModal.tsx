@@ -3,7 +3,7 @@ import {
   Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
   InfoField,
-  NetAuAg, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
+  NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, MovedRecord, spravValues, SGP, PRIHOD_SKLAD, DOC_VOZVRAT_SGP } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -259,7 +259,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
               <td className="px-3 py-2">{iss.totals.qty}</td>
               <td className="px-3 py-2">{iss.totals.lig.toFixed(2)}</td>
-              <td className="px-3 py-2 text-blue-600">{iss.totals.net.toFixed(2)}</td>
+              <td className="px-3 py-2 text-blue-600"><NetAuAgTotal items={positions.map(p => ({ chem: p.chem, k: iss.line(p).share }))} /></td>
               {!lockPos && <td></td>}
             </tr></tfoot>
           </table>

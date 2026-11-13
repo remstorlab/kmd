@@ -3,7 +3,7 @@ import {
   Badge, Btn, Modal, DeleteIcon, ExportBtn, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
   InfoField,
-  NetAuAg, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
+  NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, MAIN_SKLAD, SGP, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
@@ -287,7 +287,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
               <td className="px-3 py-2">{iss.totals.qty}</td>
               <td className="px-3 py-2">{iss.totals.lig.toFixed(2)}</td>
-              <td className="px-3 py-2 text-blue-600">{iss.totals.net.toFixed(2)}</td>
+              <td className="px-3 py-2 text-blue-600"><NetAuAgTotal items={positions.map(p => ({ chem: p.chem, k: iss.line(p).share }))} /></td>
               <td colSpan={lockPos ? 1 : 2}></td>
             </tr></tfoot>
           </table>

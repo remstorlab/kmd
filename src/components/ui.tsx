@@ -168,6 +168,21 @@ export function NetAuAg({ chem, k = 1 }: { chem?: ChemComposition | null; k?: nu
   return <ChemTip chem={chem} k={k}><span className="tabular-nums">{f(au)} / {f(ag)}</span></ChemTip>;
 }
 
+// Итог «Вес чист. Au/Ag» по позициям: суммы Au и Ag отдельно (k — доля выдаваемой части позиции)
+export function NetAuAgTotal({ items }: { items: { chem?: ChemComposition | null; k?: number }[] }) {
+  let au: number | null = null;
+  let ag: number | null = null;
+  for (const { chem, k = 1 } of items) {
+    const a = chemVal(chem?.au);
+    const g = chemVal(chem?.ag);
+    if (a !== null) au = (au ?? 0) + a * k;
+    if (g !== null) ag = (ag ?? 0) + g * k;
+  }
+  if (au === null && ag === null) return <>—</>;
+  const f = (v: number | null) => (v === null ? "—" : v.toFixed(2));
+  return <span className="tabular-nums" title="Сумма чистого веса Au / Ag, г">{f(au)} / {f(ag)}</span>;
+}
+
 // ── Статус позиции с подсказкой ──────────────────────────────────────────────
 // «В подотчёте» — у кого и по какому документу (операция движения материала, в выдаче которой позиция);
 // «Резерв» — по какой шихтовой карте. Подсказка выводится поверх всего (в body).
