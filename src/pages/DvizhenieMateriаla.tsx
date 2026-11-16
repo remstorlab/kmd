@@ -1582,6 +1582,16 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
   // «Сохранить» — операция «В работе», «Оформить» — «Завершено»
   const save = (oformit = false) => {
+    const docNo = head.document.trim();
+    if (!docNo) {
+      show("Укажите номер документа");
+      return;
+    }
+    // Номер уникален в пределах вида операции; у разных видов номера могут совпадать
+    if (operations.some(o => o.id !== op?.id && o.vid === vid && o.document.trim() === docNo)) {
+      show(`Операция вида «${vid}» с номером документа ${docNo} уже существует`);
+      return;
+    }
     if (badVydacha.length) {
       setTab("Выдача");
       show(`Выдача: укажите количество, а при частичной выдаче — лигатурный вес выдаваемой части: ${badVydacha.map(p => p.name).join(", ")}`);
@@ -1641,7 +1651,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         </Field>
         <Field label="Наименование изделия" full><Input value={description} onChange={setDescription} placeholder="Краткое описание операции" disabled={headRo} /></Field>
         <Field label="Тип документа" required={!headRo}><Select value={head.docType} options={docTypeOptions} onChange={v => setHead(h => ({ ...h, docType: v }))} disabled={headRo || !!fixedDocType} /></Field>
-        <Field label="Номер документа"><Input value={head.document} disabled /></Field>
+        {/* При создании номер подставляется следующим по порядку, но его можно изменить вручную */}
+        <Field label="Номер документа" required={!headRo}><Input value={head.document} onChange={v => setHead(h => ({ ...h, document: v }))} disabled={headRo || !!op} /></Field>
         <Field label="Дата документа" required={!headRo}><Input value={head.date} onChange={v => setHead(h => ({ ...h, date: v }))} disabled={headRo} /></Field>
         <Field label="Заказчик/Организация"><Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...spravValues("Заказчики / Организации")]))} optionLabel={v => v || "Не указан"} onChange={v => setHead(h => ({ ...h, zakazchik: v }))} disabled={headRo} /></Field>
         <Field label="Подотчётное лицо" required={!headRo} full><Select value={head.responsible} options={withBlank(withCurrent(spravValues("Подотчётные лица"), head.responsible))} onChange={v => setHead(h => ({ ...h, responsible: v }))} disabled={headRo} /></Field>
