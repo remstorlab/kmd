@@ -4,12 +4,12 @@ import {
   PageHeader, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Badge, Toggle,
   useToast, Toast, useConfirm, ConfirmDialog,
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination, usePerPage, FillerRows, fillerCount, statusColorClass, usePaged,
-  CREATED_LABEL, CreatedCell, Created, createdSortKey, useCreatedStamp, RequiredMark, YES_NO_ALL, matchYesNo,
+  CREATED_LABEL, CreatedCell, Created, createdSortKey, useCreatedStamp, RequiredMark, YES_NO_ALL, matchYesNo, useMaterialCodeLabel,
 } from "../components/ui";
-import { spravochniki, spravValues, SpravItem, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
+import { spravochniki, spravValues, SpravItem, OBOROT_DICT, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import { matchPage, useScreen } from "../router";
-import { ArrowLeft, ArrowDownUp, Gem, Target, Atom, X, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowDownUp, Gem, Target, Atom, X, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, RefreshCw, LucideIcon } from "lucide-react";
 
 type SpravKey = keyof typeof spravochniki;
 // Кто и когда создал запись простого справочника: «<справочник>|<код>» → отметка (демо-записи — при настройке системы)
@@ -32,6 +32,7 @@ const DICT_SLUG: Record<SpravKey, string> = {
   "Пробы": "proby",
   "Назначение слитков": "naznachenie-slitkov",
   "Типы доп. материалов шихты": "tipy-dop-materialov-shihty",
+  "Предельный оборот": "predelnyy-oborot",
 };
 export const SPRAV_SLUGS = {
   ...DICT_SLUG,
@@ -84,6 +85,7 @@ const dictIcon: Record<SpravKey, LucideIcon> = {
   "Пробы": Gem,
   "Назначение слитков": Target,
   "Типы доп. материалов шихты": Layers,
+  "Предельный оборот": RefreshCw,
 };
 
 // Подпись поля «Значение» для справочников, где оно называется иначе
@@ -91,11 +93,13 @@ const VALUE_LABEL: Partial<Record<SpravKey, string>> = {
   "Технологические операции": "Наименование",
   "Тип списания": "Наименование",
   "Пробы": "Проба",
+  [OBOROT_DICT]: "Предельный оборот",
 };
 // Подпись поля «Код» для справочников, где оно называется иначе
 const PODOTCHET_DICT: SpravKey = "Подотчётные лица";
 const CODE_LABEL: Partial<Record<SpravKey, string>> = {
   [PODOTCHET_DICT]: "Табельный №",
+  [OBOROT_DICT]: "Код материала",
 };
 // Справочники только с номером строки и наименованием: номер присваивается автоматически, статуса нет
 const NUMBERED: SpravKey[] = ["Тип списания", "Пробы"];
@@ -146,6 +150,11 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const codeLabel = numbered ? "№" : CODE_LABEL[name] ?? "Код";
   // У подотчётных лиц — должность (выводится в карточке подотчётного лица)
   const withPosition = name === PODOTCHET_DICT;
+  // Предельный оборот: код записи — код материала (выбор из справочника «Коды материалов»), значение — целое > 0
+  const withMaterialCode = name === OBOROT_DICT;
+  const { materialCodes } = useApp();
+  const matLabel = useMaterialCodeLabel();
+  const codeText = (code: string) => (withMaterialCode ? matLabel(code) : code);
   const recordStatuses = useRecordStatuses();
   const [items, setItems] = useState<SpravItem[]>(dict.items);
   const [norms, setNorms] = useState(techOpLossNorms);
@@ -167,10 +176,10 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(ALL);
   const q = qOf(search);
-  const filtered = items.filter(i => (has(i.code, q) || has(i.value, q) || (withPosition && has(i.position, q))) && (statusFilter === ALL || i.status === statusFilter));
+  const filtered = items.filter(i => (has(i.code, q) || (withMaterialCode && has(matLabel(i.code), q)) || has(i.value, q) || (withPosition && has(i.position, q))) && (statusFilter === ALL || i.status === statusFilter));
   const { sorted, sort, toggleSort } = useSort(filtered, {
-    code: i => (numbered ? parseInt(i.code, 10) || 0 : i.code),
-    value: i => i.value,
+    code: i => (numbered ? parseInt(i.code, 10) || 0 : codeText(i.code)),
+    value: i => (withMaterialCode ? parseInt(i.value, 10) || 0 : i.value),
     position: i => i.position ?? "",
     status: i => i.status,
     created: i => createdSortKey(dictCreatedOf(name, i.code)),
@@ -182,7 +191,8 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const save = () => {
     const code = form.code.trim(), value = form.value.trim();
     if (!code || !value) { show(`Заполните поля «${codeLabel}» и «${valueLabel}»`); return; }
-    if (!editItem && items.some(i => i.code === code)) { show(`Запись с полем «${codeLabel}» = ${code} уже есть`); return; }
+    if (!editItem && items.some(i => i.code === code)) { show(`Запись с полем «${codeLabel}» = ${codeText(code)} уже есть`); return; }
+    if (withMaterialCode && !(parseInt(value, 10) > 0)) { show("Предельный оборот — целое число больше 0"); return; }
     const rec: SpravItem = { ...form, code, value, ...(withPosition ? { position: (form.position ?? "").trim() } : {}) };
     const next = editItem ? items.map(i => i.code === editItem.code ? rec : i) : [...items, rec];
     if (!editItem) dictCreated[`${name}|${form.code}`] = createdStamp();
@@ -249,8 +259,8 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
           <tbody className="divide-y divide-gray-100">
             {pg1.pageItems.map((item, i) => (
               <tr key={i} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 font-mono text-blue-600 font-medium">{item.code}</td>
-                <td className="px-4 py-3 text-gray-900">{item.value}</td>
+                <td className={`px-4 py-3 text-blue-600 font-medium ${withMaterialCode ? "" : "font-mono"}`}>{codeText(item.code)}</td>
+                <td className={`px-4 py-3 text-gray-900 ${withMaterialCode ? "tabular-nums" : ""}`}>{item.value}</td>
                 {withPosition && <td className="px-4 py-3 text-gray-700">{item.position || <span className="text-gray-400">—</span>}</td>}
                 {withNorms && <>
                   <td className="px-4 py-3 text-gray-500">{normCell(norms[item.code]?.unit ?? "")}</td>
@@ -284,8 +294,24 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
           }
         >
           <div className="space-y-4">
-            <Field label={codeLabel} required={!numbered}><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem || numbered} placeholder={withPosition ? "ТН-000" : ""} /></Field>
-            <Field label={valueLabel} required><Input value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} placeholder={withPosition ? "Фамилия Имя Отчество" : ""} /></Field>
+            {withMaterialCode ? (
+              // Код материала — из справочника «Коды материалов»; уже заведённые коды не предлагаются
+              <Field label={codeLabel} required><Select
+                value={form.code}
+                options={["", ...materialCodes.map(c => c.code).filter(c => c === form.code || !items.some(i => i.code === c))]}
+                optionLabel={v => (v ? matLabel(v) : "Выберите код материала")}
+                onChange={v => setForm(f => ({ ...f, code: v }))}
+                disabled={!!editItem}
+              /></Field>
+            ) : (
+              <Field label={codeLabel} required={!numbered}><Input value={form.code} onChange={v => setForm(f => ({ ...f, code: v }))} disabled={!!editItem || numbered} placeholder={withPosition ? "ТН-000" : ""} /></Field>
+            )}
+            <Field label={valueLabel} required><Input
+              value={form.value}
+              onChange={v => setForm(f => ({ ...f, value: withMaterialCode ? v.replace(/[^d]/g, "").replace(/^0+/, "") : v }))}
+              placeholder={withPosition ? "Фамилия Имя Отчество" : withMaterialCode ? "Например, 5" : ""}
+            /></Field>
+            {withMaterialCode && <p className="text-xs text-gray-500">При обороте позиции, равном или большем предельного, позиция выделяется красным и рекомендуется к передаче на аффинаж. Для позиций без своей записи (продукция из СрМ 925) действует предел кода 0925.</p>}
             {withPosition && <Field label="Должность"><Input value={form.position ?? ""} onChange={v => setForm(f => ({ ...f, position: v }))} placeholder="Выводится в карточке подотчётного лица" /></Field>}
             {withNorms && <>
               <Field label="Единицы измерения норматива"><Input value={normForm.unit} onChange={v => setNormForm(f => ({ ...f, unit: v }))} placeholder="% к массе навески" /></Field>

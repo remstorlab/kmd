@@ -61,11 +61,24 @@ export function baseMetal(code: string, codes: MaterialCode[] = initialMaterialC
 // у остальных материалов — 0. При возврате с плавки по ШК марки СрМ 92,5 новые позиции получают оборот ШК + 1,
 // в прочих операциях новые позиции наследуют оборот выданного СрМ 925 (максимальный).
 export const OBOROT_CODE = "0925";
-// Предельный оборот: при нём и выше металл рекомендуется передать на аффинаж
-export const OBOROT_LIMIT = 5;
-export const OBOROT_HINT = `Достигнут предельный оборот (${OBOROT_LIMIT}). Рекомендуется передать на аффинаж`;
+// Предельный оборот: при нём и выше металл рекомендуется передать на аффинаж. Задаётся в справочнике
+// «Предельный оборот» по коду материала (код записи — код материала, значение — предельный оборот).
+// Для позиции берётся запись её кода материала; если её нет — запись кода OBOROT_CODE (оборот наследуется
+// от выданного СрМ 925). Нет активной записи — предел не установлен, позиция не выделяется.
+export const OBOROT_DICT = "Предельный оборот";
+export function oborotLimit(code?: string | null): number | null {
+  const items = spravochniki[OBOROT_DICT].items.filter(i => i.status === "Активно");
+  const rec = (code ? items.find(i => i.code === code) : undefined) ?? items.find(i => i.code === OBOROT_CODE);
+  const n = rec ? parseInt(rec.value, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 export const oborotOf = (x: { oborot?: number } | null | undefined) => x?.oborot ?? 0;
-export const oborotOver = (v: number | null | undefined) => (v ?? 0) >= OBOROT_LIMIT;
+export const oborotOver = (v: number | null | undefined, code?: string | null) => {
+  const lim = oborotLimit(code);
+  return lim !== null && (v ?? 0) >= lim;
+};
+export const oborotHint = (code?: string | null) =>
+  `Достигнут предельный оборот (${oborotLimit(code) ?? "—"}). Рекомендуется передать на аффинаж`;
 
 export interface DMItem {
   // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
@@ -1136,6 +1149,14 @@ const spravData = {
       { code: "CUP", value: "Лигатура Cu-P", status: "Активно" },
       { code: "MO", value: "Медь МО", status: "Активно" },
       { code: "PR", value: "Прочее", status: "Активно" },
+    ]
+  },
+  // Предельный оборот по коду материала: код — код материала, значение — предельный оборот (целое > 0).
+  // Читается oborotLimit / oborotOver (выделение позиций, предупреждения шихтовой карты)
+  "Предельный оборот": {
+    count: 1,
+    items: [
+      { code: "0925", value: "5", status: "Активно" },
     ]
   },
   "Тип списания": {

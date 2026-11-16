@@ -264,7 +264,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
               {pg.pageItems.map(p => {
                 const status = itemOf(p)?.status;
                 return (
-                  <tr key={p.id} className={`hover:bg-gray-50 ${oborotRowCls(p.oborot)}`}>
+                  <tr key={p.id} className={`hover:bg-gray-50 ${oborotRowCls(p.oborot, p.code)}`}>
                     <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                     <td className="px-3 py-2 font-medium">{p.name}</td>
                     <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
@@ -273,7 +273,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
                     <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos && status !== "Резерв")}</td>
                     <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos && status !== "Резерв")}</td>
                     <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
-                  <td className="px-3 py-2"><OborotValue value={p.oborot} /></td>
+                  <td className="px-3 py-2"><OborotValue value={p.oborot} code={p.code} /></td>
                     <td className="px-3 py-2 text-gray-500">{p.location}</td>
                     <td className="px-3 py-2">{status ? <PosStatusBadge status={status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
                     {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}

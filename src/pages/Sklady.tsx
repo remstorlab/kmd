@@ -6,7 +6,7 @@ import {
   Field, Input, Select, MultiSelect, KlassSelect, KlassCode, MaterialCodeSelect, useMaterialCodeLabel, FileChip, Toggle, SortTh, useSort, probaText, NetAuAg, NET_AU_AG,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
-import { GPItem, DMItem, SDM1, SDM2, SGP, oborotOf, OBOROT_LIMIT, OBOROT_HINT, oborotOver } from "../data/mock";
+import { GPItem, DMItem, SDM1, SDM2, SGP, oborotOf, oborotHint, oborotOver } from "../data/mock";
 import { Coins } from "lucide-react";
 import DMPositionViewModal from "../components/DMPositionViewModal";
 import DMPositionFormModal, { PrihodPosition, seyfsOf, polkasOf, formatLoc, parseLoc, NO_LOC, oborotFromForm } from "../components/DMPositionFormModal";
@@ -101,7 +101,7 @@ function MoveLocationModal({ item, canMoveLoc, onClose, onSave }: { item: DMItem
       <div className="mb-5 grid grid-cols-4 gap-4">
         <div className="col-span-3"><Field label="Наименование" required><Input value={name} onChange={setName} placeholder="Наименование позиции" /></Field></div>
         <Field label="Оборот">
-          <div className={oborotOver(oborotNum) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(oborotNum) ? OBOROT_HINT : undefined}>
+          <div className={oborotOver(oborotNum, item.metal) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(oborotNum, item.metal) ? oborotHint(item.metal) : undefined}>
             <Input value={oborot} onChange={v => setOborot(v.replace(/[^\d]/g, ""))} placeholder="0" />
           </div>
         </Field>
@@ -188,7 +188,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
         </tr></thead>
         <tbody className="divide-y divide-gray-100">
           {pageItems.map(it => (
-            <tr key={it.id} className={`h-8 ${oborotRowCls(oborotOf(it))}`}>
+            <tr key={it.id} className={`h-8 ${oborotRowCls(oborotOf(it), it.metal)}`}>
               <td className="px-3 py-1.5 text-gray-500">{it.nomenkl}</td>
               <td className="px-3 py-1.5 font-medium text-gray-900">{it.name}</td>
               <td className="px-3 py-1.5">{it.qty || "—"}</td>
@@ -197,7 +197,7 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
               <td className="px-3 py-1.5">{probaText(it.proba)}</td>
               <td className="px-3 py-1.5 text-right">{it.ligWeight.toFixed(2)}</td>
               <td className="px-3 py-1.5 text-right"><NetAuAg chem={it.chem} /></td>
-              <td className="px-3 py-1.5"><OborotValue value={oborotOf(it)} /></td>
+              <td className="px-3 py-1.5"><OborotValue value={oborotOf(it)} code={it.metal} /></td>
               <td className="px-3 py-1.5 text-gray-500">{it.location}</td>
               <td className="px-3 py-1.5"><PosStatusBadge status={it.status} nomenkl={it.nomenkl} /></td>
             </tr>
@@ -233,7 +233,8 @@ function MergeModal({ items, onClose, onConfirm }: { items: DMItem[]; onClose: (
 }
 
 // Значение фильтра «Оборот»: позиции с предельным оборотом
-const OBOROT_LIMIT_OPT = `≥ ${OBOROT_LIMIT}`;
+// Позиции, достигшие предельного оборота своего кода материала (справочник «Предельный оборот»)
+const OBOROT_LIMIT_OPT = "Предельный";
 
 // ── Остатки на складе (СДМ №1 / СДМ №2) ─────────────────────────────────────
 // Экран одного склада: только позиции со значением «Склад» = sklad. Приём и выдача здесь не оформляются —
@@ -254,7 +255,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
   // Код материала (по подписи из справочника) и проба — множественный выбор
   const [filterCode, setFilterCode] = useState<string[]>([]);
   const [filterProba, setFilterProba] = useState<string[]>([]);
-  // Оборот — множественный выбор значений; «≥ 5» — позиции с предельным оборотом
+  // Оборот — множественный выбор значений; «Предельный» — позиции, достигшие предела своего кода материала
   const [filterOborot, setFilterOborot] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -287,7 +288,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
     const matchCode = filterCode.length === 0 || filterCode.includes(codeLabel(it.metal));
     const matchProba = filterProba.length === 0 || filterProba.includes(String(it.proba));
     const ob = oborotOf(it);
-    const matchOborot = filterOborot.length === 0 || filterOborot.includes(String(ob)) || (filterOborot.includes(OBOROT_LIMIT_OPT) && ob >= OBOROT_LIMIT);
+    const matchOborot = filterOborot.length === 0 || filterOborot.includes(String(ob)) || (filterOborot.includes(OBOROT_LIMIT_OPT) && oborotOver(ob, it.metal));
     return matchSearch && matchKlass && matchStatus && matchCode && matchProba && matchOborot;
   });
   // Варианты фильтров — из позиций этого склада
@@ -430,7 +431,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {pageItems.map(item => (
-              <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${oborotRowCls(oborotOf(item))}`}>
+              <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${oborotRowCls(oborotOf(item), item.metal)}`}>
                 <td className="px-4 py-3"><input type="checkbox" checked={selected.has(item.id) && canMerge(item)} onChange={() => toggleSelect(item.id)} disabled={!canMerge(item)} title={canMerge(item) ? undefined : `Позиция «${item.status}» — объединение недоступно`} /></td>
                 <td className="px-4 py-3 text-gray-500">{item.nomenkl}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
@@ -440,7 +441,7 @@ export function OstatokSklad({ sklad }: { sklad: string }) {
                 <td className="px-4 py-3">{probaText(item.proba)}</td>
                 <td className="px-4 py-3">{item.ligWeight}</td>
                 <td className="px-4 py-3"><NetAuAg chem={item.chem} /></td>
-                <td className="px-4 py-3"><OborotValue value={oborotOf(item)} /></td>
+                <td className="px-4 py-3"><OborotValue value={oborotOf(item)} code={item.metal} /></td>
                 <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{item.sklad}</td>
                 <td className="px-4 py-3 text-gray-500">{item.location}</td>
                 <td className="px-4 py-3"><PosStatusBadge status={item.status} nomenkl={item.nomenkl} /></td>

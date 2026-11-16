@@ -9,7 +9,7 @@ import {
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
   PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO,
-  PrikazPlavka, OBOROT_HINT, oborotOver,
+  PrikazPlavka, oborotHint, oborotOver,
 } from "../data/mock";
 import { returnToStock } from "../data/stock";
 import {
@@ -484,11 +484,11 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
         {/* Оборот шихты: по умолчанию — расчётный (максимум оборотов материалов), можно изменить вручную */}
         <Field label="Оборот">
           <div
-            className={`relative ${oborotOver(oborotNum) ? "rounded-lg ring-1 ring-red-400" : ""}`}
+            className={`relative ${oborotOver(oborotNum, grade?.materialCode) ? "rounded-lg ring-1 ring-red-400" : ""}`}
             title={[
               oborotManualSet ? `Изменён вручную, расчётный оборот — ${ob.max}` : "Расчётный оборот — максимум оборотов материалов шихты",
               oborotHintText(ob),
-              oborotOver(oborotNum) ? OBOROT_HINT : "",
+              oborotOver(oborotNum, grade?.materialCode) ? oborotHint(grade?.materialCode) : "",
             ].filter(Boolean).join("\n")}
           >
             <Input value={oborotValue} onChange={v => setOborotManual(v.replace(/[^\d]/g, ""))} placeholder={String(ob.max)} disabled={ro} />
@@ -563,7 +563,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
                 const issued = isIssued(m);
                 const sklad = m.kind === "sklad";
                 return (
-                  <tr key={m.key} className={`hover:bg-gray-50 ${ban || issued ? "bg-red-50/60" : sklad ? oborotRowCls(m.oborot) : ""}`}>
+                  <tr key={m.key} className={`hover:bg-gray-50 ${ban || issued ? "bg-red-50/60" : sklad ? oborotRowCls(m.oborot, m.code) : ""}`}>
                     <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{m.nomenkl || dash}</td>
                     <td className="px-3 py-2">
                       <div className="font-medium">{matName(m)}</div>
@@ -576,7 +576,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
                     <td className="px-3 py-2 whitespace-nowrap">{m.sklad ?? dash}</td>
                     <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{sklad && m.loc && m.loc !== "-" ? m.loc : dash}</td>
                     {/* Оборот — у позиций склада; доп. материалы без оборота (в расчёте — 0) */}
-                    <td className="px-3 py-2 text-right">{sklad ? <OborotValue value={m.oborot} /> : dash}</td>
+                    <td className="px-3 py-2 text-right">{sklad ? <OborotValue value={m.oborot} code={m.code} /> : dash}</td>
                     <td className="px-3 py-2 text-right font-medium">
                       {/* Позиция склада берётся целиком — масса = вес позиции, без ввода; доп. материал — ввод массы */}
                       {ro || sklad ? (
@@ -825,7 +825,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
                     {m.code && <span className="ml-2 text-blue-600">{codeLabel(m.code)}</span>}
                   </td>
                   <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{m.plavki.join(", ")}</td>
-                  <td className="px-3 py-2 text-right">{isSkladMaterial(m) ? <OborotValue value={m.oborot} /> : <span className="text-gray-400">—</span>}</td>
+                  <td className="px-3 py-2 text-right">{isSkladMaterial(m) ? <OborotValue value={m.oborot} code={m.code} /> : <span className="text-gray-400">—</span>}</td>
                   <td className="px-3 py-2 text-right font-medium">{str2(m.ves)}</td>
                   {shkEls.map(e => {
                     const v = calc.chems[i][e.id] ?? 0;
@@ -1021,7 +1021,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
                       <td className="px-3 py-2 text-gray-500">{k.date}</td>
                       <td className="px-3 py-2 text-gray-900">{k.name}</td>
                       <td className="px-3 py-2 text-gray-700">{gradeName(k) || dash}</td>
-                      <td className="px-3 py-2"><OborotValue value={kartaOborot(k)} /></td>
+                      <td className="px-3 py-2"><OborotValue value={kartaOborot(k)} code={alloyGrades.find(g => g.id === k.alloyId)?.materialCode} /></td>
                       <td className="px-3 py-2 text-right">{k.materials.length}</td>
                       <td className="px-3 py-2 text-right">{str2(kartaMass(k))}</td>
                       <td className="px-3 py-2"><Badge label={k.status} group="shihta" /></td>

@@ -1,5 +1,5 @@
 import type { AlloyGrade, AlloyRange, ChemComposition, ShihtaMatKind, ShihtaMaterial, ShihtovayaKarta } from "./mock";
-import { OBOROT_CODE, OBOROT_LIMIT } from "./mock";
+import { OBOROT_CODE, oborotLimit, oborotOver } from "./mock";
 
 // ── Строки карты ──
 // Вид строки: у старых записей без kind — по номенкл. № (позиция склада) или «прочее»
@@ -232,7 +232,7 @@ export interface ShihtaOborot {
   maxAt: ShihtaMaterial[];
   // Различные обороты материалов СрМ 925 шихты (по возрастанию)
   levels: number[];
-  // Материалы с предельным оборотом (≥ OBOROT_LIMIT)
+  // Материалы с предельным оборотом (≥ предела по коду материала, справочник «Предельный оборот»)
   over: ShihtaMaterial[];
 }
 
@@ -243,7 +243,7 @@ export function shihtaOborot(materials: ShihtaMaterial[]): ShihtaOborot {
     max,
     maxAt: max > 0 ? materials.filter(m => oborotOfMaterial(m) === max) : [],
     levels: [...new Set(tracked.map(oborotOfMaterial))].sort((a, b) => a - b),
-    over: materials.filter(m => oborotOfMaterial(m) >= OBOROT_LIMIT),
+    over: materials.filter(m => oborotOver(oborotOfMaterial(m), m.code)),
   };
 }
 
@@ -262,7 +262,7 @@ export function oborotHintText(o: ShihtaOborot): string {
 // Предупреждения по обороту (не блокируют оформление) — только для марки СрМ 92,5
 export function oborotWarnings(o: ShihtaOborot, g: AlloyGrade | undefined): string[] {
   if (!isOborotGrade(g) || o.over.length === 0) return [];
-  return [`В шихте позиции с предельным оборотом (${OBOROT_LIMIT} и более): ${o.over.map(m => `«${m.name}» — ${oborotOfMaterial(m)}`).join(", ")}. Рекомендуется передать на аффинаж`];
+  return [`В шихте позиции с предельным оборотом: ${o.over.map(m => `«${m.name}» — ${oborotOfMaterial(m)} (предел ${oborotLimit(m.code)})`).join(", ")}. Рекомендуется передать на аффинаж`];
 }
 
 // Информационная строка: в шихте материалы разных оборотов

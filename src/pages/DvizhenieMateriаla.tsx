@@ -180,14 +180,14 @@ function AddDMPositionModal({ already = [], onClose, onAdd }: {
                 const checked = selected.has(i.id);
                 const karta = i.status === "Резерв" ? reservedBy(i.nomenkl) : undefined;
                 return (
-                  <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : oborotRowCls(oborotOf(i))}`}>
+                  <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : oborotRowCls(oborotOf(i), i.metal)}`}>
                     <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(i.id)} className="w-4 h-4 accent-blue-600" /></td>
                     <td className="px-3 py-2 font-medium">{i.name}</td>
                     <td className="px-3 py-2 text-gray-500">{i.nomenkl}</td>
                     <td className="px-3 py-2"><KlassCode value={i.klass} /></td>
                     <td className="px-3 py-2">{probaText(i.proba)}</td>
                     <td className="px-3 py-2"><NetAuAg chem={i.chem} /></td>
-                    <td className="px-3 py-2"><OborotValue value={oborotOf(i)} /></td>
+                    <td className="px-3 py-2"><OborotValue value={oborotOf(i)} code={i.metal} /></td>
                     <td className="px-3 py-2 text-gray-500">{i.location}</td>
                     <td className="px-3 py-2">
                       <PosStatusBadge status={i.status} nomenkl={i.nomenkl} />
@@ -377,7 +377,7 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
                 const v = view(p);
                 const checked = selected.has(p.n);
                 return (
-                  <tr key={p.n} onClick={() => toggle(p.n)} className={`cursor-pointer hover:bg-gray-50 ${checked ? "bg-blue-50/50" : oborotRowCls(v.oborot)}`}>
+                  <tr key={p.n} onClick={() => toggle(p.n)} className={`cursor-pointer hover:bg-gray-50 ${checked ? "bg-blue-50/50" : oborotRowCls(v.oborot, v.metal)}`}>
                     <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(p.n)} onClick={e => e.stopPropagation()} className="w-4 h-4 accent-blue-600" /></td>
                     <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                     <td className="px-3 py-2 font-medium">{p.name}</td>
@@ -387,7 +387,7 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
                     <td className="px-3 py-2">{probaText(p.proba)}</td>
                     <td className="px-3 py-2">{dash(v.ligWeight)}</td>
                     <td className="px-3 py-2"><NetAuAg chem={v.chem} /></td>
-                <td className="px-3 py-2"><OborotValue value={v.oborot} /></td>
+                <td className="px-3 py-2"><OborotValue value={v.oborot} code={v.metal} /></td>
                     <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                   </tr>
                 );
@@ -716,7 +716,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
             const v = view(p);
             const line = lineOf(p);
             return (
-              <tr key={p.n} className={`hover:bg-gray-50 ${oborotRowCls(v.oborot)}`}>
+              <tr key={p.n} className={`hover:bg-gray-50 ${oborotRowCls(v.oborot, v.metal)}`}>
                 <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
                 <td className="px-3 py-2 font-medium">{p.name}</td>
                 <td className="px-3 py-2 align-top">
@@ -729,7 +729,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
                   {line && issue ? <IssueLigCell line={line} editable value={issue.ligValue(p)} onChange={val => issue.setLig(p, val)} /> : dash(v.ligWeight)}
                 </td>
                 <td className="px-3 py-2"><NetAuAg chem={v.chem} /></td>
-                <td className="px-3 py-2"><OborotValue value={v.oborot} /></td>
+                <td className="px-3 py-2"><OborotValue value={v.oborot} code={v.metal} /></td>
                 <td className="px-3 py-2 text-gray-500">{p.loc}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">

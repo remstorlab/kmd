@@ -1,6 +1,6 @@
 import React from "react";
 import { Badge, PosStatusBadge, Btn, Modal, Field, Input, useMaterialCodeLabel } from "./ui";
-import { ChemComposition, isStoneKlass, OBOROT_HINT, oborotOver } from "../data/mock";
+import { ChemComposition, isStoneKlass, oborotHint, oborotOver } from "../data/mock";
 import { mainElementOf } from "../data/chem";
 import { useApp } from "../store/AppContext";
 import ChemCompositionBlock from "./ChemCompositionBlock";
@@ -40,7 +40,7 @@ export default function DMPositionViewModal({ item, onClose }: { item: DMPositio
         <Field label="Проба"><Input value={val(item.proba)} disabled /></Field>
         <Field label="Лигатурный вес г"><Input value={val(item.ligWeight)} disabled /></Field>
         <Field label="Оборот">
-          <div className={oborotOver(item.oborot) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(item.oborot) ? OBOROT_HINT : undefined}>
+          <div className={oborotOver(item.oborot, item.metal) ? "rounded-lg ring-1 ring-red-400" : ""} title={oborotOver(item.oborot, item.metal) ? oborotHint(item.metal) : undefined}>
             <Input value={String(item.oborot ?? 0)} disabled />
           </div>
         </Field>

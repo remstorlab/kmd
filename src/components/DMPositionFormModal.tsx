@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Btn, Modal, Field, Input, Select, KlassSelect, MaterialCodeSelect } from "./ui";
-import { StorageLocation, ChemComposition, spravValues, isStoneKlass, OBOROT_HINT, oborotOver } from "../data/mock";
+import { StorageLocation, ChemComposition, spravValues, isStoneKlass, oborotHint as oborotOverHint, oborotOver } from "../data/mock";
 import ChemCompositionBlock from "./ChemCompositionBlock";
 import { ChemPercent, compositionOf, applyProba, gramsFrom, pctFrom, mainElementOf, num0, r2 } from "../data/chem";
 import { useApp } from "../store/AppContext";
@@ -217,11 +217,11 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
           {probaError && <div className="text-xs text-red-600 mt-1">Укажите пробу</div>}
         </Field>
         <Field label="Вес лигатурный, г" required={!ro && !lockWeights}><Input value={form.lig} onChange={changeLig} placeholder="0.00" disabled={ro || lockWeights} /></Field>
-        {/* Оборот — целое ≥ 0, необязательно (пусто — 0); при ≥ 5 — подсказка о передаче на аффинаж */}
+        {/* Оборот — целое ≥ 0, необязательно (пусто — 0); при пределе по коду материала (справочник «Предельный оборот») — подсказка о передаче на аффинаж */}
         <Field label="Оборот">
           <div
-            className={oborotOver(oborotFromForm(form.oborot)) ? "rounded-lg ring-1 ring-red-400" : ""}
-            title={[oborotHint, oborotOver(oborotFromForm(form.oborot)) ? OBOROT_HINT : ""].filter(Boolean).join("\n") || undefined}
+            className={oborotOver(oborotFromForm(form.oborot), form.code) ? "rounded-lg ring-1 ring-red-400" : ""}
+            title={[oborotHint, oborotOver(oborotFromForm(form.oborot), form.code) ? oborotOverHint(form.code) : ""].filter(Boolean).join("\n") || undefined}
           >
             {/* Только число; пусто — 0 (оборотов не было), ведущие нули убираются */}
             <Input value={String(oborotFromForm(form.oborot))} onChange={v => set("oborot")(v.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "") || "0")} placeholder="0" disabled={ro} />

@@ -371,7 +371,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
                     <td className="px-3 py-2">{probaText(p.proba)}</td>
                     <td className="px-3 py-2 font-medium">{p.lig}</td>
                     <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} /></td>
-                    <td className="px-3 py-2"><OborotValue value={oborotFromForm(p.oborot)} /></td>
+                    <td className="px-3 py-2"><OborotValue value={oborotFromForm(p.oborot)} code={p.code} /></td>
                   </>}
                   <td className="px-3 py-2 text-gray-500">{locOf(p)}</td>
                   <td className="px-3 py-2">
