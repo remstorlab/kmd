@@ -239,12 +239,8 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   const [name, setName] = useState(init?.name || "");
   const [alloyId, setAlloyId] = useState(init?.alloyId ?? "");
   const [plavkaNo, setPlavkaNo] = useState(() => karta?.plavkaNo ?? nextPlavkaNo(shihtovyeKarty));
-  // Дата документа — задаётся вручную, по умолчанию сегодняшняя
-  const [docDate, setDocDate] = useState(karta?.date || new Date().toLocaleDateString("ru-RU"));
   const [naznachenie, setNaznachenie] = useState(init?.naznachenie ?? "");
-  const [osnovanie, setOsnovanie] = useState(init?.osnovanie ?? "");
   const [note, setNote] = useState(karta?.note ?? "");
-  const [files, setFiles] = useState<File[]>(() => karta?.files ?? []);
   const [materials, setMaterials] = useState<MatRow[]>(() => (karta?.materials ?? []).map(m => toRow(m, dmItems)));
   // Вложенные экраны: …/from-sklad, …/dop-material, …/raschet (результат расчёта)
   const screen = useScreen();
@@ -405,9 +401,12 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
     }));
     const head = {
       name: name.trim() || karta?.name || "Новая шихтовая карта",
-      plavkaNo: plavkaNo.trim(), alloyId: alloyId || undefined, oborot: String(oborotNum), naznachenie, osnovanie: osnovanie.trim(), note: note.trim(),
-      date: docDate.trim() || karta?.date || new Date().toLocaleDateString("ru-RU"),
-      materials: mats, files,
+      plavkaNo: plavkaNo.trim(), alloyId: alloyId || undefined, oborot: String(oborotNum), naznachenie, note: note.trim(),
+      // Дата, основание и документы в конструкторе не редактируются: дата — дата создания карты,
+      // основание — приказ, документы прикрепляются к приказу на плавку
+      osnovanie: (init?.osnovanie ?? "").trim(),
+      date: karta?.date || new Date().toLocaleDateString("ru-RU"),
+      materials: mats,
     };
     // Пометка о выданных позициях остаётся, пока такие позиции есть в карте; оформление её снимает.
     const status = oformit ? "Новая" as const : "На редактировании" as const;
@@ -479,7 +478,6 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
           <Select value={alloyId} options={gradeOptions} optionLabel={gradeLabel} onChange={setAlloyId} disabled={ro} />
         </Field>
         <Field label="Номер плавки" required={!ro}><Input value={plavkaNo} onChange={v => setPlavkaNo(v.replace(/[^\d]/g, ""))} placeholder="1" disabled={ro} /></Field>
-        <Field label="Дата документа" required={!ro}><Input value={docDate} onChange={setDocDate} placeholder="дд.мм.гггг" disabled={ro} /></Field>
         {/* Оборот шихты — расчётный (максимум оборотов материалов), не редактируется */}
         {/* Оборот шихты: по умолчанию — расчётный (максимум оборотов материалов), можно изменить вручную */}
         <Field label="Оборот">
@@ -503,13 +501,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
         <Field label="Назначение слитков" required={!ro}>
           <Select value={naznachenie} options={naznOptions} optionLabel={v => v || "Не выбрано"} onChange={setNaznachenie} disabled={ro} />
         </Field>
-        <Field label="Основание" full><Input value={osnovanie} onChange={setOsnovanie} placeholder="Приказ, распоряжение" disabled={ro} /></Field>
         <Field label="Примечание" full><Textarea value={note} onChange={setNote} rows={2} placeholder={grade?.allowDeviation ? "Обязательно при отклонении состава от марки" : ""} disabled={ro} /></Field>
-      </div>
-
-      <div className="mb-5">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
-        <MultiFileUpload files={files} onChange={setFiles} disabled={ro} />
       </div>
 
       <div className="border-t border-gray-200 pt-4">
@@ -915,6 +907,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
   const [date, setDate] = useState(prikaz?.date ?? new Date().toLocaleDateString("ru-RU"));
   const [name, setName] = useState(prikaz?.name ?? "");
   const [note, setNote] = useState(prikaz?.note ?? "");
+  const [files, setFiles] = useState<File[]>(() => prikaz?.files ?? []);
 
   const karty = prikaz ? kartyOfPrikaz(shihtovyeKarty, prikaz.id) : [];
   const status = prikazStatus(karty);
@@ -925,7 +918,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
 
   const error = !number.trim() ? "Укажите номер приказа" : !date.trim() ? "Укажите дату приказа" : !name.trim() ? "Укажите наименование" : "";
   const build = (): PrikazPlavka => {
-    const head = { number: number.trim(), date: date.trim(), name: name.trim(), note: note.trim() || undefined };
+    const head = { number: number.trim(), date: date.trim(), name: name.trim(), note: note.trim() || undefined, files };
     return prikaz
       ? { ...prikaz, ...head }
       : { id: `pp-${Date.now()}`, ...head, createdAt: new Date().toISOString(), createdBy: currentUser?.fullName || currentUser?.name || "—" };
@@ -979,6 +972,11 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
         <Field label="Дата приказа" required={!ro}><Input value={date} onChange={setDate} placeholder="дд.мм.гггг" disabled={ro} /></Field>
         <Field label="Наименование" required={!ro} full><Input value={name} onChange={setName} placeholder="Например: слитки СрМ 92,5 для монет пруф-качества" disabled={ro} /></Field>
         <Field label="Примечание" full><Textarea value={note} onChange={setNote} rows={2} disabled={ro} /></Field>
+      </div>
+
+      <div className="mb-5">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
+        <MultiFileUpload files={files} onChange={setFiles} disabled={ro} />
       </div>
 
       {prikaz && karty.length > 0 && <PrikazSummary karty={karty} mass={mass} />}

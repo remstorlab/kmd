@@ -296,6 +296,8 @@ export interface PrikazPlavka {
   date: string;
   name: string;
   note?: string;
+  // Прикреплённые документы приказа
+  files?: File[];
   createdAt: string;
   createdBy: string;
 }
