@@ -62,20 +62,8 @@ export default function PrihodDocModal(props: Props) {
 // Читаем справочник при каждом обращении — чтобы видеть добавленные и отключённые записи
 const orgs = () => spravValues("Заказчики / Организации");
 
-// Демо-позиции для документов из демо-данных (без сохранённых позиций)
-export const DEMO_ORDER: PrihodPosition[] = [
-  { id: "po-1", nomenkl: "5015301", name: "Слиток золотой стандартный", klass: "Слиток", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "1000.00", net: "999.90", seyf: "1", polka: "1", chem: { au: "999.90" } },
-  { id: "po-2", nomenkl: "5015302", name: "Слиток серебряный", klass: "Слиток", code: "2000", kol: "1", unit: "шт", proba: "925", lig: "318.60", net: "294.71", seyf: "2", polka: "1", chem: { ag: "294.71" } },
-];
-const DEMO_NAKLAD: PrihodPosition[] = [
-  { id: "pn-1", nomenkl: "5015303", name: "Монета «Атамекен» Ag 925", klass: "Готовая продукция", code: "2000", kol: "200", unit: "шт", proba: "925", lig: "6220.00", net: "5753.50", seyf: "1", polka: "1", chem: { ag: "5753.50" } },
-  { id: "pn-2", nomenkl: "5015304", name: "Орден «Алтын алка»", klass: "Готовая продукция", code: "0300", kol: "30", unit: "шт", proba: "750", lig: "672.00", net: "504.00", seyf: "1", polka: "2", chem: { au: "504.00", ag: "100.80", cu: "67.20" } },
-];
-// Демо-позиции акта приёма (АКТ-0042, давальческий материал Национального банка)
-const DEMO_AKT: PrihodPosition[] = [
-  { id: "pa-1", nomenkl: "5015305", name: "Скрап серебряный Ag 925", klass: "Скрап", code: "2000", kol: "1", unit: "шт", proba: "925", lig: "1250.00", net: "1156.25", seyf: "2", polka: "2", chem: { ag: "1156.25" } },
-  { id: "pa-2", nomenkl: "5015306", name: "Гранулы золотые Au 999,9", klass: "Гранулы", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "500.00", net: "499.95", seyf: "1", polka: "3", chem: { au: "499.95" } },
-];
+// Запись склада позиции документа приёма: у демо-документов — запись остатков (stockId), иначе dm-<id> / gp-<id>
+const stockIdOf = (p: PrihodPosition) => p.stockId ?? `${isGPKlass(p.klass) ? "gp" : "dm"}-${p.id}`;
 
 // Реквизиты приходного ордера по умолчанию (поля шапки формы; используются и печатной формой)
 export const ORDER_HEAD_DEFAULTS = {
@@ -140,13 +128,11 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
   const [nakladFiles, setNakladFiles] = useState<File[]>(() =>
     [new File([], doc?.type === DOC_PRIHOD_AKT ? `Акт_${doc.number}.pdf` : `Накладная_${doc?.number || "НП-001234"}.pdf`)]);
 
-  // Позиции: новый документ — без позиций (сохранить можно и пустым); сохранённый — свои позиции,
-  // у демо-документов без сохранённых позиций — демо-набор.
-  const initialPositions = (type: string, demo: PrihodPosition[]) =>
-    !doc ? [] : doc.type !== type ? [] : doc.prihodPositions ?? demo;
-  const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>(() => initialPositions(DOC_PRIHOD_ORDER, DEMO_ORDER));
+  // Позиции: новый документ — без позиций (сохранить можно и пустым); сохранённый — свои позиции
+  const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>(() =>
+    doc?.type === DOC_PRIHOD_ORDER ? doc.prihodPositions ?? [] : []);
   const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>(() =>
-    doc?.type === DOC_PRIHOD_AKT ? doc.prihodPositions ?? DEMO_AKT : initialPositions(DOC_PRIHOD_NAKLAD, DEMO_NAKLAD));
+    doc && doc.type !== DOC_PRIHOD_ORDER ? doc.prihodPositions ?? [] : []);
 
   // Хим. состав на партию — задаётся в документе и подставляется в каждую новую позицию
 
@@ -188,15 +174,14 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     status: p => stockOf(p)?.status ?? "",
   });
 
-  // Статус позиции — по записи склада, созданной сохранением документа (dm-<id> / gp-<id>);
-  // пока документ не сохранён, позиция на склад не принята
+  // Статус позиции — по записи склада, созданной сохранением документа; до первого сохранения — прочерк
   function stockOf(p: PrihodPosition): GPItem | DMItem | undefined {
-    return gpItems.find(i => i.id === `gp-${p.id}`) ?? dmItems.find(i => i.id === `dm-${p.id}`);
+    const id = stockIdOf(p);
+    return isGPKlass(p.klass) ? gpItems.find(i => i.id === id) : dmItems.find(i => i.id === id);
   }
   const posStatusCell = (p: PrihodPosition) => {
     const st = stockOf(p)?.status;
-    if (st) return <PosStatusBadge status={st} nomenkl={p.nomenkl} />;
-    return <span className="text-gray-400">{doc ? "—" : "Не принята"}</span>;
+    return st ? <PosStatusBadge status={st} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>;
   };
 
   // Постановка на склад-получатель при каждом сохранении документа («Сохранить» и «Оформить»): позиции класса
@@ -211,17 +196,17 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     const zakazchik = isOrder ? head.otpravitel : head.zakazchik;
     const created = stamp();
     const gp: GPItem[] = positions.filter(p => isGPKlass(p.klass)).map(p => ({
-      id: `gp-${p.id}`, name: p.name, nomenkl: p.nomenkl, qty: kol(p), unit: p.unit || "шт", klass: p.klass, code: p.code,
+      id: stockIdOf(p), name: p.name, nomenkl: p.nomenkl, qty: kol(p), unit: p.unit || "шт", klass: p.klass, code: p.code,
       location: locOf(p), sklad, status: "На складе", proba: n(p.proba), ligWeight: n(p.lig), netWeight: n(p.net), chem: p.chem, zakazchik, ownProperty, ...created,
     }));
     const dm: DMItem[] = positions.filter(p => !isGPKlass(p.klass)).map(p => ({
-      id: `dm-${p.id}`, name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.code, qty: kol(p), proba: n(p.proba),
+      id: stockIdOf(p), name: p.name, nomenkl: p.nomenkl, klass: p.klass, metal: p.code, qty: kol(p), proba: n(p.proba),
       ligWeight: n(p.lig), netWeight: n(p.net), location: locOf(p), sklad, status: "На складе", chem: p.chem, info: p.info || undefined, zakazchik, ownProperty, ...created,
       // Оборот — из позиции документа (по умолчанию при приёмке — 0)
       ...(oborotFromForm(p.oborot) ? { oborot: oborotFromForm(p.oborot) } : {}),
     }));
     const keepIds = new Set([...gp, ...dm].map(i => i.id));
-    const prevIds = new Set((doc?.prihodPositions ?? []).flatMap(p => [`gp-${p.id}`, `dm-${p.id}`]));
+    const prevIds = new Set((doc?.prihodPositions ?? []).flatMap(p => [`gp-${p.id}`, `dm-${p.id}`, ...(p.stockId ? [p.stockId] : [])]));
     const busy: string[] = [];
     const sync = <T extends GPItem | DMItem>(items: T[], next: T[]): T[] => {
       const free = (i: T) => i.status === "На складе";

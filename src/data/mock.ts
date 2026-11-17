@@ -504,6 +504,8 @@ export const initialGPItems: GPItem[] = [
   gp("gp40", "Кольцо ЗлСрМ 375-100 тонкое", "5015408", 12, "7000", 375, 2.90, L(3, 2)),
   gp("gp41", "Подвеска ЗлСрМ 375-20 «Тулпар»", "5015409", 25, "8000", 375, 1.80, L(4, 1)),
   gp("gp42", "Монета палладиевая «Барыс» Pd 999", "5015410", 8, "3000", 999, 31.10, L(4, 2)),
+  // Возвращены с СГП №2 по оформленному документу ВС-0012 — на СДМ1 без места хранения
+  gp("gp43", "Монета «Тумар» Ag 925", "5015411", 20, "2000", 925, 31.10, "-", "На складе", SDM1),
 ];
 
 // --- DM Items ---
@@ -623,14 +625,30 @@ export const DOC_VOZVRAT_SGP = "Возврат СГП №2";
 export const DOC_OTGRUZKA_DM = "Накладная на отгрузку ДМ";
 export const DOC_PEREDACHA_GP = "Накладная на передачу ГП";
 
+// Позиция документа приёма из записи остатков склада: документ уже сохранён, позиция стоит на складе (stockId) —
+// реквизиты позиции совпадают с записью склада, статус в документе — текущий статус записи
+const prihodPos = (docId: string, stockId: string): PrihodPosition => {
+  const it: GPItem | DMItem = initialGPItems.find(x => x.id === stockId) ?? initialDMItems.find(x => x.id === stockId)!;
+  const m = /Сейф\s*№?\s*([^,\s]+)(?:,\s*Полка\s*([^,\s]+))?/.exec(it.location);
+  const code = "metal" in it ? it.metal : it.code;
+  const s2 = (v: number | null | undefined) => (v ? v.toFixed(2) : "");
+  return {
+    id: `${docId}-${stockId}`, stockId, nomenkl: it.nomenkl, name: it.name, klass: it.klass, code,
+    kol: String(it.qty), unit: "unit" in it ? it.unit : "шт", proba: it.proba ? String(it.proba) : "",
+    lig: s2(it.ligWeight), net: s2(it.netWeight), seyf: m?.[1] ?? "-", polka: m?.[2] ?? "-",
+    chem: it.chem ?? {}, oborot: String(("oborot" in it && it.oborot) || 0),
+  };
+};
+const prihodPositions = (docId: string, ...stockIds: string[]) => stockIds.map(id => prihodPos(docId, id));
+
 export const initialSkladDocs: SkladDoc[] = [
-  { id: "sd1", date: "19.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0342", status: "В работе", sender: "ОО «АурумПоставка»", receiver: PRIHOD_SKLAD },
-  { id: "sd2", date: "18.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0118", status: "В работе", sender: "Монетный двор", receiver: PRIHOD_SKLAD },
-  { id: "sd3", date: "17.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0341", status: "Оформлено", sender: "АО «Металл Инвест»", receiver: PRIHOD_SKLAD },
-  { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "Национальный банк", receiver: PRIHOD_SKLAD, info: "Давальческий материал по договору с Национальным банком. Приёмка в присутствии представителя заказчика, пломбы целы, расхождений по массе не выявлено. Паспорта качества приложены к накладной." },
-  { id: "sd5", date: "15.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0340", status: "Оформлено", sender: "ОО «СереброТрейд»", receiver: PRIHOD_SKLAD },
-  { id: "sd6", date: "14.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0116", status: "Оформлено", sender: "Монетный двор", receiver: PRIHOD_SKLAD },
-  { id: "sd9", date: "13.08.2026", type: DOC_PRIHOD_AKT, number: "АКТ-0042", status: "В работе", sender: "Национальный банк", receiver: PRIHOD_SKLAD },
+  { id: "sd1", date: "19.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0342", status: "В работе", sender: "ОО «АурумПоставка»", receiver: PRIHOD_SKLAD, prihodPositions: prihodPositions("sd1", "dm6", "dm8") },
+  { id: "sd2", date: "18.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0118", status: "В работе", sender: "Монетный двор", receiver: PRIHOD_SKLAD, prihodPositions: prihodPositions("sd2", "dm25", "dm27", "gp34") },
+  { id: "sd3", date: "17.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0341", status: "Оформлено", sender: "АО «Металл Инвест»", receiver: PRIHOD_SKLAD, prihodPositions: prihodPositions("sd3", "dm46", "dm47", "dm49") },
+  { id: "sd4", date: "16.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0117", status: "Оформлено", sender: "Национальный банк", receiver: PRIHOD_SKLAD, info: "Давальческий материал по договору с Национальным банком. Приёмка в присутствии представителя заказчика, пломбы целы, расхождений по массе не выявлено. Паспорта качества приложены к накладной.", prihodPositions: prihodPositions("sd4", "dm1", "dm2", "dm14", "gp33") },
+  { id: "sd5", date: "15.08.2026", type: DOC_PRIHOD_ORDER, number: "ПО-0340", status: "Оформлено", sender: "ОО «СереброТрейд»", receiver: PRIHOD_SKLAD, prihodPositions: prihodPositions("sd5", "dm50", "dm52") },
+  { id: "sd6", date: "14.08.2026", type: DOC_PRIHOD_NAKLAD, number: "НП-0116", status: "Оформлено", sender: "Монетный двор", receiver: PRIHOD_SKLAD, prihodPositions: prihodPositions("sd6", "dm4", "dm23", "dm29") },
+  { id: "sd9", date: "13.08.2026", type: DOC_PRIHOD_AKT, number: "АКТ-0042", status: "В работе", sender: "Национальный банк", receiver: PRIHOD_SKLAD, prihodPositions: prihodPositions("sd9", "dm3", "dm7", "dm20") },
 ];
 
 // Позиция накладной на выдачу из позиции склада (выдаётся целиком)
@@ -647,6 +665,15 @@ const vpos = (src: "gp" | "dm", id: string): VydachaDocPosition => {
 initialSkladDocs.unshift(
   { id: "sd7", date: "20.08.2026", type: DOC_TREBOVANIE, number: "ТР-0013", status: "В работе", sender: SDM1, receiver: SDM2, prikazId: "pp3", positions: [vpos("dm", "dm43"), vpos("dm", "dm44"), vpos("dm", "dm45")] },
 );
+
+// Возврат СГП №2 ВС-0012 (оформлен): монеты «Тумар» возвращены с СГП №2 на СДМ1 — запись gp43-sgp (на СГП №2)
+// перемещена в gp43 (на СДМ1)
+initialSkladDocs.push({
+  id: "sd10", date: "12.08.2026", type: DOC_VOZVRAT_SGP, number: "ВС-0012", status: "Оформлено", sender: SGP, receiver: SDM1,
+  zakazchik: "Монетный двор", ownProperty: false, info: "Возврат невостребованной партии монет с СГП №2",
+  positions: [{ ...vpos("gp", "gp43"), id: "gp43-sgp", location: "-", sklad: SGP }],
+  moved: [{ src: "gp", from: "gp43-sgp", to: "gp43" }],
+});
 
 export const initialVydachaDocs: SkladDoc[] = [
   { id: "vd1", date: "19.08.2026", type: DOC_PEREDACHA_GP, number: "НО-0205", status: "В работе", sender: MAIN_SKLAD, receiver: SGP, zakazchik: "Монетный двор", positions: [vpos("gp", "gp2"), vpos("gp", "gp9")] },

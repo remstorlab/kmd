@@ -4,7 +4,7 @@
 // кор. счёт), оставлены пустыми для заполнения вручную; подписи — пустые строки.
 
 import { SkladDoc, ShihtovayaKarta, PrikazPlavka, DOC_PRIHOD_ORDER, DOC_TREBOVANIE } from "../data/mock";
-import { DEMO_ORDER, ORDER_HEAD_DEFAULTS } from "../components/PrihodDocModal";
+import { ORDER_HEAD_DEFAULTS } from "../components/PrihodDocModal";
 import { issueShare } from "../data/stock";
 import { Sheet, S, downloadXlsx } from "./xlsx";
 
@@ -194,7 +194,7 @@ function prihodOrderSheet(d: SkladDoc): Sheet {
 
   // Позиции: количество и масса — лигатурный и чистый вес позиции, г; сумма — чистый вес × цена
   const price = num(head.price);
-  const positions = d.prihodPositions ?? DEMO_ORDER;
+  const positions = d.prihodPositions ?? [];
   const rows = positions.map(p => {
     const lig = num(p.lig);
     const net = num(p.net);
