@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
-  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, probaText, NetAuAg, NET_AU_AG, usePaged, FillerRows, useCreatedStamp,
+  Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, probaText, NetAuAg, NetAuAgTotal, NET_AU_AG, usePaged, FillerRows, useCreatedStamp,
   InfoField,
   OborotValue, OBOROT_LABEL,
 } from "./ui";
@@ -20,6 +20,9 @@ import { useScreen } from "../router";
 // со склада на склад (СДМ1 → СДМ2), см. TrebovanieDocModal.
 
 type PrihodDocType = string;
+
+// Число из поля позиции («1 555,00» → 1555); пустое и нечисловое — 0
+const numOf = (v: string | number | undefined) => parseFloat(String(v ?? "").replace(/\s/g, "").replace(",", ".")) || 0;
 type Props = {
   onClose: () => void;
   onSave: (d: SkladDoc) => void;
@@ -67,6 +70,11 @@ export const DEMO_ORDER: PrihodPosition[] = [
 const DEMO_NAKLAD: PrihodPosition[] = [
   { id: "pn-1", nomenkl: "5015303", name: "Монета «Атамекен» Ag 925", klass: "Готовая продукция", code: "2000", kol: "200", unit: "шт", proba: "925", lig: "6220.00", net: "5753.50", seyf: "1", polka: "1", chem: { ag: "5753.50" } },
   { id: "pn-2", nomenkl: "5015304", name: "Орден «Алтын алка»", klass: "Готовая продукция", code: "0300", kol: "30", unit: "шт", proba: "750", lig: "672.00", net: "504.00", seyf: "1", polka: "2", chem: { au: "504.00", ag: "100.80", cu: "67.20" } },
+];
+// Демо-позиции акта приёма (АКТ-0042, давальческий материал Национального банка)
+const DEMO_AKT: PrihodPosition[] = [
+  { id: "pa-1", nomenkl: "5015305", name: "Скрап серебряный Ag 925", klass: "Скрап", code: "2000", kol: "1", unit: "шт", proba: "925", lig: "1250.00", net: "1156.25", seyf: "2", polka: "2", chem: { ag: "1156.25" } },
+  { id: "pa-2", nomenkl: "5015306", name: "Гранулы золотые Au 999,9", klass: "Гранулы", code: "1000", kol: "1", unit: "шт", proba: "999.9", lig: "500.00", net: "499.95", seyf: "1", polka: "3", chem: { au: "499.95" } },
 ];
 
 // Реквизиты приходного ордера по умолчанию (поля шапки формы; используются и печатной формой)
@@ -138,7 +146,7 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     !doc ? [] : doc.type !== type ? [] : doc.prihodPositions ?? demo;
   const [orderPositions, setOrderPositions] = useState<PrihodPosition[]>(() => initialPositions(DOC_PRIHOD_ORDER, DEMO_ORDER));
   const [nakladPositions, setNakladPositions] = useState<PrihodPosition[]>(() =>
-    doc?.type === DOC_PRIHOD_AKT ? doc.prihodPositions ?? [] : initialPositions(DOC_PRIHOD_NAKLAD, DEMO_NAKLAD));
+    doc?.type === DOC_PRIHOD_AKT ? doc.prihodPositions ?? DEMO_AKT : initialPositions(DOC_PRIHOD_NAKLAD, DEMO_NAKLAD));
 
   // Хим. состав на партию — задаётся в документе и подставляется в каждую новую позицию
 
@@ -385,6 +393,17 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
               ))}
               <FillerRows count={pg10.fill} cols={11} />
             </tbody>
+            {/* Итоговая строка — по всем позициям документа (не только по текущей странице) */}
+            <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
+              <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
+              <td className="px-3 py-2">{positions.reduce((s, p) => s + numOf(p.kol), 0)}</td>
+              {isOrder && <>
+                <td></td>
+                <td className="px-3 py-2">{positions.reduce((s, p) => s + numOf(p.lig), 0).toFixed(2)}</td>
+                <td className="px-3 py-2 text-blue-600"><NetAuAgTotal items={positions.map(p => ({ chem: p.chem }))} /></td>
+              </>}
+              <td colSpan={isOrder ? 3 : 2}></td>
+            </tr></tfoot>
           </table>
           {pg10.pager}
         </>)}
