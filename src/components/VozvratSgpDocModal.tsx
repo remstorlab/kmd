@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   Btn, Modal, DeleteIcon, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
-  InfoField,
+  InfoField, PosStatusBadge, probaText,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, MovedRecord, spravValues, SGP, PRIHOD_SKLAD, DOC_VOZVRAT_SGP } from "../data/mock";
@@ -66,6 +66,12 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
 
   const itemOf = (p: VsPosition): GPItem | DMItem | undefined =>
     p.src === "gp" ? gpItems.find(i => i.id === p.id) : dmItems.find(i => i.id === p.id);
+  // Текущая запись позиции: после сохранения — запись на складе-получателе (doc.moved), до — запись на СГП №2
+  function currentOf(p: VsPosition): GPItem | DMItem | undefined {
+    const to = doc?.moved?.find(m => m.src === p.src && m.from === p.id)?.to;
+    const list: (GPItem | DMItem)[] = p.src === "gp" ? gpItems : dmItems;
+    return (to ? list.find(i => i.id === to) : undefined) ?? list.find(i => i.id === p.id);
+  }
 
   // Заказчик и «Собственность заказчика» после выбора позиций — из позиций (цепочка от документа приёма на СДМ1),
   // только для чтения; до выбора позиций — выбираются вручную
@@ -103,6 +109,9 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
     oborot: p => p.oborot ?? 0,
     lig: p => p.lig ?? 0,
     net: p => p.net ?? 0,
+    proba: p => p.proba ?? 0,
+    location: p => currentOf(p)?.location ?? p.location,
+    status: p => currentOf(p)?.status ?? "",
   });
 
   // Позиции перемещаются на склад-получатель при каждом сохранении («Сохранить» и «Оформить»).
@@ -231,11 +240,14 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл. №</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код</SortTh>
+              <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код материала</SortTh>
               <SortTh sortKey="issue" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
+              <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
               <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
+              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
+              <SortTh sortKey="status" sort={sort} onSort={toggleSort} className="px-3 py-2">Статус</SortTh>
               {!lockPos && <th className="w-12"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -246,20 +258,24 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                   <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos)}</td>
+                  <td className="px-3 py-2">{probaText(p.proba)}</td>
                   <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos)}</td>
                   <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
                   <td className="px-3 py-2"><OborotValue value={p.oborot} code={p.code} /></td>
+                  <td className="px-3 py-2 text-gray-500">{currentOf(p)?.location ?? p.location}</td>
+                  <td className="px-3 py-2">{(() => { const st = currentOf(p)?.status; return st ? <PosStatusBadge status={st} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>; })()}</td>
                   {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
                 </tr>
               ))}
-              <FillerRows count={pg.fill} cols={9} />
+              <FillerRows count={pg.fill} cols={12} />
             </tbody>
             <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
               <td className="px-3 py-2">{iss.totals.qty}</td>
+              <td></td>
               <td className="px-3 py-2">{iss.totals.lig.toFixed(2)}</td>
               <td className="px-3 py-2 text-blue-600"><NetAuAgTotal items={positions.map(p => ({ chem: p.chem, k: iss.line(p).share }))} /></td>
-              {!lockPos && <td></td>}
+              <td colSpan={lockPos ? 3 : 4}></td>
             </tr></tfoot>
           </table>
           {pg.pager}

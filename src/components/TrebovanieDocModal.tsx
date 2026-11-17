@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   Btn, Modal, DeleteIcon, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
-  MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp, PosStatusBadge,
+  MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp, PosStatusBadge, probaText,
   InfoField,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
@@ -141,6 +141,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     lig: p => p.lig ?? 0,
     net: p => p.net ?? 0,
     location: p => p.location,
+    proba: p => p.proba ?? 0,
+    status: p => itemOf(p)?.status ?? "",
   });
 
   const save = (status: DocStatus) => {
@@ -251,13 +253,14 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл. №</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код</SortTh>
+              <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код материала</SortTh>
               <SortTh sortKey="issue" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
+              <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
               <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
-              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
-              <th className="px-3 py-2 text-left">Статус</th>
+              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
+              <SortTh sortKey="status" sort={sort} onSort={toggleSort} className="px-3 py-2">Статус</SortTh>
               {!lockPos && <th className="w-12"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -271,6 +274,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
                     <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                     {/* Позиция в резерве шихтовой карты перемещается целиком — без ввода количества и веса */}
                     <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos && status !== "Резерв")}</td>
+                    <td className="px-3 py-2">{probaText(p.proba)}</td>
                     <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos && status !== "Резерв")}</td>
                     <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
                   <td className="px-3 py-2"><OborotValue value={p.oborot} code={p.code} /></td>
@@ -280,14 +284,15 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
                   </tr>
                 );
               })}
-              <FillerRows count={pg.fill} cols={11} />
+              <FillerRows count={pg.fill} cols={12} />
             </tbody>
             <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
               <td className="px-3 py-2">{iss.totals.qty}</td>
+              <td></td>
               <td className="px-3 py-2">{iss.totals.lig.toFixed(2)}</td>
               <td className="px-3 py-2 text-blue-600"><NetAuAgTotal items={positions.map(p => ({ chem: p.chem, k: iss.line(p).share }))} /></td>
-              <td colSpan={lockPos ? 2 : 3}></td>
+              <td colSpan={lockPos ? 3 : 4}></td>
             </tr></tfoot>
           </table>
           {pg.pager}

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   Badge, Btn, Modal, DeleteIcon, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
-  InfoField,
+  InfoField, PosStatusBadge, probaText,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, MAIN_SKLAD, SGP, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
@@ -139,7 +139,21 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
     lig: p => p.lig ?? 0,
     net: p => p.net ?? 0,
     location: p => p.location,
+    proba: p => p.proba ?? 0,
+    status: p => currentOf(p)?.status ?? "",
   });
+
+  // Текущая запись позиции: после оформления — выданная запись на СГП №2 (при частичной выдаче — часть <id>-v…),
+  // до оформления — запись на складе-отправителе
+  function currentOf(p: VydachaDocPosition): GPItem | DMItem | undefined {
+    const list: (GPItem | DMItem)[] = p.src === "gp" ? gpItems : dmItems;
+    if (!issued) return list.find(i => i.id === p.id);
+    return list.find(i => i.sklad === SGP && (i.id === p.id || i.id.startsWith(`${p.id}-v`)));
+  }
+  const statusCell = (p: VydachaDocPosition) => {
+    const st = currentOf(p)?.status;
+    return st ? <PosStatusBadge status={st} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>;
+  };
 
   const save = (status: DocStatus) => {
     // Списание выполняется один раз — при первом оформлении документа
@@ -257,12 +271,14 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл. №</SortTh>
               <SortTh sortKey="name" sort={sort} onSort={toggleSort} className="px-3 py-2">Наименование</SortTh>
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код</SortTh>
+              <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код материала</SortTh>
               <SortTh sortKey="issue" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
+              <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
               <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
-              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
+              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
+              <SortTh sortKey="status" sort={sort} onSort={toggleSort} className="px-3 py-2">Статус</SortTh>
               {!lockPos && <th className="w-12"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -273,21 +289,24 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                   <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos)}</td>
+                  <td className="px-3 py-2">{probaText(p.proba)}</td>
                   <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos)}</td>
                   <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
                   <td className="px-3 py-2"><OborotValue value={p.oborot} code={p.code} /></td>
                   <td className="px-3 py-2 text-gray-500">{p.location}</td>
+                  <td className="px-3 py-2">{statusCell(p)}</td>
                   {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
                 </tr>
               ))}
-              <FillerRows count={pg12.fill} cols={10} />
+              <FillerRows count={pg12.fill} cols={12} />
             </tbody>
             <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
               <td className="px-3 py-2">{iss.totals.qty}</td>
+              <td></td>
               <td className="px-3 py-2">{iss.totals.lig.toFixed(2)}</td>
               <td className="px-3 py-2 text-blue-600"><NetAuAgTotal items={positions.map(p => ({ chem: p.chem, k: iss.line(p).share }))} /></td>
-              <td colSpan={lockPos ? 1 : 2}></td>
+              <td colSpan={lockPos ? 3 : 4}></td>
             </tr></tfoot>
           </table>
           {pg12.pager}

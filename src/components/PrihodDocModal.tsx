@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   Btn, Modal, EyeIcon, EditIcon, DeleteIcon, ExportBtn, useToast, Toast,
   Field, Input, Select, KlassCode, useMaterialCodeLabel, MultiFileUpload, Toggle, SortTh, useSort, probaText, NetAuAg, NetAuAgTotal, NET_AU_AG, usePaged, FillerRows, useCreatedStamp,
-  InfoField,
+  InfoField, PosStatusBadge,
   OborotValue, OBOROT_LABEL,
 } from "./ui";
 import { SkladDoc, DocStatus, DMItem, GPItem, spravValues, isGPKlass, PRIHOD_SKLAD, DOC_PRIHOD_ORDER, DOC_PRIHOD_NAKLAD, DOC_PRIHOD_AKT, DOC_TREBOVANIE, DOC_VOZVRAT_SGP, SGP } from "../data/mock";
@@ -185,7 +185,19 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
     net: p => parseFloat(p.net) || 0,
     oborot: p => oborotFromForm(p.oborot),
     loc: p => locOf(p),
+    status: p => stockOf(p)?.status ?? "",
   });
+
+  // Статус позиции — по записи склада, созданной сохранением документа (dm-<id> / gp-<id>);
+  // пока документ не сохранён, позиция на склад не принята
+  function stockOf(p: PrihodPosition): GPItem | DMItem | undefined {
+    return gpItems.find(i => i.id === `gp-${p.id}`) ?? dmItems.find(i => i.id === `dm-${p.id}`);
+  }
+  const posStatusCell = (p: PrihodPosition) => {
+    const st = stockOf(p)?.status;
+    if (st) return <PosStatusBadge status={st} nomenkl={p.nomenkl} />;
+    return <span className="text-gray-400">{doc ? "—" : "Не принята"}</span>;
+  };
 
   // Постановка на склад-получатель при каждом сохранении документа («Сохранить» и «Оформить»): позиции класса
   // «Готовая продукция» — в учёт ГП, остальные — в учёт ДМ; статус «На складе», место хранения — из позиции документа.
@@ -358,13 +370,12 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
               <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
               <SortTh sortKey="code" sort={sort} onSort={toggleSort} className="px-3 py-2">Код материала</SortTh>
               <SortTh sortKey="kol" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
-              {isOrder && <>
-                <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
-                <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
-                <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
-                <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
-              </>}
+              <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
+              <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
+              <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
+              <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
               <SortTh sortKey="loc" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
+              <SortTh sortKey="status" sort={sort} onSort={toggleSort} className="px-3 py-2">Статус</SortTh>
               <th className="w-24"></th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
@@ -375,13 +386,12 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
                   <td className="px-3 py-2">{p.kol || "—"}</td>
-                  {isOrder && <>
-                    <td className="px-3 py-2">{probaText(p.proba)}</td>
-                    <td className="px-3 py-2 font-medium">{p.lig}</td>
-                    <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} /></td>
-                    <td className="px-3 py-2"><OborotValue value={oborotFromForm(p.oborot)} code={p.code} /></td>
-                  </>}
+                  <td className="px-3 py-2">{probaText(p.proba)}</td>
+                  <td className="px-3 py-2 font-medium">{p.lig || "—"}</td>
+                  <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} /></td>
+                  <td className="px-3 py-2"><OborotValue value={oborotFromForm(p.oborot)} code={p.code} /></td>
                   <td className="px-3 py-2 text-gray-500">{locOf(p)}</td>
+                  <td className="px-3 py-2">{posStatusCell(p)}</td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
                       <EyeIcon onClick={() => screen.open("position", p.id)} />
@@ -391,18 +401,16 @@ function PrihodForm({ onClose, onSave, doc, readOnly = false, docType, typeSelec
                   </td>
                 </tr>
               ))}
-              <FillerRows count={pg10.fill} cols={11} />
+              <FillerRows count={pg10.fill} cols={12} />
             </tbody>
             {/* Итоговая строка — по всем позициям документа (не только по текущей странице) */}
             <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
               <td className="px-3 py-2">{positions.reduce((s, p) => s + numOf(p.kol), 0)}</td>
-              {isOrder && <>
-                <td></td>
-                <td className="px-3 py-2">{positions.reduce((s, p) => s + numOf(p.lig), 0).toFixed(2)}</td>
-                <td className="px-3 py-2 text-blue-600"><NetAuAgTotal items={positions.map(p => ({ chem: p.chem }))} /></td>
-              </>}
-              <td colSpan={isOrder ? 3 : 2}></td>
+              <td></td>
+              <td className="px-3 py-2">{positions.reduce((s, p) => s + numOf(p.lig), 0).toFixed(2)}</td>
+              <td className="px-3 py-2 text-blue-600"><NetAuAgTotal items={positions.map(p => ({ chem: p.chem }))} /></td>
+              <td colSpan={4}></td>
             </tr></tfoot>
           </table>
           {pg10.pager}
