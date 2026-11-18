@@ -365,10 +365,10 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
     dola: m => num(m.ves),
   });
 
-  // Сохранить — карта «На редактировании»; Оформить — «Новая»: доступна для плавки, редактирование закрыто
-  const save = (oformit = false) => {
+  // Сохранить — карта «На редактировании», позиции склада резервируются (убранные — снимаются с резерва).
+  // Оформление — в приказе на плавку: «Оформить» приказа переводит все его карты в «Новая».
+  const save = () => {
     if (badMass.length) { show(massError(badMass[0])); return; }
-    if (oformit && oformitBlock) { show(oformitBlock); return; }
     // Выбранные позиции склада должны быть всё ещё на складе (резервируются целиком)
     const reserve = new Set(materials.filter(m => m.srcId).map(m => m.srcId!));
     const lacking = [...reserve].filter(id => dmItems.find(i => i.id === id)?.status !== "На складе");
@@ -396,11 +396,11 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
       date: karta?.date || new Date().toLocaleDateString("ru-RU"),
       materials: mats,
     };
-    // Пометка о выданных позициях остаётся, пока такие позиции есть в карте; оформление её снимает.
-    const status = oformit ? "Новая" as const : "На редактировании" as const;
+    // Пометка о выданных позициях остаётся, пока такие позиции есть в карте
+    const status = "На редактировании" as const;
     const stillIssued = (karta?.vydannyePozicii ?? []).filter(v => materials.some(m => isIssued(m) && m.nomenkl === v.nomenkl));
     const k: ShihtovayaKarta = karta
-      ? { ...karta, ...head, status, vydannyePozicii: !oformit && stillIssued.length ? stillIssued : undefined }
+      ? { ...karta, ...head, status, vydannyePozicii: stillIssued.length ? stillIssued : undefined }
       : {
         id: `sk-${Date.now()}`, ...head, status, prikazId: prikaz?.id,
         createdAt: new Date().toISOString(),
@@ -428,11 +428,10 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
           {(badMass.length > 0 || (oformitBlock && materials.length > 0)) && (
             <div className="mb-3 space-y-1 text-xs">
               {badMass.map(m => <div key={m.key} className="text-red-600">⛔ {massError(m)}</div>)}
-              {oformitBlock && materials.length > 0 && <div className="text-red-600">Оформление недоступно: {oformitBlock}</div>}
+              {oformitBlock && materials.length > 0 && <div className="text-orange-700">Карта не готова к оформлению приказа: {oformitBlock}</div>}
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <div className="mr-auto"><Btn variant="success" onClick={() => save(true)} disabled={!!oformitBlock || badMass.length > 0}>Оформить</Btn></div>
+          <div className="flex items-center justify-end gap-2">
             <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
             <Btn onClick={() => save()} disabled={badMass.length > 0}>Сохранить</Btn>
           </div>
@@ -448,8 +447,8 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
       {karta && (
         <div className="flex items-center gap-2 mb-4">
           <Badge label={karta.status} group="shihta" />
-          {karta.status === "Новая" && <span className="text-xs text-gray-500">Карта оформлена — доступна для выдачи на плавку</span>}
-          {karta.status === "На редактировании" && !karta.vydannyePozicii?.length && <span className="text-xs text-gray-500">Карта сохранена, но не оформлена — недоступна для выдачи в плавку</span>}
+          {karta.status === "Новая" && <span className="text-xs text-gray-500">Приказ оформлен — карта доступна для выдачи на плавку, редактирование закрыто</span>}
+          {karta.status === "На редактировании" && !karta.vydannyePozicii?.length && <span className="text-xs text-gray-500">Карта сохранена — оформляется вместе с приказом на плавку (кнопка «Оформить» в приказе)</span>}
         </div>
       )}
       {karta?.status === "На редактировании" && !!karta.vydannyePozicii?.length && (
@@ -872,7 +871,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
 // ── Приказ на плавку: окно записи ───────────────────────────────────────────────
 // Шапка приказа, общая информация, шихтовые карты приказа и «Добавить ШК» — карта создаётся в конструкторе
 // поверх окна. Вложенные экраны: …/karta-new, …/view/:id, …/edit/:id, …/itogo.
-// Новый приказ: карты добавляются после создания — «Добавить ШК» сначала создаёт приказ.
+// Новый приказ: «Сохранить» создаёт приказ, окно остаётся открытым — после этого доступна «Добавить ШК».
 
 // Снятие резерва с позиций ДМ невыполненных карт
 function releaseKarty(setDmItems: React.Dispatch<React.SetStateAction<DMItem[]>>, karty: ShihtovayaKarta[]) {
@@ -884,18 +883,38 @@ function releaseKarty(setDmItems: React.Dispatch<React.SetStateAction<DMItem[]>>
 const kartyOfPrikaz = (all: ShihtovayaKarta[], id: string) =>
   all.filter(k => k.prikazId === id).sort((a, b) => (parseInt(a.plavkaNo, 10) || 0) - (parseInt(b.plavkaNo, 10) || 0));
 
-function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd }: {
+// Причина, по которой карту приказа нельзя оформить (null — можно): те же условия, что показывает конструктор
+function kartaOformitBlock(k: ShihtovayaKarta, grade: AlloyGrade | undefined, label: (el: string) => string): string | null {
+  if (k.materials.length === 0) return "нет материалов";
+  if (k.materials.some(m => !(m.ves > 0))) return "не указан вес лигат. материала";
+  if (!grade) return "не указана марка сплава";
+  if (!k.naznachenie) return "не указано назначение слитков";
+  if (!k.plavkaNo?.trim()) return "не указан номер плавки";
+  if (k.vydannyePozicii?.length) return `позиции выданы в другой операции: ${k.vydannyePozicii.map(v => v.name).join(", ")}`;
+  const calc = new ShihtaCalc(k.materials.map(lineOfMaterial), grade);
+  if (calc.complies) return null;
+  const fail = calc.failed.map(c => `${label(c.element)} ${fmtFact(c)} % при норме ${normText(c)}`).join("; ");
+  if (!grade.allowDeviation) return `состав не соответствует марке ${grade.name}: ${fail}`;
+  if (!k.note?.trim()) return `состав не соответствует марке ${grade.name}: ${fail} — заполните «Примечание» карты`;
+  return null;
+}
+
+// Приказ на плавку. Новый приказ сначала сохраняется (окно остаётся открытым), затем добавляются шихтовые карты —
+// каждая сохраняется «На редактировании», позиции склада резервируются при каждом сохранении карты.
+// «Оформить» приказа переводит все его карты и сам приказ в «Новая» — редактирование закрыто.
+// Если позицию из резерва выдали со склада, карта (и приказ) возвращается в «На редактировании».
+function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
   prikaz?: PrikazPlavka | null;
   readOnly?: boolean;
   onClose: () => void;
-  onSave: (p: PrikazPlavka) => void;
-  // Новый приказ: создать и сразу открыть конструктор первой карты
-  onCreateAndAdd: (p: PrikazPlavka) => void;
+  // created — приказ сохранён впервые (окно остаётся открытым для добавления карт); oformlen — приказ оформлен
+  onSave: (p: PrikazPlavka, mode: "created" | "saved" | "oformlen") => void;
 }) {
-  const { currentUser, shihtovyeKarty, setShihtovyeKarty, setDmItems, alloyGrades } = useApp();
+  const { currentUser, shihtovyeKarty, setShihtovyeKarty, setDmItems, alloyGrades, chemElements } = useApp();
   const screen = useScreen();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
+  const shortName = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
   const [number, setNumber] = useState(prikaz?.number ?? "");
   const [date, setDate] = useState(prikaz?.date ?? new Date().toLocaleDateString("ru-RU"));
   const [name, setName] = useState(prikaz?.name ?? "");
@@ -905,15 +924,16 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
   const karty = prikaz ? kartyOfPrikaz(shihtovyeKarty, prikaz.id) : [];
   const status = prikazStatus(karty);
   const done = !!prikaz && status === "Выполнена";
-  const ro = readOnly || done;
+  // Оформленный приказ («Новая») и выполненный не редактируются
+  const ro = readOnly || (!!prikaz && status !== "На редактировании");
   const mass = r2(karty.reduce((s, k) => s + kartaMass(k), 0));
   const gradeName = (k: ShihtovayaKarta) => alloyGrades.find(g => g.id === k.alloyId)?.name ?? "";
 
   // Марка сплава и назначение слитков — общие для всех карт приказа (в картах только для чтения).
-  // После оформления хотя бы одной карты не меняются: состав оформленных карт рассчитан под эту марку.
+  // Поля приказа не меняются, как только в приказе сохранена хотя бы одна шихтовая карта.
   const [alloyId, setAlloyId] = useState(prikaz?.alloyId ?? "");
   const [naznachenie, setNaznachenie] = useState(prikaz?.naznachenie ?? "");
-  const headLocked = karty.some(k => k.status !== "На редактировании");
+  const headLocked = ro || karty.length > 0;
   const gradeOptions = ["", ...alloyGrades.filter(g => g.status === "Активно" || g.id === alloyId).map(g => g.id)];
   const gradeLabel = (id: string) => { const g = alloyGrades.find(x => x.id === id); return g ? `${g.name} (${g.nd})` : "Выберите марку"; };
   const naznOptions = ["", ...new Set([...spravValues("Назначение слитков"), ...(naznachenie ? [naznachenie] : [])])];
@@ -928,19 +948,32 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
   };
   const save = () => {
     if (error) { show(error); return; }
-    const p = build();
-    // Марка и назначение переносятся в карты приказа, которые ещё на редактировании
-    if (prikaz) setShihtovyeKarty(prev => prev.map(k => (k.prikazId === p.id && k.status === "На редактировании" ? { ...k, alloyId: p.alloyId, naznachenie: p.naznachenie } : k)));
-    onSave(p);
+    onSave(build(), prikaz ? "saved" : "created");
   };
+  // Шапка изменена, но не сохранена — карту добавить нельзя (карта берёт марку и назначение из сохранённого приказа)
+  const dirty = !!prikaz && (number.trim() !== prikaz.number || date.trim() !== prikaz.date || name.trim() !== prikaz.name
+    || alloyId !== (prikaz.alloyId ?? "") || naznachenie !== (prikaz.naznachenie ?? ""));
+  const addKartaBlock = !prikaz ? "Сначала сохраните приказ" : dirty ? "Данные приказа изменены — сохраните приказ" : null;
   const addKarta = () => {
-    if (prikaz) {
-      if (alloyId !== (prikaz.alloyId ?? "") || naznachenie !== (prikaz.naznachenie ?? "")) { show("Марка сплава или назначение слитков изменены — сохраните приказ, затем добавьте ШК"); return; }
-      screen.open("karta-new");
-      return;
-    }
-    if (error) { show(`${error} — затем добавьте ШК`); return; }
-    onCreateAndAdd(build());
+    if (addKartaBlock) { show(addKartaBlock); return; }
+    screen.open("karta-new");
+  };
+
+  // Оформление приказа: все карты — «Новая» (редактирование закрыто), приказ — «Новая»
+  const kartaBlocks = karty.filter(k => k.status === "На редактировании")
+    .map(k => ({ k, why: kartaOformitBlock(k, alloyGrades.find(g => g.id === k.alloyId), shortName) }))
+    .filter((x): x is { k: ShihtovayaKarta; why: string } => !!x.why);
+  const oformitBlock = !prikaz ? "Сначала сохраните приказ"
+    : karty.length === 0 ? "Добавьте хотя бы одну шихтовую карту"
+    : dirty ? "Данные приказа изменены — сохраните приказ"
+    : kartaBlocks.length ? `не готовы карты: ${kartaBlocks.map(({ k, why }) => `плавка № ${k.plavkaNo} — ${why}`).join("; ")}`
+    : null;
+  const oformit = () => {
+    if (!prikaz || oformitBlock) { if (oformitBlock) show(oformitBlock); return; }
+    // Выполненные карты (уже выданы на плавку) не меняются
+    const ids = new Set(karty.filter(k => k.status === "На редактировании").map(k => k.id));
+    setShihtovyeKarty(prev => prev.map(k => (ids.has(k.id) ? { ...k, status: "Новая", vydannyePozicii: undefined } : k)));
+    onSave(build(), "oformlen");
   };
 
   // Вложенные экраны карты
@@ -969,30 +1002,42 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
       title={prikaz ? `Приказ на плавку № ${prikaz.number}` : "Новый приказ на плавку"}
       fullWide
       onClose={onClose}
-      footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : <>
-        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={save} disabled={!!error}>{prikaz ? "Сохранить" : "Создать"}</Btn>
-      </>}
+      footer={ro ? <Btn variant="secondary" onClick={onClose}>Закрыть</Btn> : (
+        <div className="w-full">
+          {prikaz && oformitBlock && (
+            <div className="mb-3 text-xs text-red-600">Оформление недоступно: {oformitBlock}</div>
+          )}
+          <div className="flex items-center gap-2">
+            <div className="mr-auto"><Btn variant="success" onClick={oformit} disabled={!!oformitBlock}>Оформить</Btn></div>
+            <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+            <Btn onClick={save} disabled={!!error}>Сохранить</Btn>
+          </div>
+        </div>
+      )}
     >
       {prikaz && (
         <div className="flex items-center gap-2 mb-4">
           <Badge label={status} group="shihta" />
           {done && <span className="text-xs text-gray-500">Карты приказа выданы на плавку — изменения недоступны</span>}
+          {status === "Новая" && <span className="text-xs text-gray-500">Приказ оформлен — карты доступны для выдачи на плавку, редактирование закрыто</span>}
+          {status === "На редактировании" && karty.some(k => k.vydannyePozicii?.length) && (
+            <span className="text-xs text-red-600">Позиции из резерва выданы со склада — замените их в отмеченных картах и оформите приказ</span>
+          )}
         </div>
       )}
       <div className="grid grid-cols-4 gap-4 mb-5">
-        <Field label="Номер приказа" required={!ro}><Input value={number} onChange={setNumber} placeholder="№" disabled={ro} /></Field>
-        <Field label="Дата приказа" required={!ro}><Input value={date} onChange={setDate} placeholder="дд.мм.гггг" disabled={ro} /></Field>
-        <Field label="Наименование" required={!ro} full><Input value={name} onChange={setName} placeholder="Например: слитки СрМ 92,5 для монет пруф-качества" disabled={ro} /></Field>
-        <Field label="Марка сплава" required={!ro && !headLocked} full>
-          <Select value={alloyId} options={gradeOptions} optionLabel={gradeLabel} onChange={setAlloyId} disabled={ro || headLocked} />
+        <Field label="Номер приказа" required={!headLocked}><Input value={number} onChange={setNumber} placeholder="№" disabled={headLocked} /></Field>
+        <Field label="Дата приказа" required={!headLocked}><Input value={date} onChange={setDate} placeholder="дд.мм.гггг" disabled={headLocked} /></Field>
+        <Field label="Наименование" required={!headLocked} full><Input value={name} onChange={setName} placeholder="Например: слитки СрМ 92,5 для монет пруф-качества" disabled={headLocked} /></Field>
+        <Field label="Марка сплава" required={!headLocked} full>
+          <Select value={alloyId} options={gradeOptions} optionLabel={gradeLabel} onChange={setAlloyId} disabled={headLocked} />
         </Field>
-        <Field label="Назначение слитков" required={!ro && !headLocked}>
-          <Select value={naznachenie} options={naznOptions} optionLabel={v => v || "Не выбрано"} onChange={setNaznachenie} disabled={ro || headLocked} />
+        <Field label="Назначение слитков" required={!headLocked}>
+          <Select value={naznachenie} options={naznOptions} optionLabel={v => v || "Не выбрано"} onChange={setNaznachenie} disabled={headLocked} />
         </Field>
-        <Field label="Примечание" full><Textarea value={note} onChange={setNote} rows={2} disabled={ro} /></Field>
+        <Field label="Примечание" full><Textarea value={note} onChange={setNote} rows={2} disabled={headLocked} /></Field>
         {!ro && headLocked && (
-          <div className="col-span-4 -mt-2 text-xs text-gray-500">Марка сплава и назначение слитков не меняются: в приказе есть оформленные шихтовые карты</div>
+          <div className="col-span-4 -mt-2 text-xs text-gray-500">Поля приказа не меняются: в приказе сохранены шихтовые карты</div>
         )}
       </div>
 
@@ -1008,12 +1053,12 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
           <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Шихтовые карты</h3>
           <div className="flex gap-2">
             {prikaz && karty.length > 0 && <Btn size="sm" variant="secondary" onClick={() => screen.open("itogo")}><Sigma className="w-4 h-4" />Итого по приказу</Btn>}
-            {!ro && <Btn size="sm" onClick={addKarta}><Plus className="w-4 h-4" />Добавить ШК</Btn>}
+            {!ro && <span title={addKartaBlock ?? undefined}><Btn size="sm" onClick={addKarta} disabled={!!addKartaBlock}><Plus className="w-4 h-4" />Добавить ШК</Btn></span>}
           </div>
         </div>
         {karty.length === 0 ? (
           <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-            {prikaz ? "В приказе нет шихтовых карт. Нажмите «+ Добавить ШК»" : "Заполните шапку приказа и нажмите «+ Добавить ШК» — приказ будет создан, откроется конструктор шихтовой карты"}
+            {prikaz ? "В приказе нет шихтовых карт. Нажмите «+ Добавить ШК»" : "Заполните поля приказа и нажмите «Сохранить» — после сохранения станет доступна кнопка «+ Добавить ШК»"}
           </div>
         ) : (
           <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -1035,8 +1080,10 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
                 {karty.map(k => {
                   // Редактировать и удалять карту можно, пока она не оформлена
                   const draft = !ro && k.status === "На редактировании";
+                  // Карта, позиции которой выданы со склада, — подсвечена
+                  const issued = !!k.vydannyePozicii?.length;
                   return (
-                    <tr key={k.id} className="hover:bg-gray-50">
+                    <tr key={k.id} className={issued ? "bg-red-50 hover:bg-red-100/60" : "hover:bg-gray-50"} title={issued ? `Выданы со склада: ${k.vydannyePozicii!.map(v => `${v.name} (${v.doc})`).join("; ")}` : undefined}>
                       <td className="px-3 py-2 text-blue-600 font-medium">{k.plavkaNo}</td>
                       <td className="px-3 py-2 text-gray-500">{k.date}</td>
                       <td className="px-3 py-2 text-gray-900">{k.name}</td>
@@ -1088,7 +1135,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
           onSave={k => {
             setShihtovyeKarty(prev => prev.map(s => (s.id === k.id ? k : s)));
             screen.close("edit");
-            show(k.status === "Новая" ? "Карта оформлена — доступна для выдачи на плавку в составе приказа" : "Карта сохранена");
+            show("Карта сохранена, позиции склада зарезервированы");
           }}
         />
       )}
@@ -1100,7 +1147,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
           onSave={k => {
             setShihtovyeKarty(prev => [k, ...prev]);
             screen.close("karta-new");
-            show(k.status === "Новая" ? "Шихтовая карта оформлена, позиции зарезервированы" : "Шихтовая карта сохранена в статусе «На редактировании»");
+            show("Шихтовая карта сохранена в статусе «На редактировании», позиции склада зарезервированы");
           }}
         />
       )}
@@ -1228,7 +1275,7 @@ export function ShihtovyeKarty() {
                   <CreatedCell row={p} />
                   <td className="px-4 py-3 flex items-center gap-1">
                     <EyeIcon onClick={() => screen.openTop("prikaz-view", p.id)} />
-                    <EditIcon onClick={() => screen.openTop("prikaz", p.id)} disabled={done} title={done ? "Приказ выполнен — редактирование недоступно" : "Редактировать"} />
+                    <EditIcon onClick={() => screen.openTop("prikaz", p.id)} disabled={status !== "На редактировании"} title={status === "На редактировании" ? "Редактировать" : done ? "Приказ выполнен — редактирование недоступно" : "Приказ оформлен — редактирование недоступно"} />
                     <DeleteIcon
                       onClick={() => confirm(
                         karty.length ? `Удалить приказ № ${p.number} и его шихтовые карты (${karty.length})? Резерв позиций будет снят.` : `Удалить приказ № ${p.number}?`,
@@ -1252,13 +1299,9 @@ export function ShihtovyeKarty() {
           onClose={() => screen.close("new")}
           onSave={p => {
             setShihtaPrikazy(prev => [p, ...prev]);
-            screen.close("new");
-            show(`Приказ № ${p.number} создан`);
-          }}
-          onCreateAndAdd={p => {
-            setShihtaPrikazy(prev => [p, ...prev]);
-            // Окно приказа переходит в редактирование, поверх — конструктор новой карты
-            screen.openTop("prikaz", p.id, "karta-new");
+            // Окно остаётся открытым: приказ переходит в редактирование, становится доступна «+ Добавить ШК»
+            screen.openTop("prikaz", p.id);
+            show(`Приказ № ${p.number} сохранён — добавьте шихтовые карты`);
           }}
         />
       )}
@@ -1267,16 +1310,15 @@ export function ShihtovyeKarty() {
           key={editPrikaz.id}
           prikaz={editPrikaz}
           onClose={() => screen.close("prikaz")}
-          onSave={p => {
+          onSave={(p, mode) => {
             setShihtaPrikazy(prev => prev.map(x => (x.id === p.id ? p : x)));
             screen.close("prikaz");
-            show("Приказ сохранён");
+            show(mode === "oformlen" ? `Приказ № ${p.number} оформлен — шихтовые карты в статусе «Новая», доступны для выдачи на плавку` : "Приказ сохранён");
           }}
-          onCreateAndAdd={() => {}}
         />
       )}
       {viewPrikaz && (
-        <PrikazModal key={viewPrikaz.id} prikaz={viewPrikaz} readOnly onClose={() => screen.close("prikaz-view")} onSave={() => {}} onCreateAndAdd={() => {}} />
+        <PrikazModal key={viewPrikaz.id} prikaz={viewPrikaz} readOnly onClose={() => screen.close("prikaz-view")} onSave={() => {}} />
       )}
       {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
