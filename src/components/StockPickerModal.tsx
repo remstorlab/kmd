@@ -33,6 +33,7 @@ export default function StockPickerModal({
   addLabel = "Добавить",
   toolbar,
   skladFilter,
+  showSklad = false,
   onClose,
   onAdd,
 }: {
@@ -58,6 +59,8 @@ export default function StockPickerModal({
   toolbar?: React.ReactNode;
   // Показывать только позиции этого склада; отмеченные позиции других складов сохраняются и тоже добавляются
   skladFilter?: string;
+  // Столбец «Склад» (подбор с нескольких складов)
+  showSklad?: boolean;
   onClose: () => void;
   onAdd: (picked: { row: StockRow; qty: number }[]) => void;
 }) {
@@ -103,6 +106,7 @@ export default function StockPickerModal({
     net: r => r.net ?? 0,
     oborot: r => r.oborot ?? 0,
     location: r => r.location,
+    sklad: r => r.sklad ?? "",
     qty: r => left(r),
   });
 
@@ -187,6 +191,7 @@ export default function StockPickerModal({
                 <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{probaPct ? "Чистый вес, г" : NET_AU_AG}</SortTh>
                 <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
               </>}
+              {showSklad && <SortTh sortKey="sklad" sort={sort} onSort={toggleSort} className="px-3 py-2">Склад</SortTh>}
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Место хранения</SortTh>
               {withStatus && <th className="px-3 py-2 text-left">Статус</th>}
               <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
@@ -208,6 +213,7 @@ export default function StockPickerModal({
                       <td className="px-3 py-2">{probaPct ? (r.net != null ? r.net.toFixed(2).replace(".", ",") : "—") : <NetAuAg chem={r.chem} />}</td>
                       <td className="px-3 py-2"><OborotValue value={r.oborot} code={r.code} /></td>
                     </>}
+                    {showSklad && <td className="px-3 py-2 whitespace-nowrap">{r.sklad ?? "—"}</td>}
                     <td className="px-3 py-2 text-gray-500">{r.location}</td>
                     {withStatus && <td className="px-3 py-2">{r.status ? <Badge label={r.status} group="pozicii" /> : "—"}</td>}
                     <td className="px-3 py-2 text-gray-500">{left(r) || "—"}</td>

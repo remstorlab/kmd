@@ -19,12 +19,13 @@ export function markIssuedElsewhere(k: ShihtovayaKarta, nomenkl: Set<string>, do
 
 // ── Расчёт шихтовой карты ──────────────────────────────────────────────────────
 // По строке i (Mᵢ — масса в шихту):
-//   • позиция склада: Au, Ag, Pd, Pt = Mᵢ × доля элемента в позиции; Cu = Mᵢ − Au − Ag − Pd − Pt;
+//   • позиция склада: каждый элемент состава (Au, Ag, Pd, Pt, примеси) = Mᵢ × доля в позиции; Cu = Mᵢ − сумма остальных;
 //   • лигатура Cu-P: Cu = ROUND(Mᵢ × (1 − p/100); 2); P = Mᵢ − Cu;
 //   • медь МО: Cu = Mᵢ;
 //   • прочее: элементы = Mᵢ × доля (состав вводится вручную).
 // Итоги: Mш = ΣMᵢ; ΣE = ΣEᵢ; база B = Mш − ΣP (фосфор выгорает); %E = ΣE × 100 / B.
-// Проверка по марке: мин ≤ ROUND(%E; 2) ≤ макс для каждого элемента с диапазоном.
+// Проверка по марке: мин ≤ ROUND(%E; 2) ≤ макс для каждого элемента с диапазоном; примеси марки, которые есть
+// в шихте, — %E ≤ предела.
 
 // Округление до 0,01 без ошибки двоичной дроби (116,695 → 116,70)
 export const r2 = (v: number) => Math.round(Number((v * 100).toFixed(6))) / 100;
@@ -73,9 +74,12 @@ export function lineChem(l: ShihtaLine): Record<string, number> {
     case "prochee":
       return Object.fromEntries(Object.entries(l.share ?? {}).map(([k, v]) => [k, r2(m * v)]));
     default: {
+      // Все элементы состава позиции (драгметаллы и примеси: Zn, Ni, Fe…) — по доле; медь — остаток до массы,
+      // чтобы примеси не попадали в Cu
       const out: Record<string, number> = {};
-      for (const e of PRECIOUS) {
-        const v = r2(m * (l.share?.[e] ?? 0));
+      for (const [e, s] of Object.entries(l.share ?? {})) {
+        if (e === "cu") continue;
+        const v = r2(m * s);
         if (v > 0) out[e] = v;
       }
       const cu = r2(m - Object.values(out).reduce((a, v) => a + v, 0));
@@ -93,9 +97,13 @@ export const chemStrings = (c: Record<string, number>): ChemComposition =>
 export function normText(r: Pick<AlloyRange, "min" | "max">) {
   if (r.min != null && r.max != null) return `от ${fmt2(r.min)} до ${fmt2(r.max)} %`;
   if (r.min != null) return `не менее ${fmt2(r.min)} %`;
-  if (r.max != null) return `не более ${fmt2(r.max)} %`;
+  if (r.max != null) return `не более ${fmtNorm(r.max)} %`;
   return "—";
 }
+
+// Фактическая доля элемента в проверке: у примеси с пределом меньше 0,01 % — 4 знака (иначе 0,004 → «0,00»)
+export const fmtFact = (c: Pick<GradeCheck, "fact" | "min" | "max">) =>
+  c.min == null && c.max != null && c.max < 0.01 ? c.fact.toFixed(4).replace(".", ",") : fmt2(c.fact);
 
 export interface GradeCheck {
   element: string;
@@ -125,14 +133,23 @@ export class ShihtaCalc {
   // Доля строки в массе шихты, %
   dola(i: number) { return this.mass > 0 ? (Math.max(0, this.lines[i].mass) / this.mass) * 100 : 0; }
 
-  // Сверка с маркой — только элементы с диапазоном
+  // Сверка с маркой: элементы с диапазоном и примеси марки («не более»), которые есть в шихте.
+  // Доля примеси сравнивается без округления до 0,01 — пределы примесей бывают тысячными (Pb 0,004 %).
   get checks(): GradeCheck[] {
     if (!this.grade || this.mass <= 0) return [];
-    return this.grade.ranges.filter(r => r.min != null || r.max != null).map(r => {
+    const ranged = this.grade.ranges.filter(r => r.min != null || r.max != null);
+    const out: GradeCheck[] = ranged.map(r => {
       const fact = r2(this.pct(r.element));
       const ok = (r.min == null || fact >= r.min) && (r.max == null || fact <= r.max);
       return { element: r.element, fact, min: r.min, max: r.max, ok };
     });
+    const imp = Object.entries((this.grade.impurities ?? {}) as Record<string, number | undefined>)
+      .filter(([e, max]) => e !== "total" && max != null && !ranged.some(r => r.element === e) && this.total(e) > 0);
+    for (const [e, max] of imp) {
+      const fact = this.pct(e);
+      out.push({ element: e, fact, max, ok: fact <= max! });
+    }
+    return out;
   }
   get complies() { return this.checks.length > 0 && this.checks.every(c => c.ok); }
   get failed() { return this.checks.filter(c => !c.ok); }
