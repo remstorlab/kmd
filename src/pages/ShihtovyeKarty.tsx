@@ -9,7 +9,7 @@ import {
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
   PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO,
-  PrikazPlavka, oborotHint, oborotOver,
+  PrikazPlavka, oborotHint, oborotOver, oborotLimit,
 } from "../data/mock";
 import { returnToStock } from "../data/stock";
 import {
@@ -237,9 +237,14 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   const elName = (id: string) => { const e = chemElements.find(x => x.id === id); return e ? `${e.name} (${e.shortName})` : id; };
 
   const [name, setName] = useState(init?.name || "");
-  const [alloyId, setAlloyId] = useState(init?.alloyId ?? "");
+  // Марка сплава и назначение слитков задаются в приказе на плавку — в карте приказа только для чтения
+  // (у старых карт без приказа — вводятся в карте)
+  const fromPrikaz = !!prikaz;
+  const [ownAlloyId, setAlloyId] = useState(init?.alloyId ?? "");
+  const alloyId = fromPrikaz ? prikaz.alloyId ?? init?.alloyId ?? "" : ownAlloyId;
   const [plavkaNo, setPlavkaNo] = useState(() => karta?.plavkaNo ?? nextPlavkaNo(shihtovyeKarty));
-  const [naznachenie, setNaznachenie] = useState(init?.naznachenie ?? "");
+  const [ownNaznachenie, setNaznachenie] = useState(init?.naznachenie ?? "");
+  const naznachenie = fromPrikaz ? prikaz.naznachenie ?? init?.naznachenie ?? "" : ownNaznachenie;
   const [note, setNote] = useState(karta?.note ?? "");
   const [materials, setMaterials] = useState<MatRow[]>(() => (karta?.materials ?? []).map(m => toRow(m, dmItems)));
   // Вложенные экраны: …/from-sklad, …/dop-material, …/raschet (результат расчёта)
@@ -291,16 +296,23 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
       if (why) { rejected.push(`${it.name}: ${why}`); return []; }
       return [{ it, qty }];
     });
-    if (rejected.length) show(`Не добавлено — ${rejected.join("; ")}`);
-    return accepted;
+    return { accepted, rejected };
   };
 
   // Позиция добавляется целиком (все изделия, весь лигатурный вес); повторно одна позиция не добавляется
   const addFromSklad = (picked: { row: StockRow; qty: number }[]) => {
-    const accepted = acceptPicked(picked);
+    const { accepted, rejected } = acceptPicked(picked);
     setMaterials(prev => [...prev, ...accepted.filter(({ it }) => !prev.some(m => m.srcId === it.id)).map(({ it }) => stockRowOf(it))]);
     setShowFromSklad(false);
-    if (accepted.length === picked.length) show(`Добавлено позиций: ${accepted.length}. Позиции резервируются целиком при сохранении карты`);
+    // Позиции с достигнутым или превышенным предельным оборотом добавляются — с предупреждением
+    const over = accepted.filter(({ it }) => oborotOver(it.oborot ?? 0, it.metal));
+    const overText = over.length
+      ? ` ⚠ Оборот превышен (≥ предельного): ${over.map(({ it }) => `${it.name}, № ${it.nomenkl} — оборот ${it.oborot ?? 0} при пределе ${oborotLimit(it.metal) ?? "—"}`).join("; ")}. Рекомендуется передать на аффинаж`
+      : "";
+    const rejectedText = rejected.length ? `Не добавлено — ${rejected.join("; ")}.` : "";
+    show(rejected.length
+      ? `${rejectedText}${overText}`
+      : `Добавлено позиций: ${accepted.length}. Позиции резервируются целиком при сохранении карты.${overText}`);
   };
 
   const setVes = (key: string, v: string) => setMaterials(prev => prev.map(m => (m.key === key ? { ...m, ves: v } : m)));
@@ -354,8 +366,8 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   const failText = calc.failed.map(c => `${shortName(c.element)} ${fmt2(c.fact)} % при норме ${normText(c)}`).join("; ");
   const oformitBlock: string | null =
     materials.length === 0 ? "Добавьте хотя бы один материал"
-    : !grade ? "Выберите марку сплава"
-    : !naznachenie ? "Выберите назначение слитков"
+    : !grade ? (fromPrikaz ? "Укажите марку сплава в приказе на плавку" : "Выберите марку сплава")
+    : !naznachenie ? (fromPrikaz ? "Укажите назначение слитков в приказе на плавку" : "Выберите назначение слитков")
     : !plavkaNo.trim() ? "Укажите номер плавки"
     : materials.some(isIssued) ? "Замените позиции, выданные в другой операции"
     : calc.complies ? null
@@ -474,8 +486,8 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
 
       <div className="grid grid-cols-4 gap-4 mb-5">
         <Field label="Наименование" required={!ro} full><Input value={name} onChange={setName} placeholder="Наименование шихты" disabled={ro} /></Field>
-        <Field label="Марка сплава" required={!ro} full>
-          <Select value={alloyId} options={gradeOptions} optionLabel={gradeLabel} onChange={setAlloyId} disabled={ro} />
+        <Field label={fromPrikaz ? "Марка сплава (из приказа)" : "Марка сплава"} required={!ro && !fromPrikaz} full>
+          <Select value={alloyId} options={gradeOptions} optionLabel={gradeLabel} onChange={setAlloyId} disabled={ro || fromPrikaz} />
         </Field>
         <Field label="Номер плавки" required={!ro}><Input value={plavkaNo} onChange={v => setPlavkaNo(v.replace(/[^\d]/g, ""))} placeholder="1" disabled={ro} /></Field>
         {/* Оборот шихты — расчётный (максимум оборотов материалов), не редактируется */}
@@ -498,8 +510,8 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
             )}
           </div>
         </Field>
-        <Field label="Назначение слитков" required={!ro}>
-          <Select value={naznachenie} options={naznOptions} optionLabel={v => v || "Не выбрано"} onChange={setNaznachenie} disabled={ro} />
+        <Field label={fromPrikaz ? "Назначение слитков (из приказа)" : "Назначение слитков"} required={!ro && !fromPrikaz}>
+          <Select value={naznachenie} options={naznOptions} optionLabel={v => v || "Не выбрано"} onChange={setNaznachenie} disabled={ro || fromPrikaz} />
         </Field>
         <Field label="Примечание" full><Textarea value={note} onChange={setNote} rows={2} placeholder={grade?.allowDeviation ? "Обязательно при отклонении состава от марки" : ""} disabled={ro} /></Field>
       </div>
@@ -916,16 +928,36 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
   const mass = r2(karty.reduce((s, k) => s + kartaMass(k), 0));
   const gradeName = (k: ShihtovayaKarta) => alloyGrades.find(g => g.id === k.alloyId)?.name ?? "";
 
-  const error = !number.trim() ? "Укажите номер приказа" : !date.trim() ? "Укажите дату приказа" : !name.trim() ? "Укажите наименование" : "";
+  // Марка сплава и назначение слитков — общие для всех карт приказа (в картах только для чтения).
+  // После оформления хотя бы одной карты не меняются: состав оформленных карт рассчитан под эту марку.
+  const [alloyId, setAlloyId] = useState(prikaz?.alloyId ?? "");
+  const [naznachenie, setNaznachenie] = useState(prikaz?.naznachenie ?? "");
+  const headLocked = karty.some(k => k.status !== "На редактировании");
+  const gradeOptions = ["", ...alloyGrades.filter(g => g.status === "Активно" || g.id === alloyId).map(g => g.id)];
+  const gradeLabel = (id: string) => { const g = alloyGrades.find(x => x.id === id); return g ? `${g.name} (${g.nd})` : "Выберите марку"; };
+  const naznOptions = ["", ...new Set([...spravValues("Назначение слитков"), ...(naznachenie ? [naznachenie] : [])])];
+
+  const error = !number.trim() ? "Укажите номер приказа" : !date.trim() ? "Укажите дату приказа" : !name.trim() ? "Укажите наименование"
+    : !alloyId ? "Выберите марку сплава" : !naznachenie ? "Выберите назначение слитков" : "";
   const build = (): PrikazPlavka => {
-    const head = { number: number.trim(), date: date.trim(), name: name.trim(), note: note.trim() || undefined, files };
+    const head = { number: number.trim(), date: date.trim(), name: name.trim(), note: note.trim() || undefined, files, alloyId, naznachenie };
     return prikaz
       ? { ...prikaz, ...head }
       : { id: `pp-${Date.now()}`, ...head, createdAt: new Date().toISOString(), createdBy: currentUser?.fullName || currentUser?.name || "—" };
   };
-  const save = () => { if (error) { show(error); return; } onSave(build()); };
+  const save = () => {
+    if (error) { show(error); return; }
+    const p = build();
+    // Марка и назначение переносятся в карты приказа, которые ещё на редактировании
+    if (prikaz) setShihtovyeKarty(prev => prev.map(k => (k.prikazId === p.id && k.status === "На редактировании" ? { ...k, alloyId: p.alloyId, naznachenie: p.naznachenie } : k)));
+    onSave(p);
+  };
   const addKarta = () => {
-    if (prikaz) { screen.open("karta-new"); return; }
+    if (prikaz) {
+      if (alloyId !== (prikaz.alloyId ?? "") || naznachenie !== (prikaz.naznachenie ?? "")) { show("Марка сплава или назначение слитков изменены — сохраните приказ, затем добавьте ШК"); return; }
+      screen.open("karta-new");
+      return;
+    }
     if (error) { show(`${error} — затем добавьте ШК`); return; }
     onCreateAndAdd(build());
   };
@@ -971,7 +1003,16 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave, onCreateAndAdd
         <Field label="Номер приказа" required={!ro}><Input value={number} onChange={setNumber} placeholder="№" disabled={ro} /></Field>
         <Field label="Дата приказа" required={!ro}><Input value={date} onChange={setDate} placeholder="дд.мм.гггг" disabled={ro} /></Field>
         <Field label="Наименование" required={!ro} full><Input value={name} onChange={setName} placeholder="Например: слитки СрМ 92,5 для монет пруф-качества" disabled={ro} /></Field>
+        <Field label="Марка сплава" required={!ro && !headLocked} full>
+          <Select value={alloyId} options={gradeOptions} optionLabel={gradeLabel} onChange={setAlloyId} disabled={ro || headLocked} />
+        </Field>
+        <Field label="Назначение слитков" required={!ro && !headLocked}>
+          <Select value={naznachenie} options={naznOptions} optionLabel={v => v || "Не выбрано"} onChange={setNaznachenie} disabled={ro || headLocked} />
+        </Field>
         <Field label="Примечание" full><Textarea value={note} onChange={setNote} rows={2} disabled={ro} /></Field>
+        {!ro && headLocked && (
+          <div className="col-span-4 -mt-2 text-xs text-gray-500">Марка сплава и назначение слитков не меняются: в приказе есть оформленные шихтовые карты</div>
+        )}
       </div>
 
       <div className="mb-5">

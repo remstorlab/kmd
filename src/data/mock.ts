@@ -296,6 +296,9 @@ export interface PrikazPlavka {
   date: string;
   name: string;
   note?: string;
+  // Марка сплава и назначение слитков — задаются в приказе, во всех его шихтовых картах только для чтения
+  alloyId?: string;
+  naznachenie?: string;
   // Прикреплённые документы приказа
   files?: File[];
   createdAt: string;
@@ -832,6 +835,11 @@ export const initialPrikazy: PrikazPlavka[] = [
   { id: "pp4", number: "1185", date: "02.04.2026", name: "Слитки ЗлСрМ 585-80 для сувенирной продукции", createdAt: "2026-04-02T09:00:00", createdBy: "Ковалева Елена" },
   { id: "pp5", number: "1010", date: "13.01.2026", name: "Слитки Ср 99,99 для инвестиционных монет", createdAt: "2026-01-13T08:20:00", createdBy: "Петров Сергей Владимирович" },
 ];
+// Марка сплава и назначение слитков приказа — как в его шихтовых картах
+for (const p of initialPrikazy) {
+  const k = initialShihtovyeKarty.find(x => x.prikazId === p.id);
+  if (k) { p.alloyId = k.alloyId; p.naznachenie = k.naznachenie; }
+}
 
 // --- Подотчётники ---
 // Позиции процессов — позиции операций движения материала соответствующего подотчётного лица
