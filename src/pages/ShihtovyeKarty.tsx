@@ -710,8 +710,6 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
           probaPct
           withStatus
           excludeKlass={[STONE_KLASS]}
-          // Позиция берётся целиком — без ввода количества и веса
-          qtyInput={false}
           emptyText={pickSklad === ALL_SKLADY ? "Нет доступных позиций на складах" : `Нет доступных позиций на складе «${pickSklad}»`}
           addLabel="Добавить выбранные"
           onClose={() => setShowFromSklad(false)}

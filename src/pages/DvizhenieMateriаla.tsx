@@ -3,224 +3,88 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, PosStatusBadge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   PrintIcon, useToast, Toast, useConfirm, ConfirmDialog,
-  Field, Input, Select, MultiSelect, KlassSelect, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, probaText, NetAuAg, NET_AU_AG, ChemTip, usePaged,
+  Field, Input, Select, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, probaText, NetAuAg, NET_AU_AG, ChemTip, usePaged,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
-import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses, OBOROT_CODE, oborotOf, DMItem } from "../data/mock";
+import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses, OBOROT_CODE, oborotOf, DMItem, isStoneKlass } from "../data/mock";
 import { Plus } from "lucide-react";
 import { takeFromStock, returnToStock, IssueLine, scaleChem, addChem } from "../data/stock";
 import { isSkladMaterial, markIssuedElsewhere, itogoMaterials, prikazStatus, r2, kartaOborot, isOborotGrade } from "../data/shihta";
-import { IssueQtyCell, IssueLigCell } from "../components/IssueInputs";
+import { NomenklCell, IssueLigCell, RezervWarning, ensurePartNomenkl } from "../components/IssueInputs";
+import StockPickerModal, { StockRow, PickedRow, IssueDraft } from "../components/StockPickerModal";
 import { useScreen, useTabParam } from "../router";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import DMPositionViewModal, { DMPositionView } from "../components/DMPositionViewModal";
-import DMPositionFormModal, { PrihodPosition, emptyPosition, locOf, parseLoc, NO_LOC, oborotFromForm } from "../components/DMPositionFormModal";
+import DMPositionFormModal, { PrihodPosition, emptyPosition, locOf, parseLoc, NO_LOC, oborotFromForm, useUsedNomenkl, nextNomenkl } from "../components/DMPositionFormModal";
 
 // ── Добавить позицию ДМ со склада ─────────────────────────────────────────────
+// Общее окно подбора (StockPickerModal) с панелью «К выдаче»: выдаётся вся позиция или часть (количество,
+// лиг. вес части, новый номенкл. № части). Запись склада делится при сохранении операции (applyVydacha).
 
+// Позиция склада ДМ → строка окна подбора
+const dmStockRow = (i: DMItem): StockRow => ({
+  id: i.id, src: "dm", nomenkl: i.nomenkl, name: i.name, klass: i.klass, code: i.metal, qty: i.qty, unit: "шт",
+  proba: i.proba, lig: i.ligWeight, net: i.netWeight, location: i.location, sklad: i.sklad, chem: i.chem,
+  oborot: oborotOf(i), status: i.status,
+});
 
+// Выбранная в окне подбора позиция → позиция выдачи: вес — введённый вес части (у камней — пропорционально
+// количеству), чистый вес и хим. состав — в доле выдаваемой части
+const operFromPicked = ({ row, qty, issueLig, partNomenkl }: PickedRow): Omit<OperPosition, "n"> => {
+  const line = IssueLine.of({ qty: row.qty, issue: qty, lig: row.lig, issueLig, klass: row.klass });
+  const lig = line.issuedLig ?? (row.lig != null ? Math.round(row.lig * line.share * 100) / 100 : 0);
+  const chem = scaleChem(row.chem, line.share);
+  return {
+    name: row.name, nomenkl: row.nomenkl, klass: row.klass, proba: row.proba ?? 0, qty: line.issue || undefined, ves: lig,
+    ag: chem?.ag || "-", cu: chem?.cu || "-", chem, loc: row.location, metal: row.code, lig, net: line.part(row.net) ?? undefined,
+    srcId: row.id,
+    ...(line.partial && partNomenkl ? { partNomenkl } : {}),
+    ...(row.oborot ? { oborot: row.oborot } : {}),
+  };
+};
 
-const ALL_KLASS = "Все классы";
-const ALL_METALS = "Все металлы";
-const ALL_LOCS = "Все места хранения";
-const ALL_STATUSES = "Все статусы";
-
-function AddDMPositionModal({ already = [], onClose, onAdd }: {
+function AddDMPositionModal({ already = [], edit, usedNomenkl, onClose, onAdd }: {
   // Уже добавленные в выдачу: id записей склада (srcId) или номенкл. № (позиции без ссылки) — повторно не предлагаются
   already?: string[];
+  // «Изменить» позицию выдачи: строка подбора (запись склада целиком) и поля карточки «К выдаче»
+  edit?: { row: StockRow; draft: IssueDraft } | null;
+  // Занятые номенкл. № (для номера выдаваемой части)
+  usedNomenkl: Iterable<string>;
   onClose: () => void;
-  onAdd: (rows: Omit<OperPosition, "n">[]) => void;
+  onAdd: (rows: PickedRow[]) => void;
 }) {
   const { dmItems, shihtovyeKarty } = useApp();
-  // Выбранные позиции (id) и количество к выдаче; без ввода — всё количество позиции
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [qtyById, setQtyById] = useState<Record<string, string>>({});
-  // Частичная выдача: лигатурный вес выдаваемой части (остаток на складе рассчитывается)
-  const [ligById, setLigById] = useState<Record<string, string>>({});
-  // Количество к выдаче: по умолчанию — всё количество позиции; пустое поле — ошибка
-  const issueQty = (i: { id: string; qty: number }) => {
-    if (i.qty <= 1 || qtyById[i.id] === undefined) return i.qty;
-    const n = parseInt(qtyById[i.id], 10);
-    return Number.isFinite(n) ? Math.min(Math.max(n, 0), i.qty) : 0;
-  };
-  const lineOf = (i: { id: string; qty: number; ligWeight: number }) =>
-    IssueLine.of({ qty: i.qty, issue: issueQty(i), lig: i.ligWeight, issueLig: ligById[i.id] });
-  const [search, setSearch] = useState("");
-  const [klass, setKlass] = useState(ALL_KLASS);
-  const [metal, setMetal] = useState(ALL_METALS);
-  const [loc, setLoc] = useState(ALL_LOCS);
-  const [status, setStatus] = useState<string[]>([]);
-  const [onlySelected, setOnlySelected] = useState(false);
-
-  type Item = (typeof dmItems)[number];
   // Позиции в резерве тоже можно выдать — тогда шихтовая карта, которая их резервирует, вернётся в «На редактировании».
   // Выдача — только со склада выдачи (СДМ2); позиции склада приёмки (СДМ1) сначала перемещаются по требованию
-  const availableItems = dmItems.filter(i => i.sklad === MAIN_SKLAD && !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв") && !already.includes(i.id) && !already.includes(i.nomenkl));
+  const rows = [
+    ...dmItems
+      .filter(i => i.sklad === MAIN_SKLAD && !isGPKlass(i.klass) && (i.status === "На складе" || i.status === "Резерв") && !already.includes(i.id) && !already.includes(i.nomenkl) && i.id !== edit?.row.id)
+      .map(dmStockRow),
+    ...(edit ? [edit.row] : []),
+  ];
   const reservedBy = (nomenkl: string) => shihtovyeKarty.find(k => k.status !== "Выполнена" && k.materials.some(m => m.nomenkl === nomenkl));
-  const affectedKarty = [...new Set(
-    availableItems.filter(i => selected.has(i.id) && i.status === "Резерв").map(i => reservedBy(i.nomenkl)?.name).filter(Boolean),
-  )];
-
-  const codeLabel = useMaterialCodeLabel();
-  const metals = [ALL_METALS, ...Array.from(new Set(availableItems.map(i => i.metal))).sort()];
-  const locations = [ALL_LOCS, ...Array.from(new Set(availableItems.map(i => i.location))).sort()];
-
-  const filtered = availableItems.filter(i => {
-    const q = search.trim().toLowerCase();
-    return (!q || i.name.toLowerCase().includes(q) || i.nomenkl.toLowerCase().includes(q))
-      && (klass === ALL_KLASS || i.klass === klass)
-      && (metal === ALL_METALS || i.metal === metal)
-      && (loc === ALL_LOCS || i.location === loc)
-      && (status.length === 0 || status.includes(i.status))
-      && (!onlySelected || selected.has(i.id));
-  });
-
-  const { sorted, sort, toggleSort } = useSort(filtered, {
-    name: i => i.name,
-    nomenkl: i => i.nomenkl,
-    klass: i => i.klass,
-    proba: i => i.proba,
-    netWeight: i => i.netWeight,
-    oborot: i => oborotOf(i),
-    location: i => i.location,
-    qty: i => i.qty,
-    ligWeight: i => i.ligWeight,
-  });
-
-  const selectedCount = selected.size;
-  const allChecked = filtered.length > 0 && filtered.every(i => selected.has(i.id));
-
-  const toggle = (id: string) => setSelected(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const toggleAll = () => setSelected(prev => {
-    const next = new Set(prev);
-    filtered.forEach(i => (allChecked ? next.delete(i.id) : next.add(i.id)));
-    return next;
-  });
-
-  const reset = () => { setSearch(""); setKlass(ALL_KLASS); setMetal(ALL_METALS); setLoc(ALL_LOCS); setStatus([]); setOnlySelected(false); };
-
-  const add = () => {
-    const chosen = availableItems.filter(i => selected.has(i.id));
-    if (chosen.length === 0) return;
-    if (chosen.some(i => !lineOf(i).ok)) return;
-    // Частичная выдача: вес — введённый выданный, чистый вес и хим. состав — в его доле;
-    // запись склада делится при сохранении операции (applyVydacha)
-    onAdd(chosen.map(i => {
-      const line = lineOf(i);
-      const lig = line.issuedLig ?? i.ligWeight;
-      const chem = scaleChem(i.chem, line.share);
-      return {
-        name: i.name, nomenkl: i.nomenkl, klass: i.klass, proba: i.proba, qty: line.issue || undefined, ves: lig,
-        ag: chem?.ag || "-", cu: chem?.cu || "-", chem, loc: i.location, metal: i.metal, lig, net: line.part(i.netWeight) ?? undefined,
-        srcId: i.id,
-        ...(i.oborot ? { oborot: i.oborot } : {}),
-      };
-    }));
-  };
-
-  const pg5 = usePaged(sorted, "dm-add-pick");
-  const restMissing = availableItems.some(i => selected.has(i.id) && !lineOf(i).ok);
   return (
-    <Modal
+    <StockPickerModal
       title={`Добавить позицию ДМ со склада «${MAIN_SKLAD}»`}
+      rows={rows}
+      showWeights
+      withStatus
+      selectableStatuses={["На складе", "Резерв"]}
+      defaultStatus="Все статусы"
+      statusNote={r => (r.status === "Резерв" ? (k => (k ? `ШК ${k.plavkaNo}` : undefined))(reservedBy(r.nomenkl)) : undefined)}
+      issue={{ usedNomenkl, initial: edit ? { [edit.row.id]: edit.draft } : undefined }}
+      emptyText="Нет доступных позиций на складе ДМ"
+      notice={picked => {
+        const affected = [...new Set(picked.filter(r => r.status === "Резерв").map(r => reservedBy(r.nomenkl)?.name).filter(Boolean))];
+        return affected.length > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm text-orange-800">
+            ⚠ Выбраны позиции из резерва. После выдачи шихтовая карта {affected.map(n => `«${n}»`).join(", ")} вернётся в статус «На редактировании» и станет недоступна для плавки.
+          </div>
+        );
+      }}
       onClose={onClose}
-      largeWide
-      footer={<>
-        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
-        <Btn onClick={add} disabled={selectedCount === 0 || restMissing}>Добавить{selectedCount > 0 ? ` (${selectedCount})` : ""}</Btn>
-      </>}
-    >
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 grid grid-cols-4 gap-3 items-end">
-        <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Наименование / Номенкл. №</label>
-          <SearchInput value={search} onChange={setSearch} placeholder="Поиск..." />
-        </div>
-        <Field label="Класс материала"><KlassSelect value={klass} onChange={setKlass} allLabel={ALL_KLASS} /></Field>
-        <Field label="Код материала"><Select value={metal} options={metals} onChange={setMetal} optionLabel={v => (v === ALL_METALS ? v : codeLabel(v))} /></Field>
-        <Field label="Место хранения"><Select value={loc} options={locations} onChange={setLoc} /></Field>
-        <Field label="Статус"><MultiSelect values={status} options={["На складе", "Резерв"]} onChange={setStatus} allLabel={ALL_STATUSES} /></Field>
-        <label className="flex items-center gap-2 text-sm text-gray-700 h-9 cursor-pointer">
-          <input type="checkbox" checked={onlySelected} onChange={e => setOnlySelected(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-          Только выбранные
-        </label>
-        <button onClick={reset} className="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
-      </div>
-
-      <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-        <span>Найдено: {filtered.length} из {availableItems.length}</span>
-        <span>Выбрано: {selectedCount}</span>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-          {availableItems.length === 0 ? "Нет доступных позиций на складе ДМ" : "Нет позиций по заданным фильтрам"}
-        </div>
-      ) : (
-        <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10"><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
-              <th className="w-10 px-3 py-2"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 accent-blue-600" title="Выбрать все найденные" /></th>
-              <SortTh sortKey="name" sort={sort} onSort={toggleSort} className="px-3 py-2">Наименование</SortTh>
-              <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл.№</SortTh>
-              <SortTh sortKey="klass" sort={sort} onSort={toggleSort} className="px-3 py-2">Класс</SortTh>
-              <SortTh sortKey="proba" sort={sort} onSort={toggleSort} className="px-3 py-2">Проба</SortTh>
-              <SortTh sortKey="netWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
-              <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
-              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
-              <th className="px-3 py-2 text-left">Статус</th>
-              <SortTh sortKey="qty" sort={sort} onSort={toggleSort} className="px-3 py-2">Количество</SortTh>
-              <SortTh sortKey="ligWeight" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
-            </tr></thead>
-            <tbody className="divide-y divide-gray-100">
-              {pg5.pageItems.map(i => {
-                const checked = selected.has(i.id);
-                const karta = i.status === "Резерв" ? reservedBy(i.nomenkl) : undefined;
-                return (
-                  <tr key={i.id} className={`hover:bg-gray-50 ${checked ? "bg-blue-50/50" : oborotRowCls(oborotOf(i), i.metal)}`}>
-                    <td className="px-3 py-2"><input type="checkbox" checked={checked} onChange={() => toggle(i.id)} className="w-4 h-4 accent-blue-600" /></td>
-                    <td className="px-3 py-2 font-medium">{i.name}</td>
-                    <td className="px-3 py-2 text-gray-500">{i.nomenkl}</td>
-                    <td className="px-3 py-2"><KlassCode value={i.klass} /></td>
-                    <td className="px-3 py-2">{probaText(i.proba)}</td>
-                    <td className="px-3 py-2"><NetAuAg chem={i.chem} /></td>
-                    <td className="px-3 py-2"><OborotValue value={oborotOf(i)} code={i.metal} /></td>
-                    <td className="px-3 py-2 text-gray-500">{i.location}</td>
-                    <td className="px-3 py-2">
-                      <PosStatusBadge status={i.status} nomenkl={i.nomenkl} />
-                      {karta && <div className="text-xs text-gray-400 mt-0.5" title={karta.name}>ШК {karta.plavkaNo}</div>}
-                    </td>
-                    <td className="px-3 py-2 text-gray-700 align-top">
-                      {checked
-                        ? <IssueQtyCell line={lineOf(i)} editable onChange={v => setQtyById(prev => ({ ...prev, [i.id]: v }))} />
-                        : (i.qty || "—")}
-                    </td>
-                    <td className="px-3 py-2 text-gray-700 align-top">
-                      {checked
-                        ? <IssueLigCell line={lineOf(i)} editable value={ligById[i.id] ?? ""} onChange={v => setLigById(prev => ({ ...prev, [i.id]: v }))} />
-                        : i.ligWeight.toFixed(2)}
-                    </td>
-                  </tr>
-                );
-              })}
-              <FillerRows count={pg5.fill} cols={11} />
-            </tbody>
-          </table>
-          {pg5.pager}
-        </div>
-      )}
-      {restMissing && (
-        <div className="mt-3 text-sm text-red-600">Укажите количество к выдаче, а при частичной выдаче — лигатурный вес выдаваемой части (больше 0 и меньше веса позиции)</div>
-      )}
-      {affectedKarty.length > 0 && (
-        <div className="mt-3 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm text-orange-800">
-          ⚠ Выбраны позиции из резерва. После выдачи шихтовая карта {affectedKarty.map(n => `«${n}»`).join(", ")} вернётся в статус «На редактировании» и станет недоступна для плавки.
-        </div>
-      )}
-    </Modal>
+      onAdd={onAdd}
+    />
   );
 }
 
@@ -654,31 +518,22 @@ function SpisanieTab({ losses, setLosses, files, setFiles, vydacha, vozvrat, cod
 
 // ── Таблица позиций операции: те же столбцы и порядок, что на складе ДМ ───────
 
-// Редактирование количества и веса выдаваемой части прямо в таблице (вкладка «Выдача»)
-type OperIssueEdit = {
-  // Расчёт выдачи позиции относительно записи склада; null — позиция без записи склада (не редактируется)
-  line: (p: OperPosition) => IssueLine | null;
-  ligValue: (p: OperPosition) => string;
-  setQty: (p: OperPosition, v: string) => void;
-  setLig: (p: OperPosition, v: string) => void;
-};
-
-function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, issue, probaPct = false }: {
+function OperPositionsTable({ rows, view, readOnly, onView, onEdit, canEdit, onDelete, issueLine, probaPct = false }: {
   rows: OperPosition[];
   view: (p: OperPosition) => DMPositionView;
   readOnly: boolean;
   onView: (p: OperPosition) => void;
-  // Если передан — у позиции есть иконка редактирования
+  // Если передан — у позиции есть иконка редактирования (canEdit — только у подходящих позиций)
   onEdit?: (p: OperPosition) => void;
+  canEdit?: (p: OperPosition) => boolean;
   onDelete: (p: OperPosition) => void;
-  issue?: OperIssueEdit;
+  // Вкладка «Выдача»: расчёт выдачи позиции относительно записи склада (вес части и остаток на складе).
+  // Количество и вес в таблице не редактируются — только в окне подбора («Изменить»)
+  issueLine?: (p: OperPosition) => IssueLine | null;
   // Проба в процентах с 2 знаками (плавка — как в шихтовой карте)
   probaPct?: boolean;
 }) {
-  const { dmItems } = useApp();
-  // Позиция из резерва шихтовой карты выдаётся целиком — без ввода количества и веса
-  const isRezerv = (p: OperPosition) => !!p.srcId && dmItems.find(i => i.id === p.srcId)?.status === "Резерв";
-  const lineOf = (p: OperPosition) => (issue && !readOnly && !isRezerv(p) ? issue.line(p) : null);
+  const lineOf = (p: OperPosition) => issueLine?.(p) ?? null;
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(rows, {
     nomenkl: p => p.nomenkl,
@@ -717,16 +572,14 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
             const line = lineOf(p);
             return (
               <tr key={p.n} className={`hover:bg-gray-50 ${oborotRowCls(v.oborot, v.metal)}`}>
-                <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                <td className="px-3 py-2 text-gray-500 align-top"><NomenklCell nomenkl={p.nomenkl} partNomenkl={p.partNomenkl} /></td>
                 <td className="px-3 py-2 font-medium">{p.name}</td>
-                <td className="px-3 py-2 align-top">
-                  {line && issue ? <IssueQtyCell line={line} editable onChange={val => issue.setQty(p, val)} /> : (p.qty ?? "—")}
-                </td>
+                <td className="px-3 py-2 align-top">{p.qty ?? "—"}</td>
                 <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                 <td className="px-3 py-2 text-blue-600 font-medium">{v.metal ? codeLabel(v.metal) : "—"}</td>
                 <td className="px-3 py-2">{probaPct && p.proba ? (p.proba / 10).toFixed(2).replace(".", ",") : probaText(p.proba)}</td>
                 <td className="px-3 py-2 align-top">
-                  {line && issue ? <IssueLigCell line={line} editable value={issue.ligValue(p)} onChange={val => issue.setLig(p, val)} /> : dash(v.ligWeight)}
+                  {isStoneKlass(p.klass) ? "—" : line?.partial ? <IssueLigCell line={line} /> : dash(v.ligWeight)}
                 </td>
                 <td className="px-3 py-2"><NetAuAg chem={v.chem} /></td>
                 <td className="px-3 py-2"><OborotValue value={v.oborot} code={v.metal} /></td>
@@ -734,7 +587,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, onDelete, is
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => onView(p)} />
-                    {!readOnly && onEdit && <EditIcon onClick={() => onEdit(p)} />}
+                    {!readOnly && onEdit && (!canEdit || canEdit(p)) && <EditIcon onClick={() => onEdit(p)} />}
                     {!readOnly && <DeleteIcon onClick={() => onDelete(p)} />}
                   </div>
                 </td>
@@ -1297,39 +1150,61 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     const r2 = (v: number) => Math.round(v * 100) / 100;
     return { qty: it.qty + parent.qty, lig: r2(it.ligWeight + parent.ligWeight), net: r2(it.netWeight + parent.netWeight), chem: addChem(it.chem, parent.chem) };
   };
-  // Введённый вес выдаваемой части (строка поля); по умолчанию — текущий вес позиции
-  const [ligDraft, setLigDraft] = useState<Record<number, string>>({});
-  const ligValue = (p: OperPosition) => ligDraft[p.n] ?? (p.lig != null ? String(p.lig) : "");
+  // Вес выдаваемой части (строка) — текущий вес позиции
+  const ligValue = (p: OperPosition) => (p.lig != null ? String(p.lig) : "");
   const issueLine = (p: OperPosition, issue = p.qty, issueLig = ligValue(p)) => {
     const b = issueBase(p);
-    return b ? IssueLine.of({ qty: b.qty, issue: issue ?? b.qty, lig: b.lig, issueLig }) : null;
+    return b ? IssueLine.of({ qty: b.qty, issue: issue ?? b.qty, lig: b.lig, issueLig, klass: p.klass }) : null;
   };
-  // Пересчёт позиции по количеству и весу: вес — введённый (или вся позиция), чистый вес и хим. состав — в его доле
-  const reissue = (p: OperPosition, issue: number, issueLig: string): OperPosition => {
+  // Пересчёт позиции по количеству и весу: вес — введённый (или вся позиция; у камней — пропорционально
+  // количеству), чистый вес и хим. состав — в доле выдаваемой части; номер части — из окна подбора
+  const reissue = (p: OperPosition, issue: number, issueLig: string, partNomenkl?: string): OperPosition => {
     const b = issueBase(p);
     const line = issueLine(p, issue, issueLig);
     if (!b || !line) return p;
     if (!line.ok) return { ...p, qty: issue };
-    const lig = line.issuedLig ?? p.lig ?? 0;
+    const lig = line.issuedLig ?? (b.lig != null ? r2(b.lig * line.share) : p.lig ?? 0);
     const chem = scaleChem(b.chem, line.share);
-    return { ...p, qty: issue || undefined, lig, ves: lig, net: line.part(b.net) ?? p.net, chem, ag: chem?.ag || "-", cu: chem?.cu || "-" };
-  };
-  const vydachaIssue: OperIssueEdit = {
-    line: p => issueLine(p),
-    ligValue,
-    setQty: (p, v) => {
-      const b = issueBase(p);
-      if (!b) return;
-      const n = parseInt(v, 10);
-      const issue = Number.isFinite(n) ? Math.min(Math.max(n, 0), b.qty) : 0;
-      setVydacha(prev => prev.map(x => (x.n === p.n ? reissue(x, issue, ligValue(x)) : x)));
-    },
-    setLig: (p, v) => {
-      setLigDraft(prev => ({ ...prev, [p.n]: v }));
-      setVydacha(prev => prev.map(x => (x.n === p.n ? reissue(x, x.qty ?? issueBase(x)?.qty ?? 0, v) : x)));
-    },
+    const { partNomenkl: _old, ...rest } = p;
+    return {
+      ...rest, qty: issue || undefined, lig, ves: lig, net: line.part(b.net) ?? p.net, chem, ag: chem?.ag || "-", cu: chem?.cu || "-",
+      ...(line.partial && partNomenkl ? { partNomenkl } : {}),
+    };
   };
   const badVydacha = vydacha.filter(p => issueLine(p)?.ok === false);
+
+  // «Изменить» позицию выдачи: …/vydacha-edit/<n> — окно подбора с предвыбранной позицией (запись склада целиком)
+  const usedNomenkl = useUsedNomenkl();
+  const vydEditKey = screen.after("vydacha-edit");
+  const vydEdit = vydEditKey ? vydacha.find(p => String(p.n) === vydEditKey) ?? null : null;
+  const editRowOf = (p: OperPosition): { row: StockRow; draft: IssueDraft } | null => {
+    const b = issueBase(p);
+    const it = srcOf(p);
+    if (!b || !it) return null;
+    const line = issueLine(p);
+    return {
+      row: { ...dmStockRow(it), id: `edit-${p.n}`, nomenkl: p.nomenkl, qty: b.qty, lig: b.lig, net: b.net, chem: b.chem, location: it.status === "В подотчёте" ? splitParent(it)?.location ?? p.loc : it.location },
+      draft: { issue: p.qty ?? b.qty, issueLig: line?.needsLig ? ligValue(p) : undefined, partNomenkl: p.partNomenkl },
+    };
+  };
+  const vydEditRow = vydEdit ? editRowOf(vydEdit) : null;
+  // Номера частей позиций выдачи (кроме позиции n) — заняты для подбора
+  const vydPartNomenkls = (exceptN?: number) => vydacha.filter(p => p.n !== exceptN).map(p => p.partNomenkl).filter((n): n is string => !!n);
+  const closeVydPick = () => (vydEdit ? screen.close("vydacha-edit") : setShowAddDM(false));
+  const addVydPicked = (picked: PickedRow[]) => {
+    const editRowId = vydEditRow?.row.id;
+    const edited = picked.find(x => x.row.id === editRowId);
+    if (vydEdit && edited) setVydacha(prev => prev.map(x => (x.n === vydEdit.n ? reissue(x, edited.qty, edited.issueLig ?? ligValue(x), edited.partNomenkl) : x)));
+    const added = picked.filter(x => x.row.id !== editRowId);
+    if (added.length) appendPositions("vydacha", added.map(operFromPicked));
+    closeVydPick();
+    show(vydEdit ? "Позиция изменена" : "Позиции добавлены");
+  };
+  // Позиции из резерва чужих шихтовых карт (не выдаваемых по ШК): карты вернутся в «На редактировании»
+  const rezVydNomenkl = new Set(vydacha.filter(p => srcOf(p)?.status === "Резерв").map(p => p.nomenkl));
+  const rezVydKarty = rezVydNomenkl.size
+    ? shihtovyeKarty.filter(k => !pickedKartaIds.includes(k.id) && k.status !== "Выполнена" && k.materials.some(m => rezVydNomenkl.has(m.nomenkl)))
+    : [];
 
   // Просмотр позиции: …/position/<вкладка>-<n>
   const posKey = screen.after("position");
@@ -1454,8 +1329,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       if (i >= 0) return vydPos[i].srcId ?? out.find(r => r.nomenkl === q.nomenkl && (r.status === "В подотчёте" || r.status === "На складе"))?.id;
       return q.srcId && out.some(r => r.id === q.srcId) ? q.srcId : undefined;
     };
-    const attrs = (q: OperPosition, r?: DMItem) => ({
-      name: q.name, nomenkl: q.nomenkl, klass: q.klass, metal: q.metal ?? r?.metal ?? "", qty: q.qty ?? r?.qty ?? 0, proba: q.proba,
+    // Номенкл. №: у записи из выдачи — номер самой записи (у выданной части — номер части), у новой — из позиции
+    const attrs = (q: OperPosition, r?: DMItem, fromVyd = false) => ({
+      name: q.name, nomenkl: fromVyd ? r?.nomenkl ?? q.partNomenkl ?? q.nomenkl : q.nomenkl, klass: q.klass, metal: q.metal ?? r?.metal ?? "", qty: q.qty ?? r?.qty ?? 0, proba: q.proba,
       ligWeight: q.lig ?? r?.ligWeight ?? q.ves, netWeight: q.net ?? r?.netWeight ?? 0, chem: q.chem ?? r?.chem,
       location: q.loc, sklad: DM_SKLAD, status: "На складе" as const, info: q.info ?? r?.info,
       ...(q.oborot ? { oborot: q.oborot } : { oborot: undefined }),
@@ -1464,8 +1340,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       const src = fromVydacha(q);
       const id = src ?? vzId(q);
       const r = out.find(x => x.id === id);
-      if (!r) out.push({ id, ...attrs(q), zakazchik: head.zakazchik || undefined, ...stamp });
-      else if (r.status === "На складе" || (src && r.status === "В подотчёте")) out = out.map(x => (x.id === id ? { ...x, ...attrs(q, x) } : x));
+      if (!r) out.push({ id, ...attrs(q, undefined, !!src), zakazchik: head.zakazchik || undefined, ...stamp });
+      else if (r.status === "На складе" || (src && r.status === "В подотчёте")) out = out.map(x => (x.id === id ? { ...x, ...attrs(q, x, !!src) } : x));
       return src ? { ...q, srcId: src } : q;
     });
     // Новые позиции, убранные из возврата с прошлого сохранения, — со склада
@@ -1497,11 +1373,16 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     const relocate = new Map<string, string>();
     const differs = (a: number | undefined, b: number) => a !== undefined && Math.abs(a - b) > 0.005;
     // Выдача из записи склада: q изделий (без количества изделий — вся запись), при частичной — по весу
+    // Позиции, выдаваемые заново из записей склада (n → позиция и запись)
+    const pendingPos = new Map<number, { p: OperPosition; partial: boolean }>();
     const addTake = (p: OperPosition, it: { id: string; qty: number }) => {
       const q = p.qty && it.qty > 0 ? p.qty : it.qty;
       take.set(it.id, (take.get(it.id) ?? 0) + q);
-      if (it.qty > 0 && q < it.qty && p.lig) partLig.set(it.id, (partLig.get(it.id) ?? 0) + p.lig);
+      const partial = it.qty > 0 && q < it.qty;
+      // Камни делятся по количеству — без веса
+      if (partial && p.lig && !isStoneKlass(p.klass)) partLig.set(it.id, (partLig.get(it.id) ?? 0) + p.lig);
       pending.set(p.n, it.id);
+      pendingPos.set(p.n, { p, partial });
     };
     for (const p of rows) {
       const it = srcOf(p);
@@ -1526,16 +1407,29 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
       const origin = returned.find(i => i.id === it.id) ?? returned.find(i => i.id === it.parentId);
       if (origin) addTake(p, origin);
     }
+    // Номенкл. № выдаваемых частей: из позиции (резервируется при подборе, сохраняется при перевыдаче);
+    // если номер уже занят — следующий свободный (уведомление)
+    const partPos = [...pendingPos.values()].filter(x => x.partial && x.p.partNomenkl).map(x => x.p);
+    const otherNs = vydacha.filter(p => !pendingPos.has(p.n)).map(p => p.partNomenkl).filter((n): n is string => !!n);
+    const fixed = ensurePartNomenkl(partPos, new Set([...usedNomenkl(opId, returned), ...otherNs]), nextNomenkl);
+    if (fixed.changed.length) show(`Номенкл. № части изменён. ${fixed.changed.join("; ")}`);
+    const partNomenklByN = new Map(fixed.positions.map(p => [p.n, p.partNomenkl!]));
+    const partNomenkl = new Map([...pendingPos].flatMap(([n]) => (partNomenklByN.has(n) ? [[pending.get(n)!, partNomenklByN.get(n)!] as [string, string]] : [])));
     const { items, taken } = takeFromStock(
       returned,
       take,
       i => ({ ...i, status: "В подотчёте" as const, location: NO_LOC }),
       i => `${i.id}-p${stamp}`,
       partLig,
+      partNomenkl,
     );
     const withSrc = vydacha.map(p => {
       const id = linked.get(p.n) ?? (pending.has(p.n) ? taken.get(pending.get(p.n)!) : undefined);
-      return id ? { ...p, srcId: id } : p;
+      const out = id ? { ...p, srcId: id } : p;
+      if (!pendingPos.has(p.n)) return out;
+      // Выдача заново: номер части — итоговый (полная выдача номер не меняет)
+      const { partNomenkl: _n, ...rest } = out;
+      return partNomenklByN.has(p.n) ? { ...rest, partNomenkl: partNomenklByN.get(p.n)! } : rest;
     });
     const posted = postVozvrat(items, withSrc);
     setDmItems(posted.items);
@@ -1680,6 +1574,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               )}
             </div>
           )}
+          {!ro && <RezervWarning karty={rezVydKarty} className="mb-3" />}
           <PositionsSummary rows={vydacha} view={posView} />
           <OperPositionsTable
             probaPct={vid === "Плавка"}
@@ -1688,7 +1583,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
             readOnly={ro}
             onView={p => screen.open("position", `vydacha-${p.n}`)}
             onDelete={p => setVydacha(prev => prev.filter(x => x.n !== p.n))}
-            issue={vydachaIssue}
+            issueLine={p => issueLine(p)}
+            onEdit={p => screen.open("vydacha-edit", String(p.n))}
+            canEdit={p => !!editRowOf(p)}
           />
           <div className="mt-4">
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
@@ -1765,11 +1662,13 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
         </>
       )}
 
-      {showAddDM && (
+      {(showAddDM || vydEdit) && (
         <AddDMPositionModal
           already={vydacha.map(p => p.srcId ?? p.nomenkl)}
-          onClose={() => setShowAddDM(false)}
-          onAdd={rows => { appendPositions("vydacha", rows); setShowAddDM(false); show("Позиции добавлены"); }}
+          edit={vydEditRow}
+          usedNomenkl={[...usedNomenkl(opId), ...vydPartNomenkls(vydEdit?.n)]}
+          onClose={closeVydPick}
+          onAdd={addVydPicked}
         />
       )}
       {showVozvratNew && (

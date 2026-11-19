@@ -5,7 +5,7 @@
 
 import { SkladDoc, ShihtovayaKarta, PrikazPlavka, DOC_PRIHOD_ORDER, DOC_TREBOVANIE } from "../data/mock";
 import { ORDER_HEAD_DEFAULTS } from "../components/PrihodDocModal";
-import { issueShare } from "../data/stock";
+import { IssueLine } from "../data/stock";
 import { Sheet, S, downloadXlsx } from "./xlsx";
 
 const ORG = "РГП «Казахстанский монетный двор Национального Банка Республики Казахстан»";
@@ -84,10 +84,11 @@ function trebovanieSheet(d: SkladDoc, karty: ShihtovayaKarta[], prikazy: PrikazP
   sh.height(h, 18).height(h + 1, 30).height(h + 2, 18);
   for (let c = 1; c <= LAST; c++) sh.set(h + 3, c, c, S.small);
 
-  // Позиции: при частичном перемещении — вес выдаваемой части
+  // Позиции: при частичном перемещении — номер и вес выдаваемой части (камни — без веса)
   const rows = (d.positions ?? []).map(p => {
-    const share = issueShare(p);
-    const lig = p.lig !== null ? round(p.lig * share, 2) : null;
+    const line = IssueLine.of(p);
+    const share = line.share;
+    const lig = line.issuedLig;
     const metals = METALS.map(m => { const v = num(p.chem?.[m.id]); return v === null ? 0 : round(v * share, 3); });
     return { p, lig, metals };
   });
@@ -95,7 +96,7 @@ function trebovanieSheet(d: SkladDoc, karty: ShihtovayaKarta[], prikazy: PrikazP
   rows.forEach(({ p, lig, metals }, i) => {
     sh.set(r, 1, i + 1, S.tdCenter);
     sh.set(r, 2, p.code, S.tdCenter);
-    sh.set(r, 3, p.nomenkl, S.tdCenter);
+    sh.set(r, 3, IssueLine.of(p).partial && p.partNomenkl ? p.partNomenkl : p.nomenkl, S.tdCenter);
     sh.set(r, 4, p.name, S.td);
     sh.set(r, 5, p.issue, S.tdCenter);
     sh.set(r, 6, p.proba ?? "", S.tdCenter);

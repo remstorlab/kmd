@@ -165,6 +165,9 @@ export interface VydachaDocPosition {
   // Частичная выдача (issue < qty): лигатурный вес выдаваемой части, г (вводится вручную);
   // остаток на складе = lig − issueLig (см. IssueLine в data/stock.ts)
   issueLig?: string;
+  // Частичная выдача: номенкл. № выдаваемой части (новая запись склада); остаток сохраняет nomenkl.
+  // Резервируется при подборе, передаётся в takeFromStock при оформлении
+  partNomenkl?: string;
 }
 
 // Статус операции движения материала: (Сохранить) «В работе» → (Оформить) «Завершено».
@@ -185,6 +188,8 @@ export const lossWeight = (l: OperLoss) =>
 export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string; metal?: string; lig?: number; net?: number;
   // id записи склада ДМ, из которой выдана позиция (при частичной выдаче — выделенная часть)
   srcId?: string;
+  // Частичная выдача: номенкл. № выданной части (новая запись склада); nomenkl — номер исходной записи
+  partNomenkl?: string;
   // Оборот позиции (СрМ 925): выдача — оборот записи склада; возврат — из выдачи сохраняется,
   // новая позиция — оборот ШК + 1 (плавка СрМ 92,5) или оборот выданного СрМ 925 (прочие операции)
   oborot?: number;

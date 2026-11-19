@@ -1,19 +1,23 @@
-import { ChemComposition } from "./mock";
+import { ChemComposition, isStoneKlass } from "./mock";
 
 // ── Учёт остатков: частичная выдача / резерв и возврат ─────────────────────────
-// Запись склада (позиция ДМ или ГП) идентифицируется своим id. Номенклатурный № — номер партии (лота):
-// он сохраняется у всех частей, на которые делится запись.
+// Запись склада (позиция ДМ или ГП) идентифицируется своим id. Документы и операции ссылаются на конкретную
+// запись по id (srcId), а не по номенкл. №.
 //
-// Частичная выдача (резерв) q из qty:
-//   • исходная запись остаётся на месте — тот же id, место хранения и статус, количество qty − q,
+// Частичная выдача q из qty (выдача со склада, требование, возврат СГП №2, движение материала):
+//   • исходная запись остаётся на месте — тот же id, тот же номенкл. №, место хранения и статус, количество qty − q,
 //     массы и хим. состав — остаток;
-//   • выделенная часть — новая запись (новый id, parentId = id исходной) с количеством q и
-//     пропорциональными массами и хим. составом; к ней применяется новый статус (выдача, резерв).
-// Документы и операции ссылаются на конкретную запись по id (srcId), а не по номенкл. №.
+//   • выданная часть — новая запись (новый id, parentId = id исходной) с НОВЫМ номенкл. № и количеством q;
+//     массы и хим. состав — по введённому весу части (драгоценные камни — по количеству).
+//   Номер части выдаётся генератором nextNomenkl при подборе и хранится в позиции документа (partNomenkl),
+//   при оформлении передаётся в splitRecord / takeFromStock. Повторное сохранение, перевыдача в «Движении
+//   материала» и откат в «Возврате СГП №2» номер части сохраняют.
+// Полная выдача номер не меняет — меняется сама запись. Шихтовые карты связаны с записью склада по номеру
+// исходной записи.
 // Возврат выделенной части (отмена выдачи / снятие резерва) объединяет её обратно с исходной записью,
-// если та ещё на складе; иначе часть возвращается на склад отдельной записью.
+// если та ещё на складе (номер части при этом исчезает); иначе часть возвращается на склад отдельной записью.
 //
-// Позиция без количества изделий (qty = 0) или выдаваемая полностью не делится — меняется сама запись.
+// Позиция без количества изделий (qty = 0) или выдаваемая полностью не делится.
 
 export interface StockRecord {
   id: string;
@@ -22,6 +26,8 @@ export interface StockRecord {
   netWeight?: number;
   chem?: ChemComposition;
   parentId?: string;
+  // Номенкл. № записи (у выделенной при частичной выдаче части — новый)
+  nomenkl?: string;
   status: string;
   // Склад записи: возвращаемая часть объединяется с исходной записью только на том же складе
   sklad?: string;
@@ -63,10 +69,10 @@ export const addChem = (a:ChemComposition | undefined, b: ChemComposition | unde
 // Можно ли выдать из записи часть (есть количество изделий и берётся меньше него)
 export const isPartial = (it: { qty: number }, q: number) => it.qty > 0 && q > 0 && q < it.qty;
 
-// Делит запись: [остаток с прежним id, выделенная часть с новым id].
-// partLig — лигатурный вес выделенной части (= вес записи − введённый вес остатка на складе): если задан,
-// массы и хим. состав делятся по весу, иначе — пропорционально количеству.
-export function splitRecord<T extends StockRecord>(it: T, q: number, newId: string, partLig?: number): [T, T] {
+// Делит запись: [остаток с прежним id и номером, выделенная часть с новым id].
+// partLig — лигатурный вес выделенной части: если задан, массы и хим. состав делятся по весу, иначе —
+// пропорционально количеству. partNomenkl — номенкл. № выделенной части (без него часть сохраняет прежний).
+export function splitRecord<T extends StockRecord>(it: T, q: number, newId: string, partLig?: number, partNomenkl?: string): [T, T] {
   const byWeight = partLig != null && it.ligWeight != null && it.ligWeight > 0 && partLig > 0 && partLig < it.ligWeight;
   const k = byWeight ? partLig! / it.ligWeight! : q / it.qty;
   const lig = it.ligWeight == null ? undefined : byWeight ? round2(partLig!) : round2(it.ligWeight * k);
@@ -80,6 +86,7 @@ export function splitRecord<T extends StockRecord>(it: T, q: number, newId: stri
   };
   const part = {
     ...it, id: newId, parentId: it.id, qty: q,
+    ...(partNomenkl ? { nomenkl: partNomenkl } : {}),
     ...(lig != null ? { ligWeight: lig } : {}),
     ...(net != null ? { netWeight: net } : {}),
     ...(chemPart ? { chem: chemPart } : {}),
@@ -94,8 +101,10 @@ export function takeFromStock<T extends StockRecord>(
   take: Map<string, number>,
   apply: (it: T) => T,
   newId: (it: T) => string,
-  // id записи → лигатурный вес выделяемой части (частичная выдача с введённым весом остатка)
+  // id записи → лигатурный вес выделяемой части (частичная выдача с введённым весом)
   partLig?: Map<string, number>,
+  // id записи → номенкл. № выделяемой части (частичная выдача)
+  partNomenkl?: Map<string, string>,
 ): { items: T[]; taken: Map<string, string> } {
   const taken = new Map<string, string>();
   const out = items.flatMap(it => {
@@ -105,7 +114,7 @@ export function takeFromStock<T extends StockRecord>(
       taken.set(it.id, it.id);
       return [apply(it)];
     }
-    const [rest, part] = splitRecord(it, q, newId(it), partLig?.get(it.id));
+    const [rest, part] = splitRecord(it, q, newId(it), partLig?.get(it.id), partNomenkl?.get(it.id));
     taken.set(it.id, part.id);
     return [rest, apply(part)];
   });
@@ -113,13 +122,16 @@ export function takeFromStock<T extends StockRecord>(
 }
 
 // ── Частичная выдача позиции (выдача, требование, возврат СГП №2, движение материала) ──
-// Позиция выдаётся частично, если выдаётся меньше изделий, чем есть. Тогда вручную вводится лигатурный вес
-// выдаваемой части (больше 0 и меньше веса позиции); вес, остающийся на складе, = вес позиции − выданный.
-// Чистый вес и хим. состав выдаваемой части — в доле выданного веса.
+// Позиция выдаётся частично, если выдаётся меньше изделий, чем есть. Тогда указывается лигатурный вес
+// выдаваемой части (больше 0 и меньше веса позиции; предзаполняется пропорционально количеству);
+// вес, остающийся на складе, = вес позиции − выданный. Чистый вес и хим. состав выдаваемой части — в доле
+// выданного веса. Драгоценные камни выдаются только по количеству: вес не вводится и не проверяется,
+// доля — по количеству.
 
 // Позиция с выдаваемым количеством: qty / lig — количество и лиг. вес всей позиции склада,
-// issue — количество к выдаче, issueLig — введённый лиг. вес выдаваемой части (строка поля ввода)
-export interface IssuePos { qty: number; issue: number; lig: number | null; issueLig?: string }
+// issue — количество к выдаче, issueLig — введённый лиг. вес выдаваемой части (строка поля ввода),
+// klass — класс материала (драгоценные камни — без веса)
+export interface IssuePos { qty: number; issue: number; lig: number | null; issueLig?: string; klass?: string }
 
 // Расчёт выдачи по одной позиции: количество, выданный вес, остаток на складе, доля, проверки
 export class IssueLine {
@@ -129,13 +141,15 @@ export class IssueLine {
 
   get qty() { return this.p.qty; }
   get issue() { return this.p.issue; }
+  // Драгоценные камни: выдача только по количеству, вес не участвует
+  get stone() { return !!this.p.klass && isStoneKlass(this.p.klass); }
   // Полный лиг. вес позиции склада
   get totalLig() { return this.p.lig; }
   // Количество можно менять: у позиции больше одного изделия
   get qtyEditable() { return this.p.qty > 1; }
   get partial() { return this.p.qty > 0 && this.p.issue > 0 && this.p.issue < this.p.qty; }
-  // При частичной выдаче вводится вес (если у позиции есть лиг. вес)
-  get needsLig() { return this.partial && this.p.lig != null && this.p.lig > 0; }
+  // При частичной выдаче вводится вес (если у позиции есть лиг. вес; у камней — нет)
+  get needsLig() { return this.partial && !this.stone && this.p.lig != null && this.p.lig > 0; }
   get qtyOk() { return this.p.qty <= 0 || (this.p.issue >= 1 && this.p.issue <= this.p.qty); }
   get enteredLig() { return num(this.p.issueLig); }
   get ligOk() {
@@ -144,9 +158,15 @@ export class IssueLine {
     return Number.isFinite(v) && v > 0 && v < this.p.lig!;
   }
   get ok() { return this.qtyOk && this.ligOk; }
-  // Выданный лиг. вес: вся позиция; при частичной — введённый (пока не введён корректно — null)
+  // Вес выдаваемой части пропорционально количеству (предзаполнение поля)
+  get proportionalLig(): number | null {
+    if (this.p.lig == null || this.p.qty <= 0) return this.p.lig;
+    return round2(this.p.lig * this.p.issue / this.p.qty);
+  }
+  // Выданный лиг. вес: вся позиция; при частичной — введённый (пока не введён корректно — null).
+  // У камней вес не выводится — null
   get issuedLig(): number | null {
-    if (this.p.lig == null) return null;
+    if (this.p.lig == null || this.stone) return null;
     if (!this.needsLig) return this.p.lig;
     return this.ligOk ? round2(this.enteredLig) : null;
   }
@@ -155,7 +175,9 @@ export class IssueLine {
     const v = this.issuedLig;
     return this.partial && v != null && this.p.lig != null ? round2(this.p.lig - v) : null;
   }
-  // Доля выдаваемой части (0..1): по выданному весу, без веса — по количеству
+  // Количество, остающееся на складе
+  get restQty() { return this.p.qty > 0 ? Math.max(this.p.qty - this.p.issue, 0) : 0; }
+  // Доля выдаваемой части (0..1): по выданному весу, без веса (и у камней) — по количеству
   get share(): number {
     if (!this.partial) return 1;
     if (this.needsLig) return this.ligOk ? this.enteredLig / this.p.lig! : 0;
@@ -180,6 +202,9 @@ export const partLigMap = <P extends IssuePos & { id: string }>(ps: P[]) =>
     const l = IssueLine.of(p);
     return l.needsLig && l.issuedLig != null ? [[p.id, l.issuedLig] as [string, number]] : [];
   }));
+// Номенкл. № выдаваемых частей для takeFromStock: id записи → номер (только частичная выдача)
+export const partNomenklMap = <P extends IssuePos & { id: string; partNomenkl?: string }>(ps: P[]) =>
+  new Map(ps.flatMap(p => (p.partNomenkl && IssueLine.of(p).partial ? [[p.id, p.partNomenkl] as [string, string]] : [])));
 
 // Возврат записей на склад: часть объединяется с исходной записью (parentId), если та на складе
 // со статусом stockStatus; иначе запись получает статус stockStatus (и место хранения, если задано).

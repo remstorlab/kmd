@@ -1,16 +1,17 @@
 import React, { useMemo, useState } from "react";
 import {
-  Badge, Btn, Modal, DeleteIcon, useToast, Toast, Field, Input, Select, KlassCode,
+  Badge, Btn, Modal, DeleteIcon, EditIcon, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
   InfoField, PosStatusBadge, probaText,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, MAIN_SKLAD, SGP, DOC_OTGRUZKA_DM, DOC_PEREDACHA_GP } from "../data/mock";
 import { useApp } from "../store/AppContext";
-import StockPickerModal, { StockRow } from "./StockPickerModal";
-import { takeFromStock, partLigMap } from "../data/stock";
+import StockPickerModal, { StockRow, PickedRow } from "./StockPickerModal";
+import { takeFromStock, partLigMap, partNomenklMap } from "../data/stock";
 import { markIssuedElsewhere } from "../data/shihta";
-import { useIssuePositions } from "./IssueInputs";
+import { useIssuePositions, ensurePartNomenkl, RezervWarning } from "./IssueInputs";
+import { useUsedNomenkl, nextNomenkl } from "./DMPositionFormModal";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
@@ -106,27 +107,23 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
   const zakazchik = zakazchikManual ?? posZakazchiki[0] ?? "";
   const zakazchikOptions = Array.from(new Set(["", ...(zakazchik ? [zakazchik] : []), ...posZakazchiki, ...orgs()]));
 
-  const already = Object.fromEntries(positions.map(p => [p.id, p.issue]));
-
-  const addPicked = (picked: { row: StockRow; qty: number }[]) => {
-    setPositions(prev => {
-      const next = [...prev];
-      for (const { row, qty } of picked) {
-        const idx = next.findIndex(p => p.id === row.id);
-        if (idx >= 0) next[idx] = { ...next[idx], issue: Math.min(next[idx].issue + qty, row.qty) };
-        else next.push({ ...row, issue: qty });
-      }
-      return next;
-    });
-    setShowPick(false);
-    show(`Добавлено позиций: ${picked.length}`);
-  };
-
-
   const changeType = (t: string) => screen.toggle("gp", t === DOC_PEREDACHA_GP);
   // Количество к выдаче (от 1 до количества изделий) и выданный вес при частичной выдаче — IssueLine;
-  // без количества изделий позиция выдаётся целиком
+  // без количества изделий позиция выдаётся целиком. Вводятся в окне подбора (панель «К выдаче»)
   const iss = useIssuePositions(positions, setPositions);
+  const usedNomenkl = useUsedNomenkl();
+  // «Изменить» позицию: …/pick-edit/<id> — то же окно подбора с предвыбранной позицией
+  const editId = screen.after("pick-edit");
+  const editPos = editId ? positions.find(p => p.id === editId) ?? null : null;
+  // Позиции документа повторно не предлагаются (кроме редактируемой)
+  const already = Object.fromEntries(positions.filter(p => p.id !== editPos?.id).map(p => [p.id, p.issue]));
+  const closePick = () => (editPos ? screen.close("pick-edit") : setShowPick(false));
+
+  const addPicked = (picked: PickedRow[]) => {
+    iss.applyPicked(picked, row => ({ ...row, issue: row.qty }));
+    closePick();
+    show(editPos ? "Позиция изменена" : `Добавлено позиций: ${picked.length}`);
+  };
 
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(positions, {
@@ -157,6 +154,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
   const save = (status: DocStatus) => {
     // Списание выполняется один раз — при первом оформлении документа
+    let finalPositions = positions;
     const err = iss.validate(status === "Оформлено" && !issued);
     if (err) { show(err); return; }
     if (status === "Оформлено" && !issued) {
@@ -169,14 +167,20 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
         show(`Недостаточно остатка на складе: ${lacking.map(p => p.name).join(", ")}`);
         return;
       }
+      // Номер выдаваемой части: если его уже заняли — следующий свободный
+      const fixed = ensurePartNomenkl(positions, usedNomenkl(doc?.id), nextNomenkl);
+      if (fixed.changed.length) show(`Номенкл. № части изменён. ${fixed.changed.join("; ")}`);
+      finalPositions = fixed.positions;
       const stamp = Date.now();
-      const gpIssue = new Map(positions.filter(p => p.src === "gp").map(p => [p.id, p.issue]));
-      const dmIssue = new Map(positions.filter(p => p.src === "dm").map(p => [p.id, p.issue]));
+      const gpIssue = new Map(finalPositions.filter(p => p.src === "gp").map(p => [p.id, p.issue]));
+      const dmIssue = new Map(finalPositions.filter(p => p.src === "dm").map(p => [p.id, p.issue]));
       const partId = (it: { id: string }) => `${it.id}-v${stamp}`;
       // Выданная позиция — на склад СГП №2 без места хранения; заказчик позиции сохраняется (без него — из документа)
       const toSgp = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: SGP, status: "На складе", location: NO_LOC, zakazchik: it.zakazchik ?? zakazchik });
-      if (gpIssue.size) setGpItems(prev => takeFromStock(prev, gpIssue, toSgp, partId, partLigMap(positions)).items);
-      if (dmIssue.size) setDmItems(prev => takeFromStock(prev, dmIssue, toSgp, partId, partLigMap(positions)).items);
+      const gpPart = finalPositions.filter(p => p.src === "gp");
+      const dmPart = finalPositions.filter(p => p.src === "dm");
+      if (gpIssue.size) setGpItems(prev => takeFromStock(prev, gpIssue, toSgp, partId, partLigMap(gpPart), partNomenklMap(gpPart)).items);
+      if (dmIssue.size) setDmItems(prev => takeFromStock(prev, dmIssue, toSgp, partId, partLigMap(dmPart), partNomenklMap(dmPart)).items);
       // Выданные позиции из резерва: шихтовая карта, которая их резервировала, возвращается в «На редактировании»
       if (affectedKarty.length) {
         const ids = new Set(affectedKarty.map(k => k.id));
@@ -194,7 +198,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
       receiver: SGP,
       zakazchik,
       info: info.trim() || undefined,
-      positions,
+      positions: finalPositions,
     });
   };
 
@@ -213,11 +217,7 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
         <Btn onClick={() => save("В работе")}>Сохранить</Btn>
       </>}
     >
-      {!issued && !ro && affectedKarty.length > 0 && (
-        <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm text-orange-800">
-          ⚠ В выдаче есть позиции из резерва. После оформления шихтовая карта {affectedKarty.map(k => `«${k.name}»`).join(", ")} вернётся в статус «На редактировании» и станет недоступна для плавки.
-        </div>
-      )}
+      {!issued && !ro && <RezervWarning karty={affectedKarty} />}
       {issued && (
         <div className="mb-4 text-sm bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5">
           Накладная оформлена: позиции выданы со склада «{MAIN_SKLAD}» на склад «{SGP}» (без места хранения). Состав позиций изменить нельзя.
@@ -279,23 +279,23 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
               <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort} className="px-3 py-2">Статус</SortTh>
-              {!lockPos && <th className="w-12"></th>}
+              {!lockPos && <th className="w-20"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {pg12.pageItems.map(p => (
                 <tr key={p.id} className={`hover:bg-gray-50 ${oborotRowCls(p.oborot, p.code)}`}>
-                  <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                  <td className="px-3 py-2 text-gray-500 align-top">{iss.nomenklCell(p)}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
-                  <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos)}</td>
+                  <td className="px-3 py-2 align-top">{iss.qtyCell(p)}</td>
                   <td className="px-3 py-2">{probaText(p.proba)}</td>
-                  <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos)}</td>
+                  <td className="px-3 py-2 align-top">{iss.ligCell(p)}</td>
                   <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
                   <td className="px-3 py-2"><OborotValue value={p.oborot} code={p.code} /></td>
                   <td className="px-3 py-2 text-gray-500">{p.location}</td>
                   <td className="px-3 py-2">{statusCell(p)}</td>
-                  {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
+                  {!lockPos && <td className="px-3 py-2"><div className="flex items-center gap-1"><EditIcon onClick={() => screen.open("pick-edit", p.id)} /><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></div></td>}
                 </tr>
               ))}
               <FillerRows count={pg12.fill} cols={12} />
@@ -313,15 +313,15 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
         </>)}
       </div>
 
-      {showPick && (
+      {(showPick || editPos) && (
         <StockPickerModal
-          qtyInput={r => r.qty > 1}
+          issue={{ usedNomenkl: [...usedNomenkl(doc?.id), ...iss.partNomenkls(editPos?.id)], initial: editPos ? { [editPos.id]: iss.draftOf(editPos) } : undefined }}
           title={`Добавить позиции со склада «${MAIN_SKLAD}»`}
-          rows={stock}
+          rows={iss.pickerRows(stock, editPos)}
           already={already}
           showWeights
           emptyText="Нет доступных позиций на складе"
-          onClose={() => setShowPick(false)}
+          onClose={closePick}
           onAdd={addPicked}
         />
       )}

@@ -1,15 +1,17 @@
 import React, { useMemo, useState } from "react";
 import {
-  Btn, Modal, DeleteIcon, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
+  Btn, Modal, DeleteIcon, EditIcon, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp, PosStatusBadge, probaText,
   InfoField,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, spravValues, SDM1, SDM2, SGP, DOC_TREBOVANIE } from "../data/mock";
 import { useApp } from "../store/AppContext";
-import StockPickerModal, { StockRow } from "./StockPickerModal";
-import { takeFromStock, partLigMap } from "../data/stock";
-import { useIssuePositions } from "./IssueInputs";
+import StockPickerModal, { StockRow, PickedRow } from "./StockPickerModal";
+import { takeFromStock, partLigMap, partNomenklMap } from "../data/stock";
+import { markIssuedElsewhere } from "../data/shihta";
+import { useIssuePositions, ensurePartNomenkl, RezervWarning } from "./IssueInputs";
+import { useUsedNomenkl, nextNomenkl } from "./DMPositionFormModal";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
@@ -35,7 +37,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   // Оформленное требование: позиции уже перемещены — состав и склады менять нельзя
   const posted = doc?.status === "Оформлено";
   const lockPos = ro || posted;
-  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, shihtaPrikazy } = useApp();
+  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy } = useApp();
   const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
   // Вложенный экран: …/pick (подбор со склада-отправителя)
@@ -111,23 +113,27 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     setPositions(prev => prev.filter(p => p.sklad === v));
   };
 
-  const already = Object.fromEntries(positions.map(p => [p.id, p.issue]));
-  const addPicked = (picked: { row: StockRow; qty: number }[]) => {
-    setPositions(prev => {
-      const next = [...prev];
-      for (const { row, qty } of picked) {
-        const idx = next.findIndex(p => p.id === row.id);
-        if (idx >= 0) next[idx] = { ...next[idx], issue: Math.min(next[idx].issue + qty, row.qty) };
-        else next.push({ ...row, issue: qty });
-      }
-      return next;
-    });
-    setShowPick(false);
-    show(`Добавлено позиций: ${picked.length}`);
+  // Количество к перемещению (от 1 до количества изделий) и вес перемещаемой части при частичном перемещении —
+  // вводятся в окне подбора (панель «К выдаче»)
+  const iss = useIssuePositions(positions, setPositions);
+  const usedNomenkl = useUsedNomenkl();
+  // «Изменить» позицию: …/pick-edit/<id> — то же окно подбора с предвыбранной позицией
+  const editId = screen.after("pick-edit");
+  const editPos = editId ? positions.find(p => p.id === editId) ?? null : null;
+  const already = Object.fromEntries(positions.filter(p => p.id !== editPos?.id).map(p => [p.id, p.issue]));
+  const closePick = () => (editPos ? screen.close("pick-edit") : setShowPick(false));
+  const addPicked = (picked: PickedRow[]) => {
+    iss.applyPicked(picked, row => ({ ...row, issue: row.qty }));
+    closePick();
+    show(editPos ? "Позиция изменена" : `Добавлено позиций: ${picked.length}`);
   };
 
-  // Количество к перемещению (от 1 до количества изделий) и вес перемещаемой части при частичном перемещении
-  const iss = useIssuePositions(positions, setPositions);
+  // Позиции из резерва и шихтовые карты, которые их резервируют (кроме выполненных): при оформлении
+  // карты возвращаются в «На редактировании» — как при выдаче со склада
+  const rezNomenkl = new Set(positions.filter(p => itemOf(p)?.status === "Резерв").map(p => p.nomenkl));
+  const affectedKarty = rezNomenkl.size
+    ? shihtovyeKarty.filter(k => k.status !== "Выполнена" && k.materials.some(m => rezNomenkl.has(m.nomenkl)))
+    : [];
 
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(positions, {
@@ -145,6 +151,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   });
 
   const save = (status: DocStatus) => {
+    let finalPositions = positions;
     const err = iss.validate(status === "Оформлено" && !posted, "к перемещению");
     if (err) { show(err); return; }
     if (status === "Оформлено" && !posted) {
@@ -156,15 +163,25 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       });
       if (lacking.length) { show(`Позиции недоступны на складе «${head.sender}»: ${lacking.map(p => p.name).join(", ")}`); return; }
       // Перемещение: меняется только склад — место хранения, статус и прочие атрибуты сохраняются.
-      // Резерв шихтовой карты остаётся резервом этой карты; дополнительно добавленные позиции (не из резерва карты)
-      // просто встают на склад-получатель «На складе». Шихтовая карта документом не меняется.
+      // При частичном перемещении перемещаемая часть получает новый номенкл. № (если номер заняли — следующий
+      // свободный). Позиции из резерва: шихтовые карты, которые их резервируют (кроме выполненных), возвращаются
+      // в «На редактировании» с пометкой о выданных позициях — в т. ч. при выборе позиций по приказу на плавку.
+      const fixed = ensurePartNomenkl(positions, usedNomenkl(doc?.id), nextNomenkl);
+      if (fixed.changed.length) show(`Номенкл. № части изменён. ${fixed.changed.join("; ")}`);
+      finalPositions = fixed.positions;
       const stamp = Date.now();
       const move = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: head.receiver });
       const partId = (it: { id: string }) => `${it.id}-t${stamp}`;
-      const gpTake = new Map(positions.filter(p => p.src === "gp").map(p => [p.id, p.issue]));
-      const dmTake = new Map(positions.filter(p => p.src === "dm").map(p => [p.id, p.issue]));
-      if (gpTake.size) setGpItems(prev => takeFromStock(prev, gpTake, move, partId, partLigMap(positions)).items);
-      if (dmTake.size) setDmItems(prev => takeFromStock(prev, dmTake, move, partId, partLigMap(positions)).items);
+      const gpPart = finalPositions.filter(p => p.src === "gp");
+      const dmPart = finalPositions.filter(p => p.src === "dm");
+      const gpTake = new Map(gpPart.map(p => [p.id, p.issue]));
+      const dmTake = new Map(dmPart.map(p => [p.id, p.issue]));
+      if (gpTake.size) setGpItems(prev => takeFromStock(prev, gpTake, move, partId, partLigMap(gpPart), partNomenklMap(gpPart)).items);
+      if (dmTake.size) setDmItems(prev => takeFromStock(prev, dmTake, move, partId, partLigMap(dmPart), partNomenklMap(dmPart)).items);
+      if (affectedKarty.length) {
+        const ids = new Set(affectedKarty.map(k => k.id));
+        setShihtovyeKarty(prev => prev.map(k => (ids.has(k.id) ? markIssuedElsewhere(k, rezNomenkl, `${DOC_TREBOVANIE} № ${head.number}`) : k)));
+      }
     }
     onSave({
       id: doc?.id ?? `sd-${Date.now()}`,
@@ -179,7 +196,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       zakazchik,
       ownProperty: isOwn,
       info: info.trim() || undefined,
-      positions,
+      positions: finalPositions,
     });
   };
 
@@ -199,6 +216,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         <Btn onClick={() => save("В работе")}>Сохранить</Btn>
       </>}
     >
+      {!posted && !ro && <RezervWarning karty={affectedKarty} />}
       <div className="grid grid-cols-4 gap-4 mb-5">
         {typeSelect}
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
@@ -259,26 +277,25 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
               <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort} className="px-3 py-2">Статус</SortTh>
-              {!lockPos && <th className="w-12"></th>}
+              {!lockPos && <th className="w-20"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {pg.pageItems.map(p => {
                 const status = itemOf(p)?.status;
                 return (
                   <tr key={p.id} className={`hover:bg-gray-50 ${oborotRowCls(p.oborot, p.code)}`}>
-                    <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                    <td className="px-3 py-2 text-gray-500 align-top">{iss.nomenklCell(p)}</td>
                     <td className="px-3 py-2 font-medium">{p.name}</td>
                     <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                     <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
-                    {/* Позиция в резерве шихтовой карты перемещается целиком — без ввода количества и веса */}
-                    <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos && status !== "Резерв")}</td>
+                    <td className="px-3 py-2 align-top">{iss.qtyCell(p)}</td>
                     <td className="px-3 py-2">{probaText(p.proba)}</td>
-                    <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos && status !== "Резерв")}</td>
+                    <td className="px-3 py-2 align-top">{iss.ligCell(p)}</td>
                     <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
                   <td className="px-3 py-2"><OborotValue value={p.oborot} code={p.code} /></td>
                     <td className="px-3 py-2 text-gray-500">{p.location}</td>
                     <td className="px-3 py-2">{status ? <PosStatusBadge status={status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
-                    {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
+                    {!lockPos && <td className="px-3 py-2"><div className="flex items-center gap-1"><EditIcon onClick={() => screen.open("pick-edit", p.id)} /><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></div></td>}
                   </tr>
                 );
               })}
@@ -297,15 +314,15 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         </>)}
       </div>
 
-      {showPick && (
+      {(showPick || editPos) && (
         <StockPickerModal
-          qtyLabel="Кол-во к перемещению"
+          issue={{ usedNomenkl: [...usedNomenkl(doc?.id), ...iss.partNomenkls(editPos?.id)], initial: editPos ? { [editPos.id]: iss.draftOf(editPos) } : undefined }}
           title={`Добавить позиции со склада «${head.sender}»`}
-          rows={stock}
+          rows={iss.pickerRows(stock, editPos)}
           already={already}
           showWeights
           emptyText={`Нет доступных позиций на складе «${head.sender}»`}
-          onClose={() => setShowPick(false)}
+          onClose={closePick}
           onAdd={addPicked}
         />
       )}

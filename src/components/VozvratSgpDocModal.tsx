@@ -1,15 +1,16 @@
 import React, { useMemo, useState } from "react";
 import {
-  Btn, Modal, DeleteIcon, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
+  Btn, Modal, DeleteIcon, EditIcon, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
   InfoField, PosStatusBadge, probaText,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, MovedRecord, spravValues, SGP, PRIHOD_SKLAD, DOC_VOZVRAT_SGP } from "../data/mock";
 import { useApp } from "../store/AppContext";
-import StockPickerModal, { StockRow } from "./StockPickerModal";
-import { takeFromStock, partLigMap, returnToStock } from "../data/stock";
-import { useIssuePositions } from "./IssueInputs";
+import StockPickerModal, { StockRow, PickedRow } from "./StockPickerModal";
+import { takeFromStock, partLigMap, partNomenklMap, returnToStock } from "../data/stock";
+import { useIssuePositions, ensurePartNomenkl } from "./IssueInputs";
+import { useUsedNomenkl, nextNomenkl } from "./DMPositionFormModal";
 import { useScreen } from "../router";
 import { Plus } from "lucide-react";
 
@@ -80,23 +81,20 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
   const isOwn = fromPositions ? posItems.every(i => i.ownProperty) : ownProperty;
   const lockZakazchik = ro || posted || fromPositions;
 
-  const already = Object.fromEntries(positions.map(p => [p.id, p.issue]));
-  const addPicked = (picked: { row: StockRow; qty: number }[]) => {
-    setPositions(prev => {
-      const next = [...prev];
-      for (const { row, qty } of picked) {
-        const idx = next.findIndex(p => p.id === row.id);
-        if (idx >= 0) next[idx] = { ...next[idx], issue: Math.min(next[idx].issue + qty, row.qty) };
-        else next.push({ ...row, issue: qty });
-      }
-      return next;
-    });
-    setShowPick(false);
-    show(`Добавлено позиций: ${picked.length}`);
-  };
-
-  // Количество к возврату (от 1 до количества изделий) и вес возвращаемой части при частичном возврате
+  // Количество к возврату (от 1 до количества изделий) и вес возвращаемой части при частичном возврате —
+  // вводятся в окне подбора (панель «К выдаче»)
   const iss = useIssuePositions(positions, setPositions);
+  const usedNomenkl = useUsedNomenkl();
+  // «Изменить» позицию: …/pick-edit/<id> — то же окно подбора с предвыбранной позицией
+  const editId = screen.after("pick-edit");
+  const editPos = editId ? positions.find(p => p.id === editId) ?? null : null;
+  const already = Object.fromEntries(positions.filter(p => p.id !== editPos?.id).map(p => [p.id, p.issue]));
+  const closePick = () => (editPos ? screen.close("pick-edit") : setShowPick(false));
+  const addPicked = (picked: PickedRow[]) => {
+    iss.applyPicked(picked, row => ({ ...row, issue: row.qty }));
+    closePick();
+    show(editPos ? "Позиция изменена" : `Добавлено позиций: ${picked.length}`);
+  };
 
   const codeLabel = useMaterialCodeLabel();
   const { sorted, sort, toggleSort } = useSort(positions, {
@@ -137,7 +135,12 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
     const gp0 = undo(gpItems, "gp");
     const dm0 = undo(dmItems, "dm");
     const locked = new Set(kept.map(m => m.from));
-    const active = positions.filter(p => !locked.has(p.id));
+    // Номер возвращаемой части сохраняется между сохранениями (откат выше объединил часть с остатком);
+    // если номер заняли — следующий свободный
+    const fixed = ensurePartNomenkl(positions, usedNomenkl(doc?.id, [...gp0, ...dm0]), nextNomenkl);
+    if (fixed.changed.length) show(`Номенкл. № части изменён. ${fixed.changed.join("; ")}`);
+    const finalPositions = fixed.positions;
+    const active = finalPositions.filter(p => !locked.has(p.id));
     const lacking = active.filter(p => {
       const it = p.src === "gp" ? gp0.find(i => i.id === p.id) : dm0.find(i => i.id === p.id);
       return !it || it.sklad !== SGP || it.status !== "На складе" || Math.max(it.qty, 1) < p.issue;
@@ -146,8 +149,10 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
     const stamp = Date.now();
     const move = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: head.receiver, status: "На складе", location: NO_LOC });
     const partId = (it: { id: string }) => `${it.id}-vs${stamp}`;
-    const gpRes = takeFromStock(gp0, new Map(active.filter(p => p.src === "gp").map(p => [p.id, p.issue])), move, partId, partLigMap(active));
-    const dmRes = takeFromStock(dm0, new Map(active.filter(p => p.src === "dm").map(p => [p.id, p.issue])), move, partId, partLigMap(active));
+    const gpAct = active.filter(p => p.src === "gp");
+    const dmAct = active.filter(p => p.src === "dm");
+    const gpRes = takeFromStock(gp0, new Map(gpAct.map(p => [p.id, p.issue])), move, partId, partLigMap(gpAct), partNomenklMap(gpAct));
+    const dmRes = takeFromStock(dm0, new Map(dmAct.map(p => [p.id, p.issue])), move, partId, partLigMap(dmAct), partNomenklMap(dmAct));
     setGpItems(gpRes.items);
     setDmItems(dmRes.items);
     const moved: MovedRecord[] = [
@@ -168,7 +173,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
       zakazchik,
       ownProperty: isOwn,
       info: info.trim() || undefined,
-      positions,
+      positions: finalPositions,
     });
   };
 
@@ -246,23 +251,23 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
               <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort} className="px-3 py-2">Статус</SortTh>
-              {!lockPos && <th className="w-12"></th>}
+              {!lockPos && <th className="w-20"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {pg.pageItems.map(p => (
                 <tr key={p.id} className={`hover:bg-gray-50 ${oborotRowCls(p.oborot, p.code)}`}>
-                  <td className="px-3 py-2 text-gray-500">{p.nomenkl}</td>
+                  <td className="px-3 py-2 text-gray-500 align-top">{iss.nomenklCell(p)}</td>
                   <td className="px-3 py-2 font-medium">{p.name}</td>
                   <td className="px-3 py-2"><KlassCode value={p.klass} /></td>
                   <td className="px-3 py-2 text-blue-600">{codeLabel(p.code)}</td>
-                  <td className="px-3 py-2 align-top">{iss.qtyCell(p, !lockPos)}</td>
+                  <td className="px-3 py-2 align-top">{iss.qtyCell(p)}</td>
                   <td className="px-3 py-2">{probaText(p.proba)}</td>
-                  <td className="px-3 py-2 align-top">{iss.ligCell(p, !lockPos)}</td>
+                  <td className="px-3 py-2 align-top">{iss.ligCell(p)}</td>
                   <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
                   <td className="px-3 py-2"><OborotValue value={p.oborot} code={p.code} /></td>
                   <td className="px-3 py-2 text-gray-500">{currentOf(p)?.location ?? p.location}</td>
                   <td className="px-3 py-2">{(() => { const st = currentOf(p)?.status; return st ? <PosStatusBadge status={st} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>; })()}</td>
-                  {!lockPos && <td className="px-3 py-2"><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></td>}
+                  {!lockPos && <td className="px-3 py-2"><div className="flex items-center gap-1"><EditIcon onClick={() => screen.open("pick-edit", p.id)} /><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></div></td>}
                 </tr>
               ))}
               <FillerRows count={pg.fill} cols={12} />
@@ -280,15 +285,15 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
         </>)}
       </div>
 
-      {showPick && (
+      {(showPick || editPos) && (
         <StockPickerModal
-          qtyLabel="Кол-во к перемещению"
+          issue={{ usedNomenkl: [...usedNomenkl(doc?.id), ...iss.partNomenkls(editPos?.id)], initial: editPos ? { [editPos.id]: iss.draftOf(editPos) } : undefined }}
           title={`Добавить позиции со склада «${SGP}»`}
-          rows={stock}
+          rows={iss.pickerRows(stock, editPos)}
           already={already}
           showWeights
           emptyText={`Нет позиций на складе «${SGP}»`}
-          onClose={() => setShowPick(false)}
+          onClose={closePick}
           onAdd={addPicked}
         />
       )}

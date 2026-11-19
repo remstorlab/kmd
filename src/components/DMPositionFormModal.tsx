@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Btn, Modal, Field, Input, Select, KlassSelect, MaterialCodeSelect } from "./ui";
-import { StorageLocation, ChemComposition, spravValues, isStoneKlass, oborotHint as oborotOverHint, oborotOver } from "../data/mock";
+import { StorageLocation, ChemComposition, spravValues, isStoneKlass, oborotHint as oborotOverHint, oborotOver, opVydacha, opVozvrat } from "../data/mock";
 import ChemCompositionBlock from "./ChemCompositionBlock";
 import { ChemPercent, compositionOf, applyProba, gramsFrom, pctFrom, mainElementOf, num0, r2 } from "../data/chem";
 import { useApp } from "../store/AppContext";
@@ -65,10 +65,22 @@ export function nextNomenkl(used: string[]): string {
   return String(max + 1);
 }
 
-// Все занятые номенклатурные номера: склады ДМ и ГП + переданные (позиции ещё не сохранённых документов)
+// Все занятые номенклатурные номера: склады ДМ и ГП, номера частей частичной выдачи во всех документах
+// и операциях (в т. ч. оформленных) + переданные (позиции ещё не сохранённых документов)
+export function useUsedNomenkl() {
+  const { dmItems, gpItems, skladDocs, operations } = useApp();
+  // except — документ / операция, позиции которых не учитываются (редактируемые сейчас: их номера передаёт форма);
+  // stock — записи склада вместо текущих (например, после отката прошлого перемещения документа)
+  return (except?: string, stock?: { nomenkl: string }[]): Set<string> => new Set([
+    ...(stock ?? [...dmItems, ...gpItems]).map(i => i.nomenkl),
+    ...skladDocs.filter(d => d.id !== except).flatMap(d => (d.positions ?? []).map(p => p.partNomenkl)),
+    ...operations.filter(o => o.id !== except).flatMap(o => [...opVydacha(o), ...opVozvrat(o)].map(p => p.partNomenkl)),
+  ].filter((n): n is string => !!n));
+}
+
 export function useNextNomenkl() {
-  const { dmItems, gpItems } = useApp();
-  return (reserved: string[] = []) => nextNomenkl([...dmItems.map(i => i.nomenkl), ...gpItems.map(i => i.nomenkl), ...reserved]);
+  const used = useUsedNomenkl();
+  return (reserved: string[] = []) => nextNomenkl([...used(), ...reserved]);
 }
 
 let posSeq = 0;
