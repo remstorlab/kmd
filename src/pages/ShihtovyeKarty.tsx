@@ -131,7 +131,8 @@ function banReason(m: { klass: string; share: Record<string, number>; kind: Shih
 
 // ── Окно «Добавить доп. материал» ──
 // Одно окно для всех типов справочника «Типы доп. материалов шихты»: тип, наименование, вес лигат., состав
-// (граммы / % элементов). Выбор типа подставляет его наименование и хим. состав по умолчанию (chemPct справочника,
+// (граммы / % элементов — элементы с признаком «Отображать в ШК»). Выбор типа подставляет его наименование (можно
+// исправить) и хим. состав по умолчанию (chemPct справочника,
 // граммы — от введённого лигат. веса); «Прочее» — наименование вводится вручную, состав пустой.
 // По коду типа определяется вид строки: лигатура Cu-P (проверка фосфора по ГОСТ), медь МО, прочее.
 const dopKindOf = (type: string): ShihtaMatKind => {
@@ -192,7 +193,7 @@ function DopMaterialModal({ initial, onClose, onSave }: { initial?: MatRow; onCl
       <div className="grid grid-cols-3 gap-4">
         <Field label="Тип" required><Select value={type} options={types} onChange={changeType} /></Field>
         <Field label="Наименование материала" required>
-          <Input value={name} onChange={setName} placeholder="Название" disabled={kind !== "prochee"} />
+          <Input value={name} onChange={setName} placeholder="Название" />
         </Field>
         <Field label="Вес лигат., г" required>
           <Input value={ves} onChange={decimal(v => { setVes(v); setChem(gramsFrom(pct, num0(v))); })} placeholder="0,00" />
