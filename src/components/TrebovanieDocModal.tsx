@@ -53,7 +53,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     // Отправитель — склад приёмки (СДМ1), получатель — склад выдачи (СДМ2)
     sender: doc?.sender || SDM1,
     receiver: doc?.receiver || SDM2,
-    sotrudnik: "Ким Александр Юрьевич",
     // Приказ на плавку (у старых документов — приказ шихтовой карты)
     prikazId: doc?.prikazId ?? shihtovyeKarty.find(k => k.id === doc?.shihtaId)?.prikazId ?? "",
   }));
@@ -220,7 +219,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
             disabled={lockPos}
           />
         </Field>
-        <Field label="Сотрудник склада-получателя" required={!ro} full><Select value={head.sotrudnik} options={Array.from(new Set([head.sotrudnik, ...spravValues("Подотчётные лица")]))} onChange={h("sotrudnik")} disabled={ro} /></Field>
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
           <Toggle checked={isOwn} onChange={setOwnProperty} disabled={lockZakazchik} label={isOwn ? "Да" : "Нет"} />
