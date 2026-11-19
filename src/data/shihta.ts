@@ -22,7 +22,9 @@ export function markIssuedElsewhere(k: ShihtovayaKarta, nomenkl: Set<string>, do
 //   • позиция склада: каждый элемент состава (Au, Ag, Pd, Pt, примеси) = Mᵢ × доля в позиции; Cu = Mᵢ − сумма остальных;
 //   • лигатура Cu-P: Cu = ROUND(Mᵢ × (1 − p/100); 2); P = Mᵢ − Cu;
 //   • медь МО: Cu = Mᵢ;
-//   • прочее: элементы = Mᵢ × доля (состав вводится вручную).
+//   • прочее: элементы = Mᵢ × доля (состав вводится вручную);
+//   • доп. материал любого типа с составом (окно доп. материала, % по умолчанию — справочник «Типы доп. материалов
+//     шихты»): элементы = Mᵢ × доля; лигатура Cu-P и медь МО без состава — по формулам выше.
 // Итоги: Mш = ΣMᵢ; ΣE = ΣEᵢ; база B = Mш − ΣP (фосфор выгорает); %E = ΣE × 100 / B.
 // Проверка по марке: мин ≤ ROUND(%E; 2) ≤ макс для каждого элемента с диапазоном; примеси марки, которые есть
 // в шихте, — %E ≤ предела.
@@ -64,6 +66,10 @@ export const shareOf = (chem: ChemComposition | undefined, mass: number): Record
 // Содержание элементов строки, г
 export function lineChem(l: ShihtaLine): Record<string, number> {
   const m = l.mass > 0 ? l.mass : 0;
+  // Доп. материал с составом (окно доп. материала: граммы / % по справочнику типов) — элементы по доле;
+  // без состава — прежний расчёт лигатуры Cu-P по % фосфора и меди МО
+  if (l.kind !== "sklad" && Object.keys(l.share ?? {}).length > 0)
+    return Object.fromEntries(Object.entries(l.share ?? {}).map(([k, v]) => [k, r2(m * v)]));
   switch (l.kind) {
     case "cup": {
       const cu = r2(m * (1 - (l.phosphorPct ?? 0) / 100));

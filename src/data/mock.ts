@@ -1040,7 +1040,8 @@ export function opWeights(o: Operation) {
 
 // --- Справочники ---
 // Запись справочника; position — должность (только у справочника «Подотчётные лица»)
-export interface SpravItem { code: string; value: string; status: string; position?: string }
+// chemPct — справочник «Типы доп. материалов шихты»: хим. состав по умолчанию, % (id элемента → %)
+export interface SpravItem { code: string; value: string; status: string; position?: string; chemPct?: Record<string, string> }
 export interface SpravDict { count: number; items: SpravItem[] }
 const spravData = {
   "Единицы измерения": {
@@ -1184,12 +1185,13 @@ const spravData = {
       { code: "НС-06", value: "Сувенирная продукция", status: "Активно" },
     ]
   },
-  // Типы доп. материалов шихтовой карты: по коду записи определяется расчёт строки (см. DOP_TYPE_*)
+  // Типы доп. материалов шихтовой карты: по коду записи определяется вид строки (см. DOP_TYPE_*), chemPct — хим. состав
+  // по умолчанию, % (подставляется в окно доп. материала; граммы — от введённого лигат. веса)
   "Типы доп. материалов шихты": {
     count: 3,
-    items: [
-      { code: "CUP", value: "Лигатура Cu-P", status: "Активно" },
-      { code: "MO", value: "Медь МО", status: "Активно" },
+    items: <SpravItem[]>[
+      { code: "CUP", value: "Лигатура Cu-P (Фосфор 9,44%)", status: "Активно", chemPct: { cu: "90.56", p: "9.44" } },
+      { code: "MO", value: "Медь МО", status: "Активно", chemPct: { cu: "100.00" } },
       { code: "PR", value: "Прочее", status: "Активно" },
     ]
   },
@@ -1250,10 +1252,15 @@ export function minAffinageOf(naznachenie: string | undefined): number | undefin
   return Number.isFinite(v) ? v : undefined;
 }
 
-// Коды записей справочника «Типы доп. материалов шихты»: лигатура Cu-P (Cu и P по % фосфора), медь МО (только Cu);
-// остальные типы — состав вводится вручную
+// Коды записей справочника «Типы доп. материалов шихты»: лигатура Cu-P (проверка фосфора по ГОСТ, суммирование по % P),
+// медь МО; остальные типы — «прочее». Состав строки любого типа — граммы / % элементов (по умолчанию — chemPct типа)
 export const DOP_TYPE_CUP = "CUP";
 export const DOP_TYPE_MED_MO = "MO";
+export const DOP_DICT = "Типы доп. материалов шихты";
+
+// Хим. состав типа доп. материала по умолчанию, % (пусто — у типа состав не задан, напр. «Прочее»)
+export const dopDefaultPct = (type: string): Record<string, string> =>
+  ({ ...(spravochniki[DOP_DICT].items.find(i => i.value === type)?.chemPct ?? {}) });
 
 // Назначение, при котором в шихту не допускается стружка
 export const NAZN_PROOF = "Монеты коллекционные (пруф, пруф-лайк)";

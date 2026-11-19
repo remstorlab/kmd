@@ -6,8 +6,10 @@ import {
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination, usePerPage, FillerRows, fillerCount, statusColorClass, usePaged,
   CREATED_LABEL, CreatedCell, Created, createdSortKey, useCreatedStamp, RequiredMark, YES_NO_ALL, matchYesNo, useMaterialCodeLabel,
 } from "../components/ui";
-import { spravochniki, spravValues, SpravItem, OBOROT_DICT, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
+import { spravochniki, spravValues, SpravItem, OBOROT_DICT, DOP_DICT, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
 import { useApp } from "../store/AppContext";
+import ChemCompositionBlock from "../components/ChemCompositionBlock";
+import { pctSum } from "../data/chem";
 import { matchPage, useScreen } from "../router";
 import { ArrowLeft, ArrowDownUp, Gem, Target, Atom, X, Plus, Package, Scale, CircleDot, FileText, Building2, UserRound, Settings2, Tag, Shapes, MapPin, Warehouse, Layers, FlaskConical, Wrench, Ruler, RefreshCw, LucideIcon } from "lucide-react";
 
@@ -152,6 +154,12 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const withPosition = name === PODOTCHET_DICT;
   // Предельный оборот: код записи — код материала (выбор из справочника «Коды материалов»), значение — целое > 0
   const withMaterialCode = name === OBOROT_DICT;
+  // Типы доп. материалов шихты: хим. состав по умолчанию, % — подставляется в окно доп. материала шихтовой карты
+  const withChem = name === DOP_DICT;
+  const { chemElements } = useApp();
+  const chemText = (p: Record<string, string> | undefined) =>
+    Object.entries(p ?? {}).filter(([, v]) => parseFloat(v.replace(",", ".")) > 0)
+      .map(([k, v]) => `${chemElements.find(e => e.id === k)?.shortName ?? k.toUpperCase()} ${v.replace(".", ",")} %`).join(" · ");
   const { materialCodes } = useApp();
   const matLabel = useMaterialCodeLabel();
   const codeText = (code: string) => (withMaterialCode ? matLabel(code) : code);
@@ -193,7 +201,9 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
     if (!code || !value) { show(`Заполните поля «${codeLabel}» и «${valueLabel}»`); return; }
     if (!editItem && items.some(i => i.code === code)) { show(`Запись с полем «${codeLabel}» = ${codeText(code)} уже есть`); return; }
     if (withMaterialCode && !(parseInt(value, 10) > 0)) { show("Предельный оборот — целое число больше 0"); return; }
+    if (withChem && pctSum(form.chemPct ?? {}) > 100.005) { show("Сумма содержания элементов больше 100 %"); return; }
     const rec: SpravItem = { ...form, code, value, ...(withPosition ? { position: (form.position ?? "").trim() } : {}) };
+    if (withChem) rec.chemPct = Object.fromEntries(Object.entries(form.chemPct ?? {}).filter(([, v]) => v.trim()));
     const next = editItem ? items.map(i => i.code === editItem.code ? rec : i) : [...items, rec];
     if (!editItem) dictCreated[`${name}|${form.code}`] = createdStamp();
     setItems(next);
@@ -252,6 +262,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
               <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Потери Ag, %</th>
             </>}
             {withAffinage && <th className="px-4 py-3 text-right font-medium text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">Мин. доля аффинажа, %</th>}
+            {withChem && <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Хим. состав по умолчанию, %</th>}
             {!numbered && <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>}
             <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
             <th className="w-12"></th>
@@ -268,6 +279,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                   <td className="px-4 py-3 text-right tabular-nums">{normCell(norms[item.code]?.ag ?? "")}</td>
                 </>}
                 {withAffinage && <td className="px-4 py-3 text-right tabular-nums">{normCell(affinage[item.code] ?? "")}</td>}
+                {withChem && <td className="px-4 py-3 text-gray-700 tabular-nums">{chemText(item.chemPct) || <span className="text-gray-400">—</span>}</td>}
                 {!numbered && <td className="px-4 py-3"><Badge label={item.status} group="zapisi-spravochnikov" /></td>}
                 <CreatedCell row={dictCreatedOf(name, item.code)} />
                 <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
@@ -321,6 +333,10 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
               </div>
             </>}
             {withAffinage && <Field label="Мин. доля аффинажа, %"><Input value={affForm} onChange={v => setAffForm(v.replace(/[^\d.,]/g, ""))} placeholder="Не установлено" /></Field>}
+            {withChem && <>
+              <ChemCompositionBlock scope="shk" percentOnly value={form.chemPct} onChange={(_, p) => setForm(f => ({ ...f, chemPct: p }))} />
+              <p className="text-xs text-gray-500">Подставляется в окно доп. материала шихтовой карты при выборе типа; граммы рассчитываются от введённого лигат. веса. Наименование материала в карте — значение записи.</p>
+            </>}
             {!numbered && <Field label="Статус" required><Select value={form.status} options={recordStatuses} onChange={v => setForm(f => ({ ...f, status: v }))} /></Field>}
           </div>
         </Modal>

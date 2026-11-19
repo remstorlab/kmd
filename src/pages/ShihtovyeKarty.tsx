@@ -8,7 +8,7 @@ import {
 } from "../components/ui";
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
-  PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO,
+  PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO, DOP_DICT, dopDefaultPct,
   PrikazPlavka, oborotHint, oborotOver, oborotLimit,
 } from "../data/mock";
 import { returnToStock } from "../data/stock";
@@ -18,7 +18,7 @@ import {
   shihtaOborot, oborotHintText, oborotWarnings, oborotInfoText, kartaOborot,
 } from "../data/shihta";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
-import { ChemPercent, gramsFrom, num0, pctFrom } from "../data/chem";
+import { ChemPercent, gramsFrom, num0, pctFrom, pctSum } from "../data/chem";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
 import { Plus, X, Calculator, AlertTriangle, Sigma, Info, RotateCcw } from "lucide-react";
 import { useScreen } from "../router";
@@ -130,44 +130,59 @@ function banReason(m: { klass: string; share: Record<string, number>; kind: Shih
 }
 
 // ── Окно «Добавить доп. материал» ──
-// Типы — справочник «Типы доп. материалов шихты»: по коду записи определяется расчёт строки
+// Одно окно для всех типов справочника «Типы доп. материалов шихты»: тип, наименование, вес лигат., состав
+// (граммы / % элементов). Выбор типа подставляет его наименование и хим. состав по умолчанию (chemPct справочника,
+// граммы — от введённого лигат. веса); «Прочее» — наименование вводится вручную, состав пустой.
+// По коду типа определяется вид строки: лигатура Cu-P (проверка фосфора по ГОСТ), медь МО, прочее.
 const dopKindOf = (type: string): ShihtaMatKind => {
-  const code = spravochniki["Типы доп. материалов шихты"].items.find(i => i.value === type)?.code;
+  const code = spravochniki[DOP_DICT].items.find(i => i.value === type)?.code;
   return code === DOP_TYPE_CUP ? "cup" : code === DOP_TYPE_MED_MO ? "medMO" : "prochee";
 };
 
-// Тип справочника для строки при редактировании: лигатура / медь — по коду, «прочее» — первый тип с ручным составом
+// Тип справочника для строки при редактировании — по виду строки
 const dopTypeOf = (m: MatRow, types: string[]) => types.find(t => dopKindOf(t) === m.kind) ?? types[0] ?? "";
 
+// Наименование строки в таблицах карты: у лигатуры Cu-P — фосфор, %, если его нет в наименовании
+// («Лигатура Cu-P (Фосфор 9,44%)» при P = 9,44 % — без пометки)
+const cupName = (kind: ShihtaMatKind, name: string, p?: number) =>
+  kind === "cup" && !name.includes(str2(p ?? 0)) ? `${name} (P = ${str2(p ?? 0)} %)` : name;
+
 // Окно доп. материала: добавление (initial не задан) и редактирование строки карты (initial — строка).
-// Вес лигат. — в граммах; состав «Прочего» — граммы / % элементов.
 function DopMaterialModal({ initial, onClose, onSave }: { initial?: MatRow; onClose: () => void; onSave: (row: MatRow) => void }) {
-  const types = spravValues("Типы доп. материалов шихты");
-  const initChem: ChemComposition = initial
-    ? Object.fromEntries(Object.entries(initial.share).map(([k, v]) => [k, r2(v * num(initial.ves)).toFixed(2)]))
-    : {};
-  const [type, setType] = useState(() => (initial ? dopTypeOf(initial, types) : types[0] ?? ""));
+  const types = spravValues(DOP_DICT);
+  const initType = initial ? dopTypeOf(initial, types) : types[0] ?? "";
+  // Состав строки при редактировании (у строк без состава — расчёт лигатуры / меди), у новой — по умолчанию типа
+  const initChem: ChemComposition = initial ? chemStrings(lineChem(lineOf(initial))) : {};
+  const [type, setType] = useState(initType);
   const kind = dopKindOf(type);
-  const [name, setName] = useState(initial?.kind === "prochee" ? initial.mat : "");
+  const [name, setName] = useState(initial ? initial.mat : kind === "prochee" ? "" : initType);
   const [ves, setVes] = useState(initial?.ves ?? "");
-  const [pPct, setPPct] = useState(initial?.phosphorPct != null ? str2(initial.phosphorPct) : "");
   const [chem, setChem] = useState<ChemComposition>(initChem);
-  const [pct, setPct] = useState<ChemPercent>(() => pctFrom(initChem, num(initial?.ves)));
+  const [pct, setPct] = useState<ChemPercent>(() => (initial ? pctFrom(initChem, num(initial.ves)) : dopDefaultPct(initType)));
   const mass = num(ves);
-  const p = num(pPct);
-  const cupChem = kind === "cup" && mass > 0 && p > 0 && p < 100 ? lineChem({ kind: "cup", mass, phosphorPct: p }) : null;
   const error = !(mass > 0) ? "Укажите вес лигат."
-    : kind === "cup" && !(p > 0 && p < 100) ? "Укажите содержание фосфора, %"
-    : kind === "prochee" && !name.trim() ? "Укажите наименование материала"
+    : !name.trim() ? "Укажите наименование материала"
+    : pctSum(pct) > 100.005 ? "Сумма содержания элементов больше 100 %"
     : "";
   const decimal = (set: (v: string) => void) => (v: string) => set(v.replace(/[^\d.,]/g, ""));
+
+  // Смена типа: наименование и состав по умолчанию из справочника («Прочее» — пустые)
+  const changeType = (t: string) => {
+    setType(t);
+    const p = dopDefaultPct(t);
+    setName(dopKindOf(t) === "prochee" ? "" : t);
+    setPct(p);
+    setChem(gramsFrom(p, mass));
+  };
 
   const save = () => {
     if (error) return;
     const base = { key: initial?.key ?? newKey(), nomenkl: "", klass: "", proba: 0, qty: 1, loc: "", ves: str2(mass) };
-    if (kind === "cup") onSave({ ...base, kind: "cup", mat: type, share: {}, phosphorPct: r2(p) });
-    else if (kind === "medMO") onSave({ ...base, kind: "medMO", mat: type, share: { cu: 1 } });
-    else onSave({ ...base, kind: "prochee", mat: name.trim(), share: shareOf(chem, mass) });
+    onSave({
+      ...base, kind, mat: name.trim(), share: shareOf(chem, mass),
+      // Лигатура Cu-P: фосфор, % — для проверки по ГОСТ 4515 и суммирования строк
+      ...(kind === "cup" ? { phosphorPct: r2(num(pct.p)) } : {}),
+    });
   };
 
   return (
@@ -175,27 +190,17 @@ function DopMaterialModal({ initial, onClose, onSave }: { initial?: MatRow; onCl
       <><Btn variant="secondary" onClick={onClose}>Отмена</Btn><Btn onClick={save} disabled={!!error}>{initial ? "Сохранить" : "Добавить"}</Btn></>
     }>
       <div className="grid grid-cols-3 gap-4">
-        <Field label="Тип" required><Select value={type} options={types} onChange={setType} /></Field>
-        {kind === "prochee" && <>
-          <Field label="Наименование материала" required><Input value={name} onChange={setName} placeholder="Название" /></Field>
-        </>}
-        <Field label="Вес лигат., г" required>
-          <Input value={ves} onChange={decimal(v => { setVes(v); if (kind === "prochee") setChem(gramsFrom(pct, num0(v))); })} placeholder="0,00" />
+        <Field label="Тип" required><Select value={type} options={types} onChange={changeType} /></Field>
+        <Field label="Наименование материала" required>
+          <Input value={name} onChange={setName} placeholder="Название" disabled={kind !== "prochee"} />
         </Field>
-        {kind === "cup" && <>
-          <Field label="Фосфор, %" required><Input value={pPct} onChange={decimal(setPPct)} placeholder="8,00" /></Field>
-          <div />
-          <Field label="Медь (Cu), г"><Input value={cupChem ? str2(cupChem.cu) : ""} disabled placeholder="рассчитывается" /></Field>
-          <Field label="Фосфор (P), г"><Input value={cupChem ? str2(cupChem.p) : ""} disabled placeholder="рассчитывается" /></Field>
-        </>}
-        {kind === "medMO" && <Field label="Медь (Cu), г"><Input value={mass > 0 ? str2(mass) : ""} disabled placeholder="= вес лигат." /></Field>}
+        <Field label="Вес лигат., г" required>
+          <Input value={ves} onChange={decimal(v => { setVes(v); setChem(gramsFrom(pct, num0(v))); })} placeholder="0,00" />
+        </Field>
       </div>
-      {kind === "cup" && <p className="mt-3 text-xs text-gray-500">Cu = вес лигат. × (1 − P / 100), округление до 0,01 г; P = вес лигат. − Cu. Фосфор выгорает и не входит в базу расчёта долей.</p>}
-      {kind === "prochee" && (
-        <div className="mt-4">
-          <ChemCompositionBlock scope="shk" value={chem} lig={mass} pct={pct} onChange={(c, pc) => { setChem(c); setPct(pc); }} />
-        </div>
-      )}
+      <div className="mt-4">
+        <ChemCompositionBlock scope="shk" value={chem} lig={mass} pct={pct} onChange={(c, pc) => { setChem(c); setPct(pc); }} />
+      </div>
     </Modal>
   );
 }
@@ -411,7 +416,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
 
   const codeLabel = useMaterialCodeLabel();
   // Наименование строки: у лигатуры — с содержанием фосфора
-  const matName = (m: MatRow) => (m.kind === "cup" ? `${m.mat} (P = ${str2(m.phosphorPct ?? 0)} %)` : m.mat);
+  const matName = (m: MatRow) => cupName(m.kind, m.mat, m.phosphorPct);
   const dash = <span className="text-gray-400">—</span>;
   // Колонки атрибутов позиции (до «Массы в шихту»)
   const LEAD = 8;
@@ -756,7 +761,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
     return c[k] ?? null;
   };
   const impText = impuritiesText(grade, shkEls.map(e => e.id), shortName);
-  const matName = (m: ShihtaMaterial) => (kindOf(m) === "cup" ? `${m.name} (P = ${str2(m.phosphorPct ?? 0)} %)` : m.name);
+  const matName = (m: ShihtaMaterial) => cupName(kindOf(m), m.name, m.phosphorPct);
   const LEAD = 5;
   const cols = LEAD + 1 + shkEls.length;
   const dash = <span className="text-gray-400">—</span>;
