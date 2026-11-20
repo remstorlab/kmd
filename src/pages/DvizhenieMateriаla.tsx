@@ -1096,7 +1096,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [showVozvratFromVyd, setShowVozvratFromVyd] = nested("vozvrat-from-vydacha");
   const [showShihtaPick, setShowShihtaPick] = nested("shihta-pick");
   // Карты приказа на плавку, выданные по «Выдать по ШК» (одного приказа) — при сохранении операции переходят в «Выполнена».
-  // У сохранённой операции — её карты; крестик у приказа снимает их (позиции по ШК удаляются из выдачи)
+  // У сохранённой операции — её карты (приказ после сохранения не снимается)
   const [pickedKartaIds, setPickedKartaIds] = useState<string[]>(() => (op?.vid === "Плавка" ? op.shihtaIds ?? [] : []));
   // id операции — постоянный с открытия формы: по нему записи склада позиций возврата (vz-<id>-<№>)
   const [opId] = useState(() => op?.id || `op-${Date.now()}`);
@@ -1251,7 +1251,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
   // ── Выдача по ШК (плавка): один приказ на операцию ──
   // Приказ выданных карт показывается рядом с кнопкой «Выдать по ШК» (кнопка неактивна, пока приказ выбран).
-  // Позиции по ШК не редактируются и не удаляются по одной; крестик у приказа снимает приказ и все его позиции.
+  // Позиции по ШК не редактируются и не удаляются по одной; крестик у приказа (только до сохранения операции)
+  // снимает приказ и все его позиции.
   const shkKarty = shihtovyeKarty.filter(k => pickedKartaIds.includes(k.id));
   const shkPrikaz = shihtaPrikazy.find(p => p.id === shkKarty[0]?.prikazId);
   // Позиции по ШК: с признаком; у операций, сохранённых до признака, — по номенкл. № материалов карт
@@ -1263,9 +1264,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     setHead(h => ({ ...h, plavkaNo: "" }));
     show(`Приказ № ${shkPrikaz?.number ?? ""} снят — позиции по ШК удалены из выдачи`);
   };
-  // Карты, выданные сохранённой операцией и снятые крестиком: при сохранении — снова «Готово для плавки»,
-  // их позиции возвращаются в резерв
-  const unpickedKarty = (op?.shihtaIds ?? []).filter(id => !pickedKartaIds.includes(id));
+  // Приказ, сохранённый в операции, не снимается: после «Сохранить» приказ и его позиции — только для просмотра
+  const shkLocked = ro || (op?.shihtaIds?.length ?? 0) > 0;
 
   // ── Оборот новых позиций возврата («Добавить новую») ──
   // Только СрМ 925 (код OBOROT_CODE). Плавка: максимальный оборот выданных позиций СрМ 925 + 1; если в ШК СрМ 92,5
@@ -1523,14 +1523,6 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     const pos = applyVydacha();
     // Карта выдана в плавку — «Выполнена»
     if (pickedKartaIds.length) setShihtovyeKarty(prev => prev.map(k => (pickedKartaIds.includes(k.id) ? { ...k, status: "Выполнена", vydannyePozicii: undefined } : k)));
-    // Приказ снят крестиком у сохранённой операции: позиции его карт (возвращены на склад при сохранении выдачи) —
-    // снова в резерве карт, карты — «Готово для плавки»
-    if (unpickedKarty.length) {
-      const back = shihtovyeKarty.filter(k => unpickedKarty.includes(k.id));
-      const nom = new Set(back.flatMap(k => k.materials.filter(isSkladMaterial).map(m => m.nomenkl)));
-      setDmItems(prev => prev.map(i => (nom.has(i.nomenkl) && i.status === "На складе" ? { ...i, status: "Резерв" as const } : i)));
-      setShihtovyeKarty(prev => prev.map(k => (unpickedKarty.includes(k.id) ? { ...k, status: SH_READY_PLAVKA } : k)));
-    }
     onSave(buildOp(next, pos.vydachaPos, pos.vozvratPos));
   };
 
@@ -1600,25 +1592,25 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
 
       {activeTab === "Выдача" && (
         <>
-          {!ro && (
+          {(!ro || (vid === "Плавка" && pickedKartaIds.length > 0)) && (
             <div className="flex gap-2 mb-3">
               {vid === "Плавка" ? (
                 // Для плавки состав выдачи определяет шихтовая карта; выдаётся один приказ — после выбора кнопка
                 // неактивна, рядом — выданный приказ с крестиком (снять приказ и его позиции)
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span title={shkPrikaz ? "Приказ уже выдан — чтобы выбрать другой, снимите текущий (крестик)" : undefined}>
+                  {!ro && <span title={shkPrikaz ? (shkLocked ? "Приказ сохранён в операции — изменение недоступно" : "Приказ уже выдан — чтобы выбрать другой, снимите текущий (крестик)") : undefined}>
                     <Btn size="sm" onClick={() => setShowShihtaPick(true)} disabled={pickedKartaIds.length > 0}><Plus className="w-4 h-4" />Выдать по ШК</Btn>
-                  </span>
+                  </span>}
                   {pickedKartaIds.length > 0 && (
                     <span className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-800">
                       Приказ № {shkPrikaz?.number ?? "—"}{shkPrikaz ? ` от ${shkPrikaz.date} · ${shkPrikaz.name}` : ""}
                       <span className="text-xs text-blue-600">(плавки № {shkKarty.map(k => k.plavkaNo).join(", ")})</span>
-                      <button onClick={removeShk} className="text-blue-500 hover:text-red-600" title="Снять приказ — позиции по ШК удаляются из выдачи"><X className="w-4 h-4" /></button>
+                      {!shkLocked && <button onClick={removeShk} className="text-blue-500 hover:text-red-600" title="Снять приказ — позиции по ШК удаляются из выдачи"><X className="w-4 h-4" /></button>}
                     </span>
                   )}
                 </div>
               ) : (
-                <Btn size="sm" onClick={() => setShowAddDM(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
+                !ro && <Btn size="sm" onClick={() => setShowAddDM(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               )}
             </div>
           )}
