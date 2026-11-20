@@ -94,7 +94,7 @@ export function emptyPosition(_locs: StorageLocation[], _sklad: string, klass: s
   };
 }
 
-export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany, title: titleProp, saveLabel, lockWeights = false, header, extraWide = false, fixedHeight = false, oborotHint }: {
+export default function DMPositionFormModal({ mode, sklad, initial, reservedNomenkl = [], onClose, onSave, onSaveMany, title: titleProp, saveLabel, lockWeights = false, header, extraWide = false, fixedHeight = false, oborotHint, oborotByCode }: {
   mode: "add" | "edit" | "view";
   sklad: string;
   initial: PrihodPosition;
@@ -116,6 +116,9 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   fixedHeight?: boolean;
   // Подсказка под полем «Оборот» (напр. как рассчитан оборот позиции возврата с плавки)
   oborotHint?: string;
+  // Расчётный оборот для кода материала (возврат с плавки: СрМ 925 — оборот + 1): при выборе этого кода значение
+  // подставляется (поле остаётся редактируемым), при другом коде — 0 для ввода; подсказка oborotHint — только у этого кода
+  oborotByCode?: { code: string; value: number };
 }) {
   const ro = mode === "view";
   const { storageLocations: locs, materialCodes } = useApp();
@@ -134,7 +137,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
   const applyPct = (p: ChemPercent, lig = ligN) => { setPct(p); setForm(f => ({ ...f, chem: gramsFrom(p, lig) })); };
   // Код материала: справочное содержание (с поправкой на уже выбранную пробу)
   const changeCode = (code: string) => {
-    setForm(f => ({ ...f, code }));
+    setForm(f => ({ ...f, code, ...(oborotByCode ? { oborot: code === oborotByCode.code ? String(oborotByCode.value) : "0" } : {}) }));
     applyPct(applyProba(compositionOf(code, materialCodes), form.proba, mainElementOf(code, materialCodes)));
   };
   // Проба: содержание основного металла = Проба / 10 %, остаток (Cu) пересчитывается
@@ -235,7 +238,7 @@ export default function DMPositionFormModal({ mode, sklad, initial, reservedNome
         <Field label="Оборот">
           <div
             className={oborotOver(oborotFromForm(form.oborot), form.code) ? "rounded-lg ring-1 ring-red-400" : ""}
-            title={[oborotHint, oborotOver(oborotFromForm(form.oborot), form.code) ? oborotOverHint(form.code) : ""].filter(Boolean).join("\n") || undefined}
+            title={[!oborotByCode || form.code === oborotByCode.code ? oborotHint : "", oborotOver(oborotFromForm(form.oborot), form.code) ? oborotOverHint(form.code) : ""].filter(Boolean).join("\n") || undefined}
           >
             {/* Только число; пусто — 0 (оборотов не было), ведущие нули убираются */}
             <Input value={String(oborotFromForm(form.oborot))} onChange={v => set("oborot")(v.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "") || "0")} placeholder="0" disabled={ro} />

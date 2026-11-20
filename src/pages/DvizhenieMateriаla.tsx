@@ -6,7 +6,7 @@ import {
   Field, Input, Select, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, probaText, NetAuAg, NET_AU_AG, ChemTip, usePaged,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
-import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses, OBOROT_CODE, oborotOf, DMItem, isStoneKlass } from "../data/mock";
+import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses, OBOROT_CODE, oborotOf, DMItem, isStoneKlass, PRIKAZ_MOVED } from "../data/mock";
 import { Plus } from "lucide-react";
 import { takeFromStock, returnToStock, IssueLine, scaleChem, addChem } from "../data/stock";
 import { isSkladMaterial, markIssuedElsewhere, itogoMaterials, prikazStatus, r2, kartaOborot, isOborotGrade } from "../data/shihta";
@@ -268,13 +268,14 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
 
 // ── Выдача по шихтовым картам приказа на плавку ──────────────────────────────
 
-// Выдаётся итоговый набор позиций склада всех оформленных («Новая») карт приказа. Карты выдаются на плавку со склада
+// Выдаются только приказы «Перемещено на СДМ №2» — оформленные приказы, позиции которых перемещены на склад выдачи
+// документом «Требование». Выдаётся итоговый набор позиций склада всех оформленных («Новая») карт приказа. Карты выдаются на плавку со склада
 // выдачи (СДМ2): позиции в резерве на складе приёмки (СДМ1) нужно сначала переместить требованием — до этого приказ
 // недоступен для выбора. Приказ с картой «На редактировании» не выдаётся (статус приказа — «На редактировании»).
 function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (p: PrikazPlavka, karty: ShihtovayaKarta[]) => void }) {
   const { shihtovyeKarty, shihtaPrikazy, dmItems } = useApp();
   const kartyOf = (id: string) => shihtovyeKarty.filter(k => k.prikazId === id).sort((a, b) => (parseInt(a.plavkaNo, 10) || 0) - (parseInt(b.plavkaNo, 10) || 0));
-  const available = shihtaPrikazy.map(p => ({ p, karty: kartyOf(p.id) })).filter(r => prikazStatus(r.karty) === "Новая");
+  const available = shihtaPrikazy.map(p => ({ p, karty: kartyOf(p.id) })).filter(r => prikazStatus(r.karty, r.p) === PRIKAZ_MOVED);
   const notMoved = (karty: ShihtovayaKarta[]) => karty.flatMap(k => k.materials).filter(m => m.nomenkl && dmItems.some(i => i.nomenkl === m.nomenkl && i.status === "Резерв" && i.sklad !== MAIN_SKLAD));
   const fmtG = (v: number) => v.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -282,7 +283,7 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (p:
     <Modal title="Выдача по шихтовым картам" wide onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Отмена</Btn>}>
       {available.length === 0 ? (
         <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-          Нет приказов на плавку с оформленными шихтовыми картами
+          Нет приказов на плавку, позиции которых перемещены на СДМ №2 документом «Требование»
         </div>
       ) : (
         <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
@@ -308,7 +309,7 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (p:
                     </div>
                   )}
                 </div>
-                <Badge label="Новая" group="shihta" />
+                <Badge label={PRIKAZ_MOVED} group="shihta" />
               </button>
             );
           })}
@@ -1246,28 +1247,29 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   }));
 
   // ── Оборот новых позиций возврата («Добавить новую») ──
-  // Плавка: максимальный оборот выданных позиций с оборотом (СрМ 925 и любые с оборотом > 0) + 1; если в ШК СрМ 92,5
+  // Только СрМ 925 (код OBOROT_CODE). Плавка: максимальный оборот выданных позиций СрМ 925 + 1; если в ШК СрМ 92,5
   // оборот указан вручную больше — оборот ШК + 1. Прочие операции:
   // наследуется оборот выданного СрМ 925 без +1 (по нескольким позициям — максимальный). Значение можно поправить в форме.
-  // Позиции, возвращённые «Добавить из Выдачи», сохраняют свой оборот.
+  // Значение подставляется при коде СрМ 925 и остаётся редактируемым; у других кодов оборот не рассчитывается —
+  // 0 для ручного ввода. Позиции, возвращённые «Добавить из Выдачи», сохраняют свой оборот.
   const plavkaKartaIds = pickedKartaIds.length ? pickedKartaIds : op?.shihtaIds ?? [];
   const plavkaKarty = vid !== "Плавка" ? [] : plavkaKartaIds.length
     ? shihtovyeKarty.filter(k => plavkaKartaIds.includes(k.id))
     : shihtovyeKarty.filter(k => head.plavkaNo.split(/[,\s]+/).filter(Boolean).includes(k.plavkaNo));
   const oborotKarty = plavkaKarty.filter(k => isOborotGrade(alloyGrades.find(g => g.id === k.alloyId)));
-  // Выданные позиции с оборотом: СрМ 925 (в т. ч. с оборотом 0) и любые позиции с оборотом > 0
-  const vydanoSrM = vydacha.filter(p => posView(p).metal === OBOROT_CODE || (posView(p).oborot ?? 0) > 0);
+  // Выданные позиции СрМ 925
+  const vydanoSrM = vydacha.filter(p => posView(p).metal === OBOROT_CODE);
   const maxVydanoOborot = Math.max(0, ...vydanoSrM.map(p => posView(p).oborot ?? 0));
   const vozvratOborot: { value: number; hint: string } | null = (() => {
-    // Плавка: максимальный оборот выданных позиций + 1. Если в ШК СрМ 92,5 оборот указан вручную больше — от него
+    // Плавка: максимальный оборот выданных позиций СрМ 925 + 1. Если в ШК СрМ 92,5 оборот указан вручную больше — от него
     if (vid === "Плавка" && (vydanoSrM.length || oborotKarty.length)) {
       const kartaMax = Math.max(0, ...oborotKarty.map(kartaOborot));
       const base = Math.max(maxVydanoOborot, kartaMax);
       const pl = oborotKarty.map(k => k.plavkaNo).join(", ");
       const src = kartaMax > maxVydanoOborot
         ? `оборот ШК (плавка № ${pl}) ${base}`
-        : `максимальный оборот выданных позиций ${base}`;
-      return { value: base + 1, hint: `Переплав: ${src} + 1 = ${base + 1}. Рассчитан автоматически, можно изменить` };
+        : `максимальный оборот выданных позиций СрМ 925 ${base}`;
+      return { value: base + 1, hint: `Переплав СрМ 925: ${src} + 1 = ${base + 1}. Рассчитан автоматически, можно изменить` };
     }
     if (vydanoSrM.length === 0) return null;
     return { value: maxVydanoOborot, hint: `Наследуется оборот выданного СрМ 925: ${maxVydanoOborot}${vydanoSrM.length > 1 ? " (максимальный среди выданных позиций)" : ""}. Можно изменить` };
@@ -1686,6 +1688,7 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
             oborot: String(vozvratOborot?.value ?? 0),
           }}
           oborotHint={vozvratOborot?.hint}
+          oborotByCode={vozvratOborot ? { code: OBOROT_CODE, value: vozvratOborot.value } : undefined}
           reservedNomenkl={[...vydacha, ...vozvrat].map(p => p.nomenkl)}
           onClose={() => setShowVozvratNew(false)}
           onSave={p => addVozvratNew([p])}

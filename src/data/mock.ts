@@ -12,6 +12,10 @@ export type LogType = "Создание" | "Изменение" | "Удален�
 // Карта «Новая» доступна для выдачи на плавку и не редактируется; если её зарезервированную позицию выдадут
 // в другой операции, карта возвращается в «На редактировании».
 export type ShihtaStatus = "На редактировании" | "Новая" | "Выполнена";
+// Статус приказа на плавку: статусы карт + «Перемещено на СДМ №2» — оформленный приказ, позиции которого перемещены
+// на склад выдачи документом «Требование» (только такой приказ выдаётся на плавку)
+export const PRIKAZ_MOVED = "Перемещено на СДМ №2";
+export type PrikazStatus = ShihtaStatus | typeof PRIKAZ_MOVED;
 
 export interface GPItem {
   // Кто и когда создал запись (колонка «Дата, время - Пользователь» в реестрах)
@@ -304,6 +308,8 @@ export interface PrikazPlavka {
   // Марка сплава и назначение слитков — задаются в приказе, во всех его шихтовых картах только для чтения
   alloyId?: string;
   naznachenie?: string;
+  // Оформленное требование (id документа), которым позиции карт приказа перемещены на СДМ №2
+  trebovanieId?: string;
   // Прикреплённые документы приказа
   files?: File[];
   createdAt: string;
@@ -672,6 +678,9 @@ const vpos = (src: "gp" | "dm", id: string): VydachaDocPosition => {
 // Требование ТР-0013 (в работе) — резерв карты П-2026-0088, позиции ещё на СДМ1
 initialSkladDocs.unshift(
   { id: "sd7", date: "20.08.2026", type: DOC_TREBOVANIE, number: "ТР-0013", status: "В работе", sender: SDM1, receiver: SDM2, prikazId: "pp3", positions: [vpos("dm", "dm43"), vpos("dm", "dm44"), vpos("dm", "dm45")] },
+  // Требование ТР-0014 (оформлено) по приказу № 1240: резерв карт плавок № 47, 48 перемещён на СДМ2 — приказ
+  // «Перемещено на СДМ №2», доступен для выдачи на плавку
+  { id: "sd11", date: "20.08.2026", type: DOC_TREBOVANIE, number: "ТР-0014", status: "Оформлено", sender: SDM1, receiver: SDM2, prikazId: "pp1", positions: ["dm40", "dm41", "dm42", "dm55"].map(id => vpos("dm", id)) },
 );
 
 // Возврат СГП №2 ВС-0012 (оформлен): монеты «Тумар» возвращены с СГП №2 на СДМ1 — запись gp43-sgp (на СГП №2)
@@ -834,7 +843,7 @@ export const initialShihtovyeKarty: ShihtovayaKarta[] = [
 for (const k of initialShihtovyeKarty) k.oborot = String(Math.max(0, ...k.materials.map(m => m.oborot ?? 0)));
 
 export const initialPrikazy: PrikazPlavka[] = [
-  { id: "pp1", number: "1240", date: "20.08.2026", name: "Слитки СрМ 92,5 для монет пруф-качества", createdAt: "2026-08-20T11:00:00", createdBy: "Бекова Айгуль Маратовна" },
+  { id: "pp1", number: "1240", date: "20.08.2026", name: "Слитки СрМ 92,5 для монет пруф-качества", trebovanieId: "sd11", createdAt: "2026-08-20T11:00:00", createdBy: "Бекова Айгуль Маратовна" },
   { id: "pp2", number: "1236", date: "19.08.2026", name: "Слитки СрМ 92,5 для столового серебра", createdAt: "2026-08-19T15:30:00", createdBy: "Бекова Айгуль Маратовна" },
   { id: "pp3", number: "1190", date: "08.04.2026", name: "Слитки ЗлСрМ 750-150 для сувенирной продукции", createdAt: "2026-04-08T10:00:00", createdBy: "Ковалева Елена" },
   { id: "pp4", number: "1185", date: "02.04.2026", name: "Слитки ЗлСрМ 585-80 для сувенирной продукции", createdAt: "2026-04-02T09:00:00", createdBy: "Ковалева Елена" },
@@ -1404,7 +1413,7 @@ export const initialStatusDicts: StatusDict[] = [
   { group: "operacii", name: "Статусы операций движения материала", sections: "Движение материала",
     items: st("operacii", [["В работе", "blue"], ["Завершено", "green"]]) },
   { group: "shihta", name: "Статусы шихтовых карт", sections: "Шихтовые карты, Движение материала (выдача по шихтовой карте)",
-    items: st("shihta", [["На редактировании", "blue"], ["Новая", "green"], ["Выполнена", "gray"]]) },
+    items: st("shihta", [["На редактировании", "blue"], ["Новая", "green"], ["Перемещено на СДМ №2", "purple"], ["Выполнена", "gray"]]) },
   { group: "gost", name: "Статусы соответствия ГОСТ", sections: "Шихтовые карты, Отчётность",
     items: st("gost", [["Соответствует", "green"], ["Не соответствует", "red"]]) },
   { group: "podotchet", name: "Статусы подотчётника", sections: "Подотчётники",

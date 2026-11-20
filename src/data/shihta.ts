@@ -1,5 +1,5 @@
-import type { AlloyGrade, AlloyRange, ChemComposition, ShihtaMatKind, ShihtaMaterial, ShihtovayaKarta } from "./mock";
-import { OBOROT_CODE, oborotLimit, oborotOver } from "./mock";
+import type { AlloyGrade, AlloyRange, ChemComposition, PrikazPlavka, PrikazStatus, ShihtaMatKind, ShihtaMaterial, ShihtovayaKarta } from "./mock";
+import { OBOROT_CODE, PRIKAZ_MOVED, oborotLimit, oborotOver } from "./mock";
 
 // ── Строки карты ──
 // Вид строки: у старых записей без kind — по номенкл. № (позиция склада) или «прочее»
@@ -296,11 +296,13 @@ export function oborotInfoText(o: ShihtaOborot, g: AlloyGrade | undefined): stri
 
 // ── Приказ на плавку: несколько шихтовых карт ─────────────────────────────────
 // Статус приказа по картам: есть карта на редактировании (или карт нет) — «На редактировании»;
-// все выполнены — «Выполнена»; иначе — «Новая» (оформлен, доступен для выдачи на плавку).
-export function prikazStatus(karty: Pick<ShihtovayaKarta, "status">[]): ShihtovayaKarta["status"] {
+// все выполнены — «Выполнена»; иначе — «Новая» (оформлен). Оформленный приказ, позиции которого перемещены на СДМ №2
+// документом «Требование» (prikaz.trebovanieId), — «Перемещено на СДМ №2»: только он выдаётся на плавку
+// («Выдать по ШК»), после выдачи карты — «Выполнена».
+export function prikazStatus(karty: Pick<ShihtovayaKarta, "status">[], prikaz?: Pick<PrikazPlavka, "trebovanieId">): PrikazStatus {
   if (karty.length === 0 || karty.some(k => k.status === "На редактировании")) return "На редактировании";
   if (karty.every(k => k.status === "Выполнена")) return "Выполнена";
-  return "Новая";
+  return prikaz?.trebovanieId ? PRIKAZ_MOVED : "Новая";
 }
 
 // Итоговая строка шихтовых материалов приказа: одинаковые материалы всех карт суммируются
