@@ -196,6 +196,9 @@ export const lossWeight = (l: OperLoss) =>
 
 // ves — вес позиции для расчётов операции; metal (код материала), lig / net (лигатурный / чистый вес, г) — для отображения как на складе ДМ
 export type OperPosition = { n: number; name: string; nomenkl: string; klass: string; proba: number; qty?: number; ves: number; ag: string; cu: string; chem?: ChemComposition; loc: string; metal?: string; lig?: number; net?: number;
+  // Плавка: позиция выдана по «Выдать по ШК» (резерв шихтовых карт приказа) — не редактируется и не удаляется в таблице;
+  // снимается только вместе с приказом (крестик у приказа)
+  poShihte?: boolean;
   // id записи склада ДМ, из которой выдана позиция (при частичной выдаче — выделенная часть)
   srcId?: string;
   // Частичная выдача: номенкл. № выданной части (новая запись склада); nomenkl — номер исходной записи

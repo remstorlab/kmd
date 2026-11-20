@@ -7,7 +7,7 @@ import {
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
 import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses, OBOROT_CODE, oborotOf, DMItem, isStoneKlass, SH_READY_PLAVKA } from "../data/mock";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { takeFromStock, returnToStock, IssueLine, scaleChem, addChem } from "../data/stock";
 import { isSkladMaterial, markIssuedElsewhere, itogoMaterials, prikazStatus, r2, kartaOborot, isOborotGrade } from "../data/shihta";
 import { NomenklCell, IssueLigCell, RezervWarning, ensurePartNomenkl } from "../components/IssueInputs";
@@ -519,7 +519,7 @@ function SpisanieTab({ losses, setLosses, files, setFiles, vydacha, vozvrat, cod
 
 // ── Таблица позиций операции: те же столбцы и порядок, что на складе ДМ ───────
 
-function OperPositionsTable({ rows, view, readOnly, onView, onEdit, canEdit, onDelete, issueLine, probaPct = false }: {
+function OperPositionsTable({ rows, view, readOnly, onView, onEdit, canEdit, onDelete, canDelete, issueLine, probaPct = false }: {
   rows: OperPosition[];
   view: (p: OperPosition) => DMPositionView;
   readOnly: boolean;
@@ -528,6 +528,8 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, canEdit, onD
   onEdit?: (p: OperPosition) => void;
   canEdit?: (p: OperPosition) => boolean;
   onDelete: (p: OperPosition) => void;
+  // Если передан — иконка удаления только у подходящих позиций (напр. не у выданных по ШК)
+  canDelete?: (p: OperPosition) => boolean;
   // Вкладка «Выдача»: расчёт выдачи позиции относительно записи склада (вес части и остаток на складе).
   // Количество и вес в таблице не редактируются — только в окне подбора («Изменить»)
   issueLine?: (p: OperPosition) => IssueLine | null;
@@ -589,7 +591,7 @@ function OperPositionsTable({ rows, view, readOnly, onView, onEdit, canEdit, onD
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => onView(p)} />
                     {!readOnly && onEdit && (!canEdit || canEdit(p)) && <EditIcon onClick={() => onEdit(p)} />}
-                    {!readOnly && <DeleteIcon onClick={() => onDelete(p)} />}
+                    {!readOnly && (!canDelete || canDelete(p)) && <DeleteIcon onClick={() => onDelete(p)} />}
                   </div>
                 </td>
               </tr>
@@ -1093,11 +1095,12 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   const [showVozvratNew, setShowVozvratNew] = nested("vozvrat-new");
   const [showVozvratFromVyd, setShowVozvratFromVyd] = nested("vozvrat-from-vydacha");
   const [showShihtaPick, setShowShihtaPick] = nested("shihta-pick");
-  // Карты приказа на плавку, выданные по «Выдать по ШК» — при сохранении операции переходят в «Выполнена»
-  const [pickedKartaIds, setPickedKartaIds] = useState<string[]>([]);
+  // Карты приказа на плавку, выданные по «Выдать по ШК» (одного приказа) — при сохранении операции переходят в «Выполнена».
+  // У сохранённой операции — её карты; крестик у приказа снимает их (позиции по ШК удаляются из выдачи)
+  const [pickedKartaIds, setPickedKartaIds] = useState<string[]>(() => (op?.vid === "Плавка" ? op.shihtaIds ?? [] : []));
   // id операции — постоянный с открытия формы: по нему записи склада позиций возврата (vz-<id>-<№>)
   const [opId] = useState(() => op?.id || `op-${Date.now()}`);
-  const { dmItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, operations, currentUser, storageLocations, alloyGrades } = useApp();
+  const { dmItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, operations, currentUser, storageLocations, alloyGrades } = useApp();
   const createdStamp = useCreatedStamp();
   // Документы вкладок «Выдача» / «Возврат»
   const [vydachaFiles, setVydachaFiles] = useState<File[]>(() =>
@@ -1246,13 +1249,31 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     poluchil: op ? (op.poluchil ?? op.responsible) : "",
   }));
 
+  // ── Выдача по ШК (плавка): один приказ на операцию ──
+  // Приказ выданных карт показывается рядом с кнопкой «Выдать по ШК» (кнопка неактивна, пока приказ выбран).
+  // Позиции по ШК не редактируются и не удаляются по одной; крестик у приказа снимает приказ и все его позиции.
+  const shkKarty = shihtovyeKarty.filter(k => pickedKartaIds.includes(k.id));
+  const shkPrikaz = shihtaPrikazy.find(p => p.id === shkKarty[0]?.prikazId);
+  // Позиции по ШК: с признаком; у операций, сохранённых до признака, — по номенкл. № материалов карт
+  const shkNomenkl = new Set(shkKarty.flatMap(k => k.materials.filter(isSkladMaterial).map(m => m.nomenkl)));
+  const isShk = (p: OperPosition) => !!p.poShihte || (pickedKartaIds.length > 0 && shkNomenkl.has(p.nomenkl));
+  const removeShk = () => {
+    setVydacha(prev => prev.filter(p => !isShk(p)));
+    setPickedKartaIds([]);
+    setHead(h => ({ ...h, plavkaNo: "" }));
+    show(`Приказ № ${shkPrikaz?.number ?? ""} снят — позиции по ШК удалены из выдачи`);
+  };
+  // Карты, выданные сохранённой операцией и снятые крестиком: при сохранении — снова «Готово для плавки»,
+  // их позиции возвращаются в резерв
+  const unpickedKarty = (op?.shihtaIds ?? []).filter(id => !pickedKartaIds.includes(id));
+
   // ── Оборот новых позиций возврата («Добавить новую») ──
   // Только СрМ 925 (код OBOROT_CODE). Плавка: максимальный оборот выданных позиций СрМ 925 + 1; если в ШК СрМ 92,5
   // оборот указан вручную больше — оборот ШК + 1. Прочие операции:
   // наследуется оборот выданного СрМ 925 без +1 (по нескольким позициям — максимальный). Значение можно поправить в форме.
   // Значение подставляется при коде СрМ 925 и остаётся редактируемым; у других кодов оборот не рассчитывается —
   // 0 для ручного ввода. Позиции, возвращённые «Добавить из Выдачи», сохраняют свой оборот.
-  const plavkaKartaIds = pickedKartaIds.length ? pickedKartaIds : op?.shihtaIds ?? [];
+  const plavkaKartaIds = pickedKartaIds;
   const plavkaKarty = vid !== "Плавка" ? [] : plavkaKartaIds.length
     ? shihtovyeKarty.filter(k => plavkaKartaIds.includes(k.id))
     : shihtovyeKarty.filter(k => head.plavkaNo.split(/[,\s]+/).filter(Boolean).includes(k.plavkaNo));
@@ -1502,6 +1523,14 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     const pos = applyVydacha();
     // Карта выдана в плавку — «Выполнена»
     if (pickedKartaIds.length) setShihtovyeKarty(prev => prev.map(k => (pickedKartaIds.includes(k.id) ? { ...k, status: "Выполнена", vydannyePozicii: undefined } : k)));
+    // Приказ снят крестиком у сохранённой операции: позиции его карт (возвращены на склад при сохранении выдачи) —
+    // снова в резерве карт, карты — «Готово для плавки»
+    if (unpickedKarty.length) {
+      const back = shihtovyeKarty.filter(k => unpickedKarty.includes(k.id));
+      const nom = new Set(back.flatMap(k => k.materials.filter(isSkladMaterial).map(m => m.nomenkl)));
+      setDmItems(prev => prev.map(i => (nom.has(i.nomenkl) && i.status === "На складе" ? { ...i, status: "Резерв" as const } : i)));
+      setShihtovyeKarty(prev => prev.map(k => (unpickedKarty.includes(k.id) ? { ...k, status: SH_READY_PLAVKA } : k)));
+    }
     onSave(buildOp(next, pos.vydachaPos, pos.vozvratPos));
   };
 
@@ -1574,8 +1603,20 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
           {!ro && (
             <div className="flex gap-2 mb-3">
               {vid === "Плавка" ? (
-                // Для плавки состав выдачи определяет только шихтовая карта.
-                <Btn size="sm" onClick={() => setShowShihtaPick(true)}><Plus className="w-4 h-4" />Выдать по ШК</Btn>
+                // Для плавки состав выдачи определяет шихтовая карта; выдаётся один приказ — после выбора кнопка
+                // неактивна, рядом — выданный приказ с крестиком (снять приказ и его позиции)
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span title={shkPrikaz ? "Приказ уже выдан — чтобы выбрать другой, снимите текущий (крестик)" : undefined}>
+                    <Btn size="sm" onClick={() => setShowShihtaPick(true)} disabled={pickedKartaIds.length > 0}><Plus className="w-4 h-4" />Выдать по ШК</Btn>
+                  </span>
+                  {pickedKartaIds.length > 0 && (
+                    <span className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-800">
+                      Приказ № {shkPrikaz?.number ?? "—"}{shkPrikaz ? ` от ${shkPrikaz.date} · ${shkPrikaz.name}` : ""}
+                      <span className="text-xs text-blue-600">(плавки № {shkKarty.map(k => k.plavkaNo).join(", ")})</span>
+                      <button onClick={removeShk} className="text-blue-500 hover:text-red-600" title="Снять приказ — позиции по ШК удаляются из выдачи"><X className="w-4 h-4" /></button>
+                    </span>
+                  )}
+                </div>
               ) : (
                 <Btn size="sm" onClick={() => setShowAddDM(true)}><Plus className="w-4 h-4" />Добавить позицию</Btn>
               )}
@@ -1590,9 +1631,10 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
             readOnly={ro}
             onView={p => screen.open("position", `vydacha-${p.n}`)}
             onDelete={p => setVydacha(prev => prev.filter(x => x.n !== p.n))}
+            canDelete={p => !isShk(p)}
             issueLine={p => issueLine(p)}
             onEdit={p => screen.open("vydacha-edit", String(p.n))}
-            canEdit={p => !!editRowOf(p)}
+            canEdit={p => !isShk(p) && !!editRowOf(p)}
           />
           <div className="mt-4">
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
@@ -1736,9 +1778,9 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
               if (take.length === 0) {
                 const dm = dmItems.find(i => i.nomenkl === m.nomenkl);
                 const part = dm && dm.qty > 0 ? (m.qty ?? 1) / dm.qty : 1;
-                return [{ ...m, ag: "-", cu: "-", metal: dm?.metal, lig: m.ves, net: dm ? +(dm.netWeight * part).toFixed(2) : undefined, chem: m.chem ?? dm?.chem }];
+                return [{ ...m, ag: "-", cu: "-", metal: dm?.metal, lig: m.ves, net: dm ? +(dm.netWeight * part).toFixed(2) : undefined, chem: m.chem ?? dm?.chem, poShihte: true }];
               }
-              return take.map(r => ({ ...m, qty: r.qty, ves: r.ligWeight, ag: "-", cu: "-", metal: r.metal, lig: r.ligWeight, net: r.netWeight, chem: r.chem ?? m.chem, srcId: r.id, oborot: r.oborot ?? m.oborot ?? 0 }));
+              return take.map(r => ({ ...m, qty: r.qty, ves: r.ligWeight, ag: "-", cu: "-", metal: r.metal, lig: r.ligWeight, net: r.netWeight, chem: r.chem ?? m.chem, srcId: r.id, oborot: r.oborot ?? m.oborot ?? 0, poShihte: true }));
             });
             appendPositions("vydacha", rows);
             setHead(h => ({ ...h, plavkaNo: karty.map(k => k.plavkaNo).join(", ") }));
