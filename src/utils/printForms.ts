@@ -64,7 +64,6 @@ function trebovanieSheet(d: SkladDoc, karty: ShihtovayaKarta[], prikazy: PrikazP
     ? `приказ на плавку № ${prikaz.number} от ${prikaz.date}${plavki.length ? `, шихтовые карты плавок № ${plavki.join(", ")}` : ""}`
     : karta ? `шихтовая карта № ${karta.plavkaNo} «${karta.name}» от ${karta.date}` : "—";
   sh.merge(7, 1, 7, LAST, `Основание: ${osnovanie}        Склад-отправитель: ${d.sender}        Склад-получатель: ${d.receiver}`, S.center);
-  if (d.zakazchik) sh.merge(8, 1, 8, LAST, `Заказчик: ${d.zakazchik}${d.ownProperty === false ? " (не собственность заказчика)" : ""}`, S.center);
 
   // Шапка таблицы
   const h = 10;

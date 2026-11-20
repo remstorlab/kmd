@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from "react";
 import {
-  Btn, Modal, DeleteIcon, EditIcon, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
+  Btn, Modal, DeleteIcon, EditIcon, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp, PosStatusBadge, probaText,
   InfoField,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
-import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, PrikazPlavka, spravValues, SDM1, SDM2, DOC_TREBOVANIE, SH_READY_TREB } from "../data/mock";
+import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, PrikazPlavka, SDM1, SDM2, DOC_TREBOVANIE, SH_READY_TREB } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow, PickedRow } from "./StockPickerModal";
 import { takeFromStock, partLigMap, partNomenklMap } from "../data/stock";
@@ -57,7 +57,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const [head, setHead] = useState(() => ({
     number: doc?.number || `ТР-${String(Math.floor(Math.random() * 900 + 100)).padStart(4, "0")}`,
     date: doc?.date || today,
-    zakazchik: doc?.zakazchik ?? "Монетный двор",
     // Отправитель — склад приёмки (СДМ1), получатель — склад выдачи (СДМ2); не редактируются
     sender: SDM1,
     receiver: SDM2,
@@ -65,7 +64,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     prikazId: doc?.prikazId ?? shihtovyeKarty.find(k => k.id === doc?.shihtaId)?.prikazId ?? "",
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
-  const [ownProperty, setOwnProperty] = useState(doc?.ownProperty ?? true);
   const [info, setInfo] = useState(doc?.info ?? "");
   const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Требование_${doc.number}.pdf`)] : []));
   const [positions, setPositions] = useState<TrebPosition[]>(() => doc?.positions ?? []);
@@ -127,13 +125,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     else show(`У шихтовых карт приказа нет позиций в резерве на складе «${head.sender}»`);
   };
 
-  // Заказчик и «Собственность заказчика» после выбора позиций берутся из них (из документов приёма)
-  // и только для чтения; до выбора позиций — вводятся вручную
-  const posItems = positions.map(itemOf).filter((i): i is GPItem | DMItem => !!i?.zakazchik);
-  const fromPositions = !posted && posItems.length > 0;
-  const zakazchik = fromPositions ? Array.from(new Set(posItems.map(i => i.zakazchik!))).join(", ") : head.zakazchik;
-  const isOwn = fromPositions ? posItems.every(i => i.ownProperty) : ownProperty;
-  const lockZakazchik = ro || posted || fromPositions;
 
 
   // Количество к перемещению (от 1 до количества изделий) и вес перемещаемой части при частичном перемещении —
@@ -239,8 +230,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       sender: head.sender,
       receiver: head.receiver,
       prikazId: head.prikazId || undefined,
-      zakazchik,
-      ownProperty: isOwn,
       info: info.trim() || undefined,
       positions: finalPositions,
     });
@@ -266,11 +255,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         {typeSelect}
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>
         <Field label="Дата документа" required={!ro}><Input value={head.date} onChange={h("date")} disabled={ro} /></Field>
-        <Field label="Заказчик/Организация">
-          {lockZakazchik
-            ? <Input value={zakazchik} disabled />
-            : <Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...spravValues("Заказчики / Организации")]))} optionLabel={v => v || "Не указан"} onChange={h("zakazchik")} />}
-        </Field>
         <Field label="Отправитель"><Input value={head.sender} disabled /></Field>
         <Field label="Получатель"><Input value={head.receiver} disabled /></Field>
         <Field label="Приказ на плавку (все шихтовые карты)" full>
@@ -284,10 +268,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
           {!lockPos && <div className="text-xs text-gray-500 mt-1">Приказы «Готово для Требования». Добавляются все позиции резерва его шихтовых карт со склада-отправителя (по шихте) — целиком, без удаления и изменения</div>}
           {!lockPos && prikazBlock && <div className="text-xs text-red-600 mt-1">{prikazBlock}</div>}
         </Field>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
-          <Toggle checked={isOwn} onChange={setOwnProperty} disabled={lockZakazchik} label={isOwn ? "Да" : "Нет"} />
-        </div>
         <InfoField value={info} onChange={setInfo} disabled={ro} />
       </div>
 

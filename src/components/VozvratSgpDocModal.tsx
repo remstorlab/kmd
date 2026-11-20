@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
-  Btn, Modal, DeleteIcon, EditIcon, useToast, Toast, Field, Input, Select, KlassCode, Toggle,
+  Btn, Modal, DeleteIcon, EditIcon, useToast, Toast, Field, Input, Select, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp,
   InfoField, PosStatusBadge, probaText,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
@@ -22,8 +22,6 @@ import { Plus } from "lucide-react";
 
 type VsPosition = VydachaDocPosition;
 const NO_LOC = "-";
-// Читаем справочник при каждом обращении — чтобы видеть добавленные и отключённые записи
-const orgs = () => spravValues("Заказчики / Организации");
 
 export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = false, typeSelect }: {
   onClose: () => void;
@@ -49,10 +47,8 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
     number: doc?.number || `ВС-${String(Math.floor(Math.random() * 900 + 100)).padStart(4, "0")}`,
     date: doc?.date || today,
     receiver: doc?.receiver || PRIHOD_SKLAD,
-    zakazchik: doc?.zakazchik ?? orgs()[0],
   }));
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
-  const [ownProperty, setOwnProperty] = useState(doc?.ownProperty ?? true);
   const [info, setInfo] = useState(doc?.info ?? "");
   const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Возврат СГП №2_${doc.number}.pdf`)] : []));
   const [positions, setPositions] = useState<VsPosition[]>(() => doc?.positions ?? []);
@@ -73,13 +69,6 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
     return (to ? list.find(i => i.id === to) : undefined) ?? list.find(i => i.id === p.id);
   }
 
-  // Заказчик и «Собственность заказчика» после выбора позиций — из позиций (цепочка от документа приёма на СДМ1),
-  // только для чтения; до выбора позиций — выбираются вручную
-  const posItems = positions.map(itemOf).filter((i): i is GPItem | DMItem => !!i?.zakazchik);
-  const fromPositions = !posted && posItems.length > 0;
-  const zakazchik = fromPositions ? Array.from(new Set(posItems.map(i => i.zakazchik!))).join(", ") : head.zakazchik;
-  const isOwn = fromPositions ? posItems.every(i => i.ownProperty) : ownProperty;
-  const lockZakazchik = ro || posted || fromPositions;
 
   // Количество к возврату (от 1 до количества изделий) и вес возвращаемой части при частичном возврате —
   // вводятся в окне подбора (панель «К выдаче»)
@@ -170,8 +159,6 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
       status,
       sender: SGP,
       receiver: head.receiver,
-      zakazchik,
-      ownProperty: isOwn,
       info: info.trim() || undefined,
       positions: finalPositions,
     });
@@ -209,15 +196,6 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
         <Field label="Получатель" required={!ro}>
           <Select value={head.receiver} options={receivers.includes(head.receiver) ? receivers : [head.receiver, ...receivers]} onChange={h("receiver")} disabled={lockPos} />
         </Field>
-        <Field label="Заказчик/Организация">
-          {lockZakazchik
-            ? <Input value={zakazchik} disabled />
-            : <Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...orgs()]))} optionLabel={v => v || "Не указан"} onChange={h("zakazchik")} />}
-        </Field>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Собственность заказчика</label>
-          <Toggle checked={isOwn} onChange={setOwnProperty} disabled={lockZakazchik} label={isOwn ? "Да" : "Нет"} />
-        </div>
         <InfoField value={info} onChange={setInfo} disabled={ro} />
       </div>
 

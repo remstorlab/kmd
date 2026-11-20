@@ -702,7 +702,7 @@ initialSkladDocs.unshift(
 // перемещена в gp43 (на СДМ1)
 initialSkladDocs.push({
   id: "sd10", date: "12.08.2026", type: DOC_VOZVRAT_SGP, number: "ВС-0012", status: "Оформлено", sender: SGP, receiver: SDM1,
-  zakazchik: "Монетный двор", ownProperty: false, info: "Возврат невостребованной партии монет с СГП №2",
+  info: "Возврат невостребованной партии монет с СГП №2",
   positions: [{ ...vpos("gp", "gp43"), id: "gp43-sgp", location: "-", sklad: SGP }],
   moved: [{ src: "gp", from: "gp43-sgp", to: "gp43" }],
 });
