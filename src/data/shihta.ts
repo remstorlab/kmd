@@ -1,4 +1,4 @@
-import type { AlloyGrade, AlloyRange, ChemComposition, PrikazPlavka, PrikazStatus, ShihtaMatKind, ShihtaMaterial, ShihtovayaKarta } from "./mock";
+import type { AlloyGrade, AlloyRange, ChemComposition, PrikazStatus, ShihtaMatKind, ShihtaMaterial, ShihtovayaKarta } from "./mock";
 import { OBOROT_CODE, PRIKAZ_MOVED, oborotLimit, oborotOver } from "./mock";
 
 // ── Строки карты ──
@@ -296,13 +296,14 @@ export function oborotInfoText(o: ShihtaOborot, g: AlloyGrade | undefined): stri
 
 // ── Приказ на плавку: несколько шихтовых карт ─────────────────────────────────
 // Статус приказа по картам: есть карта на редактировании (или карт нет) — «На редактировании»;
-// все выполнены — «Выполнена»; иначе — «Новая» (оформлен). Оформленный приказ, позиции которого перемещены на СДМ №2
-// документом «Требование» (prikaz.trebovanieId), — «Перемещено на СДМ №2»: только он выдаётся на плавку
-// («Выдать по ШК»), после выдачи карты — «Выполнена».
-export function prikazStatus(karty: Pick<ShihtovayaKarta, "status">[], prikaz?: Pick<PrikazPlavka, "trebovanieId">): PrikazStatus {
+// все выполнены — «Выполнена»; иначе — «Новая» (оформлен). Оформленный приказ, все действующие карты которого
+// перемещены на СДМ №2 документом «Требование» (отметка карты trebovanie), — «Перемещено на СДМ №2»: только он
+// выдаётся на плавку («Выдать по ШК»), после выдачи карты — «Выполнена». Отметка хранится в карте: если одну карту
+// вернули на редактирование и снова оформили (позиции на СДМ №2), приказ снова «Перемещено на СДМ №2», а не «Новая».
+export function prikazStatus(karty: Pick<ShihtovayaKarta, "status" | "trebovanie">[]): PrikazStatus {
   if (karty.length === 0 || karty.some(k => k.status === "На редактировании")) return "На редактировании";
   if (karty.every(k => k.status === "Выполнена")) return "Выполнена";
-  return prikaz?.trebovanieId ? PRIKAZ_MOVED : "Новая";
+  return karty.every(k => k.status === "Выполнена" || !!k.trebovanie) ? PRIKAZ_MOVED : "Новая";
 }
 
 // Итоговая строка шихтовых материалов приказа: одинаковые материалы всех карт суммируются

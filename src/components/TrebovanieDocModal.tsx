@@ -21,7 +21,9 @@ import { Plus } from "lucide-react";
 // (в т. ч. «Резерв» под шихтовую карту) и остальные атрибуты сохраняются. Склады меняются только при оформлении;
 // при частичном перемещении запись делится (data/stock.ts) — остаток остаётся на складе-отправителе.
 // По приказу на плавку («Новая») перемещается сразу весь резерв его карт (целиком, состав не правится); после
-// оформления приказ — «Перемещено на СДМ №2» (prikaz.trebovanieId): выдаётся на плавку и в новом требовании не выбирается.
+// оформления карты приказа получают отметку требования (karta.trebovanie), приказ — «Перемещено на СДМ №2»: выдаётся
+// на плавку и в новом требовании не выбирается. Если часть карт уже перемещена, приказ «Новая» — новое требование
+// перемещает оставшиеся на складе-отправителе позиции.
 
 type TrebPosition = VydachaDocPosition;
 // Переместить можно позицию на складе или в резерве
@@ -39,7 +41,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   // Оформленное требование: позиции уже перемещены — состав и склады менять нельзя
   const posted = doc?.status === "Оформлено";
   const lockPos = ro || posted;
-  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, setShihtaPrikazy, skladDocs } = useApp();
+  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, skladDocs } = useApp();
   const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
   // Вложенный экран: …/pick (подбор со склада-отправителя)
@@ -80,7 +82,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   // Выбрать можно оформленный приказ («Новая»), который ещё не перемещён (после оформления требования приказ —
   // «Перемещено на СДМ №2») и не выбран в другом неоформленном требовании.
   const kartyOf = (id: string) => shihtovyeKarty.filter(k => k.prikazId === id && k.status !== "Выполнена");
-  const statusOf = (p: PrikazPlavka) => prikazStatus(shihtovyeKarty.filter(k => k.prikazId === p.id), p);
+  const statusOf = (p: PrikazPlavka) => prikazStatus(shihtovyeKarty.filter(k => k.prikazId === p.id));
   const takenBy = (id: string) => skladDocs.find(d => d.id !== doc?.id && d.type === DOC_TREBOVANIE && d.status !== "Оформлено" && d.prikazId === id);
   const prikazy = shihtaPrikazy.filter(p => p.id === head.prikazId || (statusOf(p) === "Новая" && !takenBy(p.id)));
   const byPrikaz = !!head.prikazId;
@@ -218,8 +220,10 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         if (k.status === "Выполнена" || !k.materials.some(m => rezMovedWhole.has(m.nomenkl))) return k;
         return { ...k, materials: k.materials.map(m => (rezMovedWhole.has(m.nomenkl) ? { ...m, sklad: head.receiver } : m)) };
       }));
-      // Приказ перемещён — «Перемещено на СДМ №2», доступен для выдачи на плавку; в новом требовании не выбирается
-      if (byPrikaz) setShihtaPrikazy(prev => prev.map(p => (p.id === head.prikazId ? { ...p, trebovanieId: docId } : p)));
+      // Приказ перемещён: каждая действующая карта приказа получает отметку требования — приказ «Перемещено на СДМ №2»,
+      // доступен для выдачи на плавку; в новом требовании не выбирается
+      if (byPrikaz) setShihtovyeKarty(prev => prev.map(k => (k.prikazId === head.prikazId && k.status !== "Выполнена"
+        ? { ...k, trebovanie: { id: docId, number: head.number } } : k)));
     } else if (status === "В работе" && prikazConflict) { show(prikazConflict); return; }
     onSave({
       id: docId,

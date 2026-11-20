@@ -9,7 +9,7 @@ import {
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
   PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, isProofNazn, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO, DOP_DICT, dopDefaultPct,
-  PrikazPlavka, oborotHint, oborotOver, oborotLimit, PRIKAZ_MOVED, SDM2,
+  PrikazPlavka, oborotHint, oborotOver, oborotLimit, PRIKAZ_MOVED, SDM2, DOC_TREBOVANIE,
 } from "../data/mock";
 import { returnToStock } from "../data/stock";
 import {
@@ -753,7 +753,7 @@ function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
   const mats = useMemo(() => itogoMaterials(karty), [karty]);
   const grade = prikazGrade(karty, alloyGrades);
   const calc = useMemo(() => new ShihtaCalc(mats.map(lineOfMaterial), grade), [mats, grade]);
-  const status = prikazStatus(karty, prikaz);
+  const status = prikazStatus(karty);
   const pct = (e: string) => (e === "p" || !(calc.total(e) > 0) || calc.base <= 0 ? "—" : fmt2(calc.pct(e)));
   const normOf = (e: string, k: "min" | "max") => {
     const c = normCell(grade, e);
@@ -927,7 +927,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
   const [files, setFiles] = useState<File[]>(() => prikaz?.files ?? []);
 
   const karty = prikaz ? kartyOfPrikaz(shihtovyeKarty, prikaz.id) : [];
-  const status = prikazStatus(karty, prikaz ?? undefined);
+  const status = prikazStatus(karty);
   const done = !!prikaz && status === "Выполнена";
   // Оформленный приказ («Новая») и выполненный не редактируются
   const ro = readOnly || (!!prikaz && status !== "На редактировании");
@@ -982,15 +982,16 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
     : null;
   const oformit = () => {
     if (!prikaz || oformitBlock) { if (oformitBlock) show(oformitBlock); return; }
-    // Выполненные карты (уже выданы на плавку) не меняются
-    const ids = new Set(karty.filter(k => k.status === "На редактировании").map(k => k.id));
-    setShihtovyeKarty(prev => prev.map(k => (ids.has(k.id) ? { ...k, status: "Новая", vydannyePozicii: undefined } : k)));
-    // Повторное оформление (карты возвращались в «На редактировании»): перемещение требованием остаётся в силе,
-    // только если все позиции склада карт уже на СДМ №2 — иначе нужно новое требование
-    const next = build();
-    const onSdm2 = karty.flatMap(k => k.materials.filter(isSkladMaterial))
+    // Выполненные карты (уже выданы на плавку) не меняются. Отметка карты о перемещении требованием (trebovanie)
+    // сохраняется при повторном оформлении, если все позиции склада карты — в резерве на СДМ №2 (напр. выданную
+    // в другую операцию позицию заменили позицией СДМ №2); иначе снимается — оставшиеся позиции перемещает новое требование
+    const onSdm2 = (k: ShihtovayaKarta) => k.materials.filter(isSkladMaterial)
       .every(m => dmItems.some(i => i.nomenkl === m.nomenkl && i.status === "Резерв" && i.sklad === SDM2));
-    onSave(next.trebovanieId && !onSdm2 ? { ...next, trebovanieId: undefined } : next, "oformlen");
+    const ids = new Set(karty.filter(k => k.status === "На редактировании").map(k => k.id));
+    setShihtovyeKarty(prev => prev.map(k => (ids.has(k.id)
+      ? { ...k, status: "Новая", vydannyePozicii: undefined, trebovanie: k.trebovanie && onSdm2(k) ? k.trebovanie : undefined }
+      : k)));
+    onSave(build(), "oformlen");
   };
 
   // Вложенные экраны карты
@@ -1109,7 +1110,11 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
                       <td className="px-3 py-2"><OborotValue value={kartaOborot(k)} code={alloyGrades.find(g => g.id === k.alloyId)?.materialCode} /></td>
                       <td className="px-3 py-2 text-right">{k.materials.length}</td>
                       <td className="px-3 py-2 text-right">{str2(kartaMass(k))}</td>
-                      <td className="px-3 py-2"><Badge label={k.status} group="shihta" /></td>
+                      <td className="px-3 py-2">
+                        <Badge label={k.status} group="shihta" />
+                        {/* Позиции карты перемещены на СДМ №2 требованием — отметка сохраняется и при возврате карты на редактирование */}
+                        {k.trebovanie && k.status !== "Выполнена" && <div className="text-[11px] text-gray-500 mt-1 whitespace-nowrap">на СДМ №2 · {DOC_TREBOVANIE} № {k.trebovanie.number}</div>}
+                      </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
                           <EyeIcon onClick={() => screen.open("view", k.id)} />
@@ -1246,7 +1251,7 @@ export function ShihtovyeKarty() {
     const karty = kartyOfPrikaz(shihtovyeKarty, p.id);
     const grades = [...new Set(karty.map(k => alloyGrades.find(g => g.id === k.alloyId)?.name).filter(Boolean))];
     // Итоговая масса шихты — сумма масс всех шихтовых карт приказа
-    return { id: p.id, p, karty, status: prikazStatus(karty, p), grade: grades.join(", "), mass: r2(karty.reduce((s, k) => s + kartaMass(k), 0)) };
+    return { id: p.id, p, karty, status: prikazStatus(karty), grade: grades.join(", "), mass: r2(karty.reduce((s, k) => s + kartaMass(k), 0)) };
   });
 
   const removePrikaz = (p: PrikazPlavka) => {

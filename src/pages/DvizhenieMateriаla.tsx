@@ -275,7 +275,7 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
 function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (p: PrikazPlavka, karty: ShihtovayaKarta[]) => void }) {
   const { shihtovyeKarty, shihtaPrikazy, dmItems } = useApp();
   const kartyOf = (id: string) => shihtovyeKarty.filter(k => k.prikazId === id).sort((a, b) => (parseInt(a.plavkaNo, 10) || 0) - (parseInt(b.plavkaNo, 10) || 0));
-  const available = shihtaPrikazy.map(p => ({ p, karty: kartyOf(p.id) })).filter(r => prikazStatus(r.karty, r.p) === PRIKAZ_MOVED);
+  const available = shihtaPrikazy.map(p => ({ p, karty: kartyOf(p.id) })).filter(r => prikazStatus(r.karty) === PRIKAZ_MOVED);
   const notMoved = (karty: ShihtovayaKarta[]) => karty.flatMap(k => k.materials).filter(m => m.nomenkl && dmItems.some(i => i.nomenkl === m.nomenkl && i.status === "Резерв" && i.sklad !== MAIN_SKLAD));
   const fmtG = (v: number) => v.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
