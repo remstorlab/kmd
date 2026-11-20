@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../store/AppContext";
 import {
-  Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
+  Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   useToast, Toast, Field, Input, Select, Textarea, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
   SortTh, useSort, parseRuDate, usePaged, CREATED_LABEL, CreatedCell, useMaterialCodeLabel,
   OborotValue, oborotRowCls, OBOROT_LABEL,
@@ -20,7 +20,8 @@ import {
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { ChemPercent, gramsFrom, num0, pctFrom, pctSum } from "../data/chem";
 import StockPickerModal, { StockRow } from "../components/StockPickerModal";
-import { Plus, X, Calculator, AlertTriangle, Sigma, Info, RotateCcw } from "lucide-react";
+import { Plus, X, Calculator, AlertTriangle, Sigma, Info, RotateCcw, Printer, FileDown } from "lucide-react";
+import { downloadPrikazDocx, prikazHtml, printPrikazPdf } from "../utils/prikazPrint";
 import { useScreen } from "../router";
 
 // ── Шихтовая карта: конструктор ─────────────────────────────────────────────────
@@ -934,7 +935,8 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
   const gradeName = (k: ShihtovayaKarta) => alloyGrades.find(g => g.id === k.alloyId)?.name ?? "";
 
   // Марка сплава и назначение слитков — общие для всех карт приказа (в картах только для чтения).
-  // Поля приказа не меняются, как только в приказе сохранена хотя бы одна шихтовая карта.
+  // Марка, назначение и примечание не меняются, как только в приказе сохранена хотя бы одна шихтовая карта;
+  // номер, дата, наименование и документы — пока приказ «На редактировании».
   const [alloyId, setAlloyId] = useState(prikaz?.alloyId ?? "");
   const [naznachenie, setNaznachenie] = useState(prikaz?.naznachenie ?? "");
   const headLocked = ro || karty.length > 0;
@@ -952,7 +954,13 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
   };
   const save = () => {
     if (error) { show(error); return; }
-    onSave(build(), prikaz ? "saved" : "created");
+    const next = build();
+    // Основание карт приказа — «Приказ № … от …»: при смене номера или даты обновляется
+    if (prikaz && (next.number !== prikaz.number || next.date !== prikaz.date)) {
+      const was = `Приказ № ${prikaz.number} от ${prikaz.date}`, now = `Приказ № ${next.number} от ${next.date}`;
+      setShihtovyeKarty(prev => prev.map(k => (k.prikazId === prikaz.id && k.osnovanie === was ? { ...k, osnovanie: now } : k)));
+    }
+    onSave(next, prikaz ? "saved" : "created");
   };
   // Шапка изменена, но не сохранена — карту добавить нельзя (карта берёт марку и назначение из сохранённого приказа)
   const dirty = !!prikaz && (number.trim() !== prikaz.number || date.trim() !== prikaz.date || name.trim() !== prikaz.name
@@ -1030,9 +1038,9 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
         </div>
       )}
       <div className="grid grid-cols-4 gap-4 mb-5">
-        <Field label="Номер приказа" required={!headLocked}><Input value={number} onChange={setNumber} placeholder="№" disabled={headLocked} /></Field>
-        <Field label="Дата приказа" required={!headLocked}><Input value={date} onChange={setDate} placeholder="дд.мм.гггг" disabled={headLocked} /></Field>
-        <Field label="Наименование" required={!headLocked} full><Input value={name} onChange={setName} placeholder="Например: слитки СрМ 92,5 для монет пруф-качества" disabled={headLocked} /></Field>
+        <Field label="Номер приказа" required={!ro}><Input value={number} onChange={setNumber} placeholder="№" disabled={ro} /></Field>
+        <Field label="Дата приказа" required={!ro}><Input value={date} onChange={setDate} placeholder="дд.мм.гггг" disabled={ro} /></Field>
+        <Field label="Наименование" required={!ro} full><Input value={name} onChange={setName} placeholder="Например: слитки СрМ 92,5 для монет пруф-качества" disabled={ro} /></Field>
         <Field label="Марка сплава" required={!headLocked} full>
           <Select value={alloyId} options={gradeOptions} optionLabel={gradeLabel} onChange={setAlloyId} disabled={headLocked} />
         </Field>
@@ -1041,7 +1049,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
         </Field>
         <Field label="Примечание" full><Textarea value={note} onChange={setNote} rows={2} disabled={headLocked} /></Field>
         {!ro && headLocked && (
-          <div className="col-span-4 -mt-2 text-xs text-gray-500">Поля приказа не меняются: в приказе сохранены шихтовые карты</div>
+          <div className="col-span-4 -mt-2 text-xs text-gray-500">Марка сплава, назначение слитков и примечание не меняются: в приказе сохранены шихтовые карты</div>
         )}
       </div>
 
@@ -1197,6 +1205,22 @@ function PrikazSummary({ karty, mass }: { karty: ShihtovayaKarta[]; mass: number
 // Масса шихты карты, г
 const kartaMass = (k: ShihtovayaKarta) => r2(k.materials.reduce((s, m) => s + m.ves, 0));
 
+// Печатная форма приказа на плавку: просмотр, скачивание Word (.docx) и печать / сохранение в PDF (utils/prikazPrint.ts)
+function PrikazPrintModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; karty: ShihtovayaKarta[]; onClose: () => void }) {
+  const { alloyGrades, materialCodes } = useApp();
+  const html = useMemo(() => prikazHtml(prikaz, karty, alloyGrades, materialCodes), [prikaz, karty, alloyGrades, materialCodes]);
+  return (
+    <Modal title={`Печать приказа на плавку № ${prikaz.number}`} largeWide onClose={onClose} footer={<>
+      <Btn variant="secondary" onClick={onClose}>Закрыть</Btn>
+      <Btn variant="secondary" onClick={() => printPrikazPdf(html)}><Printer className="w-4 h-4" />Печать / PDF</Btn>
+      <Btn onClick={() => downloadPrikazDocx(prikaz, karty, alloyGrades, materialCodes)}><FileDown className="w-4 h-4" />Скачать Word (.docx)</Btn>
+    </>}>
+      <p className="text-xs text-gray-500 mb-3">Пустые строки (установка, толщина, ФИО, срок выдачи) заполняются в Word. Для PDF в окне печати выберите «Сохранить как PDF».</p>
+      <iframe title="Приказ на плавку" srcDoc={html} className="w-full h-[65vh] border border-gray-200 rounded-lg bg-white" />
+    </Modal>
+  );
+}
+
 export function ShihtovyeKarty() {
   const { shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, setShihtaPrikazy, setDmItems, alloyGrades } = useApp();
   const { toast, show, clear } = useToast();
@@ -1208,6 +1232,8 @@ export function ShihtovyeKarty() {
   const showNew = screen.has("new");
   const editPrikaz = shihtaPrikazy.find(p => p.id === screen.after("prikaz")) ?? null;
   const viewPrikaz = shihtaPrikazy.find(p => p.id === screen.after("prikaz-view")) ?? null;
+  // /print/:id — печатная форма приказа
+  const printPrikaz = shihtaPrikazy.find(p => p.id === screen.after("print")) ?? null;
   const [perPage, setPerPage] = usePerPage("shihtovye-karty", 8);
 
   const rows = shihtaPrikazy.map(p => {
@@ -1259,7 +1285,7 @@ export function ShihtovyeKarty() {
               <SortTh sortKey="mass" sort={sort} onSort={toggleSort} align="right">Итоговая масса, г.</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
               <SortTh sortKey="createdAt" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
-              <th className="w-28"></th>
+              <th className="w-36"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -1279,6 +1305,7 @@ export function ShihtovyeKarty() {
                   <CreatedCell row={p} />
                   <td className="px-4 py-3 flex items-center gap-1">
                     <EyeIcon onClick={() => screen.openTop("prikaz-view", p.id)} />
+                    <PrintIcon onClick={() => screen.openTop("print", p.id)} title="Печать приказа" />
                     <EditIcon onClick={() => screen.openTop("prikaz", p.id)} disabled={status !== "На редактировании"} title={status === "На редактировании" ? "Редактировать" : done ? "Приказ выполнен — редактирование недоступно" : "Приказ оформлен — редактирование недоступно"} />
                     <DeleteIcon
                       onClick={() => confirm(
@@ -1309,6 +1336,7 @@ export function ShihtovyeKarty() {
           }}
         />
       )}
+      {printPrikaz && <PrikazPrintModal prikaz={printPrikaz} karty={kartyOfPrikaz(shihtovyeKarty, printPrikaz.id)} onClose={() => screen.close("print")} />}
       {editPrikaz && (
         <PrikazModal
           key={editPrikaz.id}

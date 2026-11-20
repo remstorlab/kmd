@@ -173,7 +173,8 @@ const crc32 = (d: Uint8Array) => {
   return (c ^ 0xffffffff) >>> 0;
 };
 
-function zip(files: Record<string, string>): Uint8Array {
+// ZIP без сжатия (store) — контейнер .xlsx и .docx (utils/prikazPrint.ts)
+export function zip(files: Record<string, string>): Uint8Array {
   const enc = new TextEncoder();
   const local: Uint8Array[] = [];
   const central: Uint8Array[] = [];
