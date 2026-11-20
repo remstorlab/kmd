@@ -5,7 +5,7 @@ import {
   InfoField,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
-import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, PrikazPlavka, spravValues, SDM1, SDM2, SGP, DOC_TREBOVANIE, SH_READY_TREB } from "../data/mock";
+import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, PrikazPlavka, spravValues, SDM1, SDM2, DOC_TREBOVANIE, SH_READY_TREB } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow, PickedRow } from "./StockPickerModal";
 import { takeFromStock, partLigMap, partNomenklMap } from "../data/stock";
@@ -51,16 +51,16 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const showPick = screen.has("pick");
   const setShowPick = (open: boolean) => (open ? screen.open("pick") : screen.close("pick"));
   const today = new Date().toLocaleDateString("ru-RU");
-  // Склады СДМ (СГП №2 — только через выдачу со склада и «Возврат СГП №2»)
-  const sklady = spravValues("Склады").filter(s => s !== SGP);
+
+
 
   const [head, setHead] = useState(() => ({
     number: doc?.number || `ТР-${String(Math.floor(Math.random() * 900 + 100)).padStart(4, "0")}`,
     date: doc?.date || today,
     zakazchik: doc?.zakazchik ?? "Монетный двор",
-    // Отправитель — склад приёмки (СДМ1), получатель — склад выдачи (СДМ2)
-    sender: doc?.sender || SDM1,
-    receiver: doc?.receiver || SDM2,
+    // Отправитель — склад приёмки (СДМ1), получатель — склад выдачи (СДМ2); не редактируются
+    sender: SDM1,
+    receiver: SDM2,
     // Приказ на плавку (у старых документов — приказ шихтовой карты)
     prikazId: doc?.prikazId ?? shihtovyeKarty.find(k => k.id === doc?.shihtaId)?.prikazId ?? "",
   }));
@@ -84,11 +84,13 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const pickStock = useMemo(() => stock.filter(r => itemOf({ ...r, issue: 0 })?.status !== "Резерв"), [stock]);
 
   // Приказы на плавку: выбрать можно приказ «Готово для Требования» (есть позиции на СДМ1), не выбранный в другом
-  // неоформленном требовании. После оформления требования приказ — «Готово для плавки» и здесь не выбирается.
+  // неоформленном требовании (такие видны в списке с пометкой). После оформления требования приказ — «Готово для
+  // плавки» и в списке не показывается.
   const kartyOf = (id: string) => shihtovyeKarty.filter(k => k.prikazId === id && k.status !== "Выполнена");
   const statusOf = (p: PrikazPlavka) => prikazStatus(shihtovyeKarty.filter(k => k.prikazId === p.id));
   const takenBy = (id: string) => skladDocs.find(d => d.id !== doc?.id && d.type === DOC_TREBOVANIE && d.status !== "Оформлено" && d.prikazId === id);
-  const prikazy = shihtaPrikazy.filter(p => p.id === head.prikazId || (statusOf(p) === SH_READY_TREB && !takenBy(p.id)));
+  // Приказ, выбранный в другом неоформленном требовании, показывается с пометкой и не выбирается
+  const prikazy = shihtaPrikazy.filter(p => p.id === head.prikazId || statusOf(p) === SH_READY_TREB);
   const byPrikaz = !!head.prikazId;
   // Препятствия для приказа: выбран в другом неоформленном требовании (и для сохранения), не в статусе
   // «Готово для Требования» (для оформления)
@@ -102,7 +104,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     const p = shihtaPrikazy.find(x => x.id === id);
     if (!p) return NO_KARTA;
     const pl = kartyOf(id).map(k => k.plavkaNo);
-    return `Приказ № ${p.number} от ${p.date} · ${p.name}${pl.length ? ` (ШК плавок № ${pl.join(", ")})` : ""}`;
+    const busy = takenBy(id);
+    return `Приказ № ${p.number} от ${p.date} · ${p.name}${pl.length ? ` (ШК плавок № ${pl.join(", ")})` : ""}${busy ? ` — выбран в требовании № ${busy.number}` : ""}`;
   };
   const rezervOf = (prikazId: string) => {
     const nomenkl = new Set(kartyOf(prikazId).flatMap(k => k.materials.map(m => m.nomenkl)).filter(Boolean));
@@ -113,6 +116,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   // Выбор приказа добавляет позиции по шихте (позиции ранее выбранного приказа заменяются, добавленные вручную
   // остаются); прочерк — позиции по шихте удаляются
   const choosePrikaz = (id: string) => {
+    const busy = id ? takenBy(id) : undefined;
+    if (busy) { show(`Приказ уже выбран в требовании № ${busy.number} — оформите или измените это требование`); return; }
     setHead(x => ({ ...x, prikazId: id }));
     const rows = id ? shihtaRows(id) : [];
     const ids = new Set(rows.map(r => r.id));
@@ -130,11 +135,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const isOwn = fromPositions ? posItems.every(i => i.ownProperty) : ownProperty;
   const lockZakazchik = ro || posted || fromPositions;
 
-  // Смена склада-отправителя: позиции другого склада убираются из требования
-  const changeSender = (v: string) => {
-    setHead(x => ({ ...x, sender: v }));
-    setPositions(prev => prev.filter(p => p.sklad === v));
-  };
 
   // Количество к перемещению (от 1 до количества изделий) и вес перемещаемой части при частичном перемещении —
   // вводятся в окне подбора (панель «К выдаче»)
@@ -184,7 +184,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     const err = iss.validate(status === "Оформлено" && !posted, "к перемещению");
     if (err) { show(err); return; }
     if (status === "Оформлено" && !posted) {
-      if (head.sender === head.receiver) { show("Склад-отправитель и склад-получатель должны различаться"); return; }
       if (prikazBlock) { show(prikazBlock); return; }
       if (byPrikaz) {
         // Состав резерва приказа на складе-отправителе мог измениться — по шихте перемещается весь резерв, целиком
@@ -247,7 +246,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     });
   };
 
-  const skladOptions = (v: string) => (sklady.includes(v) ? sklady : [v, ...sklady]);
   const pg = usePaged(sorted, "trebovanie-positions");
   return (
     <Modal
@@ -273,8 +271,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
             ? <Input value={zakazchik} disabled />
             : <Select value={head.zakazchik} options={Array.from(new Set(["", head.zakazchik, ...spravValues("Заказчики / Организации")]))} optionLabel={v => v || "Не указан"} onChange={h("zakazchik")} />}
         </Field>
-        <Field label="Отправитель" required={!ro}><Select value={head.sender} options={skladOptions(head.sender)} onChange={changeSender} disabled={lockPos} /></Field>
-        <Field label="Получатель" required={!ro}><Select value={head.receiver} options={skladOptions(head.receiver)} onChange={h("receiver")} disabled={lockPos} /></Field>
+        <Field label="Отправитель"><Input value={head.sender} disabled /></Field>
+        <Field label="Получатель"><Input value={head.receiver} disabled /></Field>
         <Field label="Приказ на плавку (все шихтовые карты)" full>
           <Select
             value={head.prikazId}
@@ -292,9 +290,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         </div>
         <InfoField value={info} onChange={setInfo} disabled={ro} />
       </div>
-      {!lockPos && head.sender === head.receiver && (
-        <div className="mb-4 -mt-2 text-xs text-red-600">Склад-отправитель и склад-получатель должны различаться</div>
-      )}
 
       <div className="mb-4">
         <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Документы</h4>
