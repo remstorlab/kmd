@@ -9,7 +9,7 @@ import {
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
   PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, isProofNazn, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO, DOP_DICT, dopDefaultPct,
-  PrikazPlavka, oborotHint, oborotOver, oborotLimit, SH_READY_TREB, SH_READY_PLAVKA,
+  PrikazPlavka, oborotHint, oborotOver, oborotLimit, SH_READY_TREB, SH_READY_PLAVKA, DOC_TREBOVANIE,
 } from "../data/mock";
 import { returnToStock } from "../data/stock";
 import {
@@ -1230,7 +1230,9 @@ function PrikazPrintModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
 }
 
 export function ShihtovyeKarty() {
-  const { shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, setShihtaPrikazy, dmItems, setDmItems, alloyGrades } = useApp();
+  const { shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, setShihtaPrikazy, dmItems, setDmItems, alloyGrades, skladDocs } = useApp();
+  // Требование, в котором выбран приказ (любой статус документа) — такой приказ не удаляется ни в одной роли
+  const trebOf = (id: string) => skladDocs.find(d => d.type === DOC_TREBOVANIE && d.prikazId === id);
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
@@ -1252,6 +1254,8 @@ export function ShihtovyeKarty() {
   });
 
   const removePrikaz = (p: PrikazPlavka) => {
+    const treb = trebOf(p.id);
+    if (treb) { show(`Приказ № ${p.number} указан в требовании № ${treb.number} — удаление недоступно`); return; }
     const karty = kartyOfPrikaz(shihtovyeKarty, p.id);
     releaseKarty(setDmItems, karty);
     const ids = new Set(karty.map(k => k.id));
@@ -1301,7 +1305,9 @@ export function ShihtovyeKarty() {
               const done = status === "Выполнена";
               // Удаляется только приказ «На редактировании» (и без выданных на плавку карт): резерв позиций его карт
               // снимается — позиции возвращаются в прежний статус «На складе» (releaseKarty)
-              const canDelete = status === "На редактировании" && !karty.some(k => k.status === "Выполнена");
+              // Приказ, указанный в документе «Требование», не удаляется (в любой роли)
+              const treb = trebOf(p.id);
+              const canDelete = status === "На редактировании" && !karty.some(k => k.status === "Выполнена") && !treb;
               return (
                 <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-gray-500">{p.date}</td>
@@ -1322,7 +1328,7 @@ export function ShihtovyeKarty() {
                         () => removePrikaz(p),
                       )}
                       disabled={!canDelete}
-                      title={canDelete ? "Удалить" : done || karty.some(k => k.status === "Выполнена") ? "Карты приказа выданы на плавку — удаление недоступно" : "Приказ оформлен — удаление доступно только на редактировании"}
+                      title={canDelete ? "Удалить" : treb ? `Приказ указан в требовании № ${treb.number} — удаление недоступно` : done || karty.some(k => k.status === "Выполнена") ? "Карты приказа выданы на плавку — удаление недоступно" : "Приказ оформлен — удаление доступно только на редактировании"}
                     />
                   </td>
                 </tr>
