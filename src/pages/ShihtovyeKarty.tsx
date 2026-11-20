@@ -8,7 +8,7 @@ import {
 } from "../components/ui";
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
-  PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, NAZN_PROOF, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO, DOP_DICT, dopDefaultPct,
+  PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, isProofNazn, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO, DOP_DICT, dopDefaultPct,
   PrikazPlavka, oborotHint, oborotOver, oborotLimit,
 } from "../data/mock";
 import { returnToStock } from "../data/stock";
@@ -126,7 +126,7 @@ function reserveDm(items: DMItem[], release: Set<string>, reserve: Set<string>):
 // Нарушения допуска материалов в шихту (те же правила, что при добавлении со склада)
 function banReason(m: { klass: string; share: Record<string, number>; kind: ShihtaMatKind }, grade: AlloyGrade | undefined, naznachenie: string): string | null {
   if (grade?.base === "Ag" && (m.share.au ?? 0) > 0) return "В шихту серебряного сплава материалы с золотом не допускаются";
-  if (naznachenie === NAZN_PROOF && m.klass === STRUZHKA_KLASS) return "Стружка в шихте для монет пруф-качества не допускается";
+  if (isProofNazn(naznachenie) && m.klass === STRUZHKA_KLASS) return "Стружка в шихте для монет пруф-качества не допускается";
   return null;
 }
 

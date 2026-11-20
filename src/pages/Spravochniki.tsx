@@ -160,7 +160,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const chemText = (p: Record<string, string> | undefined) =>
     Object.entries(p ?? {}).filter(([, v]) => parseFloat(v.replace(",", ".")) > 0)
       .map(([k, v]) => `${chemElements.find(e => e.id === k)?.shortName ?? k.toUpperCase()} ${v.replace(".", ",")} %`).join(" · ");
-  const { materialCodes } = useApp();
+  const { materialCodes, setShihtaPrikazy, setShihtovyeKarty } = useApp();
   const matLabel = useMaterialCodeLabel();
   const codeText = (code: string) => (withMaterialCode ? matLabel(code) : code);
   const recordStatuses = useRecordStatuses();
@@ -207,6 +207,12 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
     const next = editItem ? items.map(i => i.code === editItem.code ? rec : i) : [...items, rec];
     if (!editItem) dictCreated[`${name}|${form.code}`] = createdStamp();
     setItems(next);
+    // Назначение слитков хранится в приказах на плавку и шихтовых картах значением — при переименовании записи обновляется
+    if (withAffinage && editItem && editItem.value !== value) {
+      const ren = <T extends { naznachenie?: string }>(x: T): T => (x.naznachenie === editItem.value ? { ...x, naznachenie: value } : x);
+      setShihtaPrikazy(prev => prev.map(ren));
+      setShihtovyeKarty(prev => prev.map(ren));
+    }
     // Справочник — общий источник вариантов для полей форм, поэтому изменения пишем в него.
     dict.items = next;
     dict.count = next.length;
@@ -633,6 +639,10 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
 
 function MaterialClassesPage({ onBack }: { onBack: () => void }) {
   const [items, setItemsState] = useState(() => [...initialMaterialClasses]);
+  // Класс, указанный в позициях склада ДМ / ГП или в строках шихтовых карт, не удаляется (связь по наименованию)
+  const { dmItems, gpItems, shihtovyeKarty, setDmItems, setGpItems, setShihtovyeKarty } = useApp();
+  const klassUsed = (name: string) => dmItems.some(i => i.klass === name) || gpItems.some(i => i.klass === name)
+    || shihtovyeKarty.some(k => k.materials.some(m => m.klass === name));
   // Классы — общий источник для полей «Класс» (KlassSelect) и кодов класса в формах, поэтому изменения пишем в него.
   const setItems = (upd: (prev: MaterialClass[]) => MaterialClass[]) => setItemsState(prev => {
     const next = upd(prev);
@@ -669,6 +679,13 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
   const save = () => {
     if (editItem) {
       setItems(prev => prev.map(i => i.code === editItem.code ? form : i));
+      // Класс хранится в позициях склада и строках шихтовых карт наименованием — при переименовании обновляется
+      if (form.name !== editItem.name) {
+        const ren = <T extends { klass: string }>(x: T): T => (x.klass === editItem.name ? { ...x, klass: form.name } : x);
+        setDmItems(prev => prev.map(ren));
+        setGpItems(prev => prev.map(ren));
+        setShihtovyeKarty(prev => prev.map(k => ({ ...k, materials: k.materials.map(ren) })));
+      }
     } else {
       setItems(prev => [...prev, form]);
     }
@@ -711,7 +728,11 @@ function MaterialClassesPage({ onBack }: { onBack: () => void }) {
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => setViewItem(item)} />
                     <EditIcon onClick={() => openEdit(item)} />
-                    <DeleteIcon onClick={() => confirm(`Удалить класс материала «${item.name}»?`, () => { setItems(prev => prev.filter(x => x.code !== item.code)); show("Класс материала удалён"); })} />
+                    <DeleteIcon
+                      onClick={() => confirm(`Удалить класс материала «${item.name}»?`, () => { setItems(prev => prev.filter(x => x.code !== item.code)); show("Класс материала удалён"); })}
+                      disabled={klassUsed(item.name)}
+                      title={klassUsed(item.name) ? "Класс указан в позициях склада или шихтовых картах — удаление недоступно" : "Удалить"}
+                    />
                   </div>
                 </td>
               </tr>
@@ -947,7 +968,13 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
 const emptyChem = (): ChemElement => ({ id: "", name: "", shortName: "", showDm: true, showShk: true });
 
 function ChemElementsPage({ onBack }: { onBack: () => void }) {
-  const { chemElements: items, setChemElements: setItems } = useApp();
+  const { chemElements: items, setChemElements: setItems, materialCodes, alloyGrades, dmItems, gpItems } = useApp();
+  // Элемент, входящий в состав кодов материалов, марок сплавов, типов доп. материалов шихты или позиций склада, не удаляется
+  const elUsed = (id: string) =>
+    materialCodes.some(c => (c.composition?.[id] ?? 0) > 0)
+    || alloyGrades.some(g => g.rest === id || g.ranges.some(r => r.element === id) || id in g.impurities)
+    || spravochniki[DOP_DICT].items.some(i => !!i.chemPct?.[id])
+    || [...dmItems, ...gpItems].some(i => !!i.chem?.[id]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [form, setForm] = useState<ChemElement>(emptyChem());
@@ -1048,7 +1075,11 @@ function ChemElementsPage({ onBack }: { onBack: () => void }) {
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => setViewItem(item)} />
                     <EditIcon onClick={() => goEdit(item)} />
-                    <DeleteIcon onClick={() => confirm(`Удалить элемент «${item.name}»?`, () => { setItems(prev => prev.filter(x => x.id !== item.id)); show("Элемент удалён"); })} />
+                    <DeleteIcon
+                      onClick={() => confirm(`Удалить элемент «${item.name}»?`, () => { setItems(prev => prev.filter(x => x.id !== item.id)); show("Элемент удалён"); })}
+                      disabled={elUsed(item.id)}
+                      title={elUsed(item.id) ? "Элемент используется в кодах материалов, марках сплавов, типах доп. материалов или позициях склада — удаление недоступно" : "Удалить"}
+                    />
                   </div>
                 </td>
               </tr>

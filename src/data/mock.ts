@@ -1263,7 +1263,10 @@ export const dopDefaultPct = (type: string): Record<string, string> =>
   ({ ...(spravochniki[DOP_DICT].items.find(i => i.value === type)?.chemPct ?? {}) });
 
 // Назначение, при котором в шихту не допускается стружка
-export const NAZN_PROOF = "Монеты коллекционные (пруф, пруф-лайк)";
+// Связь по коду записи справочника «Назначение слитков» (значение записи можно переименовать)
+export const NAZN_PROOF_CODE = "НС-01";
+export const isProofNazn = (naznachenie: string | undefined) =>
+  !!naznachenie && spravochniki["Назначение слитков"].items.find(i => i.value === naznachenie)?.code === NAZN_PROOF_CODE;
 export const STRUZHKA_KLASS = "Стружка";
 
 // --- Марки сплавов ---

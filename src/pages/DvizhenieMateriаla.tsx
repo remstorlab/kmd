@@ -1246,7 +1246,8 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
   }));
 
   // ── Оборот новых позиций возврата («Добавить новую») ──
-  // Плавка по ШК марки СрМ 92,5: оборот ШК + 1 (по нескольким картам — максимальный); прочие операции:
+  // Плавка: максимальный оборот выданных позиций с оборотом (СрМ 925 и любые с оборотом > 0) + 1; если в ШК СрМ 92,5
+  // оборот указан вручную больше — оборот ШК + 1. Прочие операции:
   // наследуется оборот выданного СрМ 925 без +1 (по нескольким позициям — максимальный). Значение можно поправить в форме.
   // Позиции, возвращённые «Добавить из Выдачи», сохраняют свой оборот.
   const plavkaKartaIds = pickedKartaIds.length ? pickedKartaIds : op?.shihtaIds ?? [];
@@ -1254,17 +1255,21 @@ function OperModal({ op, onClose, onSave, readOnly = false }: { op?: Operation |
     ? shihtovyeKarty.filter(k => plavkaKartaIds.includes(k.id))
     : shihtovyeKarty.filter(k => head.plavkaNo.split(/[,\s]+/).filter(Boolean).includes(k.plavkaNo));
   const oborotKarty = plavkaKarty.filter(k => isOborotGrade(alloyGrades.find(g => g.id === k.alloyId)));
-  const vydanoSrM = vydacha.filter(p => posView(p).metal === OBOROT_CODE);
+  // Выданные позиции с оборотом: СрМ 925 (в т. ч. с оборотом 0) и любые позиции с оборотом > 0
+  const vydanoSrM = vydacha.filter(p => posView(p).metal === OBOROT_CODE || (posView(p).oborot ?? 0) > 0);
   const maxVydanoOborot = Math.max(0, ...vydanoSrM.map(p => posView(p).oborot ?? 0));
   const vozvratOborot: { value: number; hint: string } | null = (() => {
-    if (oborotKarty.length) {
-      const base = Math.max(0, ...oborotKarty.map(kartaOborot));
+    // Плавка: максимальный оборот выданных позиций + 1. Если в ШК СрМ 92,5 оборот указан вручную больше — от него
+    if (vid === "Плавка" && (vydanoSrM.length || oborotKarty.length)) {
+      const kartaMax = Math.max(0, ...oborotKarty.map(kartaOborot));
+      const base = Math.max(maxVydanoOborot, kartaMax);
       const pl = oborotKarty.map(k => k.plavkaNo).join(", ");
-      return { value: base + 1, hint: `Плавка по ШК СрМ 92,5 (плавка № ${pl}): оборот ШК ${base} + 1 = ${base + 1}. Рассчитан автоматически, можно изменить` };
+      const src = kartaMax > maxVydanoOborot
+        ? `оборот ШК (плавка № ${pl}) ${base}`
+        : `максимальный оборот выданных позиций ${base}`;
+      return { value: base + 1, hint: `Переплав: ${src} + 1 = ${base + 1}. Рассчитан автоматически, можно изменить` };
     }
-    if (vid === "Плавка" && plavkaKarty.length) return null;
     if (vydanoSrM.length === 0) return null;
-    if (vid === "Плавка") return { value: maxVydanoOborot + 1, hint: `Переплав выданного СрМ 925: оборот ${maxVydanoOborot} + 1 = ${maxVydanoOborot + 1}. Можно изменить` };
     return { value: maxVydanoOborot, hint: `Наследуется оборот выданного СрМ 925: ${maxVydanoOborot}${vydanoSrM.length > 1 ? " (максимальный среди выданных позиций)" : ""}. Можно изменить` };
   })();
 

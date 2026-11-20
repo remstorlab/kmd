@@ -128,9 +128,13 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     show(editPos ? "Позиция изменена" : `Добавлено позиций: ${picked.length}`);
   };
 
-  // Позиции из резерва и шихтовые карты, которые их резервируют (кроме выполненных): при оформлении
-  // карты возвращаются в «На редактировании» — как при выдаче со склада
-  const rezNomenkl = new Set(positions.filter(p => itemOf(p)?.status === "Резерв").map(p => p.nomenkl));
+  // Позиции из резерва. Перемещение целиком (в т. ч. по приказу на плавку) меняет только склад: номенкл. № и резерв
+  // сохраняются — карта остаётся действительной, в её строках обновляется склад (иначе приказ после требования
+  // не выдать на плавку). Частичное перемещение делит запись (часть — с новым номером): шихтовые карты, которые
+  // резервируют такие позиции (кроме выполненных), при оформлении возвращаются в «На редактировании» — как при выдаче.
+  const rezPos = positions.filter(p => itemOf(p)?.status === "Резерв");
+  const rezMovedWhole = new Set(rezPos.filter(p => !iss.line(p).partial).map(p => p.nomenkl));
+  const rezNomenkl = new Set(rezPos.filter(p => iss.line(p).partial).map(p => p.nomenkl));
   const affectedKarty = rezNomenkl.size
     ? shihtovyeKarty.filter(k => k.status !== "Выполнена" && k.materials.some(m => rezNomenkl.has(m.nomenkl)))
     : [];
@@ -178,10 +182,13 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       const dmTake = new Map(dmPart.map(p => [p.id, p.issue]));
       if (gpTake.size) setGpItems(prev => takeFromStock(prev, gpTake, move, partId, partLigMap(gpPart), partNomenklMap(gpPart)).items);
       if (dmTake.size) setDmItems(prev => takeFromStock(prev, dmTake, move, partId, partLigMap(dmPart), partNomenklMap(dmPart)).items);
-      if (affectedKarty.length) {
-        const ids = new Set(affectedKarty.map(k => k.id));
-        setShihtovyeKarty(prev => prev.map(k => (ids.has(k.id) ? markIssuedElsewhere(k, rezNomenkl, `${DOC_TREBOVANIE} № ${head.number}`) : k)));
-      }
+      const ids = new Set(affectedKarty.map(k => k.id));
+      if (ids.size || rezMovedWhole.size) setShihtovyeKarty(prev => prev.map(k => {
+        if (ids.has(k.id)) return markIssuedElsewhere(k, rezNomenkl, `${DOC_TREBOVANIE} № ${head.number}`);
+        // Резерв перемещён целиком — в строках карты новый склад позиции
+        if (k.status === "Выполнена" || !k.materials.some(m => rezMovedWhole.has(m.nomenkl))) return k;
+        return { ...k, materials: k.materials.map(m => (rezMovedWhole.has(m.nomenkl) ? { ...m, sklad: head.receiver } : m)) };
+      }));
     }
     onSave({
       id: doc?.id ?? `sd-${Date.now()}`,
