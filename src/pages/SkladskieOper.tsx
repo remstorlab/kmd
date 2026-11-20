@@ -6,7 +6,7 @@ import {
   SortTh, useSort, parseRuDate, Badge, CREATED_LABEL, CreatedCell, createdSortKey,
   InfoTip, INFO_LABEL,
 } from "../components/ui";
-import { SkladDoc } from "../data/mock";
+import { SkladDoc, DOC_TREBOVANIE } from "../data/mock";
 import { Inbox, Send, Repeat, Plus, X, LucideIcon } from "lucide-react";
 import PrihodDocModal from "../components/PrihodDocModal";
 import VydachaDocModal from "../components/VydachaDocModal";
@@ -206,7 +206,12 @@ function DocList({
                 <td className="px-4 py-3 flex items-center gap-1">
                   <EyeIcon onClick={() => screen.openTop("view", doc.id)} />
                   <EditIcon onClick={() => screen.openTop("edit", doc.id)} disabled={doc.status === "Оформлено"} title={doc.status === "Оформлено" ? "Документ оформлен — редактирование недоступно" : "Редактировать"} />
-                  <DeleteIcon onClick={() => confirm(`Удалить документ ${doc.number}?`, () => { onDelete(doc.id); show(`Документ ${doc.number} удалён`); })} />
+                  {/* Удаление документа не меняет позиции на складах; оформленное требование (позиции уже перемещены) не удаляется */}
+                  <DeleteIcon
+                    onClick={() => confirm(`Удалить документ ${doc.number}?`, () => { onDelete(doc.id); show(`Документ ${doc.number} удалён`); })}
+                    disabled={doc.type === DOC_TREBOVANIE && doc.status === "Оформлено"}
+                    title={doc.type === DOC_TREBOVANIE && doc.status === "Оформлено" ? "Требование оформлено — удаление недоступно" : "Удалить"}
+                  />
                   <PrintIcon
                     title={canPrintXlsx(doc) ? "Печать (Excel)" : "Печать"}
                     onClick={() => {

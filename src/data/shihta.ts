@@ -1,5 +1,5 @@
-import type { AlloyGrade, AlloyRange, ChemComposition, PrikazStatus, ShihtaMatKind, ShihtaMaterial, ShihtovayaKarta } from "./mock";
-import { OBOROT_CODE, PRIKAZ_MOVED, oborotLimit, oborotOver } from "./mock";
+import type { AlloyGrade, AlloyRange, ChemComposition, DMItem, PrikazStatus, ShihtaMatKind, ShihtaMaterial, ShihtovayaKarta } from "./mock";
+import { OBOROT_CODE, SDM2, SH_READY_PLAVKA, SH_READY_TREB, oborotLimit, oborotOver } from "./mock";
 
 // ── Строки карты ──
 // Вид строки: у старых записей без kind — по номенкл. № (позиция склада) или «прочее»
@@ -295,15 +295,35 @@ export function oborotInfoText(o: ShihtaOborot, g: AlloyGrade | undefined): stri
 }
 
 // ── Приказ на плавку: несколько шихтовых карт ─────────────────────────────────
-// Статус приказа по картам: есть карта на редактировании (или карт нет) — «На редактировании»;
-// все выполнены — «Выполнена»; иначе — «Новая» (оформлен). Оформленный приказ, все действующие карты которого
-// перемещены на СДМ №2 документом «Требование» (отметка карты trebovanie), — «Перемещено на СДМ №2»: только он
-// выдаётся на плавку («Выдать по ШК»), после выдачи карты — «Выполнена». Отметка хранится в карте: если одну карту
-// вернули на редактирование и снова оформили (позиции на СДМ №2), приказ снова «Перемещено на СДМ №2», а не «Новая».
-export function prikazStatus(karty: Pick<ShihtovayaKarta, "status" | "trebovanie">[]): PrikazStatus {
+// Статус приказа по картам: есть карта на редактировании (или карт нет) — «На редактировании»; все выполнены —
+// «Выполнена»; есть карта «Готово для Требования» — «Готово для Требования» (приказ выбирается в «Требовании»);
+// иначе — «Готово для плавки» (выдаётся в операции «Плавка», после выдачи карты — «Выполнена»).
+export function prikazStatus(karty: Pick<ShihtovayaKarta, "status">[]): PrikazStatus {
   if (karty.length === 0 || karty.some(k => k.status === "На редактировании")) return "На редактировании";
   if (karty.every(k => k.status === "Выполнена")) return "Выполнена";
-  return karty.every(k => k.status === "Выполнена" || !!k.trebovanie) ? PRIKAZ_MOVED : "Новая";
+  return karty.some(k => k.status === SH_READY_TREB) ? SH_READY_TREB : SH_READY_PLAVKA;
+}
+
+// Статус оформленных карт приказа по складам позиций: все позиции склада всех действующих карт приказа — в резерве
+// на СДМ2 → «Готово для плавки», хотя бы одна на другом складе (СДМ1) → «Готово для Требования».
+export function readyStatus(karty: Pick<ShihtovayaKarta, "status" | "materials">[], dm: Pick<DMItem, "nomenkl" | "status" | "sklad">[]): PrikazStatus {
+  const mats = karty.filter(k => k.status !== "Выполнена").flatMap(k => k.materials.filter(isSkladMaterial));
+  const onSdm2 = mats.every(m => dm.some(i => i.nomenkl === m.nomenkl && i.status === "Резерв" && i.sklad === SDM2));
+  return onSdm2 ? SH_READY_PLAVKA : SH_READY_TREB;
+}
+
+// Пересчёт статусов оформленных карт («Готово для Требования» / «Готово для плавки») по складам позиций — после
+// перемещения позиций (оформление требования). Карты на редактировании и выполненные не меняются; приказ, в котором
+// есть карта на редактировании, пересчитывается после её оформления (оформление приказа).
+export function refreshReady(all: ShihtovayaKarta[], dm: Pick<DMItem, "nomenkl" | "status" | "sklad">[]): ShihtovayaKarta[] {
+  const ready = (s: string) => s === SH_READY_TREB || s === SH_READY_PLAVKA;
+  const byPrikaz = new Map<string, PrikazStatus>();
+  return all.map(k => {
+    if (!ready(k.status) || !k.prikazId) return k;
+    if (!byPrikaz.has(k.prikazId)) byPrikaz.set(k.prikazId, readyStatus(all.filter(x => x.prikazId === k.prikazId), dm));
+    const st = byPrikaz.get(k.prikazId)!;
+    return st === k.status ? k : { ...k, status: st };
+  });
 }
 
 // Итоговая строка шихтовых материалов приказа: одинаковые материалы всех карт суммируются

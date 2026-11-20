@@ -6,7 +6,7 @@ import {
   Field, Input, Select, KlassCode, SearchInput, Tabs, MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, MaterialCodeSelect, parseRuDate, probaText, NetAuAg, NET_AU_AG, ChemTip, usePaged,
   CREATED_LABEL, CreatedCell, createdSortKey, useCreatedStamp, InfoField, InfoTip, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
-import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses, OBOROT_CODE, oborotOf, DMItem, isStoneKlass, PRIKAZ_MOVED } from "../data/mock";
+import { MAIN_SKLAD, Operation, OperPosition, OperStage, OperLoss, lossWeight, baseMetal, techOpLossNorm, SPISANIE_POTERYA, SPISANIE_PRIROST, ShihtovayaKarta, PrikazPlavka, opVydacha, opVozvrat, opLosses, opWeights, ChemComposition, isGPKlass, spravValues, DOC_TYPE_LKI, DOC_TYPE_NIOKR, initialMaterialClasses, OBOROT_CODE, oborotOf, DMItem, isStoneKlass, SH_READY_PLAVKA } from "../data/mock";
 import { Plus } from "lucide-react";
 import { takeFromStock, returnToStock, IssueLine, scaleChem, addChem } from "../data/stock";
 import { isSkladMaterial, markIssuedElsewhere, itogoMaterials, prikazStatus, r2, kartaOborot, isOborotGrade } from "../data/shihta";
@@ -268,14 +268,14 @@ function VozvratFromVydachaModal({ rows, already, view, onClose, onAdd }: {
 
 // ── Выдача по шихтовым картам приказа на плавку ──────────────────────────────
 
-// Выдаются только приказы «Перемещено на СДМ №2» — оформленные приказы, позиции которых перемещены на склад выдачи
-// документом «Требование». Выдаётся итоговый набор позиций склада всех оформленных («Новая») карт приказа. Карты выдаются на плавку со склада
+// Выдаются только приказы «Готово для плавки» — оформленные приказы, все позиции карт которых на складе выдачи (СДМ2)
+// (в т. ч. перемещённые документом «Требование»). Выдаётся итоговый набор позиций склада всех карт приказа. Карты выдаются на плавку со склада
 // выдачи (СДМ2): позиции в резерве на складе приёмки (СДМ1) нужно сначала переместить требованием — до этого приказ
 // недоступен для выбора. Приказ с картой «На редактировании» не выдаётся (статус приказа — «На редактировании»).
 function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (p: PrikazPlavka, karty: ShihtovayaKarta[]) => void }) {
   const { shihtovyeKarty, shihtaPrikazy, dmItems } = useApp();
   const kartyOf = (id: string) => shihtovyeKarty.filter(k => k.prikazId === id).sort((a, b) => (parseInt(a.plavkaNo, 10) || 0) - (parseInt(b.plavkaNo, 10) || 0));
-  const available = shihtaPrikazy.map(p => ({ p, karty: kartyOf(p.id) })).filter(r => prikazStatus(r.karty) === PRIKAZ_MOVED);
+  const available = shihtaPrikazy.map(p => ({ p, karty: kartyOf(p.id) })).filter(r => prikazStatus(r.karty) === SH_READY_PLAVKA);
   const notMoved = (karty: ShihtovayaKarta[]) => karty.flatMap(k => k.materials).filter(m => m.nomenkl && dmItems.some(i => i.nomenkl === m.nomenkl && i.status === "Резерв" && i.sklad !== MAIN_SKLAD));
   const fmtG = (v: number) => v.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -283,12 +283,12 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (p:
     <Modal title="Выдача по шихтовым картам" wide onClose={onClose} footer={<Btn variant="secondary" onClick={onClose}>Отмена</Btn>}>
       {available.length === 0 ? (
         <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-200">
-          Нет приказов на плавку, позиции которых перемещены на СДМ №2 документом «Требование»
+          Нет приказов на плавку в статусе «Готово для плавки» (все позиции карт на СДМ2)
         </div>
       ) : (
         <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
           {available.map(({ p, karty }) => {
-            const issue = karty.filter(k => k.status === "Новая");
+            const issue = karty.filter(k => k.status === SH_READY_PLAVKA);
             const wait = notMoved(issue);
             const skl = itogoMaterials(issue).filter(isSkladMaterial);
             return (
@@ -309,7 +309,7 @@ function ShihtaPickModal({ onClose, onPick }: { onClose: () => void; onPick: (p:
                     </div>
                   )}
                 </div>
-                <Badge label={PRIKAZ_MOVED} group="shihta" />
+                <Badge label={SH_READY_PLAVKA} group="shihta" />
               </button>
             );
           })}

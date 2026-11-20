@@ -9,13 +9,13 @@ import {
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
   PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, isProofNazn, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO, DOP_DICT, dopDefaultPct,
-  PrikazPlavka, oborotHint, oborotOver, oborotLimit, PRIKAZ_MOVED, SDM2, DOC_TREBOVANIE,
+  PrikazPlavka, oborotHint, oborotOver, oborotLimit, SH_READY_TREB, SH_READY_PLAVKA,
 } from "../data/mock";
 import { returnToStock } from "../data/stock";
 import {
   ShihtaCalc, ShihtaLine, chemStrings, fmt2, fmtFact, normText, r2, shareOf, shihtaWarnings, lineChem, kindOf,
   normCell, impuritiesText, fmtNorm, restNorm, REST_HINT, prikazStatus, itogoMaterials, lineOfMaterial, prikazGrade, isSkladMaterial,
-  shihtaOborot, oborotHintText, oborotWarnings, oborotInfoText, kartaOborot,
+  shihtaOborot, oborotHintText, oborotWarnings, oborotInfoText, kartaOborot, readyStatus,
 } from "../data/shihta";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { ChemPercent, gramsFrom, num0, pctFrom, pctSum } from "../data/chem";
@@ -27,7 +27,7 @@ import { useScreen } from "../router";
 // ── Шихтовая карта: конструктор ─────────────────────────────────────────────────
 // Технолог выбирает марку сплава, добавляет материалы со склада ДМ и доп. материалы; состав рассчитывается
 // (data/shihta.ts) и сверяется с нормой марки. Резерв позиций склада ставится при «Сохранить»,
-// «Оформить» переводит карту в «Новая» (доступна для выдачи на плавку).
+// «Оформить» приказа переводит его карты в «Готово для Требования» (есть позиции на СДМ1) или «Готово для плавки».
 
 // Строка шихтовых материалов в конструкторе
 interface MatRow {
@@ -373,7 +373,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   });
 
   // Сохранить — карта «На редактировании», позиции склада резервируются (убранные — снимаются с резерва).
-  // Оформление — в приказе на плавку: «Оформить» приказа переводит все его карты в «Новая».
+  // Оформление — в приказе на плавку: «Оформить» приказа переводит все его карты в «Готово для Требования» / «Готово для плавки».
   const save = () => {
     if (badMass.length) { show(massError(badMass[0])); return; }
     // Выбранные позиции склада должны быть всё ещё на складе (резервируются целиком)
@@ -454,7 +454,8 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
       {karta && (
         <div className="flex items-center gap-2 mb-4">
           <Badge label={karta.status} group="shihta" />
-          {karta.status === "Новая" && <span className="text-xs text-gray-500">Приказ оформлен — карта выдаётся на плавку после перемещения позиций на СДМ №2 требованием, редактирование закрыто</span>}
+          {karta.status === SH_READY_TREB && <span className="text-xs text-gray-500">Приказ оформлен — позиции на СДМ1 перемещаются на СДМ2 документом «Требование», редактирование закрыто</span>}
+          {karta.status === SH_READY_PLAVKA && <span className="text-xs text-gray-500">Позиции на СДМ2 — карта доступна для выдачи на плавку, редактирование закрыто</span>}
           {karta.status === "На редактировании" && !karta.vydannyePozicii?.length && <span className="text-xs text-gray-500">Карта сохранена — оформляется вместе с приказом на плавку (кнопка «Оформить» в приказе)</span>}
         </div>
       )}
@@ -906,7 +907,8 @@ function kartaOformitBlock(k: ShihtovayaKarta, grade: AlloyGrade | undefined, la
 
 // Приказ на плавку. Новый приказ сначала сохраняется (окно остаётся открытым), затем добавляются шихтовые карты —
 // каждая сохраняется «На редактировании», позиции склада резервируются при каждом сохранении карты.
-// «Оформить» приказа переводит все его карты и сам приказ в «Новая» — редактирование закрыто.
+// «Оформить» приказа переводит все его карты и сам приказ в «Готово для Требования» (есть позиции на СДМ1) или «Готово
+// для плавки» (все позиции на СДМ2) — редактирование закрыто.
 // Если позицию из резерва выдали со склада, карта (и приказ) возвращается в «На редактировании».
 function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
   prikaz?: PrikazPlavka | null;
@@ -929,7 +931,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
   const karty = prikaz ? kartyOfPrikaz(shihtovyeKarty, prikaz.id) : [];
   const status = prikazStatus(karty);
   const done = !!prikaz && status === "Выполнена";
-  // Оформленный приказ («Новая») и выполненный не редактируются
+  // Оформленный приказ («Готово для Требования» / «Готово для плавки») и выполненный не редактируются
   const ro = readOnly || (!!prikaz && status !== "На редактировании");
   const mass = r2(karty.reduce((s, k) => s + kartaMass(k), 0));
   const gradeName = (k: ShihtovayaKarta) => alloyGrades.find(g => g.id === k.alloyId)?.name ?? "";
@@ -971,7 +973,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
     screen.open("karta-new");
   };
 
-  // Оформление приказа: все карты — «Новая» (редактирование закрыто), приказ — «Новая»
+  // Оформление приказа: все карты и приказ — «Готово для Требования» / «Готово для плавки» (редактирование закрыто)
   const kartaBlocks = karty.filter(k => k.status === "На редактировании")
     .map(k => ({ k, why: kartaOformitBlock(k, alloyGrades.find(g => g.id === k.alloyId), shortName) }))
     .filter((x): x is { k: ShihtovayaKarta; why: string } => !!x.why);
@@ -982,15 +984,12 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
     : null;
   const oformit = () => {
     if (!prikaz || oformitBlock) { if (oformitBlock) show(oformitBlock); return; }
-    // Выполненные карты (уже выданы на плавку) не меняются. Отметка карты о перемещении требованием (trebovanie)
-    // сохраняется при повторном оформлении, если все позиции склада карты — в резерве на СДМ №2 (напр. выданную
-    // в другую операцию позицию заменили позицией СДМ №2); иначе снимается — оставшиеся позиции перемещает новое требование
-    const onSdm2 = (k: ShihtovayaKarta) => k.materials.filter(isSkladMaterial)
-      .every(m => dmItems.some(i => i.nomenkl === m.nomenkl && i.status === "Резерв" && i.sklad === SDM2));
-    const ids = new Set(karty.filter(k => k.status === "На редактировании").map(k => k.id));
-    setShihtovyeKarty(prev => prev.map(k => (ids.has(k.id)
-      ? { ...k, status: "Новая", vydannyePozicii: undefined, trebovanie: k.trebovanie && onSdm2(k) ? k.trebovanie : undefined }
-      : k)));
+    // Все карты приказа (кроме выполненных) получают один статус по складам позиций: хотя бы одна позиция на СДМ1 —
+    // «Готово для Требования» (приказ выбирается в «Требовании»), все на СДМ2 — «Готово для плавки». Так же при
+    // повторном оформлении после правки карты, позицию которой выдали в другую операцию.
+    const st = readyStatus(karty, dmItems);
+    const ids = new Set(karty.filter(k => k.status !== "Выполнена").map(k => k.id));
+    setShihtovyeKarty(prev => prev.map(k => (ids.has(k.id) ? { ...k, status: st, vydannyePozicii: undefined } : k)));
     onSave(build(), "oformlen");
   };
 
@@ -1037,8 +1036,8 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
         <div className="flex items-center gap-2 mb-4">
           <Badge label={status} group="shihta" />
           {done && <span className="text-xs text-gray-500">Карты приказа выданы на плавку — изменения недоступны</span>}
-          {status === "Новая" && <span className="text-xs text-gray-500">Приказ оформлен — переместите позиции карт на СДМ №2 документом «Требование», после этого приказ доступен для выдачи на плавку</span>}
-          {status === PRIKAZ_MOVED && <span className="text-xs text-gray-500">Позиции карт перемещены на СДМ №2 требованием — приказ доступен для выдачи на плавку, редактирование закрыто</span>}
+          {status === SH_READY_TREB && <span className="text-xs text-gray-500">Приказ оформлен — есть позиции на СДМ1: переместите их на СДМ2 документом «Требование», после этого приказ доступен для выдачи на плавку</span>}
+          {status === SH_READY_PLAVKA && <span className="text-xs text-gray-500">Все позиции карт на СДМ2 — приказ доступен для выдачи на плавку, редактирование закрыто</span>}
           {status === "На редактировании" && karty.some(k => k.vydannyePozicii?.length) && (
             <span className="text-xs text-red-600">Позиции из резерва выданы со склада — замените их в отмеченных картах и оформите приказ</span>
           )}
@@ -1112,8 +1111,6 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
                       <td className="px-3 py-2 text-right">{str2(kartaMass(k))}</td>
                       <td className="px-3 py-2">
                         <Badge label={k.status} group="shihta" />
-                        {/* Позиции карты перемещены на СДМ №2 требованием — отметка сохраняется и при возврате карты на редактирование */}
-                        {k.trebovanie && k.status !== "Выполнена" && <div className="text-[11px] text-gray-500 mt-1 whitespace-nowrap">на СДМ №2 · {DOC_TREBOVANIE} № {k.trebovanie.number}</div>}
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
@@ -1233,7 +1230,7 @@ function PrikazPrintModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
 }
 
 export function ShihtovyeKarty() {
-  const { shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, setShihtaPrikazy, setDmItems, alloyGrades } = useApp();
+  const { shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, setShihtaPrikazy, dmItems, setDmItems, alloyGrades } = useApp();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
@@ -1302,8 +1299,9 @@ export function ShihtovyeKarty() {
           <tbody className="divide-y divide-gray-100">
             {sorted.slice((page - 1) * perPage, page * perPage).map(({ p, karty, status, grade, mass }) => {
               const done = status === "Выполнена";
-              // Приказ, по которому уже выдавались карты, не удаляется
-              const canDelete = !karty.some(k => k.status === "Выполнена");
+              // Удаляется только приказ «На редактировании» (и без выданных на плавку карт): резерв позиций его карт
+              // снимается — позиции возвращаются в прежний статус «На складе» (releaseKarty)
+              const canDelete = status === "На редактировании" && !karty.some(k => k.status === "Выполнена");
               return (
                 <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-gray-500">{p.date}</td>
@@ -1324,7 +1322,7 @@ export function ShihtovyeKarty() {
                         () => removePrikaz(p),
                       )}
                       disabled={!canDelete}
-                      title={canDelete ? "Удалить" : "Карты приказа выданы на плавку — удаление недоступно"}
+                      title={canDelete ? "Удалить" : done || karty.some(k => k.status === "Выполнена") ? "Карты приказа выданы на плавку — удаление недоступно" : "Приказ оформлен — удаление доступно только на редактировании"}
                     />
                   </td>
                 </tr>
@@ -1356,7 +1354,7 @@ export function ShihtovyeKarty() {
           onSave={(p, mode) => {
             setShihtaPrikazy(prev => prev.map(x => (x.id === p.id ? p : x)));
             screen.close("prikaz");
-            show(mode === "oformlen" ? `Приказ № ${p.number} оформлен — шихтовые карты в статусе «Новая», доступны для выдачи на плавку` : "Приказ сохранён");
+            show(mode === "oformlen" ? `Приказ № ${p.number} оформлен — статус «${readyStatus(kartyOfPrikaz(shihtovyeKarty, p.id), dmItems)}»` : "Приказ сохранён");
           }}
         />
       )}

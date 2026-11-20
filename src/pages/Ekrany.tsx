@@ -24,7 +24,7 @@ export function useScreenGroups(): Group[] {
   const gp = gpItems[0];
   const dm1 = dmItems.find(i => i.sklad === SDM1 && i.status !== "Закрыта");
   const dm2 = dmItems.find(i => i.sklad === SDM2 && i.status !== "Закрыта");
-  const karta = shihtovyeKarty.find(k => k.status === "Новая") ?? shihtovyeKarty[0];
+  const karta = shihtovyeKarty.find(k => k.status === "Готово для плавки") ?? shihtovyeKarty[0];
   const kartaRed = shihtovyeKarty.find(k => k.status === "На редактировании");
   const prikaz = shihtaPrikazy.find(p => p.id === karta?.prikazId) ?? shihtaPrikazy[0];
   const person = podotchetniki[0];
