@@ -55,6 +55,9 @@ export type Metal = "Au" | "Ag" | "Pt" | "Pd";
 // поле хранит код из справочника «Коды материалов», металл — префикс его краткого наименования.
 export function baseMetal(code: string, codes: MaterialCode[] = initialMaterialCodes): Metal {
   const c = codes.find(x => x.code === code);
+  // Основной металл в сплаве — из справочника «Коды материалов»
+  const m = c?.mainElement;
+  if (m === "au" || m === "ag" || m === "pt" || m === "pd") return m === "au" ? "Au" : m === "ag" ? "Ag" : m === "pt" ? "Pt" : "Pd";
   const prefix = (c?.shortName ?? code).slice(0, 2);
   if (prefix === "Au" || prefix === "Ag" || prefix === "Pt" || prefix === "Pd") return prefix;
   // Сплав с кратким наименованием по ГОСТ (СрМ 925): металл — первый элемент состава кода
@@ -448,6 +451,7 @@ const CODE_COMPOSITION: Record<string, Record<string, number>> = {
   "8000": { au: 37.5, ag: 2, cu: 60.5 },              // ЗлСрМ 375-20
   "7000": { au: 37.5, ag: 10, cu: 52.5 },             // ЗлСрМ 375-100
   "0925": { ag: 92.5, cu: 7.5 },                      // СрМ 925 (марка сплава СрМ 92,5)
+  "0120": { au: 100 },                                // Сигнальные образцы золота
 };
 const mainOf = (code: string) => Object.keys(CODE_COMPOSITION[code] ?? {})[0] ?? "au";
 
@@ -1486,6 +1490,9 @@ export interface MaterialCode {
   // Процентное содержание элементов сплава: id элемента справочника «Химический состав» → %
   // (ЗлСрМ 750-125 → Au 75, Ag 12,5, остальное Cu 12,5). По нему рассчитывается хим. состав позиций (data/chem.ts)
   composition?: Record<string, number>;
+  // Основной металл в сплаве — id элемента состава (значение > 0): к нему относится проба при создании позиции
+  // (содержание основного металла = Проба / 10 %, остаток — Cu; data/chem.ts: mainElementOf, applyProba)
+  mainElement?: string;
 }
 
 export const initialMaterialCodes: MaterialCode[] = [
@@ -1501,12 +1508,18 @@ export const initialMaterialCodes: MaterialCode[] = [
   { code: "4000", name: "Платина чистое", shortName: "Pt чистое", composition: CODE_COMPOSITION["4000"] },
   { code: "0700", name: "Сплав ЗлСрПдМ 375-100-38", shortName: "ЗлСрПдМ 375-100-38", composition: CODE_COMPOSITION["0700"] },
   { code: "0800", name: "Сплав ЗлСрМ 950", shortName: "ЗлСрМ 950", composition: CODE_COMPOSITION["0800"] },
-  { code: "0120", name: "Сигнальные образцы", shortName: "Сигн. образцы" },
+  { code: "0120", name: "Сигнальные образцы золота", shortName: "Сигн. образцы Au", composition: CODE_COMPOSITION["0120"] },
   { code: "8000", name: "Сплав ЗлСрМ 375-20", shortName: "ЗлСрМ 375-20", composition: CODE_COMPOSITION["8000"] },
   { code: "7000", name: "Сплав ЗлСрМ 375-100", shortName: "ЗлСрМ 375-100", composition: CODE_COMPOSITION["7000"] },
   { code: "0050", name: "Бриллиантовые вставки", shortName: "Брилл. вставки" },
   { code: "0925", name: "Сплав СрМ 925", shortName: "СрМ 925", composition: CODE_COMPOSITION["0925"] },
 ];
+// Основной металл кодов (демо): по краткому наименованию (Au / Ag / Pt / Pd …), иначе — первый элемент состава
+for (const c of initialMaterialCodes) {
+  if (c.mainElement || !c.composition) continue;
+  const prefix = c.shortName.slice(0, 2).toLowerCase();
+  c.mainElement = ["au", "ag", "pt", "pd"].includes(prefix) && (c.composition[prefix] ?? 0) > 0 ? prefix : Object.keys(c.composition)[0];
+}
 
 // --- Классы материалов ---
 export interface MaterialClass {

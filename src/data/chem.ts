@@ -28,6 +28,8 @@ export type ChemPercent = Record<string, string>;
 // (как baseMetal в data/mock.ts), по умолчанию — золото
 export const mainElementOf = (code: string, codes: MaterialCode[]) => {
   const c = codes.find(x => x.code === code);
+  // Основной металл в сплаве задан в справочнике «Коды материалов» — по нему рассчитывается проба
+  if (c?.mainElement) return c.mainElement;
   const prefix = (c?.shortName ?? code).slice(0, 2);
   if (prefix === "Au" || prefix === "Ag" || prefix === "Pt" || prefix === "Pd") return prefix.toLowerCase();
   // Сплав с кратким наименованием по ГОСТ (СрМ 925) — первый элемент состава кода

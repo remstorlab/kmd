@@ -532,9 +532,18 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
   const openAdd = goAdd;
   const openEdit = goEdit;
 
+  // Основной металл в сплаве — один из элементов состава со значением > 0 (обязателен); единственный элемент
+  // выбирается сам, элемент, убранный из состава, сбрасывается
+  const comp = compositionOfForm() ?? {};
+  const mainOptions = compElements.map(e => e.id).filter(id => (comp[id] ?? 0) > 0);
+  const mainValue = mainOptions.includes(form.mainElement ?? "") ? form.mainElement! : mainOptions.length === 1 ? mainOptions[0] : "";
+
   const save = () => {
+    if (!form.code.trim() || !form.name.trim() || !form.shortName.trim()) { show("Заполните поля «Код», «Наименование» и «Краткое наименование»"); return; }
+    if (Object.keys(comp).length === 0) { show("Укажите хим. состав позиции"); return; }
     if (totalPct > 100.005) { show("Сумма содержания элементов больше 100 %"); return; }
-    const rec: MaterialCode = { ...form, composition: compositionOfForm() };
+    if (!mainValue) { show("Укажите основной металл в сплаве"); return; }
+    const rec: MaterialCode = { ...form, composition: comp, mainElement: mainValue };
     if (editItem) {
       setItems(prev => prev.map(i => i.code === editItem.code ? rec : i));
     } else {
@@ -572,6 +581,7 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
             <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
             <SortTh sortKey="shortName" sort={sort} onSort={toggleSort}>Краткое наименование</SortTh>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Содержание в сплаве</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Основной металл</th>
             <th className="w-12"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
@@ -581,13 +591,14 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
                 <td className="px-4 py-3 text-gray-900">{item.name}</td>
                 <td className="px-4 py-3 text-gray-500">{item.shortName}</td>
                 <td className="px-4 py-3 text-gray-700 tabular-nums">{compositionText(item.composition, shortOf) || <span className="text-gray-400">—</span>}</td>
+                <td className="px-4 py-3 text-gray-700">{item.mainElement ? shortOf(item.mainElement) : <span className="text-gray-400">—</span>}</td>
                 <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
               </tr>
             ))}
             {pageItems.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
-            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={5} />
+            <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={6} />
           </tbody>
         </table>
         <Pagination page={page} total={sorted.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
@@ -627,6 +638,16 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
                 Итого: {String(totalPct).replace(".", ",")} %{cuAuto && restCu > 0 ? ` (в т. ч. Cu — остаток ${String(restCu).replace(".", ",")} %)` : ""}
               </div>
             </div>
+            {/* Основной металл: к нему относится проба позиции ДМ (содержание = Проба / 10 %, остаток — Cu) */}
+            <Field label="Основной металл в сплаве" required>
+              <Select
+                value={mainValue}
+                options={["", ...mainOptions]}
+                optionLabel={v => (v ? `${chemElements.find(e => e.id === v)?.name ?? v} (${shortOf(v)})` : mainOptions.length ? "Выберите элемент" : "Сначала укажите хим. состав")}
+                onChange={v => setForm(f => ({ ...f, mainElement: v || undefined }))}
+                disabled={mainOptions.length === 0}
+              />
+            </Field>
           </div>
         </Modal>
       )}
