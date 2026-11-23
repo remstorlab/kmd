@@ -44,7 +44,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   // Оформленное требование: позиции уже перемещены — состав и склады менять нельзя
   const posted = doc?.status === "Оформлено";
   const lockPos = ro || posted;
-  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, skladDocs } = useApp();
+  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, skladDocs, alloyGrades } = useApp();
   const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
   // Вложенный экран: …/pick (подбор со склада-отправителя)
@@ -105,6 +105,21 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const notReady = selPrikazy.filter(p => statusOf(p) !== SH_READY_TREB)
     .map(p => `Приказ № ${p.number} в статусе «${statusOf(p)}» — перемещаются позиции приказа «${SH_READY_TREB}»`);
   const prikazBlock = prikazConflict ?? (notReady.length ? notReady.join("; ") : null);
+  // Подсказка к приказу (метка в поле и строка списка): все поля приказа
+  const prikazHint = (p: PrikazPlavka) => {
+    const karty = kartyOf(p.id);
+    const grade = alloyGrades.find(g => g.id === p.alloyId);
+    return [
+      `Приказ на плавку № ${p.number} от ${p.date}`,
+      `Наименование: ${p.name}`,
+      `Марка сплава: ${grade ? `${grade.name} (${grade.nd})` : "—"}`,
+      `Назначение слитков: ${p.naznachenie || "—"}`,
+      `Статус: ${statusOf(p)}`,
+      `Шихтовые карты: ${karty.length ? karty.map(k => `плавка № ${k.plavkaNo}`).join(", ") : "—"}`,
+      ...(p.note ? [`Примечание: ${p.note}`] : []),
+      `Создан: ${p.createdBy}`,
+    ].join("\n");
+  };
   const rezervOf = (ids: string[]) => {
     const nomenkl = new Set(ids.flatMap(id => kartyOf(id)).flatMap(k => k.materials.map(m => m.nomenkl)).filter(Boolean));
     return stock.filter(r => nomenkl.has(r.nomenkl) && itemOf({ ...r, issue: 0 })?.status === "Резерв");
@@ -261,7 +276,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
             values={prikazIds}
             options={prikazy.map(p => ({
               id: p.id, number: p.number, date: p.date, name: p.name,
-              plavki: kartyOf(p.id).map(k => k.plavkaNo),
+              hint: prikazHint(p),
               busy: takenBy(p.id)?.number,
             }))}
             onChange={choosePrikazy}
@@ -358,26 +373,25 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
 }
 
 // ── Множественный выбор приказов на плавку ──
-// Кнопка: «Не выбрано» / «Все приказы (N)» / «Выбрано: N»; под ней — выбранные приказы метками «№ … от …» (полное
-// наименование — в подсказке) с крестиком. Список: «Выбрать все» / «Снять все», поиск, у приказа — номер и дата,
-// плавки и наименование второй строкой (длинные названия переносятся). Приказ, выбранный в другом неоформленном
-// требовании, недоступен — с пометкой.
-interface PrikazOption { id: string; number: string; date: string; name: string; plavki: string[]; busy?: string }
+// В поле — выбранные приказы метками «№ … от …» с крестиком (убрать из выбора); при наведении на метку — подсказка
+// с полными данными приказа (наименование, марка сплава, назначение слитков, плавки, примечание). Пусто — «Не выбрано».
+// Список: «Выбрать все» / «Снять все», строка приказа — номер, дата и наименование. Приказ, выбранный в другом
+// неоформленном требовании, недоступен — с пометкой.
+interface PrikazOption { id: string; number: string; date: string; name: string; hint: string; busy?: string }
 
 function PrikazMultiSelect({ options, values, onChange, disabled = false }: {
   options: PrikazOption[]; values: string[]; onChange: (ids: string[]) => void; disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
   const [rect, setRect] = useState<DOMRect | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const update = () => btnRef.current && setRect(btnRef.current.getBoundingClientRect());
+    const update = () => boxRef.current && setRect(boxRef.current.getBoundingClientRect());
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (!btnRef.current?.contains(t) && !listRef.current?.contains(t)) setOpen(false);
+      if (!boxRef.current?.contains(t) && !listRef.current?.contains(t)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     update();
@@ -396,38 +410,38 @@ function PrikazMultiSelect({ options, values, onChange, disabled = false }: {
   const free = options.filter(o => !o.busy);
   const allOn = free.length > 0 && free.every(o => values.includes(o.id));
   const toggle = (id: string) => onChange(values.includes(id) ? values.filter(v => v !== id) : [...values, id]);
-  const label = values.length === 0 ? "Не выбрано" : allOn && free.length > 1 ? `Все приказы (${values.length})` : `Выбрано: ${values.length}`;
-  const ql = q.trim().toLowerCase();
-  const shown = ql ? options.filter(o => `${o.number} ${o.date} ${o.name} ${o.plavki.join(" ")}`.toLowerCase().includes(ql)) : options;
   const sel = values.map(id => options.find(o => o.id === id)).filter((o): o is PrikazOption => !!o);
 
   return (
-    <div>
-      <button
-        ref={btnRef}
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500 bg-white"
+    <>
+      <div
+        ref={boxRef}
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        onClick={() => !disabled && setOpen(o => !o)}
+        onKeyDown={e => { if (!disabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setOpen(o => !o); } }}
+        className={`w-full min-h-[38px] flex items-center gap-2 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${disabled ? "bg-gray-50 cursor-default" : "bg-white cursor-pointer"}`}
       >
-        <span className={values.length ? "text-gray-900" : "text-gray-400"}>{label}</span>
-        <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
-      </button>
-      {sel.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2">
+        <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+          {sel.length === 0 && <span className="px-1 text-gray-400">Не выбрано</span>}
           {sel.map(o => (
-            <span key={o.id} title={`${o.name}${o.plavki.length ? ` · плавки № ${o.plavki.join(", ")}` : ""}`}
-              className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-800">
+            <span key={o.id} title={o.hint}
+              className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-800 whitespace-nowrap">
               № {o.number} от {o.date}
-              {!disabled && <button type="button" onClick={() => toggle(o.id)} className="text-blue-400 hover:text-red-600" title="Убрать приказ — его позиции удаляются из требования"><X className="w-3 h-3" /></button>}
+              {!disabled && (
+                <button type="button" onClick={e => { e.stopPropagation(); toggle(o.id); }} className="text-blue-400 hover:text-red-600" title="Убрать приказ — его позиции удаляются из требования">
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </span>
           ))}
         </div>
-      )}
+        {!disabled && <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />}
+      </div>
       {open && rect && createPortal(
         <div
           ref={listRef}
-          style={{ position: "fixed", top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 520), maxWidth: "calc(100vw - 32px)", zIndex: 1000 }}
+          style={{ position: "fixed", top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 480), maxWidth: "calc(100vw - 32px)", zIndex: 1000 }}
           className="bg-white border border-gray-200 rounded-lg shadow-lg text-sm"
         >
           <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
@@ -436,19 +450,16 @@ function PrikazMultiSelect({ options, values, onChange, disabled = false }: {
                 onChange={() => onChange(allOn ? [] : free.map(o => o.id))} />
               Выбрать все
             </label>
-            <button type="button" className="text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline" disabled={values.length === 0} onClick={() => onChange([])}>Снять все</button>
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск: №, дата, наименование"
-              className="ml-auto w-56 px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            <button type="button" className="ml-auto text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline" disabled={values.length === 0} onClick={() => onChange([])}>Снять все</button>
           </div>
           <div className="max-h-72 overflow-auto py-1">
-            {shown.length === 0 && <div className="px-3 py-3 text-gray-400">{options.length ? "Ничего не найдено" : "Нет приказов «Готово для Требования»"}</div>}
-            {shown.map(o => (
-              <label key={o.id} className={`flex items-start gap-2 px-3 py-2 ${o.busy ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-gray-50"}`}>
+            {options.length === 0 && <div className="px-3 py-3 text-gray-400">Нет приказов «Готово для Требования»</div>}
+            {options.map(o => (
+              <label key={o.id} title={o.hint} className={`flex items-start gap-2 px-3 py-2 ${o.busy ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-gray-50"}`}>
                 <input type="checkbox" className="accent-blue-600 mt-0.5" checked={values.includes(o.id)} disabled={!!o.busy} onChange={() => toggle(o.id)} />
-                <span className="min-w-0">
+                <span className="min-w-0 break-words">
                   <span className="font-medium text-gray-900">№ {o.number} от {o.date}</span>
-                  {o.plavki.length > 0 && <span className="text-gray-500"> · плавки № {o.plavki.join(", ")}</span>}
-                  <span className="block text-xs text-gray-500 break-words">{o.name}</span>
+                  <span className="text-gray-600"> · {o.name}</span>
                   {o.busy && <span className="block text-xs text-red-600">выбран в требовании № {o.busy}</span>}
                 </span>
               </label>
@@ -457,6 +468,6 @@ function PrikazMultiSelect({ options, values, onChange, disabled = false }: {
         </div>,
         document.body,
       )}
-    </div>
+    </>
   );
 }
