@@ -132,7 +132,9 @@ export interface SkladDoc {
   positions?: VydachaDocPosition[];
   // Требование: шихтовая карта, под которую перемещаются позиции (старые документы — до приказов на плавку)
   shihtaId?: string;
-  // Требование: приказ на плавку — перемещаются зарезервированные позиции всех его шихтовых карт
+  // Требование: приказы на плавку — перемещаются зарезервированные позиции всех их шихтовых карт (несколько приказов)
+  prikazIds?: string[];
+  // Требование (документы до множественного выбора): один приказ на плавку; читать через docPrikazIds
   prikazId?: string;
   // Требование: заказчик и признак собственности — по позициям шихтовой карты
   zakazchik?: string;
@@ -646,6 +648,8 @@ export const DOC_PRIHOD_NAKLAD = "Накладная";
 export const DOC_PRIHOD_AKT = "Акт";
 // Требование — перемещение позиций со склада на склад (СДМ1 → СДМ2) без смены места хранения и статуса
 export const DOC_TREBOVANIE = "Требование";
+// Приказы на плавку требования: prikazIds, у старых документов — prikazId
+export const docPrikazIds = (d: Pick<SkladDoc, "prikazIds" | "prikazId">): string[] => d.prikazIds ?? (d.prikazId ? [d.prikazId] : []);
 // Возврат СГП №2 — возврат позиций со склада СГП №2 на склад СДМ (поля как у накладной, отправитель — СГП №2)
 export const DOC_VOZVRAT_SGP = "Возврат СГП №2";
 
@@ -692,13 +696,13 @@ const vpos = (src: "gp" | "dm", id: string): VydachaDocPosition => {
 initialSkladDocs.unshift(
   // Требование ТР-0015 (в работе) по приказу № 1242 «Готово для Требования»: позиции резерва карты плавки № 49 (по шихте)
   // и добавленный вручную слиток СДМ1 «На складе»; позиции ещё на СДМ1
-  { id: "sd7", date: "21.08.2026", type: DOC_TREBOVANIE, number: "ТР-0015", status: "В работе", sender: SDM1, receiver: SDM2, prikazId: "pp6", positions: [{ ...vpos("dm", "dm57"), poShihte: true }, { ...vpos("dm", "dm58"), poShihte: true }, vpos("dm", "dm46")] },
+  { id: "sd7", date: "21.08.2026", type: DOC_TREBOVANIE, number: "ТР-0015", status: "В работе", sender: SDM1, receiver: SDM2, prikazIds: ["pp6"], positions: [{ ...vpos("dm", "dm57"), poShihte: true }, { ...vpos("dm", "dm58"), poShihte: true }, vpos("dm", "dm46")] },
   // Требование ТР-0014 (оформлено) по приказу № 1240: резерв карт плавок № 47, 48 перемещён на СДМ2 — приказ
   // «Готово для плавки», доступен для выдачи на плавку
-  { id: "sd11", date: "20.08.2026", type: DOC_TREBOVANIE, number: "ТР-0014", status: "Оформлено", sender: SDM1, receiver: SDM2, prikazId: "pp1", positions: ["dm40", "dm41", "dm42", "dm55"].map(id => ({ ...vpos("dm", id), poShihte: true })) },
+  { id: "sd11", date: "20.08.2026", type: DOC_TREBOVANIE, number: "ТР-0014", status: "Оформлено", sender: SDM1, receiver: SDM2, prikazIds: ["pp1"], positions: ["dm40", "dm41", "dm42", "dm55"].map(id => ({ ...vpos("dm", id), poShihte: true })) },
   // Требование ТР-0012 (оформлено) по приказу № 1236: резерв карты плавки № 46 перемещён на СДМ2; позже отходы
   // СрМ 92,5 выданы в «Отбор пробы» — карта и приказ «На редактировании»
-  { id: "sd12", date: "19.08.2026", type: DOC_TREBOVANIE, number: "ТР-0012", status: "Оформлено", sender: SDM1, receiver: SDM2, prikazId: "pp2", positions: ["dm53", "dm54"].map(id => ({ ...vpos("dm", id), poShihte: true })) },
+  { id: "sd12", date: "19.08.2026", type: DOC_TREBOVANIE, number: "ТР-0012", status: "Оформлено", sender: SDM1, receiver: SDM2, prikazIds: ["pp2"], positions: ["dm53", "dm54"].map(id => ({ ...vpos("dm", id), poShihte: true })) },
 );
 
 // Возврат СГП №2 ВС-0012 (оформлен): монеты «Тумар» возвращены с СГП №2 на СДМ1 — запись gp43-sgp (на СГП №2)

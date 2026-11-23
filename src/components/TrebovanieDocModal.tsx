@@ -1,11 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
-  Btn, Modal, DeleteIcon, EditIcon, useToast, Toast, Field, Input, Select, KlassCode,
+  Btn, Modal, DeleteIcon, EditIcon, useToast, Toast, Field, Input, KlassCode,
   MultiFileUpload, SortTh, useSort, useMaterialCodeLabel, usePaged, FillerRows, useCreatedStamp, PosStatusBadge, probaText,
   InfoField,
   NetAuAg, NetAuAgTotal, NET_AU_AG, OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "./ui";
-import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, PrikazPlavka, SDM1, SDM2, DOC_TREBOVANIE, SH_READY_TREB } from "../data/mock";
+import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, PrikazPlavka, SDM1, SDM2, DOC_TREBOVANIE, SH_READY_TREB, docPrikazIds } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow, PickedRow } from "./StockPickerModal";
 import { takeFromStock, partLigMap, partNomenklMap } from "../data/stock";
@@ -13,15 +14,16 @@ import { markIssuedElsewhere, prikazStatus, refreshReady } from "../data/shihta"
 import { useIssuePositions, ensurePartNomenkl, RezervWarning } from "./IssueInputs";
 import { useUsedNomenkl, nextNomenkl } from "./DMPositionFormModal";
 import { useScreen } from "../router";
-import { Plus } from "lucide-react";
+import { Plus, X, ChevronDown } from "lucide-react";
 
 // ── Требование: перемещение позиций со склада на склад (СДМ1 → СДМ2) ─────────
 // Позиции, принятые на склад приёмки (СДМ1) и зарезервированные под шихтовую карту, по требованию передаются
 // на склад выдачи (СДМ2), откуда выдаются на плавку. Перемещение меняет только склад: место хранения, статус
 // (в т. ч. «Резерв» под шихтовую карту) и остальные атрибуты сохраняются. Склады меняются только при оформлении;
 // при частичном перемещении запись делится (data/stock.ts) — остаток остаётся на складе-отправителе.
-// Приказ на плавку («Готово для Требования»): выбор добавляет все позиции резерва всех его шихтовых карт со
-// склада-отправителя (по шихте — poShihte, целиком; не удаляются и не редактируются; снятие приказа их убирает).
+// Приказы на плавку («Готово для Требования», можно несколько — все / ни одного): выбор добавляет все позиции резерва
+// всех их шихтовых карт со склада-отправителя (по шихте — poShihte, целиком; не удаляются и не редактируются;
+// снятие приказа убирает его позиции).
 // «Добавить позицию» — дополнительные позиции склада-отправителя «На складе» (резерв ставится только шихтовой картой,
 // поэтому позиции в резерве вручную не подбираются). «Сохранить» — позиции сохраняются в документе, склады не меняются;
 // «Оформить» — все позиции перемещаются на склад-получатель с теми же местами хранения, статусы карт пересчитываются
@@ -30,7 +32,6 @@ import { Plus } from "lucide-react";
 type TrebPosition = VydachaDocPosition;
 // Переместить можно позицию на складе или в резерве (резерв — только позиции по шихте)
 const canMove = (status: string) => status === "На складе" || status === "Резерв";
-const NO_KARTA = "—";
 
 export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = false, typeSelect }: {
   onClose: () => void;
@@ -60,9 +61,14 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     // Отправитель — склад приёмки (СДМ1), получатель — склад выдачи (СДМ2); не редактируются
     sender: SDM1,
     receiver: SDM2,
-    // Приказ на плавку (у старых документов — приказ шихтовой карты)
-    prikazId: doc?.prikazId ?? shihtovyeKarty.find(k => k.id === doc?.shihtaId)?.prikazId ?? "",
   }));
+  // Приказы на плавку (у старых документов — один приказ или приказ шихтовой карты)
+  const [prikazIds, setPrikazIds] = useState<string[]>(() => {
+    if (!doc) return [];
+    const ids = docPrikazIds(doc);
+    const old = shihtovyeKarty.find(k => k.id === doc.shihtaId)?.prikazId;
+    return ids.length ? ids : old ? [old] : [];
+  });
   const h = (k: keyof typeof head) => (v: string) => setHead(x => ({ ...x, [k]: v }));
   const [info, setInfo] = useState(doc?.info ?? "");
   const [files, setFiles] = useState<File[]>(() => (doc ? [new File([], `Требование_${doc.number}.pdf`)] : []));
@@ -86,43 +92,34 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   // плавки» и в списке не показывается.
   const kartyOf = (id: string) => shihtovyeKarty.filter(k => k.prikazId === id && k.status !== "Выполнена");
   const statusOf = (p: PrikazPlavka) => prikazStatus(shihtovyeKarty.filter(k => k.prikazId === p.id));
-  const takenBy = (id: string) => skladDocs.find(d => d.id !== doc?.id && d.type === DOC_TREBOVANIE && d.status !== "Оформлено" && d.prikazId === id);
-  // Приказ, выбранный в другом неоформленном требовании, показывается с пометкой и не выбирается
-  const prikazy = shihtaPrikazy.filter(p => p.id === head.prikazId || statusOf(p) === SH_READY_TREB);
-  const byPrikaz = !!head.prikazId;
-  // Препятствия для приказа: выбран в другом неоформленном требовании (и для сохранения), не в статусе
+  const takenBy = (id: string) => skladDocs.find(d => d.id !== doc?.id && d.type === DOC_TREBOVANIE && d.status !== "Оформлено" && docPrikazIds(d).includes(id));
+  // Варианты: приказы «Готово для Требования» и уже выбранные; приказ, выбранный в другом неоформленном требовании,
+  // показывается с пометкой и не выбирается
+  const prikazy = shihtaPrikazy.filter(p => prikazIds.includes(p.id) || statusOf(p) === SH_READY_TREB);
+  const byPrikaz = prikazIds.length > 0;
+  const selPrikazy = prikazIds.map(id => shihtaPrikazy.find(p => p.id === id)).filter((p): p is PrikazPlavka => !!p);
+  // Препятствия: приказ выбран в другом неоформленном требовании (и для сохранения), не в статусе
   // «Готово для Требования» (для оформления)
-  const selPrikaz = shihtaPrikazy.find(p => p.id === head.prikazId);
-  const conflict = byPrikaz ? takenBy(head.prikazId) : undefined;
-  const prikazConflict = conflict ? `Приказ № ${selPrikaz?.number ?? ""} уже выбран в требовании № ${conflict.number}` : null;
-  const prikazBlock = prikazConflict ?? (selPrikaz && statusOf(selPrikaz) !== SH_READY_TREB
-    ? `Приказ № ${selPrikaz.number} в статусе «${statusOf(selPrikaz)}» — перемещаются позиции приказа «${SH_READY_TREB}»`
-    : null);
-  const prikazLabel = (id: string) => {
-    const p = shihtaPrikazy.find(x => x.id === id);
-    if (!p) return NO_KARTA;
-    const pl = kartyOf(id).map(k => k.plavkaNo);
-    const busy = takenBy(id);
-    return `Приказ № ${p.number} от ${p.date} · ${p.name}${pl.length ? ` (ШК плавок № ${pl.join(", ")})` : ""}${busy ? ` — выбран в требовании № ${busy.number}` : ""}`;
-  };
-  const rezervOf = (prikazId: string) => {
-    const nomenkl = new Set(kartyOf(prikazId).flatMap(k => k.materials.map(m => m.nomenkl)).filter(Boolean));
+  const conflicts = selPrikazy.flatMap(p => { const d = takenBy(p.id); return d ? [`Приказ № ${p.number} уже выбран в требовании № ${d.number}`] : []; });
+  const prikazConflict = conflicts.length ? conflicts.join("; ") : null;
+  const notReady = selPrikazy.filter(p => statusOf(p) !== SH_READY_TREB)
+    .map(p => `Приказ № ${p.number} в статусе «${statusOf(p)}» — перемещаются позиции приказа «${SH_READY_TREB}»`);
+  const prikazBlock = prikazConflict ?? (notReady.length ? notReady.join("; ") : null);
+  const rezervOf = (ids: string[]) => {
+    const nomenkl = new Set(ids.flatMap(id => kartyOf(id)).flatMap(k => k.materials.map(m => m.nomenkl)).filter(Boolean));
     return stock.filter(r => nomenkl.has(r.nomenkl) && itemOf({ ...r, issue: 0 })?.status === "Резерв");
   };
-  // Позиции по шихте: резерв всех карт приказа со склада-отправителя, целиком
-  const shihtaRows = (id: string): TrebPosition[] => rezervOf(id).map(r => ({ ...r, issue: r.qty, poShihte: true }));
-  // Выбор приказа добавляет позиции по шихте (позиции ранее выбранного приказа заменяются, добавленные вручную
-  // остаются); прочерк — позиции по шихте удаляются
-  const choosePrikaz = (id: string) => {
-    const busy = id ? takenBy(id) : undefined;
-    if (busy) { show(`Приказ уже выбран в требовании № ${busy.number} — оформите или измените это требование`); return; }
-    setHead(x => ({ ...x, prikazId: id }));
-    const rows = id ? shihtaRows(id) : [];
-    const ids = new Set(rows.map(r => r.id));
-    setPositions(prev => [...rows, ...prev.filter(p => !p.poShihte && !ids.has(p.id))]);
-    if (!id) return;
-    if (rows.length) show(`Добавлены позиции резерва шихтовых карт приказа (${kartyOf(id).length} карт): ${rows.length}`);
-    else show(`У шихтовых карт приказа нет позиций в резерве на складе «${head.sender}»`);
+  // Позиции по шихте: резерв всех карт выбранных приказов со склада-отправителя, целиком
+  const shihtaRows = (ids: string[]): TrebPosition[] => rezervOf(ids).map(r => ({ ...r, issue: r.qty, poShihte: true }));
+  // Выбор приказов: позиции по шихте пересобираются по выбранным приказам (добавленные вручную остаются);
+  // ни одного приказа — позиции по шихте удаляются
+  const choosePrikazy = (ids: string[]) => {
+    setPrikazIds(ids);
+    const rows = shihtaRows(ids);
+    const rIds = new Set(rows.map(r => r.id));
+    setPositions(prev => [...rows, ...prev.filter(p => !p.poShihte && !rIds.has(p.id))]);
+    const added = ids.filter(id => !prikazIds.includes(id));
+    if (added.length === 1 && rezervOf(added).length === 0) show(`У шихтовых карт приказа нет позиций в резерве на складе «${head.sender}»`);
   };
 
 
@@ -178,7 +175,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       if (prikazBlock) { show(prikazBlock); return; }
       if (byPrikaz) {
         // Состав резерва приказа на складе-отправителе мог измениться — по шихте перемещается весь резерв, целиком
-        const rows = shihtaRows(head.prikazId);
+        const rows = shihtaRows(prikazIds);
         const cur = positions.filter(p => p.poShihte);
         const ids = new Set(cur.map(p => p.id));
         if (rows.length !== cur.length || rows.some(r => !ids.has(r.id))) {
@@ -229,13 +226,15 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       status,
       sender: head.sender,
       receiver: head.receiver,
-      prikazId: head.prikazId || undefined,
+      prikazIds: prikazIds.length ? prikazIds : undefined,
       info: info.trim() || undefined,
       positions: finalPositions,
     });
   };
 
   const pg = usePaged(sorted, "trebovanie-positions");
+  // Колонка действий — только если есть позиции, добавленные вручную (у позиций по шихте действий нет)
+  const actCol = !lockPos && positions.some(p => !p.poShihte);
   return (
     <Modal
       title={`${DOC_TREBOVANIE}${doc ? ` ${doc.number}` : ""}`}
@@ -258,14 +257,16 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         <Field label="Отправитель"><Input value={head.sender} disabled /></Field>
         <Field label="Получатель"><Input value={head.receiver} disabled /></Field>
         <Field label="Приказ на плавку (все шихтовые карты)" full>
-          <Select
-            value={head.prikazId}
-            options={["", ...prikazy.map(p => p.id)]}
-            optionLabel={v => (v ? prikazLabel(v) : NO_KARTA)}
-            onChange={choosePrikaz}
+          <PrikazMultiSelect
+            values={prikazIds}
+            options={prikazy.map(p => ({
+              id: p.id, number: p.number, date: p.date, name: p.name,
+              plavki: kartyOf(p.id).map(k => k.plavkaNo),
+              busy: takenBy(p.id)?.number,
+            }))}
+            onChange={choosePrikazy}
             disabled={lockPos}
           />
-          {!lockPos && <div className="text-xs text-gray-500 mt-1">Приказы «Готово для Требования». Добавляются все позиции резерва его шихтовых карт со склада-отправителя (по шихте) — целиком, без удаления и изменения</div>}
           {!lockPos && prikazBlock && <div className="text-xs text-red-600 mt-1">{prikazBlock}</div>}
         </Field>
         <InfoField value={info} onChange={setInfo} disabled={ro} />
@@ -301,7 +302,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
               <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
               <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort} className="px-3 py-2">Статус</SortTh>
-              {!lockPos && <th className="w-24"></th>}
+              {actCol && <th className="w-20"></th>}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {pg.pageItems.map(p => {
@@ -319,9 +320,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
                   <td className="px-3 py-2"><OborotValue value={p.oborot} code={p.code} /></td>
                     <td className="px-3 py-2 text-gray-500">{p.location}</td>
                     <td className="px-3 py-2">{status ? <PosStatusBadge status={status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
-                    {!lockPos && <td className="px-3 py-2">{p.poShihte
-                      ? <span className="text-xs text-gray-400 whitespace-nowrap" title="Позиция резерва шихтовой карты приказа — не удаляется и не изменяется">по шихте</span>
-                      : <div className="flex items-center gap-1"><EditIcon onClick={() => screen.open("pick-edit", p.id)} /><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></div>}</td>}
+                    {/* Позиции по шихте не изменяются и не удаляются — у них ячейка действий пустая */}
+                    {actCol && <td className="px-3 py-2">{!p.poShihte && <div className="flex items-center gap-1"><EditIcon onClick={() => screen.open("pick-edit", p.id)} /><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></div>}</td>}
                   </tr>
                 );
               })}
@@ -333,7 +333,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
               <td></td>
               <td className="px-3 py-2">{iss.totals.lig.toFixed(2)}</td>
               <td className="px-3 py-2 text-blue-600"><NetAuAgTotal items={positions.map(p => ({ chem: p.chem, k: iss.line(p).share }))} /></td>
-              <td colSpan={lockPos ? 3 : 4}></td>
+              <td colSpan={actCol ? 4 : 3}></td>
             </tr></tfoot>
           </table>
           {pg.pager}
@@ -354,5 +354,109 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       )}
       {toast && <Toast message={toast} onDone={clear} />}
     </Modal>
+  );
+}
+
+// ── Множественный выбор приказов на плавку ──
+// Кнопка: «Не выбрано» / «Все приказы (N)» / «Выбрано: N»; под ней — выбранные приказы метками «№ … от …» (полное
+// наименование — в подсказке) с крестиком. Список: «Выбрать все» / «Снять все», поиск, у приказа — номер и дата,
+// плавки и наименование второй строкой (длинные названия переносятся). Приказ, выбранный в другом неоформленном
+// требовании, недоступен — с пометкой.
+interface PrikazOption { id: string; number: string; date: string; name: string; plavki: string[]; busy?: string }
+
+function PrikazMultiSelect({ options, values, onChange, disabled = false }: {
+  options: PrikazOption[]; values: string[]; onChange: (ids: string[]) => void; disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const update = () => btnRef.current && setRect(btnRef.current.getBoundingClientRect());
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!btnRef.current?.contains(t) && !listRef.current?.contains(t)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const free = options.filter(o => !o.busy);
+  const allOn = free.length > 0 && free.every(o => values.includes(o.id));
+  const toggle = (id: string) => onChange(values.includes(id) ? values.filter(v => v !== id) : [...values, id]);
+  const label = values.length === 0 ? "Не выбрано" : allOn && free.length > 1 ? `Все приказы (${values.length})` : `Выбрано: ${values.length}`;
+  const ql = q.trim().toLowerCase();
+  const shown = ql ? options.filter(o => `${o.number} ${o.date} ${o.name} ${o.plavki.join(" ")}`.toLowerCase().includes(ql)) : options;
+  const sel = values.map(id => options.find(o => o.id === id)).filter((o): o is PrikazOption => !!o);
+
+  return (
+    <div>
+      <button
+        ref={btnRef}
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500 bg-white"
+      >
+        <span className={values.length ? "text-gray-900" : "text-gray-400"}>{label}</span>
+        <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
+      </button>
+      {sel.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {sel.map(o => (
+            <span key={o.id} title={`${o.name}${o.plavki.length ? ` · плавки № ${o.plavki.join(", ")}` : ""}`}
+              className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-800">
+              № {o.number} от {o.date}
+              {!disabled && <button type="button" onClick={() => toggle(o.id)} className="text-blue-400 hover:text-red-600" title="Убрать приказ — его позиции удаляются из требования"><X className="w-3 h-3" /></button>}
+            </span>
+          ))}
+        </div>
+      )}
+      {open && rect && createPortal(
+        <div
+          ref={listRef}
+          style={{ position: "fixed", top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 520), maxWidth: "calc(100vw - 32px)", zIndex: 1000 }}
+          className="bg-white border border-gray-200 rounded-lg shadow-lg text-sm"
+        >
+          <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-100">
+            <label className="flex items-center gap-2 cursor-pointer font-medium">
+              <input type="checkbox" className="accent-blue-600" checked={allOn} disabled={free.length === 0}
+                onChange={() => onChange(allOn ? [] : free.map(o => o.id))} />
+              Выбрать все
+            </label>
+            <button type="button" className="text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline" disabled={values.length === 0} onClick={() => onChange([])}>Снять все</button>
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Поиск: №, дата, наименование"
+              className="ml-auto w-56 px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+          </div>
+          <div className="max-h-72 overflow-auto py-1">
+            {shown.length === 0 && <div className="px-3 py-3 text-gray-400">{options.length ? "Ничего не найдено" : "Нет приказов «Готово для Требования»"}</div>}
+            {shown.map(o => (
+              <label key={o.id} className={`flex items-start gap-2 px-3 py-2 ${o.busy ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-gray-50"}`}>
+                <input type="checkbox" className="accent-blue-600 mt-0.5" checked={values.includes(o.id)} disabled={!!o.busy} onChange={() => toggle(o.id)} />
+                <span className="min-w-0">
+                  <span className="font-medium text-gray-900">№ {o.number} от {o.date}</span>
+                  {o.plavki.length > 0 && <span className="text-gray-500"> · плавки № {o.plavki.join(", ")}</span>}
+                  <span className="block text-xs text-gray-500 break-words">{o.name}</span>
+                  {o.busy && <span className="block text-xs text-red-600">выбран в требовании № {o.busy}</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </div>
   );
 }

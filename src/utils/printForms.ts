@@ -3,7 +3,7 @@
 // документов и позиций системы. Значения, которых нет в системе (цена в требовании, вид операции,
 // кор. счёт), оставлены пустыми для заполнения вручную; подписи — пустые строки.
 
-import { SkladDoc, ShihtovayaKarta, PrikazPlavka, DOC_PRIHOD_ORDER, DOC_TREBOVANIE } from "../data/mock";
+import { SkladDoc, ShihtovayaKarta, PrikazPlavka, DOC_PRIHOD_ORDER, DOC_TREBOVANIE, docPrikazIds } from "../data/mock";
 import { ORDER_HEAD_DEFAULTS } from "../components/PrihodDocModal";
 import { IssueLine } from "../data/stock";
 import { Sheet, S, downloadXlsx } from "./xlsx";
@@ -56,12 +56,15 @@ function trebovanieSheet(d: SkladDoc, karty: ShihtovayaKarta[], prikazy: PrikazP
 
   sh.merge(6, 1, 6, LAST, `Требование № ${d.number} от ${d.date}г.`, S.title);
   sh.height(6, 22);
-  // Основание — приказ на плавку и шихтовые карты в его составе (старые документы — одна шихтовая карта)
-  const prikaz = prikazy.find(p => p.id === d.prikazId);
+  // Основание — приказы на плавку и шихтовые карты в их составе (старые документы — одна шихтовая карта)
+  const pr = docPrikazIds(d).map(id => prikazy.find(p => p.id === id)).filter((p): p is PrikazPlavka => !!p);
   const karta = karty.find(k => k.id === d.shihtaId);
-  const plavki = prikaz ? karty.filter(k => k.prikazId === prikaz.id).map(k => k.plavkaNo) : [];
-  const osnovanie = prikaz
-    ? `приказ на плавку № ${prikaz.number} от ${prikaz.date}${plavki.length ? `, шихтовые карты плавок № ${plavki.join(", ")}` : ""}`
+  const prikazText = (p: PrikazPlavka) => {
+    const plavki = karty.filter(k => k.prikazId === p.id).map(k => k.plavkaNo);
+    return `приказ на плавку № ${p.number} от ${p.date}${plavki.length ? ` (шихтовые карты плавок № ${plavki.join(", ")})` : ""}`;
+  };
+  const osnovanie = pr.length
+    ? pr.map(prikazText).join("; ")
     : karta ? `шихтовая карта № ${karta.plavkaNo} «${karta.name}» от ${karta.date}` : "—";
   sh.merge(7, 1, 7, LAST, `Основание: ${osnovanie}        Склад-отправитель: ${d.sender}        Склад-получатель: ${d.receiver}`, S.center);
 

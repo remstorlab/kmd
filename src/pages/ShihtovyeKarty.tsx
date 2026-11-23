@@ -9,7 +9,7 @@ import {
 import {
   ShihtovayaKarta, ShihtaMaterial, ShihtaMatKind, DMItem, ChemComposition, AlloyGrade, isGPKlass, isStoneKlass, STONE_KLASS,
   PRIHOD_SKLAD, SGP, spravValues, minAffinageOf, isProofNazn, STRUZHKA_KLASS, spravochniki, DOP_TYPE_CUP, DOP_TYPE_MED_MO, DOP_DICT, dopDefaultPct,
-  PrikazPlavka, oborotHint, oborotOver, oborotLimit, SH_READY_TREB, SH_READY_PLAVKA, DOC_TREBOVANIE,
+  PrikazPlavka, oborotHint, oborotOver, oborotLimit, SH_READY_TREB, SH_READY_PLAVKA, DOC_TREBOVANIE, docPrikazIds,
 } from "../data/mock";
 import { returnToStock } from "../data/stock";
 import {
@@ -1232,7 +1232,7 @@ function PrikazPrintModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
 export function ShihtovyeKarty() {
   const { shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, setShihtaPrikazy, dmItems, setDmItems, alloyGrades, skladDocs } = useApp();
   // Требование, в котором выбран приказ (любой статус документа) — такой приказ не удаляется ни в одной роли
-  const trebOf = (id: string) => skladDocs.find(d => d.type === DOC_TREBOVANIE && d.prikazId === id);
+  const trebOf = (id: string) => skladDocs.find(d => d.type === DOC_TREBOVANIE && docPrikazIds(d).includes(id));
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [page, setPage] = useState(1);
