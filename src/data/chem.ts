@@ -26,7 +26,14 @@ export type ChemPercent = Record<string, string>;
 
 // Основной металл кода (au / ag / pt / pd) — к нему относится проба: префикс краткого наименования кода
 // (как baseMetal в data/mock.ts), по умолчанию — золото
+// Хим. состав кода задан: есть хотя бы один элемент > 0. Пустой (null) или нулевой состав — расчёт по пробе
+// при создании позиции не выполняется (например, «Бриллиантовые вставки»)
+export const hasComposition = (code: string, codes: MaterialCode[]) =>
+  Object.values(codes.find(x => x.code === code)?.composition ?? {}).some(v => v > 0);
+
+// Пустая строка — у кода нет хим. состава, основного металла нет
 export const mainElementOf = (code: string, codes: MaterialCode[]) => {
+  if (!hasComposition(code, codes)) return "";
   const c = codes.find(x => x.code === code);
   // Основной металл в сплаве задан в справочнике «Коды материалов» — по нему рассчитывается проба
   if (c?.mainElement) return c.mainElement;
@@ -45,7 +52,8 @@ export function compositionOf(code: string, codes: MaterialCode[]): ChemPercent 
 // Корректировка состава по пробе: основной металл = Проба / 10 %, остаток (Cu) = 100 % − остальные элементы
 export function applyProba(pct: ChemPercent, proba: string, main: string): ChemPercent {
   const p = numOf(proba);
-  if (!(p > 0)) return pct;
+  // Нет основного металла или состав пустой / нулевой — расчёт не выполняется
+  if (!(p > 0) || !main || !Object.values(pct).some(v => numOf(v) > 0)) return pct;
   const next: ChemPercent = { ...pct, [main]: s2(p / 10) };
   if (main === REST_ELEMENT) return next;
   const others = Object.entries(next).filter(([k]) => k !== REST_ELEMENT).reduce((a, [, v]) => a + (numOf(v) || 0), 0);

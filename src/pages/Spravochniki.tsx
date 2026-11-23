@@ -540,10 +540,11 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
 
   const save = () => {
     if (!form.code.trim() || !form.name.trim() || !form.shortName.trim()) { show("Заполните поля «Код», «Наименование» и «Краткое наименование»"); return; }
-    if (Object.keys(comp).length === 0) { show("Укажите хим. состав позиции"); return; }
+    // Хим. состав необязателен (пустой или нулевой — расчёт по пробе для кода не выполняется);
+    // основной металл обязателен, только если в составе есть элементы > 0
     if (totalPct > 100.005) { show("Сумма содержания элементов больше 100 %"); return; }
-    if (!mainValue) { show("Укажите основной металл в сплаве"); return; }
-    const rec: MaterialCode = { ...form, composition: comp, mainElement: mainValue };
+    if (mainOptions.length > 0 && !mainValue) { show("Укажите основной металл в сплаве"); return; }
+    const rec: MaterialCode = { ...form, composition: comp, mainElement: mainValue || undefined };
     if (editItem) {
       setItems(prev => prev.map(i => i.code === editItem.code ? rec : i));
     } else {
@@ -639,11 +640,11 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
               </div>
             </div>
             {/* Основной металл: к нему относится проба позиции ДМ (содержание = Проба / 10 %, остаток — Cu) */}
-            <Field label="Основной металл в сплаве" required>
+            <Field label="Основной металл в сплаве" required={mainOptions.length > 0}>
               <Select
                 value={mainValue}
                 options={["", ...mainOptions]}
-                optionLabel={v => (v ? `${chemElements.find(e => e.id === v)?.name ?? v} (${shortOf(v)})` : mainOptions.length ? "Выберите элемент" : "Сначала укажите хим. состав")}
+                optionLabel={v => (v ? `${chemElements.find(e => e.id === v)?.name ?? v} (${shortOf(v)})` : mainOptions.length ? "Выберите элемент" : "Хим. состав не задан")}
                 onChange={v => setForm(f => ({ ...f, mainElement: v || undefined }))}
                 disabled={mainOptions.length === 0}
               />

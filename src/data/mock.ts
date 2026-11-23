@@ -453,7 +453,8 @@ const CODE_COMPOSITION: Record<string, Record<string, number>> = {
   "0925": { ag: 92.5, cu: 7.5 },                      // СрМ 925 (марка сплава СрМ 92,5)
   "0120": { au: 100 },                                // Сигнальные образцы золота
 };
-const mainOf = (code: string) => Object.keys(CODE_COMPOSITION[code] ?? {})[0] ?? "au";
+// Без хим. состава основного металла нет — расчёт по пробе не выполняется
+const mainOf = (code: string) => Object.keys(CODE_COMPOSITION[code] ?? {})[0] ?? "";
 
 // Хим. состав демо-позиции — тем же расчётом, что и в форме позиции ДМ (data/chem.ts):
 // справочное содержание кода → поправка по пробе (основной металл = Проба / 10 %, остаток — Cu) → граммы от лиг. веса.
