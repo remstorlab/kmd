@@ -3,7 +3,7 @@ import { useApp } from "../store/AppContext";
 import {
   Badge, Btn, Modal, EyeIcon, EditIcon, DeleteIcon, PrintIcon, Pagination, usePerPage, FillerRows, fillerCount, PageHeader,
   useToast, Toast, Field, Input, Select, Textarea, KlassCode, MultiFileUpload, useConfirm, ConfirmDialog,
-  SortTh, useSort, parseRuDate, usePaged, CREATED_LABEL, CreatedCell, useMaterialCodeLabel,
+  SortTh, useSort, parseRuDate, SearchInput, MultiSelect, usePaged, CREATED_LABEL, CreatedCell, useMaterialCodeLabel,
   OborotValue, oborotRowCls, OBOROT_LABEL,
 } from "../components/ui";
 import {
@@ -1230,7 +1230,7 @@ function PrikazPrintModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; ka
 }
 
 export function ShihtovyeKarty() {
-  const { shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, setShihtaPrikazy, dmItems, setDmItems, alloyGrades, skladDocs } = useApp();
+  const { shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, setShihtaPrikazy, dmItems, setDmItems, alloyGrades, skladDocs, statusDicts } = useApp();
   // Требование, в котором выбран приказ (любой статус документа) — такой приказ не удаляется ни в одной роли
   const trebOf = (id: string) => skladDocs.find(d => d.type === DOC_TREBOVANIE && docPrikazIds(d).includes(id));
   const { toast, show, clear } = useToast();
@@ -1248,10 +1248,40 @@ export function ShihtovyeKarty() {
 
   const rows = shihtaPrikazy.map(p => {
     const karty = kartyOfPrikaz(shihtovyeKarty, p.id);
-    const grades = [...new Set(karty.map(k => alloyGrades.find(g => g.id === k.alloyId)?.name).filter(Boolean))];
+    // Марки — по картам приказа (приказ без карт — марка приказа)
+    const ids = karty.length ? karty.map(k => k.alloyId) : [p.alloyId];
+    const grades = [...new Set(ids.map(id => alloyGrades.find(g => g.id === id)?.name).filter((n): n is string => !!n))];
     // Итоговая масса шихты — сумма масс всех шихтовых карт приказа
-    return { id: p.id, p, karty, status: prikazStatus(karty), grade: grades.join(", "), mass: r2(karty.reduce((s, k) => s + kartaMass(k), 0)) };
+    return { id: p.id, p, karty, status: prikazStatus(karty), grades, grade: grades.join(", "), mass: r2(karty.reduce((s, k) => s + kartaMass(k), 0)) };
   });
+
+  // ── Фильтры реестра: Дата приказа с / по, № приказа, Наименование, Марка сплава, Статус ──
+  const [fDateFrom, setFDateFrom] = useState("");
+  const [fDateTo, setFDateTo] = useState("");
+  const [fNumber, setFNumber] = useState("");
+  const [fName, setFName] = useState("");
+  const [fGrade, setFGrade] = useState<string[]>([]);
+  const [fStatus, setFStatus] = useState<string[]>([]);
+  const upd = <T,>(set: (v: T) => void) => (v: T) => { set(v); setPage(1); };
+  // Марки — из справочника «Марки сплавов» (и марки приказов, если запись неактивна); статусы — «Статусы шихтовых карт»
+  const gradeOptions = [...new Set([...alloyGrades.filter(g => g.status === "Активно").map(g => g.name), ...rows.flatMap(r => r.grades)])];
+  const statusOptions = statusDicts.find(d => d.group === "shihta")?.items.map(i => i.name) ?? [];
+  // Дата из <input type="date"> (гггг-мм-дд) — в число, сравнимое с parseRuDate
+  const isoToNum = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return y * 100000000 + m * 1000000 + d * 10000; };
+  const from = fDateFrom ? isoToNum(fDateFrom) : 0;
+  const to = fDateTo ? isoToNum(fDateTo) + 9999 : Infinity;
+  const qNum = fNumber.trim().toLowerCase();
+  const qName = fName.trim().toLowerCase();
+  const filteredRows = rows.filter(r => {
+    const dt = parseRuDate(r.p.date);
+    return dt >= from && dt <= to
+      && (!qNum || r.p.number.toLowerCase().includes(qNum))
+      && (!qName || r.p.name.toLowerCase().includes(qName))
+      && (fGrade.length === 0 || r.grades.some(g => fGrade.includes(g)))
+      && (fStatus.length === 0 || fStatus.includes(r.status));
+  });
+  const resetFilters = () => { setFDateFrom(""); setFDateTo(""); setFNumber(""); setFName(""); setFGrade([]); setFStatus([]); setPage(1); };
+  const dateCls = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
 
   const removePrikaz = (p: PrikazPlavka) => {
     const treb = trebOf(p.id);
@@ -1264,7 +1294,7 @@ export function ShihtovyeKarty() {
     show(`Приказ № ${p.number} удалён${karty.length ? ` вместе с картами (${karty.length})` : ""}`);
   };
 
-  const { sorted, sort, toggleSort } = useSort(rows, {
+  const { sorted, sort, toggleSort } = useSort(filteredRows, {
     date: r => parseRuDate(r.p.date),
     number: r => parseInt(r.p.number, 10) || 0,
     name: r => r.p.name,
@@ -1284,6 +1314,29 @@ export function ShihtovyeKarty() {
         breadcrumb={["Шихтовые карты"]}
         actions={<Btn onClick={() => screen.openTop("new")}><Plus className="w-4 h-4" />Новый приказ на плавку</Btn>}
       />
+
+      {/* Фильтры реестра приказов */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 items-end">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Дата приказа с</label>
+          <input type="date" value={fDateFrom} max={fDateTo || undefined} onChange={e => upd(setFDateFrom)(e.target.value)} className={dateCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Дата приказа по</label>
+          <input type="date" value={fDateTo} min={fDateFrom || undefined} onChange={e => upd(setFDateTo)(e.target.value)} className={dateCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">№ приказа</label>
+          <SearchInput value={fNumber} onChange={upd(setFNumber)} placeholder="Поиск по номеру..." />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Наименование</label>
+          <SearchInput value={fName} onChange={upd(setFName)} placeholder="Поиск по наименованию..." />
+        </div>
+        <Field label="Марка сплава"><MultiSelect values={fGrade} options={gradeOptions} onChange={upd(setFGrade)} allLabel="Все марки" /></Field>
+        <Field label="Статус"><MultiSelect values={fStatus} options={statusOptions} onChange={upd(setFStatus)} allLabel="Все статусы" /></Field>
+        <button onClick={resetFilters} className="h-9 px-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-white hover:bg-gray-50">Сбросить фильтры</button>
+      </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -1334,10 +1387,10 @@ export function ShihtovyeKarty() {
                 </tr>
               );
             })}
-            <FillerRows count={fillerCount(rows.length, page, perPage)} cols={9} />
+            <FillerRows count={fillerCount(filteredRows.length, page, perPage)} cols={9} />
           </tbody>
         </table>
-        <Pagination page={page} total={rows.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
+        <Pagination page={page} total={filteredRows.length} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {showNew && (
