@@ -1596,7 +1596,7 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
   const { toast, show, clear } = useToast();
   const [perPage, setPerPage] = usePerPage("sprav-grades", 10);
 
-  // Колонки диапазонов — все элементы формы записи (Au, Ag, Pd, Pt, Cu); мин и макс — отдельные колонки
+  // Элементы диапазонов (Au, Ag, Pd, Pt, Cu) — в окне «Пределы» (колонка таблицы «Пределы» → «Просмотреть»)
   const rangeEls = ALLOY_RANGE_ELEMENTS;
   const usedCodes = Array.from(new Set(items.map(g => g.materialCode).filter((c): c is string => !!c)));
   const usedBases = ALLOY_BASES.filter(b => items.some(g => g.base === b));
@@ -1632,7 +1632,16 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
     show("Запись сохранена");
   };
   const cell = (v: number | undefined) => (v != null ? fmtNum(v) : <span className="text-gray-300">—</span>);
-  const totalCols = 4 + rangeEls.length * 2 + 5;
+  const totalCols = 10;
+  // Окно «Пределы»: диапазоны элементов (мин / макс), элемент-остаток и примеси «не более» по выбранной марке
+  const [limitsItem, setLimitsItem] = useState<AlloyGrade | null>(null);
+  const limitRows = (g: AlloyGrade) => [
+    ...rangeEls.map(e => ({ el: e, r: g.ranges.find(x => x.element === e) }))
+      .filter(x => x.r || g.rest === x.el)
+      .map(({ el, r }) => ({ key: el, label: `${chemElements.find(c => c.id === el)?.name ?? el} (${short(el)})`, min: r?.min, max: r?.max, note: g.rest === el ? "Остальное" : "" })),
+    ...IMPURITY_KEYS.filter(k => g.impurities[k] != null)
+      .map(k => ({ key: `imp-${k}`, label: k === "total" ? "Примеси, всего" : `Примесь ${short(k)}`, min: undefined, max: g.impurities[k], note: "не более" })),
+  ];
   // Удаление: марка не выбрана ни в одном приказе на плавку и шихтовой карте
   const { shihtovyeKarty, shihtaPrikazy } = useApp();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
@@ -1664,22 +1673,12 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 text-xs text-gray-500">
-              <th colSpan={4}></th>
-              {rangeEls.map(e => <th key={e} colSpan={2} className="px-3 pt-2 pb-1 text-center font-medium border-b border-gray-200">{short(e)}, %</th>)}
-              <th colSpan={5}></th>
-            </tr>
             <tr className="bg-gray-50 border-b border-gray-200 whitespace-nowrap">
               <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Марка</SortTh>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Код материала</th>
               <SortTh sortKey="base" sort={sort} onSort={toggleSort}>Основа</SortTh>
               <SortTh sortKey="nd" sort={sort} onSort={toggleSort}>Нормативный документ</SortTh>
-              {rangeEls.map(e => (
-                <React.Fragment key={e}>
-                  <th className="px-3 py-3 text-right font-medium text-gray-500 text-xs">Мин</th>
-                  <th className="px-3 py-3 text-right font-medium text-gray-500 text-xs">Макс</th>
-                </React.Fragment>
-              ))}
+              <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Пределы</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Остальное</th>
               <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Отклонение</th>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>
@@ -1694,15 +1693,14 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
                 <td className="px-4 py-3 font-mono text-blue-600">{g.materialCode ?? <span className="text-gray-300">—</span>}</td>
                 <td className="px-4 py-3">{g.base}</td>
                 <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{g.nd}</td>
-                {rangeEls.map(e => {
-                  const r = g.ranges.find(x => x.element === e);
-                  return (
-                    <React.Fragment key={e}>
-                      <td className="px-3 py-3 text-right tabular-nums">{cell(r?.min)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{cell(r?.max)}</td>
-                    </React.Fragment>
-                  );
-                })}
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => setLimitsItem(g)}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                  >
+                    Просмотреть
+                  </button>
+                </td>
                 <td className="px-4 py-3">{g.rest ? short(g.rest) : <span className="text-gray-300">—</span>}</td>
                 <td className="px-4 py-3">{g.allowDeviation ? "Да" : "Нет"}</td>
                 <td className="px-4 py-3"><Badge label={g.status} group="zapisi-spravochnikov" /></td>
@@ -1744,6 +1742,36 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
           <Btn variant="secondary" onClick={closeAll}>Закрыть</Btn>
         </>}>
           <GradeFormFields form={gradeToForm(viewItem)} disabled />
+        </Modal>
+      )}
+      {limitsItem && (
+        <Modal
+          title={`Пределы марки ${limitsItem.name}`}
+          onClose={() => setLimitsItem(null)}
+          footer={<Btn variant="secondary" onClick={() => setLimitsItem(null)}>Закрыть</Btn>}
+        >
+          <div className="text-xs text-gray-500 mb-3">{limitsItem.nd} · основа {limitsItem.base}</div>
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
+              <th className="px-3 py-2 text-left font-medium">Элемент</th>
+              <th className="px-3 py-2 text-right font-medium">Мин, %</th>
+              <th className="px-3 py-2 text-right font-medium">Макс, %</th>
+              <th className="px-3 py-2 text-left font-medium">Примечание</th>
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {limitRows(limitsItem).map(row => (
+                <tr key={row.key}>
+                  <td className="px-3 py-2 text-gray-900">{row.label}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{cell(row.min)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{cell(row.max)}</td>
+                  <td className="px-3 py-2 text-gray-500">{row.note || <span className="text-gray-300">—</span>}</td>
+                </tr>
+              ))}
+              {limitRows(limitsItem).length === 0 && (
+                <tr><td colSpan={4} className="px-3 py-6 text-center text-gray-400">Пределы не заданы</td></tr>
+              )}
+            </tbody>
+          </table>
         </Modal>
       )}
       {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
