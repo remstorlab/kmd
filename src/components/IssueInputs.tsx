@@ -67,20 +67,21 @@ export function useIssuePositions<P extends DocIssuePos>(
   // Номера частей позиций документа (кроме позиции exceptId) — заняты для подбора
   const partNomenkls = (exceptId?: string) => positions.filter(p => p.id !== exceptId).map(p => p.partNomenkl).filter((n): n is string => !!n);
   // Поля карточки «К выдаче» для редактирования позиции
-  const draftOf = (p: P): IssueDraft => ({ issue: p.issue, issueLig: p.issueLig, partNomenkl: p.partNomenkl });
+  const draftOf = (p: P): IssueDraft => ({ issue: p.issue, issueLig: p.issueLig, partNomenkl: p.partNomenkl, toLocation: (p as { toLocation?: string }).toLocation });
   // Строки окна подбора: остатки склада; редактируемая позиция — по своему снимку (количество и вес всей
   // позиции склада на момент подбора), даже если запись уже перемещена прошлым сохранением документа
   const pickerRows = (stock: StockRow[], editPos: P | null): StockRow[] => {
     if (!editPos) return stock;
-    const { issue: _i, issueLig: _l, partNomenkl: _n, ...snap } = editPos;
+    const { issue: _i, issueLig: _l, partNomenkl: _n, toLocation: _t, ...snap } = editPos as P & { toLocation?: string };
     const cur = stock.find(r => r.id === editPos.id);
     return [...stock.filter(r => r.id !== editPos.id), { ...cur, ...(snap as unknown as StockRow) }];
   };
   // Результат подбора: новые позиции добавляются, выбранные повторно (редактирование) — заменяют выдачу
   const applyPicked = (picked: PickedRow[], toPos: (r: StockRow) => P) => setPositions(prev => {
     const next = [...prev];
-    for (const { row, qty, issueLig, partNomenkl } of picked) {
-      const fields = { issue: qty, issueLig, partNomenkl } as Partial<P>;
+    for (const { row, qty, issueLig, partNomenkl, toLocation } of picked) {
+      // Новое размещение (Требование, Возврат СГП №2) — только если окно подбора его задавало
+      const fields = { issue: qty, issueLig, partNomenkl, ...(toLocation !== undefined ? { toLocation } : {}) } as Partial<P>;
       const idx = next.findIndex(p => p.id === row.id);
       if (idx >= 0) next[idx] = { ...next[idx], ...fields };
       else next.push({ ...toPos(row), ...fields });

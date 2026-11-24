@@ -14,7 +14,7 @@ import { markIssuedElsewhere, prikazStatus, refreshReady } from "../data/shihta"
 import { useIssuePositions, ensurePartNomenkl, RezervWarning } from "./IssueInputs";
 import { useUsedNomenkl, nextNomenkl } from "./DMPositionFormModal";
 import { useScreen } from "../router";
-import DocLocationModal, { newLocOf, applyNewLocations, LocText } from "./DocLocationModal";
+import { newLocOf, applyNewLocations, LocText } from "./DocLocation";
 import { Plus, X, ChevronDown } from "lucide-react";
 
 // ── Требование: перемещение позиций со склада на склад (СДМ1 → СДМ2) ─────────
@@ -28,7 +28,7 @@ import { Plus, X, ChevronDown } from "lucide-react";
 // «Добавить позицию» — дополнительные позиции склада-отправителя «На складе» (резерв ставится только шихтовой картой,
 // поэтому позиции в резерве вручную не подбираются). «Сохранить» — позиции сохраняются в документе, склады не меняются;
 // «Оформить» — все позиции перемещаются на склад-получатель на «Новое размещение» (по умолчанию — то же место, что
-// текущее; меняется по карандашу позиции, см. DocLocationModal), статусы карт пересчитываются по складам позиций
+// текущее; задаётся в окне подбора при добавлении и по карандашу позиции, см. DocLocation.tsx), статусы карт пересчитываются по складам позиций
 // (все на СДМ2 — «Готово для плавки»). Удаление позиции из документа или неоформленного требования позиции не меняет.
 
 type TrebPosition = VydachaDocPosition;
@@ -147,8 +147,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const usedNomenkl = useUsedNomenkl();
   // «Изменить» позицию: …/pick-edit/<id> — то же окно подбора с предвыбранной позицией
   const editId = screen.after("pick-edit");
-  // Позиции по шихте не редактируются
-  const editPos = editId ? positions.find(p => p.id === editId && !p.poShihte) ?? null : null;
+  // Карандаш: позиция по шихте — только новое размещение (перемещается целиком), добавленная вручную — ещё количество и вес
+  const editPos = editId ? positions.find(p => p.id === editId) ?? null : null;
   const already = Object.fromEntries(positions.filter(p => p.id !== editPos?.id).map(p => [p.id, p.issue]));
   const closePick = () => (editPos ? screen.close("pick-edit") : setShowPick(false));
   const addPicked = (picked: PickedRow[]) => {
@@ -252,10 +252,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   };
 
   const pg = usePaged(sorted, "trebovanie-positions");
-  // Колонка действий: карандаш — «Изменение места хранения» (у всех позиций), удаление — у добавленных вручную
+  // Колонка действий: карандаш — окно подбора с одной позицией (у всех позиций), удаление — у добавленных вручную
   const actCol = !lockPos && positions.length > 0;
-  const locId = screen.after("mesto");
-  const locPos = locId ? positions.find(p => p.id === locId) ?? null : null;
   return (
     <Modal
       title={`${DOC_TREBOVANIE}${doc ? ` ${doc.number}` : ""}`}
@@ -343,9 +341,9 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
                     <td className="px-3 py-2"><LocText sklad={posted ? head.sender : itemOf(p)?.sklad ?? p.sklad ?? head.sender} location={p.location} /></td>
                     <td className="px-3 py-2"><LocText sklad={head.receiver} location={newLocOf(p)} /></td>
                     <td className="px-3 py-2">{status ? <PosStatusBadge status={status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
-                    {/* Карандаш — новое размещение; позиции по шихте не удаляются (снятие приказа убирает их) */}
+                    {/* Карандаш — окно подбора с одной позицией (новое размещение, количество); позиции по шихте не удаляются */}
                     {actCol && <td className="px-3 py-2"><div className="flex items-center gap-1">
-                      <EditIcon title="Изменить место хранения" onClick={() => screen.open("mesto", p.id)} />
+                      <EditIcon onClick={() => screen.open("pick-edit", p.id)} />
                       {!p.poShihte && <DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} />}
                     </div></td>}
                   </tr>
@@ -368,24 +366,19 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
 
       {(showPick || editPos) && (
         <StockPickerModal
-          issue={{ usedNomenkl: [...usedNomenkl(doc?.id), ...iss.partNomenkls(editPos?.id)], initial: editPos ? { [editPos.id]: iss.draftOf(editPos) } : undefined }}
-          title={`Добавить позиции со склада «${head.sender}»`}
-          rows={iss.pickerRows(pickStock, editPos)}
+          issue={{
+            usedNomenkl: [...usedNomenkl(doc?.id), ...iss.partNomenkls(editPos?.id)],
+            initial: editPos ? { [editPos.id]: iss.draftOf(editPos) } : undefined,
+            // Новое размещение на складе-получателе; карандаш — только эта позиция; позиции по шихте — целиком
+            toSklad: head.receiver, edit: !!editPos, noPart: !!editPos?.poShihte,
+          }}
+          title={editPos ? `Изменить позицию «${editPos.name}»` : `Добавить позиции со склада «${head.sender}»`}
+          rows={iss.pickerRows(editPos?.poShihte ? stock : pickStock, editPos)}
           already={already}
           showWeights
           emptyText={`Нет доступных позиций на складе «${head.sender}»`}
           onClose={closePick}
           onAdd={addPicked}
-        />
-      )}
-      {locPos && !lockPos && !editPos && (
-        <DocLocationModal
-          position={locPos}
-          fromSklad={itemOf(locPos)?.sklad ?? locPos.sklad ?? head.sender}
-          toSklad={head.receiver}
-          onClose={() => screen.close("mesto")}
-          onSave={loc => { setPositions(prev => prev.map(x => (x.id === locPos.id ? { ...x, toLocation: loc } : x))); screen.close("mesto"); show(`Новое размещение: ${loc}`); }}
-          onEditQty={locPos.poShihte ? undefined : () => screen.open("pick-edit", locPos.id)}
         />
       )}
       {toast && <Toast message={toast} onDone={clear} />}

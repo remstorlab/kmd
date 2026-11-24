@@ -12,14 +12,14 @@ import { takeFromStock, partLigMap, partNomenklMap, returnToStock } from "../dat
 import { useIssuePositions, ensurePartNomenkl } from "./IssueInputs";
 import { useUsedNomenkl, nextNomenkl } from "./DMPositionFormModal";
 import { useScreen } from "../router";
-import DocLocationModal, { newLocOf, applyNewLocations, LocText } from "./DocLocationModal";
+import { newLocOf, applyNewLocations, LocText } from "./DocLocation";
 import { Plus } from "lucide-react";
 
 // ── Возврат СГП №2: возврат позиций со склада СГП №2 на склад СДМ ────────────────
 // Поля — как у накладной прихода; отправитель — всегда склад СГП №2, получатель — склад из справочника «Склады»
 // (по умолчанию склад приёмки СДМ1). Позиции подбираются со склада СГП №2 с количеством к перемещению.
 // При каждом сохранении позиции встают на склад-получатель «На складе» на «Новое размещение» (по умолчанию — то же,
-// что текущее; меняется по карандашу позиции, см. DocLocationModal). Позиция, удалённая из документа, возвращается
+// что текущее; задаётся в окне подбора при добавлении и по карандашу позиции, см. DocLocation.tsx). Позиция, удалённая из документа, возвращается
 // на СГП №2 на текущее размещение.
 
 type VsPosition = VydachaDocPosition;
@@ -80,9 +80,6 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
   const editId = screen.after("pick-edit");
   const editPos = editId ? positions.find(p => p.id === editId) ?? null : null;
   const already = Object.fromEntries(positions.filter(p => p.id !== editPos?.id).map(p => [p.id, p.issue]));
-  // Карандаш позиции: …/mesto/<id> — «Изменение места хранения» (новое размещение на складе-получателе)
-  const locId = screen.after("mesto");
-  const locPos = locId ? positions.find(p => p.id === locId) ?? null : null;
   const closePick = () => (editPos ? screen.close("pick-edit") : setShowPick(false));
   const addPicked = (picked: PickedRow[]) => {
     iss.applyPicked(picked, row => ({ ...row, issue: row.qty }));
@@ -254,7 +251,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
                   <td className="px-3 py-2"><LocText sklad={SGP} location={p.location} /></td>
                   <td className="px-3 py-2"><LocText sklad={head.receiver} location={newLocOf(p)} /></td>
                   <td className="px-3 py-2">{(() => { const st = currentOf(p)?.status; return st ? <PosStatusBadge status={st} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>; })()}</td>
-                  {!lockPos && <td className="px-3 py-2"><div className="flex items-center gap-1"><EditIcon title="Изменить место хранения" onClick={() => screen.open("mesto", p.id)} /><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></div></td>}
+                  {!lockPos && <td className="px-3 py-2"><div className="flex items-center gap-1"><EditIcon onClick={() => screen.open("pick-edit", p.id)} /><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></div></td>}
                 </tr>
               ))}
               <FillerRows count={pg.fill} cols={13} />
@@ -274,24 +271,19 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
 
       {(showPick || editPos) && (
         <StockPickerModal
-          issue={{ usedNomenkl: [...usedNomenkl(doc?.id), ...iss.partNomenkls(editPos?.id)], initial: editPos ? { [editPos.id]: iss.draftOf(editPos) } : undefined }}
-          title={`Добавить позиции со склада «${SGP}»`}
+          issue={{
+            usedNomenkl: [...usedNomenkl(doc?.id), ...iss.partNomenkls(editPos?.id)],
+            initial: editPos ? { [editPos.id]: iss.draftOf(editPos) } : undefined,
+            // Новое размещение на складе-получателе; карандаш — только эта позиция
+            toSklad: head.receiver, edit: !!editPos,
+          }}
+          title={editPos ? `Изменить позицию «${editPos.name}»` : `Добавить позиции со склада «${SGP}»`}
           rows={iss.pickerRows(stock, editPos)}
           already={already}
           showWeights
           emptyText={`Нет позиций на складе «${SGP}»`}
           onClose={closePick}
           onAdd={addPicked}
-        />
-      )}
-      {locPos && !lockPos && !editPos && (
-        <DocLocationModal
-          position={locPos}
-          fromSklad={SGP}
-          toSklad={head.receiver}
-          onClose={() => screen.close("mesto")}
-          onSave={loc => { setPositions(prev => prev.map(x => (x.id === locPos.id ? { ...x, toLocation: loc } : x))); screen.close("mesto"); show(`Новое размещение: ${loc}`); }}
-          onEditQty={() => screen.open("pick-edit", locPos.id)}
         />
       )}
       {toast && <Toast message={toast} onDone={clear} />}
