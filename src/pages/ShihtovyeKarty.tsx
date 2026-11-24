@@ -14,7 +14,7 @@ import {
 import { returnToStock } from "../data/stock";
 import {
   ShihtaCalc, ShihtaLine, chemStrings, fmt2, fmtFact, normText, r2, shareOf, shihtaWarnings, lineChem, kindOf,
-  normCell, impuritiesText, fmtNorm, restNorm, REST_HINT, prikazStatus, itogoMaterials, lineOfMaterial, prikazGrade, isSkladMaterial,
+  normCell, impuritiesText, fmtNorm, restNorm, REST_HINT, prikazStatus, IMP_TOTAL, itogoMaterials, lineOfMaterial, prikazGrade, isSkladMaterial,
   shihtaOborot, oborotHintText, oborotWarnings, oborotInfoText, kartaOborot, readyStatus,
 } from "../data/shihta";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
@@ -227,8 +227,8 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
   const init = karta ?? defaults;
   // Колонки «Содержание в чистоте, г» — элементы справочника с признаком «Отображать в ШК»
   const shkEls = chemElements.filter(e => e.showShk);
-  const shortName = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
-  const elName = (id: string) => { const e = chemElements.find(x => x.id === id); return e ? `${e.name} (${e.shortName})` : id; };
+  const shortName = (id: string) => (id === IMP_TOTAL ? "Примеси всего" : chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase());
+  const elName = (id: string) => { if (id === IMP_TOTAL) return "Примеси, всего"; const e = chemElements.find(x => x.id === id); return e ? `${e.name} (${e.shortName})` : id; };
 
   const [name, setName] = useState(init?.name || "");
   // Марка сплава и назначение слитков задаются в приказе на плавку — в карте приказа только для чтения
@@ -749,7 +749,7 @@ function ShihtaConstructor({ karta, prikaz, defaults, onClose, onSave, readOnly 
 function PrikazItogoModal({ prikaz, karty, onClose }: { prikaz: PrikazPlavka; karty: ShihtovayaKarta[]; onClose: () => void }) {
   const { chemElements, alloyGrades } = useApp();
   const shkEls = chemElements.filter(e => e.showShk);
-  const shortName = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
+  const shortName = (id: string) => (id === IMP_TOTAL ? "Примеси всего" : chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase());
   const codeLabel = useMaterialCodeLabel();
   const mats = useMemo(() => itogoMaterials(karty), [karty]);
   const grade = prikazGrade(karty, alloyGrades);
@@ -921,7 +921,7 @@ function PrikazModal({ prikaz, readOnly = false, onClose, onSave }: {
   const screen = useScreen();
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
-  const shortName = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
+  const shortName = (id: string) => (id === IMP_TOTAL ? "Примеси всего" : chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase());
   const [number, setNumber] = useState(prikaz?.number ?? "");
   const [date, setDate] = useState(prikaz?.date ?? new Date().toLocaleDateString("ru-RU"));
   const [name, setName] = useState(prikaz?.name ?? "");
@@ -1183,7 +1183,7 @@ function PrikazSummary({ karty, mass }: { karty: ShihtovayaKarta[]; mass: number
   const grade = prikazGrade(karty, alloyGrades);
   const mats = useMemo(() => itogoMaterials(karty), [karty]);
   const calc = useMemo(() => new ShihtaCalc(mats.map(lineOfMaterial), grade), [mats, grade]);
-  const shortName = (id: string) => chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase();
+  const shortName = (id: string) => (id === IMP_TOTAL ? "Примеси всего" : chemElements.find(e => e.id === id)?.shortName ?? id.toUpperCase());
   const skl = mats.filter(isSkladMaterial);
   const count = (pred: (k: ShihtovayaKarta) => boolean) => karty.filter(pred).length;
   const item = (label: string, value: React.ReactNode) => (

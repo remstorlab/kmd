@@ -1,3 +1,6 @@
+import { ALLOY_IMPURITIES } from "./mock";
+// Ключ нормы «Примеси, всего» в impurities марки и в проверках состава
+export const IMP_TOTAL = "total";
 import type { AlloyGrade, AlloyRange, ChemComposition, DMItem, PrikazStatus, ShihtaMatKind, ShihtaMaterial, ShihtovayaKarta } from "./mock";
 import { OBOROT_CODE, SDM2, SH_READY_PLAVKA, SH_READY_TREB, oborotLimit, oborotOver } from "./mock";
 
@@ -154,6 +157,13 @@ export class ShihtaCalc {
     for (const [e, max] of imp) {
       const fact = this.pct(e);
       out.push({ element: e, fact, max, ok: fact <= max! });
+    }
+    // Примеси, всего: сумма долей примесей марки (Fe, Sb, Bi, Pb), которые есть в шихте, — не более нормы «всего»
+    const totalMax = (this.grade.impurities as Record<string, number | undefined>)[IMP_TOTAL];
+    const present = ALLOY_IMPURITIES.filter(e => this.total(e) > 0);
+    if (totalMax != null && present.length > 0) {
+      const fact = r2(present.reduce((s, e) => s + this.pct(e), 0));
+      out.push({ element: IMP_TOTAL, fact, max: totalMax, ok: fact <= totalMax });
     }
     return out;
   }

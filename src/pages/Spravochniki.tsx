@@ -1468,7 +1468,7 @@ function MassTolerancesPage({ onBack }: { onBack: () => void }) {
 
 // ── Марки сплавов (норма состава для сверки шихтовой карты) ───────────────────
 
-type RangeForm = { element: string; min: string; max: string; nominal: string };
+type RangeForm = { element: string; min: string; max: string };
 type GradeForm = {
   name: string; materialCode: string; base: AlloyBase; nd: string; rest: string;
   ranges: RangeForm[]; impurities: Record<string, string>; allowDeviation: boolean; status: string;
@@ -1478,11 +1478,11 @@ const numStr = (v: number | undefined) => (v == null ? "" : fmtNum(v));
 const optNum = (s: string) => { const v = numIn(s); return s.trim() && Number.isFinite(v) ? v : undefined; };
 const emptyGrade = (): GradeForm => ({
   name: "", materialCode: "", base: "Ag", nd: "", rest: "cu",
-  ranges: [{ element: "ag", min: "", max: "", nominal: "" }], impurities: {}, allowDeviation: false, status: "Активно",
+  ranges: [{ element: "ag", min: "", max: "" }], impurities: {}, allowDeviation: false, status: "Активно",
 });
 const gradeToForm = (g: AlloyGrade): GradeForm => ({
   name: g.name, materialCode: g.materialCode ?? "", base: g.base, nd: g.nd, rest: g.rest ?? "",
-  ranges: g.ranges.map(r => ({ element: r.element, min: numStr(r.min), max: numStr(r.max), nominal: numStr(r.nominal) })),
+  ranges: g.ranges.map(r => ({ element: r.element, min: numStr(r.min), max: numStr(r.max) })),
   impurities: Object.fromEntries(Object.entries(g.impurities).map(([k, v]) => [k, numStr(v)])),
   allowDeviation: g.allowDeviation, status: g.status,
 });
@@ -1497,7 +1497,7 @@ function gradeFormError(f: GradeForm, others: AlloyGrade[]): string {
   if (new Set(els).size !== els.length) return "Элемент указан в диапазонах дважды";
   for (const r of f.ranges) {
     const min = optNum(r.min), max = optNum(r.max);
-    if ([r.min, r.max, r.nominal].some(s => s.trim() && !Number.isFinite(numIn(s)))) return "Значения диапазонов — числа";
+    if ([r.min, r.max].some(s => s.trim() && !Number.isFinite(numIn(s)))) return "Значения диапазонов — числа";
     if (min == null && max == null) return "Для каждого элемента укажите мин или макс";
     if (min != null && max != null && min > max) return "Мин не может быть больше макс";
   }
@@ -1532,7 +1532,7 @@ function GradeFormFields({ form, setForm, disabled = false }: { form: GradeForm;
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Диапазоны элементов{!disabled && <RequiredMark />}</h4>
           {!disabled && freeEl && (
-            <Btn size="sm" variant="secondary" onClick={() => setForm?.(f => ({ ...f, ranges: [...f.ranges, { element: freeEl, min: "", max: "", nominal: "" }] }))}><Plus className="w-4 h-4" />Добавить элемент</Btn>
+            <Btn size="sm" variant="secondary" onClick={() => setForm?.(f => ({ ...f, ranges: [...f.ranges, { element: freeEl, min: "", max: "" }] }))}><Plus className="w-4 h-4" />Добавить элемент</Btn>
           )}
         </div>
         <table className="w-full text-sm">
@@ -1540,7 +1540,6 @@ function GradeFormFields({ form, setForm, disabled = false }: { form: GradeForm;
             <th className="py-1 pr-2 text-left font-medium">Элемент</th>
             <th className="py-1 px-2 text-left font-medium">Мин, %</th>
             <th className="py-1 px-2 text-left font-medium">Макс, %</th>
-            <th className="py-1 px-2 text-left font-medium">Номинал, % <span className="font-normal text-gray-400">(для подбора)</span></th>
             {!disabled && <th className="w-8"></th>}
           </tr></thead>
           <tbody>
@@ -1551,7 +1550,6 @@ function GradeFormFields({ form, setForm, disabled = false }: { form: GradeForm;
                 </td>
                 <td className="py-1 px-2"><Input value={r.min} onChange={v => setRange(i, { min: dec(v) })} placeholder="Не задано" disabled={disabled} /></td>
                 <td className="py-1 px-2"><Input value={r.max} onChange={v => setRange(i, { max: dec(v) })} placeholder="Не задано" disabled={disabled} /></td>
-                <td className="py-1 px-2"><Input value={r.nominal} onChange={v => setRange(i, { nominal: dec(v) })} placeholder="Середина диапазона" disabled={disabled} /></td>
                 {!disabled && <td className="py-1 text-center">
                   <button onClick={() => setForm?.(f => ({ ...f, ranges: f.ranges.filter((_, j) => j !== i) }))} className="text-gray-400 hover:text-red-500" title="Убрать"><X className="w-3.5 h-3.5" /></button>
                 </td>}
@@ -1624,7 +1622,7 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
     if (error) return;
     const rec = {
       name: form.name.trim(), materialCode: form.materialCode || undefined, base: form.base, nd: form.nd.trim(), rest: form.rest || undefined,
-      ranges: form.ranges.map(r => ({ element: r.element, min: optNum(r.min), max: optNum(r.max), nominal: optNum(r.nominal) })),
+      ranges: form.ranges.map(r => ({ element: r.element, min: optNum(r.min), max: optNum(r.max) })),
       impurities: Object.fromEntries(Object.entries(form.impurities).map(([k, v]) => [k, optNum(v)]).filter(([, v]) => v != null)),
       allowDeviation: form.allowDeviation, status: form.status as AlloyGrade["status"],
     };

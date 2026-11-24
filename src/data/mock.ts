@@ -1342,8 +1342,6 @@ export interface AlloyRange {
   // Мин / макс, % — одно из значений может быть пустым
   min?: number;
   max?: number;
-  // Номинал, % — целевая доля для подбора состава (пусто — середина диапазона)
-  nominal?: number;
 }
 
 export interface AlloyGrade {
@@ -1366,27 +1364,27 @@ export interface AlloyGrade {
   status: "Активно" | "Неактивно";
 }
 
-const ag = (min?: number, max?: number, nominal?: number): AlloyRange => ({ element: "ag", min, max, nominal });
-const au = (min?: number, max?: number, nominal?: number): AlloyRange => ({ element: "au", min, max, nominal });
-const cu = (min?: number, max?: number, nominal?: number): AlloyRange => ({ element: "cu", min, max, nominal });
+const ag = (min?: number, max?: number): AlloyRange => ({ element: "ag", min, max });
+const au = (min?: number, max?: number): AlloyRange => ({ element: "au", min, max });
+const cu = (min?: number, max?: number): AlloyRange => ({ element: "cu", min, max });
 const grade = (id: string, name: string, base: AlloyBase, nd: string, ranges: AlloyRange[], rest?: string, extra: Partial<AlloyGrade> = {}): AlloyGrade =>
   ({ id, name, base, nd, ranges, rest, impurities: {}, allowDeviation: false, status: "Активно", ...extra });
 
 export const initialAlloyGrades: AlloyGrade[] = [
-  grade("ag-9999", "Ср 99,99", "Ag", "ГОСТ 6836-2002", [ag(99.99, undefined, 99.99)], undefined, { materialCode: "2000" }),
-  grade("ag-999", "Ср 99,9", "Ag", "ГОСТ 6836-2002", [ag(99.9, undefined, 99.9)], undefined, { materialCode: "2000" }),
-  grade("agm-925", "СрМ 92,5", "Ag", "ГОСТ 6836-2002", [ag(92.2, 92.8, 92.5)], "cu", {
+  grade("ag-9999", "Ср 99,99", "Ag", "ГОСТ 6836-2002", [ag(99.99)], undefined, { materialCode: "2000" }),
+  grade("ag-999", "Ср 99,9", "Ag", "ГОСТ 6836-2002", [ag(99.9)], undefined, { materialCode: "2000" }),
+  grade("agm-925", "СрМ 92,5", "Ag", "ГОСТ 6836-2002", [ag(92.2, 92.8)], "cu", {
     materialCode: "0925",
     impurities: { pb: 0.004, fe: 0.1, sb: 0.002, bi: 0.002, total: 0.11 },
   }),
-  grade("agm-80", "СрМ 80", "Ag", "ГОСТ 6836-2002", [ag(79.7, 80.3, 80)], "cu"),
-  grade("aum-583", "ЗлМ 58,3", "Au", "ГОСТ 6835-2002", [au(58.0, 58.6, 58.3), cu(41.4, 42.0, 41.7)]),
-  grade("aum-916", "ЗлМ 91,6", "Au", "ГОСТ 6835-2002", [au(91.3, 91.9, 91.6), cu(8.1, 8.7, 8.4)]),
-  grade("auagm-585-80", "ЗлСрМ 585-80", "Au", "ГОСТ 30649-99", [au(58.5, 59.0, 58.5), ag(7.5, 8.5, 8.0)], "cu", { materialCode: "0500" }),
-  grade("auagm-375-160", "ЗлСрМ 375-160", "Au", "ГОСТ 30649-99", [au(37.5, 38.0, 37.5), ag(15.5, 16.5, 16.0)], "cu"),
-  grade("auagm-750-150", "ЗлСрМ 750-150", "Au", "ГОСТ 30649-99", [au(75.0, 75.5, 75.0), ag(14.5, 15.5, 15.0)], "cu", { materialCode: "0300" }),
+  grade("agm-80", "СрМ 80", "Ag", "ГОСТ 6836-2002", [ag(79.7, 80.3)], "cu"),
+  grade("aum-583", "ЗлМ 58,3", "Au", "ГОСТ 6835-2002", [au(58.0, 58.6), cu(41.4, 42.0)]),
+  grade("aum-916", "ЗлМ 91,6", "Au", "ГОСТ 6835-2002", [au(91.3, 91.9), cu(8.1, 8.7)]),
+  grade("auagm-585-80", "ЗлСрМ 585-80", "Au", "ГОСТ 30649-99", [au(58.5, 59.0), ag(7.5, 8.5)], "cu", { materialCode: "0500" }),
+  grade("auagm-375-160", "ЗлСрМ 375-160", "Au", "ГОСТ 30649-99", [au(37.5, 38.0), ag(15.5, 16.5)], "cu"),
+  grade("auagm-750-150", "ЗлСрМ 750-150", "Au", "ГОСТ 30649-99", [au(75.0, 75.5), ag(14.5, 15.5)], "cu", { materialCode: "0300" }),
   // Моковая запись для проверки флага «Допускается отклонение»; нормы уточняются
-  grade("psr-45", "ПСр 45", "Ag", "ГОСТ 19738", [ag(44.5, 45.5, 45)], undefined, { allowDeviation: true }),
+  grade("psr-45", "ПСр 45", "Ag", "ГОСТ 19738", [ag(44.5, 45.5)], undefined, { allowDeviation: true }),
 ];
 
 // --- Нормативы потерь драгоценных металлов по технологическим операциям ---
