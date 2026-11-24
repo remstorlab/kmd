@@ -379,7 +379,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
             )}
             <Field label={valueLabel} required><Input
               value={form.value}
-              onChange={v => setForm(f => ({ ...f, value: withMaterialCode ? v.replace(/[^d]/g, "").replace(/^0+/, "") : v }))}
+              onChange={v => setForm(f => ({ ...f, value: withMaterialCode ? v.replace(/\D/g, "").replace(/^0+/, "") : v }))}
               placeholder={withPosition ? "Фамилия Имя Отчество" : withMaterialCode ? "Например, 5" : ""}
             /></Field>
             {withMaterialCode && <p className="text-xs text-gray-500">При обороте позиции, равном или большем предельного, позиция выделяется красным и рекомендуется к передаче на аффинаж. Для позиций без своей записи (продукция из СрМ 925) действует предел кода 0925.</p>}
