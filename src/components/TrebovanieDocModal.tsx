@@ -14,6 +14,7 @@ import { markIssuedElsewhere, prikazStatus, refreshReady } from "../data/shihta"
 import { useIssuePositions, ensurePartNomenkl, RezervWarning } from "./IssueInputs";
 import { useUsedNomenkl, nextNomenkl } from "./DMPositionFormModal";
 import { useScreen } from "../router";
+import { ReceiverLocationBar, ReceiverLocationCell, receiverLocationError, applyReceiverLocations } from "./ReceiverLocation";
 import { Plus, X, ChevronDown } from "lucide-react";
 
 // ── Требование: перемещение позиций со склада на склад (СДМ1 → СДМ2) ─────────
@@ -26,8 +27,10 @@ import { Plus, X, ChevronDown } from "lucide-react";
 // снятие приказа убирает его позиции).
 // «Добавить позицию» — дополнительные позиции склада-отправителя «На складе» (резерв ставится только шихтовой картой,
 // поэтому позиции в резерве вручную не подбираются). «Сохранить» — позиции сохраняются в документе, склады не меняются;
-// «Оформить» — все позиции перемещаются на склад-получатель с теми же местами хранения, статусы карт пересчитываются
-// по складам позиций (все на СДМ2 — «Готово для плавки»). Удаление неоформленного требования позиции не меняет.
+// «Оформить» — все позиции перемещаются на склад-получатель на места, заданные в документе (toLocation, см.
+// ReceiverLocation.tsx), статусы карт пересчитываются по складам позиций (все на СДМ2 — «Готово для плавки»).
+// До оформления позиции остаются на СДМ1 на прежних местах; удаление позиции из документа или неоформленного
+// требования позиции не меняет.
 
 type TrebPosition = VydachaDocPosition;
 // Переместить можно позицию на складе или в резерве (резерв — только позиции по шихте)
@@ -44,7 +47,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   // Оформленное требование: позиции уже перемещены — состав и склады менять нельзя
   const posted = doc?.status === "Оформлено";
   const lockPos = ro || posted;
-  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, skladDocs, alloyGrades } = useApp();
+  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, skladDocs, alloyGrades, storageLocations } = useApp();
   const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
   // Вложенный экран: …/pick (подбор со склада-отправителя)
@@ -132,7 +135,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     setPrikazIds(ids);
     const rows = shihtaRows(ids);
     const rIds = new Set(rows.map(r => r.id));
-    setPositions(prev => [...rows, ...prev.filter(p => !p.poShihte && !rIds.has(p.id))]);
+    setPositions(prev => [...rows.map(r => ({ ...r, toLocation: prev.find(p => p.id === r.id)?.toLocation })), ...prev.filter(p => !p.poShihte && !rIds.has(p.id))]);
     const added = ids.filter(id => !prikazIds.includes(id));
     if (added.length === 1 && rezervOf(added).length === 0) show(`У шихтовых карт приказа нет позиций в резерве на складе «${head.sender}»`);
   };
@@ -177,6 +180,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     lig: p => p.lig ?? 0,
     net: p => p.net ?? 0,
     location: p => p.location,
+    toLocation: p => p.toLocation ?? "",
     proba: p => p.proba ?? 0,
     status: p => itemOf(p)?.status ?? "",
   });
@@ -195,7 +199,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         const ids = new Set(cur.map(p => p.id));
         if (rows.length !== cur.length || rows.some(r => !ids.has(r.id))) {
           const rIds = new Set(rows.map(r => r.id));
-          setPositions(prev => [...rows, ...prev.filter(p => !p.poShihte && !rIds.has(p.id))]);
+          setPositions(prev => [...rows.map(r => ({ ...r, toLocation: prev.find(p => p.id === r.id)?.toLocation })), ...prev.filter(p => !p.poShihte && !rIds.has(p.id))]);
           show("Резерв шихтовых карт приказа изменился — позиции обновлены, проверьте и оформите снова");
           return;
         }
@@ -206,7 +210,10 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         return !it || it.sklad !== head.sender || !canMove(it.status) || Math.max(it.qty, 1) < p.issue;
       });
       if (lacking.length) { show(`Позиции недоступны на складе «${head.sender}»: ${lacking.map(p => p.name).join(", ")}`); return; }
-      // Перемещение: меняется только склад — место хранения, статус и прочие атрибуты сохраняются.
+      const locErr = receiverLocationError(storageLocations, head.receiver, positions);
+      if (locErr) { show(locErr); return; }
+      // Перемещение: склад и место хранения — из документа (место на складе-получателе по позиции), статус и прочие
+      // атрибуты сохраняются.
       // При частичном перемещении перемещаемая часть получает новый номенкл. № (если номер заняли — следующий
       // свободный). Позиции из резерва, перемещённые частично: шихтовые карты, которые их резервируют (кроме выполненных), возвращаются
       // в «На редактировании» с пометкой о выданных позициях; перемещённые целиком — остаются в резерве карты.
@@ -220,9 +227,10 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       const dmPart = finalPositions.filter(p => p.src === "dm");
       const gpTake = new Map(gpPart.map(p => [p.id, p.issue]));
       const dmTake = new Map(dmPart.map(p => [p.id, p.issue]));
-      if (gpTake.size) setGpItems(prev => takeFromStock(prev, gpTake, move, partId, partLigMap(gpPart), partNomenklMap(gpPart)).items);
+      if (gpTake.size) setGpItems(prev => { const r = takeFromStock(prev, gpTake, move, partId, partLigMap(gpPart), partNomenklMap(gpPart)); return applyReceiverLocations(r.items, r.taken, gpPart); });
       // Склад ДМ после перемещения — по нему пересчитываются статусы карт
-      const dmNext = dmTake.size ? takeFromStock(dmItems, dmTake, move, partId, partLigMap(dmPart), partNomenklMap(dmPart)).items : dmItems;
+      const dmRes = dmTake.size ? takeFromStock(dmItems, dmTake, move, partId, partLigMap(dmPart), partNomenklMap(dmPart)) : null;
+      const dmNext = dmRes ? applyReceiverLocations(dmRes.items, dmRes.taken, dmPart) : dmItems;
       if (dmTake.size) setDmItems(dmNext);
       const ids = new Set(affectedKarty.map(k => k.id));
       setShihtovyeKarty(prev => refreshReady(prev.map(k => {
@@ -250,6 +258,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   const pg = usePaged(sorted, "trebovanie-positions");
   // Колонка действий — только если есть позиции, добавленные вручную (у позиций по шихте действий нет)
   const actCol = !lockPos && positions.some(p => !p.poShihte);
+  const setToLocation = (id: string, loc: string) => setPositions(prev => prev.map(p => (p.id === id ? { ...p, toLocation: loc } : p)));
   return (
     <Modal
       title={`${DOC_TREBOVANIE}${doc ? ` ${doc.number}` : ""}`}
@@ -304,6 +313,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
             Список позиций пуст. Выберите шихтовую карту или добавьте позиции со склада «{head.sender}»
           </div>
         ) : (<>
+          {!lockPos && <ReceiverLocationBar sklad={head.receiver} onApply={loc => setPositions(prev => prev.map(p => ({ ...p, toLocation: loc })))} />}
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл. №</SortTh>
@@ -315,7 +325,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
               <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
-              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение</SortTh>
+              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение на {head.sender}</SortTh>
+              <SortTh sortKey="toLocation" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение на {head.receiver}</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort} className="px-3 py-2">Статус</SortTh>
               {actCol && <th className="w-20"></th>}
             </tr></thead>
@@ -334,13 +345,14 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
                     <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
                   <td className="px-3 py-2"><OborotValue value={p.oborot} code={p.code} /></td>
                     <td className="px-3 py-2 text-gray-500">{p.location}</td>
+                    <td className="px-3 py-2"><ReceiverLocationCell sklad={head.receiver} position={p} onChange={loc => setToLocation(p.id, loc)} readOnly={lockPos} /></td>
                     <td className="px-3 py-2">{status ? <PosStatusBadge status={status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
                     {/* Позиции по шихте не изменяются и не удаляются — у них ячейка действий пустая */}
                     {actCol && <td className="px-3 py-2">{!p.poShihte && <div className="flex items-center gap-1"><EditIcon onClick={() => screen.open("pick-edit", p.id)} /><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></div>}</td>}
                   </tr>
                 );
               })}
-              <FillerRows count={pg.fill} cols={12} />
+              <FillerRows count={pg.fill} cols={13} />
             </tbody>
             <tfoot><tr className="border-t border-gray-200 bg-gray-50 text-sm font-medium">
               <td className="px-3 py-2" colSpan={4}>Итого: {positions.length} поз.</td>
@@ -348,7 +360,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
               <td></td>
               <td className="px-3 py-2">{iss.totals.lig.toFixed(2)}</td>
               <td className="px-3 py-2 text-blue-600"><NetAuAgTotal items={positions.map(p => ({ chem: p.chem, k: iss.line(p).share }))} /></td>
-              <td colSpan={actCol ? 4 : 3}></td>
+              <td colSpan={actCol ? 5 : 4}></td>
             </tr></tfoot>
           </table>
           {pg.pager}
