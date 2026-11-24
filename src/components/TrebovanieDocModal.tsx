@@ -14,7 +14,7 @@ import { markIssuedElsewhere, prikazStatus, refreshReady } from "../data/shihta"
 import { useIssuePositions, ensurePartNomenkl, RezervWarning } from "./IssueInputs";
 import { useUsedNomenkl, nextNomenkl } from "./DMPositionFormModal";
 import { useScreen } from "../router";
-import { ReceiverLocationBar, ReceiverLocationCell, receiverLocationError, applyReceiverLocations } from "./ReceiverLocation";
+import DocLocationModal, { newLocOf, applyNewLocations, LocText } from "./DocLocationModal";
 import { Plus, X, ChevronDown } from "lucide-react";
 
 // ── Требование: перемещение позиций со склада на склад (СДМ1 → СДМ2) ─────────
@@ -27,10 +27,9 @@ import { Plus, X, ChevronDown } from "lucide-react";
 // снятие приказа убирает его позиции).
 // «Добавить позицию» — дополнительные позиции склада-отправителя «На складе» (резерв ставится только шихтовой картой,
 // поэтому позиции в резерве вручную не подбираются). «Сохранить» — позиции сохраняются в документе, склады не меняются;
-// «Оформить» — все позиции перемещаются на склад-получатель на места, заданные в документе (toLocation, см.
-// ReceiverLocation.tsx), статусы карт пересчитываются по складам позиций (все на СДМ2 — «Готово для плавки»).
-// До оформления позиции остаются на СДМ1 на прежних местах; удаление позиции из документа или неоформленного
-// требования позиции не меняет.
+// «Оформить» — все позиции перемещаются на склад-получатель на «Новое размещение» (по умолчанию — то же место, что
+// текущее; меняется по карандашу позиции, см. DocLocationModal), статусы карт пересчитываются по складам позиций
+// (все на СДМ2 — «Готово для плавки»). Удаление позиции из документа или неоформленного требования позиции не меняет.
 
 type TrebPosition = VydachaDocPosition;
 // Переместить можно позицию на складе или в резерве (резерв — только позиции по шихте)
@@ -47,7 +46,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   // Оформленное требование: позиции уже перемещены — состав и склады менять нельзя
   const posted = doc?.status === "Оформлено";
   const lockPos = ro || posted;
-  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, skladDocs, alloyGrades, storageLocations } = useApp();
+  const { gpItems, dmItems, setGpItems, setDmItems, shihtovyeKarty, setShihtovyeKarty, shihtaPrikazy, skladDocs, alloyGrades } = useApp();
   const createdStamp = useCreatedStamp();
   const { toast, show, clear } = useToast();
   // Вложенный экран: …/pick (подбор со склада-отправителя)
@@ -180,7 +179,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
     lig: p => p.lig ?? 0,
     net: p => p.net ?? 0,
     location: p => p.location,
-    toLocation: p => p.toLocation ?? "",
+    toLocation: p => newLocOf(p),
     proba: p => p.proba ?? 0,
     status: p => itemOf(p)?.status ?? "",
   });
@@ -210,10 +209,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         return !it || it.sklad !== head.sender || !canMove(it.status) || Math.max(it.qty, 1) < p.issue;
       });
       if (lacking.length) { show(`Позиции недоступны на складе «${head.sender}»: ${lacking.map(p => p.name).join(", ")}`); return; }
-      const locErr = receiverLocationError(storageLocations, head.receiver, positions);
-      if (locErr) { show(locErr); return; }
-      // Перемещение: склад и место хранения — из документа (место на складе-получателе по позиции), статус и прочие
-      // атрибуты сохраняются.
+      // Перемещение: склад-получатель и «Новое размещение» позиции; статус и прочие атрибуты сохраняются.
       // При частичном перемещении перемещаемая часть получает новый номенкл. № (если номер заняли — следующий
       // свободный). Позиции из резерва, перемещённые частично: шихтовые карты, которые их резервируют (кроме выполненных), возвращаются
       // в «На редактировании» с пометкой о выданных позициях; перемещённые целиком — остаются в резерве карты.
@@ -227,10 +223,10 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
       const dmPart = finalPositions.filter(p => p.src === "dm");
       const gpTake = new Map(gpPart.map(p => [p.id, p.issue]));
       const dmTake = new Map(dmPart.map(p => [p.id, p.issue]));
-      if (gpTake.size) setGpItems(prev => { const r = takeFromStock(prev, gpTake, move, partId, partLigMap(gpPart), partNomenklMap(gpPart)); return applyReceiverLocations(r.items, r.taken, gpPart); });
+      if (gpTake.size) setGpItems(prev => { const r = takeFromStock(prev, gpTake, move, partId, partLigMap(gpPart), partNomenklMap(gpPart)); return applyNewLocations(r.items, r.taken, gpPart); });
       // Склад ДМ после перемещения — по нему пересчитываются статусы карт
       const dmRes = dmTake.size ? takeFromStock(dmItems, dmTake, move, partId, partLigMap(dmPart), partNomenklMap(dmPart)) : null;
-      const dmNext = dmRes ? applyReceiverLocations(dmRes.items, dmRes.taken, dmPart) : dmItems;
+      const dmNext = dmRes ? applyNewLocations(dmRes.items, dmRes.taken, dmPart) : dmItems;
       if (dmTake.size) setDmItems(dmNext);
       const ids = new Set(affectedKarty.map(k => k.id));
       setShihtovyeKarty(prev => refreshReady(prev.map(k => {
@@ -256,9 +252,10 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
   };
 
   const pg = usePaged(sorted, "trebovanie-positions");
-  // Колонка действий — только если есть позиции, добавленные вручную (у позиций по шихте действий нет)
-  const actCol = !lockPos && positions.some(p => !p.poShihte);
-  const setToLocation = (id: string, loc: string) => setPositions(prev => prev.map(p => (p.id === id ? { ...p, toLocation: loc } : p)));
+  // Колонка действий: карандаш — «Изменение места хранения» (у всех позиций), удаление — у добавленных вручную
+  const actCol = !lockPos && positions.length > 0;
+  const locId = screen.after("mesto");
+  const locPos = locId ? positions.find(p => p.id === locId) ?? null : null;
   return (
     <Modal
       title={`${DOC_TREBOVANIE}${doc ? ` ${doc.number}` : ""}`}
@@ -313,7 +310,6 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
             Список позиций пуст. Выберите шихтовую карту или добавьте позиции со склада «{head.sender}»
           </div>
         ) : (<>
-          {!lockPos && <ReceiverLocationBar sklad={head.receiver} onApply={loc => setPositions(prev => prev.map(p => ({ ...p, toLocation: loc })))} />}
           <table className="w-full text-sm">
             <thead><tr className="bg-gray-50 text-gray-500 text-xs border-b border-gray-200">
               <SortTh sortKey="nomenkl" sort={sort} onSort={toggleSort} className="px-3 py-2">Номенкл. №</SortTh>
@@ -325,8 +321,8 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
               <SortTh sortKey="lig" sort={sort} onSort={toggleSort} className="px-3 py-2">Вес лигат.</SortTh>
               <SortTh sortKey="net" sort={sort} onSort={toggleSort} className="px-3 py-2">{NET_AU_AG}</SortTh>
               <SortTh sortKey="oborot" sort={sort} onSort={toggleSort} className="px-3 py-2">{OBOROT_LABEL}</SortTh>
-              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение на {head.sender}</SortTh>
-              <SortTh sortKey="toLocation" sort={sort} onSort={toggleSort} className="px-3 py-2">Размещение на {head.receiver}</SortTh>
+              <SortTh sortKey="location" sort={sort} onSort={toggleSort} className="px-3 py-2">Текущее размещение</SortTh>
+              <SortTh sortKey="toLocation" sort={sort} onSort={toggleSort} className="px-3 py-2">Новое размещение</SortTh>
               <SortTh sortKey="status" sort={sort} onSort={toggleSort} className="px-3 py-2">Статус</SortTh>
               {actCol && <th className="w-20"></th>}
             </tr></thead>
@@ -344,11 +340,14 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
                     <td className="px-3 py-2 align-top">{iss.ligCell(p)}</td>
                     <td className="px-3 py-2 text-blue-600"><NetAuAg chem={p.chem} k={iss.line(p).share} /></td>
                   <td className="px-3 py-2"><OborotValue value={p.oborot} code={p.code} /></td>
-                    <td className="px-3 py-2 text-gray-500">{p.location}</td>
-                    <td className="px-3 py-2"><ReceiverLocationCell sklad={head.receiver} position={p} onChange={loc => setToLocation(p.id, loc)} readOnly={lockPos} /></td>
+                    <td className="px-3 py-2"><LocText sklad={posted ? head.sender : itemOf(p)?.sklad ?? p.sklad ?? head.sender} location={p.location} /></td>
+                    <td className="px-3 py-2"><LocText sklad={head.receiver} location={newLocOf(p)} /></td>
                     <td className="px-3 py-2">{status ? <PosStatusBadge status={status} nomenkl={p.nomenkl} /> : <span className="text-gray-400">—</span>}</td>
-                    {/* Позиции по шихте не изменяются и не удаляются — у них ячейка действий пустая */}
-                    {actCol && <td className="px-3 py-2">{!p.poShihte && <div className="flex items-center gap-1"><EditIcon onClick={() => screen.open("pick-edit", p.id)} /><DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} /></div>}</td>}
+                    {/* Карандаш — новое размещение; позиции по шихте не удаляются (снятие приказа убирает их) */}
+                    {actCol && <td className="px-3 py-2"><div className="flex items-center gap-1">
+                      <EditIcon title="Изменить место хранения" onClick={() => screen.open("mesto", p.id)} />
+                      {!p.poShihte && <DeleteIcon onClick={() => setPositions(prev => prev.filter(x => x.id !== p.id))} />}
+                    </div></td>}
                   </tr>
                 );
               })}
@@ -377,6 +376,16 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
           emptyText={`Нет доступных позиций на складе «${head.sender}»`}
           onClose={closePick}
           onAdd={addPicked}
+        />
+      )}
+      {locPos && !lockPos && !editPos && (
+        <DocLocationModal
+          position={locPos}
+          fromSklad={itemOf(locPos)?.sklad ?? locPos.sklad ?? head.sender}
+          toSklad={head.receiver}
+          onClose={() => screen.close("mesto")}
+          onSave={loc => { setPositions(prev => prev.map(x => (x.id === locPos.id ? { ...x, toLocation: loc } : x))); screen.close("mesto"); show(`Новое размещение: ${loc}`); }}
+          onEditQty={locPos.poShihte ? undefined : () => screen.open("pick-edit", locPos.id)}
         />
       )}
       {toast && <Toast message={toast} onDone={clear} />}
