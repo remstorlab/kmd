@@ -6,7 +6,7 @@ import {
   Field, Input, Select, SortTh, useSort, SearchInput, Pagination, usePerPage, FillerRows, fillerCount, statusColorClass, usePaged,
   CREATED_LABEL, CreatedCell, Created, createdSortKey, useCreatedStamp, RequiredMark, YES_NO_ALL, matchYesNo, useMaterialCodeLabel,
 } from "../components/ui";
-import { spravochniki, spravValues, SpravItem, OBOROT_DICT, DOP_DICT, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
+import { spravochniki, spravValues, SpravItem, OBOROT_DICT, DOP_DICT, DOP_TYPE_CUP, DOP_TYPE_MED_MO, NAZN_PROOF_CODE, DEMO_DICT_CREATED, techOpLossNorms, bullionAffinage, TechOpLossNorm, MaterialCode, initialMaterialClasses, MaterialClass, StorageLocation, ChemElement, MassTolerance, initialStatusDicts, StatusDict, StatusItem, StatusColor, STATUS_COLORS, AlloyGrade, AlloyBase, ALLOY_BASES, ALLOY_RANGE_ELEMENTS, ALLOY_IMPURITIES } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import ChemCompositionBlock from "../components/ChemCompositionBlock";
 import { pctSum } from "../data/chem";
@@ -112,6 +112,33 @@ const ALL = "Все";
 const qOf = (s: string) => s.trim().toLowerCase();
 const has = (v: string | undefined, q: string) => !q || (v ?? "").toLowerCase().includes(q);
 
+// ── Использование записи справочника в данных системы (запрет удаления) ─────────
+// Точное совпадение значения с полем документа / позиции / операции; keys — искать только в полях с этими именами
+// (без keys — только строковые поля, чтобы число не совпало с весом или количеством)
+function deepHas(data: unknown, needle: string, keys?: string[], key?: string): boolean {
+  if (data == null || !needle) return false;
+  if (Array.isArray(data)) return data.some(x => deepHas(x, needle, keys, key));
+  if (typeof data === "object") return Object.entries(data as Record<string, unknown>).some(([k, v]) => deepHas(v, needle, keys, k));
+  if (keys) return !!key && keys.includes(key) && String(data).trim() === needle;
+  return typeof data === "string" && data.trim() === needle;
+}
+// Данные разделов, в которых хранятся значения справочников
+function useDataUse() {
+  const { dmItems, gpItems, skladDocs, vydachaDocs, operations, shihtovyeKarty, shihtaPrikazy, podotchetniki, storageLocations } = useApp();
+  const docs = [dmItems, gpItems, skladDocs, vydachaDocs, operations, shihtovyeKarty, shihtaPrikazy, storageLocations];
+  return {
+    used: (needle: string, keys?: string[]) => deepHas(docs, needle, keys),
+    // Подотчётное лицо с позициями на балансе
+    podotchetUsed: (tabelNo: string) => podotchetniki.some(p => p.tabelNo === tabelNo && p.materials.length > 0),
+  };
+}
+// Записи, на коды которых опирается логика системы (лигатура Cu-P, медь МО, запрет стружки для пруфа) — не удаляются
+const SYSTEM_CODES: Partial<Record<SpravKey, string[]>> = {
+  [DOP_DICT]: [DOP_TYPE_CUP, DOP_TYPE_MED_MO],
+  "Назначение слитков": [NAZN_PROOF_CODE],
+};
+const USED_TITLE = "Запись используется в документах или позициях — удаление недоступно";
+
 function FilterBar({ children, onReset, active }: { children: React.ReactNode; onReset: () => void; active: boolean }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-wrap items-end gap-3">
@@ -169,7 +196,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
   const createdStamp = useCreatedStamp();
   const [form, setForm] = useState<SpravItem>({ code: "", value: "", status: "Активно" });
   const [normForm, setNormForm] = useState(emptyNorm);
-  const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.code);
+  const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, i => i.code);
   // Форма заполняется при открытии экрана добавления / редактирования (в т.ч. по прямой ссылке)
   useEffect(() => {
     if (editItem) { setForm(editItem); setNormForm(norms[editItem.code] ?? emptyNorm); setAffForm(affinage[editItem.code] ?? ""); }
@@ -195,6 +222,26 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
 
   const openAdd = goAdd;
   const openEdit = goEdit;
+
+  // Удаление: системные записи и записи, значение которых указано в документах / позициях, не удаляются.
+  // Предельный оборот — правило, на него не ссылаются документы; пробы хранятся в позициях числом (поле proba)
+  const { used, podotchetUsed } = useDataUse();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
+  const isSystem = (i: SpravItem) => (SYSTEM_CODES[name] ?? []).includes(i.code);
+  const isUsed = (i: SpravItem) =>
+    withMaterialCode ? false
+      : name === "Пробы" ? used(i.value, ["proba"])
+      : used(i.value) || (withPosition && podotchetUsed(i.code));
+  const delTitle = (i: SpravItem) => (isSystem(i) ? "Системная запись — на её код опирается логика системы, удаление недоступно" : isUsed(i) ? USED_TITLE : "Удалить");
+  const remove = (item: SpravItem) => confirm(`Удалить запись «${codeText(item.code)} — ${item.value}»?`, () => {
+    const next = items.filter(i => i.code !== item.code);
+    setItems(next);
+    dict.items = next;
+    dict.count = next.length;
+    if (withNorms) { delete techOpLossNorms[item.code]; setNorms({ ...techOpLossNorms }); }
+    if (withAffinage) { delete bullionAffinage[item.code]; setAffinage({ ...bullionAffinage }); }
+    show("Запись удалена");
+  });
 
   const save = () => {
     const code = form.code.trim(), value = form.value.trim();
@@ -271,7 +318,7 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
             {withChem && <th className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">Хим. состав по умолчанию, %</th>}
             {!numbered && <SortTh sortKey="status" sort={sort} onSort={toggleSort}>Статус</SortTh>}
             <SortTh sortKey="created" sort={sort} onSort={toggleSort}>{CREATED_LABEL}</SortTh>
-            <th className="w-12"></th>
+            <th className="w-28"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
             {pg1.pageItems.map((item, i) => (
@@ -288,7 +335,13 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
                 {withChem && <td className="px-4 py-3 text-gray-700 tabular-nums">{chemText(item.chemPct) || <span className="text-gray-400">—</span>}</td>}
                 {!numbered && <td className="px-4 py-3"><Badge label={item.status} group="zapisi-spravochnikov" /></td>}
                 <CreatedCell row={dictCreatedOf(name, item.code)} />
-                <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => goView(item)} />
+                    <EditIcon onClick={() => openEdit(item)} />
+                    <DeleteIcon onClick={() => remove(item)} disabled={isSystem(item) || isUsed(item)} title={delTitle(item)} />
+                  </div>
+                </td>
               </tr>
             ))}
             {pg1.pageItems.length === 0 && (
@@ -347,6 +400,33 @@ function DictPage({ name, onBack }: { name: SpravKey; onBack: () => void }) {
           </div>
         </Modal>
       )}
+      {viewItem && (
+        <Modal
+          title={`Просмотр записи: ${viewItem.value}`}
+          onClose={closeAll}
+          footer={<>
+            <Btn variant="secondary" onClick={() => goEdit(viewItem)}>Редактировать</Btn>
+            <Btn variant="secondary" onClick={closeAll}>Закрыть</Btn>
+          </>}
+        >
+          <div className="space-y-4">
+            <Field label={codeLabel}><Input value={codeText(viewItem.code)} disabled /></Field>
+            <Field label={valueLabel}><Input value={viewItem.value} disabled /></Field>
+            {withPosition && <Field label="Должность"><Input value={viewItem.position || "—"} disabled /></Field>}
+            {withNorms && <>
+              <Field label="Единицы измерения норматива"><Input value={norms[viewItem.code]?.unit || "—"} disabled /></Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Допустимые потери — Золото, %"><Input value={norms[viewItem.code]?.au || "Не установлен"} disabled /></Field>
+                <Field label="Допустимые потери — Серебро, %"><Input value={norms[viewItem.code]?.ag || "Не установлен"} disabled /></Field>
+              </div>
+            </>}
+            {withAffinage && <Field label="Мин. доля аффинажа, %"><Input value={affinage[viewItem.code] || "Не установлено"} disabled /></Field>}
+            {withChem && <ChemCompositionBlock scope="shk" percentOnly value={viewItem.chemPct} disabled />}
+            {!numbered && <Field label="Статус"><Input value={viewItem.status} disabled /></Field>}
+          </div>
+        </Modal>
+      )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );
@@ -361,7 +441,10 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
   const items = dict.items;
   const emptyForm = { name: "", color: "gray" as StatusColor };
   const [form, setForm] = useState(emptyForm);
-  const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.id);
+  const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, i => i.id);
+  // Статус, которым отмечены документы / позиции / записи, не удаляется
+  const { used } = useDataUse();
+  const statusUsed = (i: StatusItem) => used(i.name, ["status"]);
   useEffect(() => {
     if (editItem) setForm({ name: editItem.name, color: editItem.color });
     else if (showAdd) setForm(emptyForm);
@@ -418,7 +501,7 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
           <thead><tr className="bg-gray-50 border-b border-gray-200">
             <SortTh sortKey="name" sort={sort} onSort={toggleSort}>Наименование</SortTh>
             <SortTh sortKey="color" sort={sort} onSort={toggleSort}>Цвет</SortTh>
-            <th className="w-20"></th>
+            <th className="w-28"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
             {pg2.pageItems.map(item => (
@@ -432,8 +515,9 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => goView(item)} />
                     <EditIcon onClick={() => goEdit(item)} />
-                    <DeleteIcon onClick={() => remove(item)} />
+                    <DeleteIcon onClick={() => remove(item)} disabled={statusUsed(item)} title={statusUsed(item) ? "Статус установлен у документов или позиций — удаление недоступно" : "Удалить"} />
                   </div>
                 </td>
               </tr>
@@ -465,6 +549,25 @@ function StatusDictPage({ dict, onBack }: { dict: StatusDict; onBack: () => void
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Предпросмотр</label>
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusColorClass[form.color]}`}>{name || "Статус"}</span>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {viewItem && (
+        <Modal
+          title={`Статус: ${viewItem.name}`}
+          onClose={closeAll}
+          footer={<>
+            <Btn variant="secondary" onClick={() => goEdit(viewItem)}>Редактировать</Btn>
+            <Btn variant="secondary" onClick={closeAll}>Закрыть</Btn>
+          </>}
+        >
+          <div className="space-y-4">
+            <Field label="Наименование"><Input value={viewItem.name} disabled /></Field>
+            <Field label="Цвет"><Input value={colorLabel(viewItem.color)} disabled /></Field>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Предпросмотр</label>
+              <Badge label={viewItem.name} group={dict.group} />
             </div>
           </div>
         </Modal>
@@ -501,7 +604,7 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [form, setForm] = useState<MaterialCode>({ code: "", name: "", shortName: "" });
-  const { showAdd, editItem, editKey, goAdd, goEdit, closeAll } = useRecordScreens(items, i => i.code);
+  const { showAdd, viewItem, editItem, editKey, goAdd, goView, goEdit, closeAll } = useRecordScreens(items, i => i.code);
   useEffect(() => {
     if (editItem) setForm(editItem);
     else if (showAdd) setForm({ code: "", name: "", shortName: "" });
@@ -537,6 +640,18 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
   const comp = compositionOfForm() ?? {};
   const mainOptions = compElements.map(e => e.id).filter(id => (comp[id] ?? 0) > 0);
   const mainValue = mainOptions.includes(form.mainElement ?? "") ? form.mainElement! : mainOptions.length === 1 ? mainOptions[0] : "";
+
+  // Удаление: код не указан в позициях, документах, шихтовых картах, марках сплавов и правилах предельного оборота
+  const { alloyGrades } = useApp();
+  const { used } = useDataUse();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
+  const codeUsed = (c: MaterialCode) =>
+    used(c.code, ["metal", "code", "materialCode"]) || used(c.shortName, ["metal"])
+    || alloyGrades.some(g => g.materialCode === c.code) || spravochniki[OBOROT_DICT].items.some(i => i.code === c.code);
+  const remove = (c: MaterialCode) => confirm(`Удалить код материала «${c.code} — ${c.name}»?`, () => {
+    setItems(prev => prev.filter(i => i.code !== c.code));
+    show("Запись удалена");
+  });
 
   const save = () => {
     if (!form.code.trim() || !form.name.trim() || !form.shortName.trim()) { show("Заполните поля «Код», «Наименование» и «Краткое наименование»"); return; }
@@ -583,7 +698,7 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
             <SortTh sortKey="shortName" sort={sort} onSort={toggleSort}>Краткое наименование</SortTh>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Содержание в сплаве</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Основной металл</th>
-            <th className="w-12"></th>
+            <th className="w-28"></th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
             {pageItems.map((item, i) => (
@@ -593,11 +708,21 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
                 <td className="px-4 py-3 text-gray-500">{item.shortName}</td>
                 <td className="px-4 py-3 text-gray-700 tabular-nums">{compositionText(item.composition, shortOf) || <span className="text-gray-400">—</span>}</td>
                 <td className="px-4 py-3 text-gray-700">{item.mainElement ? shortOf(item.mainElement) : <span className="text-gray-400">—</span>}</td>
-                <td className="px-4 py-3"><EditIcon onClick={() => openEdit(item)} /></td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <EyeIcon onClick={() => goView(item)} />
+                    <EditIcon onClick={() => openEdit(item)} />
+                    <DeleteIcon
+                      onClick={() => remove(item)}
+                      disabled={codeUsed(item)}
+                      title={codeUsed(item) ? "Код указан в позициях, документах, шихтовых картах, марках сплавов или предельном обороте — удаление недоступно" : "Удалить"}
+                    />
+                  </div>
+                </td>
               </tr>
             ))}
             {pageItems.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
+              <tr><td colSpan={6}className="px-4 py-8 text-center text-sm text-gray-400">Записи не найдены</td></tr>
             )}
             <FillerRows count={fillerCount(sorted.length, page, perPage)} cols={6} />
           </tbody>
@@ -652,6 +777,26 @@ function MaterialCodesPage({ onBack }: { onBack: () => void }) {
           </div>
         </Modal>
       )}
+      {viewItem && (
+        <Modal
+          wide
+          title={`Код материала: ${viewItem.code} — ${viewItem.name}`}
+          onClose={closeAll}
+          footer={<>
+            <Btn variant="secondary" onClick={() => goEdit(viewItem)}>Редактировать</Btn>
+            <Btn variant="secondary" onClick={closeAll}>Закрыть</Btn>
+          </>}
+        >
+          <div className="space-y-4">
+            <Field label="Код"><Input value={viewItem.code} disabled /></Field>
+            <Field label="Наименование"><Input value={viewItem.name} disabled /></Field>
+            <Field label="Краткое наименование"><Input value={viewItem.shortName} disabled /></Field>
+            <Field label="Содержание элементов в сплаве, %"><Input value={compositionText(viewItem.composition, shortOf) || "Хим. состав не задан"} disabled /></Field>
+            <Field label="Основной металл в сплаве"><Input value={viewItem.mainElement ? `${chemElements.find(e => e.id === viewItem.mainElement)?.name ?? viewItem.mainElement} (${shortOf(viewItem.mainElement)})` : "—"} disabled /></Field>
+          </div>
+        </Modal>
+      )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );
@@ -830,6 +975,12 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
   const { toast, show, clear } = useToast();
   const { confirmState, confirm, cancel, doConfirm } = useConfirm();
   const [perPage, setPerPage] = usePerPage("sprav-locations", 10);
+  // Удаление: на месте хранения нет позиций ДМ / ГП (сейф и полка — из поля «Место хранения» позиции)
+  const { dmItems, gpItems } = useApp();
+  const locUsed = (loc: StorageLocation) => [...dmItems, ...gpItems].some(i => {
+    const m = /Сейф\s*№?\s*([^,\s]+)(?:,\s*Полка\s*([^,\s]+))?/.exec(i.location ?? "");
+    return i.sklad === loc.sklad && m?.[1] === loc.seyfNum && (m?.[2] ?? "") === (loc.polkaNum ?? "");
+  });
 
   const usedSklady = Array.from(new Set([...SKLAD_OPTIONS, ...items.map(l => l.sklad)])).filter(s => items.some(l => l.sklad === s));
   const filtered = items.filter(loc => {
@@ -916,7 +1067,10 @@ function StorageLocationsPage({ onBack }: { onBack: () => void }) {
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => setViewItem(loc)} />
                     <EditIcon onClick={() => openEdit(loc)} />
-                    <DeleteIcon onClick={() => confirm(`Удалить место хранения «${loc.sklad} / ${placeOf(loc)}»?`, () => { setItems(prev => prev.filter(l => l.id !== loc.id)); show("Место хранения удалено"); })} />
+                    <DeleteIcon onClick={() => confirm(`Удалить место хранения «${loc.sklad} / ${placeOf(loc)}»?`, () => { setItems(prev => prev.filter(l => l.id !== loc.id)); show("Место хранения удалено"); })}
+                      disabled={locUsed(loc)}
+                      title={locUsed(loc) ? "На месте хранения лежат позиции — удаление недоступно" : "Удалить"}
+                    />
                   </div>
                 </td>
               </tr>
@@ -1481,6 +1635,10 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
   };
   const cell = (v: number | undefined) => (v != null ? fmtNum(v) : <span className="text-gray-300">—</span>);
   const totalCols = 4 + rangeEls.length * 2 + 5;
+  // Удаление: марка не выбрана ни в одном приказе на плавку и шихтовой карте
+  const { shihtovyeKarty, shihtaPrikazy } = useApp();
+  const { confirmState, confirm, cancel, doConfirm } = useConfirm();
+  const gradeUsed = (g: AlloyGrade) => shihtaPrikazy.some(p => p.alloyId === g.id) || shihtovyeKarty.some(k => k.alloyId === g.id);
 
   return (
     <div>
@@ -1555,6 +1713,11 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
                   <div className="flex items-center gap-1">
                     <EyeIcon onClick={() => goView(g)} />
                     <EditIcon onClick={() => goEdit(g)} />
+                    <DeleteIcon
+                      onClick={() => confirm(`Удалить марку сплава «${g.name}»?`, () => { setItems(prev => prev.filter(x => x.id !== g.id)); show("Запись удалена"); })}
+                      disabled={gradeUsed(g)}
+                      title={gradeUsed(g) ? "Марка указана в приказах на плавку или шихтовых картах — удаление недоступно" : "Удалить"}
+                    />
                   </div>
                 </td>
               </tr>
@@ -1585,6 +1748,7 @@ function AlloyGradesPage({ onBack }: { onBack: () => void }) {
           <GradeFormFields form={gradeToForm(viewItem)} disabled />
         </Modal>
       )}
+      {confirmState && <ConfirmDialog message={confirmState.message} onConfirm={doConfirm} onCancel={cancel} />}
       {toast && <Toast message={toast} onDone={clear} />}
     </div>
   );
