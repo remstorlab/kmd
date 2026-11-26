@@ -196,12 +196,13 @@ export default function StockPickerModal({
   const setPartQty = (r: StockRow, v: string) => {
     const s = v.replace(/[^\d]/g, "");
     const n = parseInt(s, 10);
-    if (Number.isFinite(n) && n >= r.qty) { update(r.id, c => ({ ...c, part: false, qty: String(r.qty) })); return; }
     update(r.id, c => ({ ...c, qty: s, lig: Number.isFinite(n) ? propLig(r, n) : c.lig }));
   };
   const setPartLig = (r: StockRow, v: string) => update(r.id, c => ({ ...c, lig: v.replace(/[^\d.,]/g, "") }));
 
-  const hasErrors = !!issue && pickedRows.some(r => !lineOf(r, cards[r.id]).ok);
+  // Часть — строго меньше количества позиции (всё количество — «Выдать всё»); поле подсвечивается, режим не меняется
+  const partQtyBad = (r: StockRow, c: Card) => c.part && (!lineOf(r, c).qtyOk || issueOf(r, c) >= r.qty);
+  const hasErrors = !!issue && pickedRows.some(r => !lineOf(r, cards[r.id]).ok || partQtyBad(r, cards[r.id]));
 
   const reset = () => { setSearch(""); setKlass(ALL_KLASS); setCode(ALL_CODES); setLoc(ALL_LOCS); setOnlySelected(false); setStatus(defaultStatus); };
 
@@ -231,11 +232,11 @@ export default function StockPickerModal({
     const stone = line.stone;
     // Штучная позиция (и без количества изделий) — только целиком
     const whole = r.qty <= 1 || !!issue?.noPart;
-    const qtyBad = c.part && !line.qtyOk;
+    const qtyBad = partQtyBad(r, c);
     const ligBad = c.part && line.qtyOk && !line.ligOk;
     const partLig = line.partial ? (stone ? null : line.issuedLig) : r.lig;
     return (
-      <div key={r.id} className={`border rounded-lg p-3 text-sm ${line.ok ? "border-gray-200 bg-white" : "border-red-300 bg-red-50/40"}`}>
+      <div key={r.id} className={`border rounded-lg p-3 text-sm ${line.ok && !qtyBad ? "border-gray-200 bg-white" : "border-red-300 bg-red-50/40"}`}>
         <div className="flex items-start justify-between gap-2">
           <div className="font-medium truncate min-w-0" title={r.name}>{r.name}</div>
           {!editMode && <DeleteIcon onClick={() => toggle(r)} />}
@@ -261,7 +262,7 @@ export default function StockPickerModal({
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Количество, шт</label>
               <input value={c.qty} onChange={e => setPartQty(r, e.target.value)} inputMode="numeric" placeholder={`1 … ${r.qty - 1}`} className={inputCls(qtyBad)} />
-              {qtyBad && <div className="text-xs text-red-600 mt-1">{line.error}</div>}
+              {qtyBad && <div className="text-xs text-red-600 mt-1">{!line.qtyOk ? `Количество от 1 до ${r.qty - 1}` : `Всю позицию — «Выдать всё» (часть: до ${r.qty - 1})`}</div>}
             </div>
             {!stone && r.lig != null && r.lig > 0 && (
               <div>
@@ -276,7 +277,7 @@ export default function StockPickerModal({
           </div>
         )}
         {/* Итог частичной выдачи (данные позиции целиком — в таблице) */}
-        {line.ok && line.partial && (
+        {line.ok && !qtyBad && line.partial && (
           <div className="mt-2 space-y-0.5 text-xs">
             <div className="text-gray-800">Выдаётся: {amount(r, line.issue, partLig, stone)} · новый № {c.partNomenkl ?? "—"}</div>
             <div className="text-gray-500">Остаётся на складе: {amount(r, line.restQty, line.restLig, stone)} · № {r.nomenkl}</div>
