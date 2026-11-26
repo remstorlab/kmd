@@ -11,7 +11,7 @@ import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow, PickedRow } from "./StockPickerModal";
 import { takeFromStock, partLigMap, partNomenklMap } from "../data/stock";
 import { markIssuedElsewhere, prikazStatus, refreshReady } from "../data/shihta";
-import { useIssuePositions, ensurePartNomenkl, RezervWarning } from "./IssueInputs";
+import { useIssuePositions, ensurePartNomenkl, RezervWarning, MoveNotice } from "./IssueInputs";
 import { useUsedNomenkl, nextNomenkl } from "./DMPositionFormModal";
 import { useScreen } from "../router";
 import { newLocOf, applyNewLocations, LocText } from "./DocLocation";
@@ -268,6 +268,7 @@ export default function TrebovanieDocModal({ onClose, onSave, doc, readOnly = fa
         <Btn onClick={() => save("В работе")}>Сохранить</Btn>
       </>}
     >
+      {!posted && !ro && <MoveNotice receiver={head.receiver} />}
       {!posted && !ro && <RezervWarning karty={affectedKarty} />}
       <div className="grid grid-cols-4 gap-4 mb-5">
         {typeSelect}

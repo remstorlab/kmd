@@ -8,8 +8,8 @@ import {
 import { SkladDoc, DocStatus, VydachaDocPosition, GPItem, DMItem, MovedRecord, spravValues, SGP, PRIHOD_SKLAD, DOC_VOZVRAT_SGP } from "../data/mock";
 import { useApp } from "../store/AppContext";
 import StockPickerModal, { StockRow, PickedRow } from "./StockPickerModal";
-import { takeFromStock, partLigMap, partNomenklMap, returnToStock } from "../data/stock";
-import { useIssuePositions, ensurePartNomenkl } from "./IssueInputs";
+import { takeFromStock, partLigMap, partNomenklMap } from "../data/stock";
+import { useIssuePositions, ensurePartNomenkl, MoveNotice } from "./IssueInputs";
 import { useUsedNomenkl, nextNomenkl } from "./DMPositionFormModal";
 import { useScreen } from "../router";
 import { newLocOf, applyNewLocations, LocText } from "./DocLocation";
@@ -18,9 +18,9 @@ import { Plus } from "lucide-react";
 // ── Возврат СГП №2: возврат позиций со склада СГП №2 на склад СДМ ────────────────
 // Поля — как у накладной прихода; отправитель — всегда склад СГП №2, получатель — склад из справочника «Склады»
 // (по умолчанию склад приёмки СДМ1). Позиции подбираются со склада СГП №2 с количеством к перемещению.
-// При каждом сохранении позиции встают на склад-получатель «На складе» на «Новое размещение» (по умолчанию — то же,
-// что текущее; задаётся в окне подбора при добавлении и по карандашу позиции, см. DocLocation.tsx). Позиция, удалённая из документа, возвращается
-// на СГП №2 на текущее размещение.
+// Только при «Оформить» позиции встают на склад-получатель «На складе» на «Новое размещение» (по умолчанию — то же,
+// что текущее; задаётся в окне подбора при добавлении и по карандашу позиции, см. DocLocation.tsx). «Сохранить» —
+// только документ и его позиции, склады не меняются.
 
 type VsPosition = VydachaDocPosition;
 const NO_LOC = "-";
@@ -103,41 +103,27 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
     status: p => currentOf(p)?.status ?? "",
   });
 
-  // Позиции перемещаются на склад-получатель при каждом сохранении («Сохранить» и «Оформить»).
-  // Перед повторным перемещением отменяется перемещение прошлого сохранения (doc.moved): записи возвращаются
-  // на СГП №2 и объединяются с остатком, затем позиции перемещаются заново по текущему составу документа.
-  // Запись, которую на складе-получателе уже зарезервировали или выдали, не возвращается — её позиция не меняется.
+  // «Сохранить» сохраняет только документ и его позиции — на складах изменений нет. Позиции перемещаются
+  // на склад-получатель только при «Оформить» (на «Новое размещение», см. DocLocation.tsx).
   const save = (status: DocStatus) => {
     if (posted) return;
-    const err = iss.validate(true, "к возврату");
+    const err = iss.validate(status === "Оформлено", "к возврату");
     if (err) { show(err); return; }
-    if (status === "Оформлено" && positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
-    const kept: MovedRecord[] = [];
-    const undo = <T extends GPItem | DMItem>(items: T[], src: MovedRecord["src"]): T[] => {
-      let out = items;
-      for (const m of (doc?.moved ?? []).filter(x => x.src === src)) {
-        const it = out.find(i => i.id === m.to);
-        if (!it || it.sklad === SGP) continue;
-        if (it.status !== "На складе") { kept.push(m); continue; }
-        out = out.map(i => (i.id === m.to ? { ...i, sklad: SGP, location: NO_LOC } : i));
-        if (m.to !== m.from) out = returnToStock(out, new Set([m.to]), "На складе");
-      }
-      return out;
-    };
-    const gp0 = undo(gpItems, "gp");
-    const dm0 = undo(dmItems, "dm");
-    const locked = new Set(kept.map(m => m.from));
-    // Номер возвращаемой части сохраняется между сохранениями (откат выше объединил часть с остатком);
-    // если номер заняли — следующий свободный
-    const fixed = ensurePartNomenkl(positions, usedNomenkl(doc?.id, [...gp0, ...dm0]), nextNomenkl);
-    if (fixed.changed.length) show(`Номенкл. № части изменён. ${fixed.changed.join("; ")}`);
-    const finalPositions = fixed.positions;
-    const active = finalPositions.filter(p => !locked.has(p.id));
-    const lacking = active.filter(p => {
-      const it = p.src === "gp" ? gp0.find(i => i.id === p.id) : dm0.find(i => i.id === p.id);
-      return !it || it.sklad !== SGP || it.status !== "На складе" || Math.max(it.qty, 1) < p.issue;
-    });
-    if (lacking.length) { show(`Позиции недоступны на складе «${SGP}»: ${lacking.map(p => p.name).join(", ")}`); return; }
+    let finalPositions = positions;
+    let moved: MovedRecord[] | undefined = doc?.moved;
+    if (status === "Оформлено") {
+      if (positions.length === 0) { show("Добавьте хотя бы одну позицию"); return; }
+      const lacking = positions.filter(p => {
+        const it = p.src === "gp" ? gpItems.find(i => i.id === p.id) : dmItems.find(i => i.id === p.id);
+        return !it || it.sklad !== SGP || it.status !== "На складе" || Math.max(it.qty, 1) < p.issue;
+      });
+      if (lacking.length) { show(`Позиции недоступны на складе «${SGP}»: ${lacking.map(p => p.name).join(", ")}`); return; }
+      // Номер возвращаемой части: если его заняли — следующий свободный
+      const fixed = ensurePartNomenkl(positions, usedNomenkl(doc?.id), nextNomenkl);
+      if (fixed.changed.length) show(`Номенкл. № части изменён. ${fixed.changed.join("; ")}`);
+      finalPositions = fixed.positions;
+      const gp0 = gpItems, dm0 = dmItems;
+      const active = finalPositions;
     const stamp = Date.now();
     // Место на складе-получателе — «Новое размещение» позиции (applyNewLocations)
     const move = <T extends GPItem | DMItem>(it: T): T => ({ ...it, sklad: head.receiver, status: "На складе", location: NO_LOC });
@@ -148,11 +134,11 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
     const dmRes = takeFromStock(dm0, new Map(dmAct.map(p => [p.id, p.issue])), move, partId, partLigMap(dmAct), partNomenklMap(dmAct));
     setGpItems(applyNewLocations(gpRes.items, gpRes.taken, gpAct));
     setDmItems(applyNewLocations(dmRes.items, dmRes.taken, dmAct));
-    const moved: MovedRecord[] = [
-      ...kept,
+    moved = [
       ...[...gpRes.taken].map(([from, to]) => ({ src: "gp" as const, from, to })),
       ...[...dmRes.taken].map(([from, to]) => ({ src: "dm" as const, from, to })),
     ];
+    }
     onSave({
       moved,
       id: doc?.id ?? `sd-${Date.now()}`,
@@ -187,11 +173,7 @@ export default function VozvratSgpDocModal({ onClose, onSave, doc, readOnly = fa
         <div className="mb-4 text-sm bg-gray-50 border border-gray-200 text-gray-600 rounded-lg px-4 py-2.5">
           Документ оформлен: позиции возвращены со склада «{SGP}» на склад «{head.receiver}» на новое размещение. Редактирование документа недоступно.
         </div>
-      ) : !ro && (
-        <div className="mb-4 text-sm bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5">
-          Позиции перемещаются на склад «{head.receiver}» при каждом сохранении документа. После «Оформить» документ закрывается для редактирования.
-        </div>
-      )}
+      ) : !ro && <MoveNotice receiver={head.receiver} />}
       <div className="grid grid-cols-4 gap-4 mb-5">
         {typeSelect}
         <Field label="Номер" required={!ro}><Input value={head.number} onChange={h("number")} disabled={ro} /></Field>

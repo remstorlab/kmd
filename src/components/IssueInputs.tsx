@@ -127,3 +127,12 @@ export function RezervWarning({ karty, className = "mb-4" }: { karty: { name: st
     </div>
   );
 }
+
+// Плашка над документом перемещения (Требование, Возврат СГП №2): когда меняются склады
+export function MoveNotice({ receiver }: { receiver: string }) {
+  return (
+    <div className="mb-4 text-sm bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg px-4 py-2.5">
+      Позиции переместятся на склад «{receiver}» только при нажатии «Оформить». «Сохранить» сохраняет сам документ и его позиции — на складах изменений не происходит.
+    </div>
+  );
+}
