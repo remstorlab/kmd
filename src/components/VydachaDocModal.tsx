@@ -315,8 +315,8 @@ export default function VydachaDocModal({ onClose, onSave, doc, readOnly = false
 
       {(showPick || editPos) && (
         <StockPickerModal
-          issue={{ usedNomenkl: [...usedNomenkl(doc?.id), ...iss.partNomenkls(editPos?.id)], initial: editPos ? { [editPos.id]: iss.draftOf(editPos) } : undefined }}
-          title={`Добавить позиции со склада «${MAIN_SKLAD}»`}
+          issue={{ usedNomenkl: [...usedNomenkl(doc?.id), ...iss.partNomenkls(editPos?.id)], initial: editPos ? { [editPos.id]: iss.draftOf(editPos) } : undefined, edit: !!editPos }}
+          title={editPos ? `Изменить позицию «${editPos.name}»` : `Добавить позиции со склада «${MAIN_SKLAD}»`}
           rows={iss.pickerRows(stock, editPos)}
           already={already}
           showWeights
